@@ -418,7 +418,7 @@ baselines         source_id, profile_topic_id (trống = tín hiệu), metric,
 components(event, docs, signals)  → { R, P, C, A, F, N, topic }   // topic = chủ đề cho R cao nhất
 score(c, weights)                 → S = N × (0,40R + 0,25P + 0,15C + 0,10A + 0,10F)
 select(candidates, opts)          → ≤ 7 tin: cổng R ≥ 0,6, sàn 0,59, giữ chỗ mỗi nguồn,
-                                    tối đa 3 tin/nguồn, phạt trùng 0,3 × clamp((giống − 0,85)/0,10)</pre>
+                                    tối đa 5 tin/nguồn (13/10, trước là 3), phạt trùng 0,3 × clamp((giống − 0,85)/0,10)</pre>
 Trọng số và hằng số nằm trong một object cấu hình. Mỗi digest lưu lại cấu hình đã dùng, để sau này giải thích được vì sao tin đó được chọn.</dd>
 <dt>Ứng viên</dt><dd>Một câu SQL lấy các sự kiện có tài liệu mới trong 24 giờ, kèm tài liệu, điểm chủ đề, tín hiệu và nguồn. N tính từ <code>deliveries.document_ids</code> của 7 ngày gần nhất.</dd>
 <dt>CLI</dt><dd><code>cli rank --at 2026-10-06T00:00Z</code> in 7 tin đã chọn, các thành phần điểm, chủ đề khớp và lý do mỗi tin bị loại.</dd>

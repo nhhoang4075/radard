@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Gom cụm chủ đề</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7; --red:#A83A2F; --red-soft:#F8E4E1;
+  /* màu dữ liệu: 4 ô đầu của bảng categorical đã kiểm (all-pairs, light) */
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#4a3aa7; --noise:#A9B3AF;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px);margin-top:8px}
+h2{font-size:26px;margin-top:28px;padding-top:8px;border-top:2px solid var(--ink)}
+h2 .n{font-family:var(--mono);font-size:14px;color:var(--ink-3);font-weight:500;margin-right:10px;vertical-align:middle}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+ul,ol{max-width:76ch;padding-left:22px}
+li{margin:4px 0}
+a{color:var(--accent)}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;color:var(--ink-3)}
+.lede{font-size:17.5px;color:var(--ink-2);max-width:72ch}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+pre .c{color:var(--ink-3)} pre .k{color:var(--violet)} pre .s{color:var(--accent)}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg.wide{display:block;width:100%;min-width:680px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tablewrap{overflow-x:auto;margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.callout{margin-top:16px;padding:14px 16px;border-radius:10px;border-left:4px solid var(--accent);background:var(--accent-soft);max-width:86ch}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+.callout.blue{border-color:var(--blue);background:var(--blue-soft)}
+.callout.red{border-color:var(--red);background:var(--red-soft)}
+.callout p:first-child{margin-top:0}
+.callout b.t{display:block;font-family:var(--display);font-size:16px;margin-bottom:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h3{margin-top:6px}
+.pill{display:inline-block;font-family:var(--mono);font-size:12px;padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.pill.v{background:var(--violet-soft);color:var(--violet)} .pill.b{background:var(--blue-soft);color:var(--blue)} .pill.w{background:var(--warn-soft);color:var(--warn)}
+.mini{font-size:13.5px}
+.muted{color:var(--ink-2)}
+details{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+details summary{cursor:pointer;font-weight:600}
+details[open] summary{margin-bottom:6px}
+footer{margin-top:64px;font-size:13px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:14px}
+
+/* tabs */
+nav.tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;margin:22px -16px 0;padding:10px 16px;background:var(--ground);border-bottom:1px solid var(--line);scrollbar-width:thin}
+nav.tabs a{flex:none;text-decoration:none;color:var(--ink-2);font-size:14px;font-weight:500;padding:6px 12px;border-radius:8px;border:1px solid transparent;white-space:nowrap}
+nav.tabs a span{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+nav.tabs a:hover{background:var(--surface);border-color:var(--line)}
+nav.tabs a.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+nav.tabs a.active span{color:#B9C6C1}
+section.tab{display:none}
+section.tab.active{display:block}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:40px;padding-top:16px;border-top:1px solid var(--line)}
+.pager a{text-decoration:none;font-weight:500;font-size:14.5px;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.pager a:hover{border-color:var(--accent)}
+
+/* demo chung */
+.demo{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.controls{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:14px}
+.controls label{display:flex;align-items:center;gap:8px;color:var(--ink-2)}
+.controls input[type=range]{width:140px;accent-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:13.5px;border:0;background:var(--surface);color:var(--ink-2);padding:6px 12px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:#fff}
+.btn{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{color:#fff;opacity:.9}
+.status{margin-top:10px;font-size:14px;color:var(--ink-2);min-height:1.6em}
+.status b{color:var(--ink)}
+.plot{display:block;width:100%;height:auto;margin-top:10px;background:#FCFCFB;border:1px solid var(--line);border-radius:10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink-2);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{flex:none}
+
+/* c-TF-IDF */
+.ctf{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.ctf .col{border:1px solid var(--line);border-radius:10px;padding:12px;background:#FCFCFB;min-width:0}
+.ctf .col h4{margin:0;font-family:var(--display);font-size:15px}
+.ctf .docs{font-size:12.5px;color:var(--ink-2);margin:6px 0 10px;padding-left:16px}
+.ctf .docs li{margin:2px 0}
+.words{display:flex;flex-direction:column;gap:3px}
+.word{display:grid;grid-template-columns:90px 1fr 46px;align-items:center;gap:6px;font-family:var(--mono);font-size:12.5px;cursor:pointer;border-radius:4px;padding:1px 2px}
+.word:hover,.word.sel{background:var(--warn-soft)}
+.bar{height:8px;border-radius:0 4px 4px 0;background:var(--ink-3)}
+.word .v{text-align:right;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.calc{margin-top:12px;font-size:14px;background:var(--ground);border-radius:8px;padding:10px 12px;font-family:var(--mono);min-height:3em;white-space:pre-wrap}
+
+/* graph */
+.gwrap{display:grid;grid-template-columns:1fr 300px;gap:14px;margin-top:10px}
+.log{background:#141c1a;color:#d8e2de;border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.55;height:330px;overflow:auto}
+.log .t{color:#8fd3c0} .log .x{color:#f0b46a} .log .d{color:#8a9893} .log .r{color:#f08f84}
+.comms{font-size:13px;margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.comms div{display:flex;gap:8px;align-items:flex-start}
+.comms .sw{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;font-family:var(--mono)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;font-size:12.5px;padding:7px 10px;border-radius:8px;line-height:1.45;opacity:0;transition:opacity .1s;z-index:20;max-width:240px}
+.tip.show{opacity:1}
+.tip .row{display:flex;align-items:center;gap:6px}
+.tip .dot{width:9px;height:9px;border-radius:50%;flex:none}
+
+@media (max-width:760px){
+  .grid2,.grid3,.ctf,.gwrap{grid-template-columns:1fr}
+  .log{height:220px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · GIẢI THÍCH KỸ THUẬT · GIAI ĐOẠN 3 · TUỲ CHỌN</div>
+<h1>Gom cụm chủ đề: BERTopic, Louvain và Leiden</h1>
+<p class="lede">Thiết kế radard nhắc tới ba cái tên này ở mục dashboard “chủ đề nóng lên”. Trang này giải thích chúng là gì, khác nhau ra sao, và định dùng ở đâu trong radard. Có bốn bản chạy thử ngay trên trang: gom cụm điểm (tab 02), c-TF-IDF (tab 04), chủ đề theo thời gian (tab 05) và chạy Louvain từng bước (tab 07).</p>
+
+<nav class="tabs" id="tabs">
+  <a href="#s1"><span>01</span>Bức tranh lớn</a>
+  <a href="#s2"><span>02</span>Gom cụm là gì</a>
+  <a href="#s3"><span>03</span>BERTopic</a>
+  <a href="#s4"><span>04</span>c-TF-IDF</a>
+  <a href="#s5"><span>05</span>Theo thời gian</a>
+  <a href="#s6"><span>06</span>Graph và modularity</a>
+  <a href="#s7"><span>07</span>Louvain</a>
+  <a href="#s8"><span>08</span>Leiden</a>
+  <a href="#s9"><span>09</span>Dùng trong radard</a>
+  <a href="#s10"><span>10</span>Tự kiểm tra</a>
+</nav>
+
+<!-- ============================================================ -->
+<section class="tab" id="s1">
+<h2><span class="n">01</span>Bức tranh lớn: hai cách nhìn ra “chủ đề”</h2>
+<p>Cả ba kỹ thuật cùng trả lời một câu hỏi: <b>“thế giới đang bàn về những mảng nào?”</b>. Khác nhau ở chỗ chúng nhìn vào dữ liệu nào.</p>
+
+<div class="grid2">
+  <div class="card">
+    <span class="pill">Nhìn vào văn bản</span>
+    <h3>BERTopic</h3>
+    <p>Đầu vào: <b>embedding của tài liệu</b> (radard đã có, 1024 chiều). Gom những bài có nghĩa gần nhau thành cụm, rồi tìm từ khoá đặt tên cho mỗi cụm.</p>
+    <p class="mini muted">Ra: “chủ đề 7: <i>quantization, gguf, 4-bit</i>” gồm 300 bài.</p>
+  </div>
+  <div class="card">
+    <span class="pill v">Nhìn vào quan hệ</span>
+    <h3>Louvain, Leiden</h3>
+    <p>Đầu vào: <b>graph thực thể</b>. Mỗi node là một thực thể (OpenAI, llama.cpp, EU…); hai thực thể có cạnh nếu hay xuất hiện cùng nhau. Tìm những nhóm node dính chặt vào nhau.</p>
+    <p class="mini muted">Ra: cộng đồng {llama.cpp, GGUF, Ollama, Qwen}.</p>
+  </div>
+</div>
+
+<figure>
+<svg class="wide" viewBox="0 0 900 250" role="img" aria-label="Hai đường đi tới chủ đề">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5753"/></marker></defs>
+  <rect x="10" y="90" width="150" height="70" rx="10" fill="#fff" stroke="#16201D"/>
+  <text x="85" y="120" text-anchor="middle" font-size="14" font-weight="600">documents</text>
+  <text x="85" y="140" text-anchor="middle" font-size="12" fill="#4A5753">lớp 1 · 16 nghìn bài</text>
+  <path d="M160 110 L215 55" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a1)"/>
+  <path d="M160 140 L215 195" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a1)"/>
+  <rect x="220" y="20" width="170" height="64" rx="10" fill="#DDEEE9" stroke="#0E6E5C"/>
+  <text x="305" y="47" text-anchor="middle" font-size="13.5" font-weight="600">embedding</text>
+  <text x="305" y="67" text-anchor="middle" font-size="12" fill="#4A5753">doc_text · đã có</text>
+  <rect x="220" y="166" width="170" height="64" rx="10" fill="#ECE7F7" stroke="#5B45A8"/>
+  <text x="305" y="193" text-anchor="middle" font-size="13.5" font-weight="600">thực thể + đồng xuất hiện</text>
+  <text x="305" y="213" text-anchor="middle" font-size="12" fill="#4A5753">mô hình tri thức · chưa có</text>
+  <path d="M390 52 L445 52" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a1)"/>
+  <path d="M390 198 L445 198" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a1)"/>
+  <rect x="450" y="20" width="190" height="64" rx="10" fill="#fff" stroke="#0E6E5C" stroke-width="2"/>
+  <text x="545" y="47" text-anchor="middle" font-size="14" font-weight="700" fill="#0E6E5C">BERTopic</text>
+  <text x="545" y="67" text-anchor="middle" font-size="12" fill="#4A5753">UMAP → HDBSCAN → c-TF-IDF</text>
+  <rect x="450" y="166" width="190" height="64" rx="10" fill="#fff" stroke="#5B45A8" stroke-width="2"/>
+  <text x="545" y="193" text-anchor="middle" font-size="14" font-weight="700" fill="#5B45A8">Louvain / Leiden</text>
+  <text x="545" y="213" text-anchor="middle" font-size="12" fill="#4A5753">tối đa hoá modularity</text>
+  <path d="M640 52 L700 110" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a1)"/>
+  <path d="M640 198 L700 140" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a1)"/>
+  <rect x="705" y="88" width="180" height="74" rx="10" fill="#FBEFD9" stroke="#9A5B00"/>
+  <text x="795" y="115" text-anchor="middle" font-size="14" font-weight="600">Dashboard</text>
+  <text x="795" y="135" text-anchor="middle" font-size="12" fill="#4A5753">chủ đề nào đang nóng lên</text>
+  <text x="795" y="151" text-anchor="middle" font-size="12" fill="#4A5753">giai đoạn 3 · tuỳ chọn</text>
+</svg>
+<figcaption>Hình 1. Hai đường tới cùng một đích. Thiết kế ghi Leiden/Louvain là “thay hoặc bổ sung cho BERTopic, dùng chính graph đã có”: khi radard đã có graph thực thể thì không cần thêm Python.</figcaption>
+</figure>
+
+<h3>Đừng nhầm với hai kiểu gom nhóm đang có</h3>
+<div class="tablewrap"><table>
+<tr><th>Kiểu</th><th>Câu hỏi</th><th>Ai quyết định nhóm</th><th>Độ mịn</th><th>Trạng thái</th></tr>
+<tr><td><b>Gộp sự kiện</b> (<code>events</code>)</td><td>Hai bài có nói <b>cùng một chuyện</b>?</td><td>Ngưỡng cosine ≥ 0,9</td><td>Rất mịn: “OpenAI ra GPT-6”</td><td>Đang chạy</td></tr>
+<tr><td><b>Thư viện chủ đề</b> (<code>topics</code>)</td><td>Bài có thuộc <b>mối quan tâm của bạn</b>?</td><td><b>Bạn</b> chọn trước (từ trên xuống)</td><td>Vừa</td><td>Tuần 3</td></tr>
+<tr><td><b>BERTopic / Leiden</b></td><td>Thế giới đang <b>bàn về mảng nào</b>?</td><td><b>Dữ liệu</b> tự lộ ra (từ dưới lên)</td><td>Thô: một chủ đề gồm nhiều sự kiện</td><td>Giai đoạn 3, tuỳ chọn</td></tr>
+</table></div>
+<div class="callout"><p>Thư viện chủ đề chỉ tìm được những gì bạn <b>đã biết để hỏi</b>. Gom cụm từ dưới lên có giá trị ở chỗ nó lộ ra những gì bạn <b>chưa biết để hỏi</b>: một cụm bài mới về một kỹ thuật chưa có tên trong thư viện.</p></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s2">
+<h2><span class="n">02</span>Gom cụm là gì: k-means và gom theo mật độ</h2>
+<p>Mỗi chấm dưới đây là một bài viết, đặt trên mặt phẳng sao cho bài gần nghĩa nằm gần nhau. (Thật ra embedding có 1024 chiều; tab 03 nói cách đưa về ít chiều.) Có bốn nhóm thật, một nhóm có hình cong, và một ít bài lẻ không thuộc nhóm nào. Thử hai thuật toán và xem cái nào tìm đúng.</p>
+
+<div class="demo">
+  <div class="controls">
+    <div class="seg" id="algSeg">
+      <button data-a="truth" class="on">Đáp án</button>
+      <button data-a="kmeans">k-means</button>
+      <button data-a="dbscan">Theo mật độ</button>
+    </div>
+    <label id="kCtl">k = <b id="kVal">3</b> <input type="range" id="kIn" min="2" max="4" value="3"></label>
+    <label id="eCtl">bán kính = <b id="eVal">36</b> <input type="range" id="eIn" min="12" max="70" value="36"></label>
+  </div>
+  <svg class="plot" id="scatter" viewBox="0 0 640 380" role="img" aria-label="Biểu đồ điểm các bài viết"></svg>
+  <div class="legend" id="scLegend"></div>
+  <div class="status" id="scStatus"></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <span class="pill b">k-means</span>
+    <h3>Chia đều quanh k tâm</h3>
+    <ul class="mini">
+      <li>Bạn phải nói trước <b>có bao nhiêu cụm</b> (k). Với tin tức, không ai biết hôm nay có mấy chủ đề.</li>
+      <li>Coi mọi cụm là hình tròn. Cụm hình cong bị cắt làm đôi.</li>
+      <li><b>Ép mọi điểm</b> vào một cụm, kể cả bài lẻ. Một bài lạc đề làm lệch cả cụm.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <span class="pill">Theo mật độ (DBSCAN, HDBSCAN)</span>
+    <h3>Cụm là vùng đông đúc</h3>
+    <ul class="mini">
+      <li>Không cần biết trước số cụm. Chỗ nào có nhiều điểm sát nhau là một cụm.</li>
+      <li>Cụm có hình gì cũng được, miễn là liền một dải.</li>
+      <li>Điểm ở vùng thưa được dán nhãn <b>nhiễu</b> thay vì bị ép vào đâu đó.</li>
+    </ul>
+  </div>
+</div>
+<div class="callout blue">
+<b class="t">DBSCAN và HDBSCAN</b>
+<p>Bản thử dùng <b>DBSCAN</b>: một điểm có ít nhất 5 hàng xóm trong “bán kính” thì là lõi của cụm. Kéo thanh bán kính sẽ thấy vấn đề: nhỏ quá thì mọi thứ thành nhiễu, lớn quá thì các cụm dính vào nhau, và cụm dày với cụm thưa cần bán kính khác nhau. <b>HDBSCAN</b> (thứ BERTopic dùng) giải quyết bằng cách thử <i>mọi</i> bán kính, rồi giữ những cụm <b>tồn tại bền</b> qua nhiều mức bán kính nhất. Tham số còn lại chủ yếu là <code>min_cluster_size</code>: cụm nhỏ nhất bạn chấp nhận.</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s3">
+<h2><span class="n">03</span>BERTopic: bốn bước nối nhau</h2>
+<p><b>BERTopic</b> là thư viện Python (Maarten Grootendorst, 2022). Nó không phát minh thuật toán mới, mà ghép bốn khối có sẵn thành một dây chuyền. Mỗi khối thay được bằng khối khác.</p>
+
+<figure>
+<svg class="wide" viewBox="0 0 900 230" role="img" aria-label="Bốn bước của BERTopic">
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5753"/></marker></defs>
+  <g font-size="12">
+    <rect x="10" y="30" width="190" height="150" rx="12" fill="#DDEEE9" stroke="#0E6E5C"/>
+    <text x="24" y="54" font-family="IBM Plex Mono" fill="#0E6E5C" font-size="11.5">1 · EMBEDDING</text>
+    <text x="24" y="78" font-size="14" font-weight="600">Văn bản → vector</text>
+    <text x="24" y="102" fill="#4A5753">1024 số mỗi bài</text>
+    <text x="24" y="122" fill="#4A5753">radard đã có sẵn:</text>
+    <text x="24" y="140" fill="#4A5753">truyền vào, không</text>
+    <text x="24" y="158" fill="#4A5753">tính lại, không tốn tiền</text>
+    <path d="M200 105 L228 105" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a3)"/>
+    <rect x="230" y="30" width="200" height="150" rx="12" fill="#fff" stroke="#16201D"/>
+    <text x="244" y="54" font-family="IBM Plex Mono" fill="#4A5753" font-size="11.5">2 · UMAP</text>
+    <text x="244" y="78" font-size="14" font-weight="600">1024 chiều → 5 chiều</text>
+    <text x="244" y="102" fill="#4A5753">Giữ nguyên “ai là hàng xóm</text>
+    <text x="244" y="120" fill="#4A5753">của ai”, bỏ phần còn lại.</text>
+    <text x="244" y="140" fill="#4A5753">Gom cụm trên 5 chiều</text>
+    <text x="244" y="158" fill="#4A5753">nhanh và rõ hơn nhiều</text>
+    <path d="M430 105 L458 105" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a3)"/>
+    <rect x="460" y="30" width="200" height="150" rx="12" fill="#fff" stroke="#16201D"/>
+    <text x="474" y="54" font-family="IBM Plex Mono" fill="#4A5753" font-size="11.5">3 · HDBSCAN</text>
+    <text x="474" y="78" font-size="14" font-weight="600">Gom theo mật độ</text>
+    <text x="474" y="102" fill="#4A5753">Tự quyết số cụm.</text>
+    <text x="474" y="120" fill="#4A5753">Bài lẻ vào “chủ đề −1”</text>
+    <text x="474" y="140" fill="#4A5753">(nhiễu). Tab 02 là bản</text>
+    <text x="474" y="158" fill="#4A5753">thu nhỏ của bước này</text>
+    <path d="M660 105 L688 105" stroke="#4A5753" stroke-width="1.5" marker-end="url(#a3)"/>
+    <rect x="690" y="30" width="200" height="150" rx="12" fill="#FBEFD9" stroke="#9A5B00"/>
+    <text x="704" y="54" font-family="IBM Plex Mono" fill="#9A5B00" font-size="11.5">4 · c-TF-IDF</text>
+    <text x="704" y="78" font-size="14" font-weight="600">Đặt tên cho cụm</text>
+    <text x="704" y="102" fill="#4A5753">Từ nào hay gặp trong cụm</text>
+    <text x="704" y="120" fill="#4A5753">này mà hiếm ở cụm khác?</text>
+    <text x="704" y="140" fill="#4A5753">Tuỳ chọn: nhờ LLM viết</text>
+    <text x="704" y="158" fill="#4A5753">lại thành nhãn dễ đọc</text>
+  </g>
+  <text x="450" y="212" text-anchor="middle" font-size="12.5" fill="#4A5753">Bước 1–3 dựa vào nghĩa (vector). Chỉ bước 4 mới nhìn vào chữ.</text>
+</svg>
+<figcaption>Hình 2. Đặc điểm hay của BERTopic: <b>gom cụm theo nghĩa</b> (bài “Run 70B on a laptop” và “GGUF explained” chung cụm dù không chung từ nào), nhưng <b>đặt tên bằng từ khoá</b> nên người đọc hiểu cụm nói gì.</figcaption>
+</figure>
+
+<h3>Vì sao phải giảm chiều (UMAP)</h3>
+<p>Trong không gian 1024 chiều, khoảng cách giữa mọi cặp điểm có xu hướng <b>gần bằng nhau</b> (gọi là “lời nguyền số chiều”). Thuật toán dựa vào mật độ như HDBSCAN cần phân biệt “gần” và “xa”, nên ở 1024 chiều nó gần như mù. UMAP nén về khoảng 5 chiều mà vẫn giữ quan hệ hàng xóm cục bộ: bài nào gần bài nào thì sau khi nén vẫn gần.</p>
+<p>Bạn đã gặp ý tưởng “hàng xóm gần nhất” ở <code>hnsw.html</code>. UMAP cũng bắt đầu bằng việc tìm k hàng xóm gần nhất của mỗi điểm (mặc định 15), rồi tìm cách xếp các điểm trong 5 chiều sao cho đồ thị hàng xóm đó được giữ lại.</p>
+<div class="callout warn"><p><b>UMAP có yếu tố ngẫu nhiên.</b> Chạy hai lần trên cùng dữ liệu có thể ra cụm hơi khác, và số hiệu chủ đề khác hẳn. Muốn chạy lại ra y hệt phải đặt <code>random_state</code>. Tab 09 nói vì sao chuyện này quan trọng với radard.</p></div>
+
+<h3>Dùng thế nào (Python)</h3>
+<pre><code><span class="k">from</span> bertopic <span class="k">import</span> BERTopic
+
+<span class="c"># docs: danh sách tiêu đề + đoạn đầu; emb: ma trận embedding đọc từ Postgres</span>
+model = BERTopic(min_topic_size=<span class="s">15</span>)
+topics, probs = model.fit_transform(docs, embeddings=emb)  <span class="c"># truyền emb: không tính lại</span>
+
+model.get_topic_info()     <span class="c"># bảng: Topic, Count, Name ("7_quantization_gguf_4bit")</span>
+model.get_topic(<span class="s">7</span>)         <span class="c"># [("quantization", 0.08), ("gguf", 0.06), ...]</span></code></pre>
+<p class="mini muted">Truyền <code>embeddings=</code> là điểm quan trọng: radard đã trả tiền embed một lần, BERTopic chỉ dùng lại. Mặc định không cần LLM, nên chạy hằng đêm gần như miễn phí.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s4">
+<h2><span class="n">04</span>c-TF-IDF: đặt tên cho cụm</h2>
+<p>Đã có cụm, giờ cần biết cụm đó nói về gì. Cách ngây thơ là đếm từ nào xuất hiện nhiều nhất trong cụm. Vấn đề: những từ như <code>ai</code>, <code>model</code> xuất hiện nhiều ở <b>mọi</b> cụm, nên đứng đầu ở đâu cũng vậy và không nói lên gì.</p>
+<p><b>c-TF-IDF</b> (class-based TF-IDF) gộp mọi bài trong một cụm thành <b>một tài liệu lớn</b>, rồi chấm mỗi từ:</p>
+<pre><code>điểm(từ t, cụm c) = tf(t, c) × log(1 + A / f(t))
+
+tf(t, c)  số lần t xuất hiện trong cụm c          → hay gặp trong cụm này thì cao
+f(t)      số lần t xuất hiện trong mọi cụm cộng lại → gặp ở khắp nơi thì kéo điểm xuống
+A         số từ trung bình mỗi cụm                 → chỉ để chuẩn hoá</code></pre>
+
+<div class="demo">
+  <div class="controls">
+    <div class="seg" id="ctfSeg">
+      <button data-m="raw">Đếm thô</button>
+      <button data-m="ctf" class="on">c-TF-IDF</button>
+    </div>
+    <span class="mini muted">Bấm một từ để xem phép tính.</span>
+  </div>
+  <div class="ctf" id="ctf"></div>
+  <div class="calc" id="ctfCalc">Bấm vào một từ bất kỳ ở trên.</div>
+</div>
+<p class="mini muted">Ba cụm 5 tiêu đề, tự soạn để minh hoạ. Đã bỏ từ nối (the, with, for…) và từ dưới 2 ký tự. Chuyển qua lại giữa “Đếm thô” và “c-TF-IDF” để thấy <code>ai</code> và <code>model</code> tụt hạng ở cụm 0 và 1, và rơi khỏi top ở cụm 2. Với chỉ 3 cụm thì hiệu ứng còn nhẹ; dữ liệu thật có hàng chục cụm, từ phổ biến bị kéo xuống mạnh hơn nhiều.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s5">
+<h2><span class="n">05</span>Chủ đề theo thời gian: “cái gì đang nóng lên”</h2>
+<p>Đây là thứ radard thật sự cần từ BERTopic. Sau khi có chủ đề cho mỗi bài, đếm số bài của mỗi chủ đề theo ngày. BERTopic có sẵn hàm <code>topics_over_time(docs, timestamps)</code>: nó đếm, và tính lại c-TF-IDF <b>cho từng khoảng thời gian</b>, nên từ khoá của một chủ đề cũng đổi theo thời gian (tuần này “quantization” đi với “gguf”, tuần sau đi với “fp4”).</p>
+
+<div class="demo">
+  <div class="lbl mini muted" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase">Số bài mỗi ngày theo chủ đề · dữ liệu minh hoạ, không phải số thật của radard</div>
+  <div class="legend" id="tsLegend"></div>
+  <svg class="plot" id="ts" viewBox="0 0 760 300" role="img" aria-label="Biểu đồ đường số bài mỗi ngày của ba chủ đề"></svg>
+  <details><summary>Xem dạng bảng</summary><div class="tablewrap" id="tsTable"></div></details>
+</div>
+
+<h3>“Nóng lên” nghĩa là gì, đo ra sao</h3>
+<p>Nhìn biểu đồ: chủ đề agent nhiều bài nhất nhưng <b>đều đều</b>, không “nóng”. Quantization ít hơn nhưng <b>tăng vọt</b> ngày 15/10. Chủ đề quản lý AI <b>tăng dần</b>. “Nóng” là tăng <b>so với chính nó</b>, không phải nhiều nhất.</p>
+<p>Thiết kế radard đã có công cụ cho việc này: <b>z-score</b> và <b>burst detection</b> (mục thuật toán). Ý tưởng giống mặt bằng (baseline) ở <code>xep-hang.html</code>:</p>
+<pre><code>z = (số bài hôm nay − trung bình 14 ngày) / độ lệch chuẩn 14 ngày
+z ≥ 3  → đang nóng lên bất thường, đưa lên dashboard kèm lý do “gấp 4 lần bình thường”</code></pre>
+<p class="mini muted">BERTopic chỉ trả lời “bài này thuộc chủ đề nào”. Việc “chủ đề nào đang nóng” là SQL trên kết quả đó, chạy trong Postgres như mọi con số khác của radard.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s6">
+<h2><span class="n">06</span>Graph thực thể và modularity</h2>
+<p>Giờ sang cách nhìn thứ hai. Giả sử radard đã có mô hình tri thức (tuần 6–7 trong lộ trình): mỗi bài được trích ra các <b>thực thể</b> (công ty, model, sản phẩm, luật…). Dựng graph như sau:</p>
+<ul>
+  <li><b>Node</b>: một thực thể. Ví dụ <code>llama.cpp</code>, <code>GGUF</code>.</li>
+  <li><b>Cạnh</b>: hai thực thể cùng xuất hiện trong một sự kiện.</li>
+  <li><b>Trọng số</b>: số sự kiện có cả hai. <code>llama.cpp</code>–<code>GGUF</code> cùng xuất hiện trong 6 sự kiện thì cạnh nặng 6.</li>
+</ul>
+<p>Một “chủ đề” lúc này là một <b>cộng đồng</b> (community): nhóm node có nhiều cạnh bên trong, ít cạnh ra ngoài. Giống một lớp học: bạn cùng nhóm nói chuyện với nhau nhiều, thỉnh thoảng mới nói với nhóm khác.</p>
+
+<h3>Modularity: điểm số của một cách chia</h3>
+<p>Có hàng tỉ cách chia 16 node thành nhóm. Cần một con số để biết cách chia nào tốt. <b>Modularity Q</b> là con số đó:</p>
+<pre><code>Q = Σ trên mỗi cộng đồng c [  L_c / m   −   γ × ( d_c / 2m )²  ]
+                               ─────         ──────────────────
+                     tỉ lệ cạnh thật       tỉ lệ cạnh “nên có” nếu
+                     nằm trong c           nối ngẫu nhiên (cùng bậc)
+
+L_c  tổng trọng số cạnh bên trong c     d_c  tổng bậc các node trong c
+m    tổng trọng số mọi cạnh              γ    độ phân giải (mặc định 1)</code></pre>
+<p>Ý nghĩa: Q đo xem trong mỗi nhóm có <b>nhiều cạnh hơn mức may rủi</b> bao nhiêu. Q gần 0: chia như bốc thăm. Q từ 0,3 trở lên: có cấu trúc cộng đồng rõ.</p>
+<div class="grid3">
+  <div class="card"><span class="pill w">Gộp tất cả</span><p class="mini">Một nhóm duy nhất: L/m = 1 nhưng phần trừ cũng = 1. <b>Q = 0.</b></p></div>
+  <div class="card"><span class="pill w">Mỗi node một nhóm</span><p class="mini">Không cạnh nào nằm trong nhóm. Q <b>âm</b>.</p></div>
+  <div class="card"><span class="pill">Chia đúng</span><p class="mini">Nhiều cạnh trong, ít cạnh giữa các nhóm. Q <b>lớn nhất</b>.</p></div>
+</div>
+<div class="callout blue"><p><b>Độ phân giải γ</b> là núm vặn kích thước chủ đề: γ lớn thì phần trừ nặng hơn, thuật toán ưa nhóm <b>nhỏ</b> (chủ đề hẹp). γ nhỏ thì ưa nhóm <b>lớn</b> (chủ đề rộng). Thử ở tab 07.</p></div>
+<p>Tìm cách chia có Q lớn nhất là bài toán rất khó (NP-hard). Louvain và Leiden là hai thuật toán <b>tham lam</b> tìm được cách chia tốt, rất nhanh, kể cả trên graph hàng triệu node.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s7">
+<h2><span class="n">07</span>Louvain: chạy từng bước</h2>
+<p><b>Louvain</b> (Blondel và cộng sự, Đại học Louvain, 2008) lặp hai pha:</p>
+<ol>
+  <li><b>Di chuyển cục bộ.</b> Ban đầu mỗi node là một cộng đồng. Lần lượt xét từng node: thử chuyển nó sang cộng đồng của từng hàng xóm, chọn nơi làm Q tăng nhiều nhất. Không nơi nào làm Q tăng thì đứng yên. Lặp tới khi cả vòng không ai đổi.</li>
+  <li><b>Gộp.</b> Mỗi cộng đồng thành một “siêu node”. Cạnh giữa hai siêu node là tổng các cạnh giữa hai nhóm. Quay lại pha 1 trên graph nhỏ hơn này.</li>
+</ol>
+<p>Dừng khi pha 1 không di chuyển được gì nữa. Graph dưới đây là 16 thực thể giả lập; độ dày cạnh là số sự kiện chung.</p>
+
+<div class="demo">
+  <div class="controls">
+    <button class="btn primary" id="lvStep">Bước tiếp ▶</button>
+    <button class="btn" id="lvRun">Chạy hết ▶▶</button>
+    <button class="btn" id="lvReset">Làm lại</button>
+    <label>γ =
+      <span class="seg" id="gSeg"><button data-g="0.5">0,5</button><button data-g="1" class="on">1</button><button data-g="2">2</button><button data-g="4">4</button></span>
+    </label>
+  </div>
+  <div class="status" id="lvStatus"></div>
+  <div class="gwrap">
+    <div>
+      <svg class="plot" id="graph" viewBox="0 0 620 440" role="img" aria-label="Graph thực thể"></svg>
+      <div class="comms" id="lvComms"></div>
+    </div>
+    <div><div class="log" id="lvLog"></div></div>
+  </div>
+</div>
+<p class="mini muted">Chữ cái trong mỗi node là tên cộng đồng của nó; bốn cộng đồng lớn nhất được tô màu, các cộng đồng một node để trắng. Bấm “Chạy hết” ở từng mức γ: với γ = 0,5, nhóm OpenAI và nhóm Anthropic gộp thành một chủ đề rộng “phòng lab lớn”; với γ = 4, các nhóm bị chẻ thành cặp nhỏ. γ = 1 và 2 ra cùng 4 cộng đồng: cấu trúc rõ thì không nhạy với γ.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s8">
+<h2><span class="n">08</span>Leiden: sửa một lỗi ngầm của Louvain</h2>
+<p>Năm 2019, Traag, Waltman và van Eck (Đại học Leiden) chỉ ra Louvain có thể sinh ra cộng đồng <b>bị đứt ruột</b>: các node trong cùng một cộng đồng không nối được với nhau nếu chỉ đi qua node trong cộng đồng đó.</p>
+
+<figure>
+<svg class="wide" viewBox="0 0 900 260" role="img" aria-label="Ví dụ cộng đồng bị đứt của Louvain">
+  <g font-size="12.5">
+    <text x="20" y="22" font-weight="600">① Louvain gom 7 node vào cộng đồng xanh</text>
+    <g stroke="#9AA6A2" stroke-width="2">
+      <line x1="60" y1="70" x2="110" y2="50"/><line x1="60" y1="70" x2="90" y2="120"/><line x1="110" y1="50" x2="90" y2="120"/>
+      <line x1="300" y1="70" x2="250" y2="50"/><line x1="300" y1="70" x2="270" y2="120"/><line x1="250" y1="50" x2="270" y2="120"/>
+      <line x1="110" y1="50" x2="180" y2="90"/><line x1="90" y1="120" x2="180" y2="90"/><line x1="250" y1="50" x2="180" y2="90"/><line x1="270" y1="120" x2="180" y2="90"/>
+      <line x1="180" y1="90" x2="180" y2="200" stroke-dasharray="4 4"/>
+    </g>
+    <g fill="#2a78d6" stroke="#fff" stroke-width="2">
+      <circle cx="60" cy="70" r="13"/><circle cx="110" cy="50" r="13"/><circle cx="90" cy="120" r="13"/>
+      <circle cx="300" cy="70" r="13"/><circle cx="250" cy="50" r="13"/><circle cx="270" cy="120" r="13"/>
+      <circle cx="180" cy="90" r="15"/>
+    </g>
+    <text x="180" y="95" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">X</text>
+    <circle cx="180" cy="210" r="13" fill="#eb6834" stroke="#fff" stroke-width="2"/>
+    <text x="180" y="245" text-anchor="middle" fill="#4A5753">nhóm cam ở xa</text>
+    <text x="180" y="168" text-anchor="middle" fill="#4A5753" font-size="11.5">X là cầu nối</text>
+
+    <text x="470" y="22" font-weight="600">② Về sau X chuyển sang nhóm cam (Q tăng)</text>
+    <g stroke="#9AA6A2" stroke-width="2">
+      <line x1="510" y1="70" x2="560" y2="50"/><line x1="510" y1="70" x2="540" y2="120"/><line x1="560" y1="50" x2="540" y2="120"/>
+      <line x1="750" y1="70" x2="700" y2="50"/><line x1="750" y1="70" x2="720" y2="120"/><line x1="700" y1="50" x2="720" y2="120"/>
+      <line x1="560" y1="50" x2="630" y2="130" stroke-dasharray="3 4"/><line x1="540" y1="120" x2="630" y2="130" stroke-dasharray="3 4"/><line x1="700" y1="50" x2="630" y2="130" stroke-dasharray="3 4"/><line x1="720" y1="120" x2="630" y2="130" stroke-dasharray="3 4"/>
+      <line x1="630" y1="130" x2="630" y2="200"/>
+    </g>
+    <g fill="#2a78d6" stroke="#fff" stroke-width="2">
+      <circle cx="510" cy="70" r="13"/><circle cx="560" cy="50" r="13"/><circle cx="540" cy="120" r="13"/>
+      <circle cx="750" cy="70" r="13"/><circle cx="700" cy="50" r="13"/><circle cx="720" cy="120" r="13"/>
+    </g>
+    <circle cx="630" cy="130" r="15" fill="#eb6834" stroke="#fff" stroke-width="2"/>
+    <text x="630" y="135" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">X</text>
+    <circle cx="630" cy="210" r="13" fill="#eb6834" stroke="#fff" stroke-width="2"/>
+    <rect x="482" y="30" width="96" height="112" rx="14" fill="none" stroke="#A83A2F" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <rect x="682" y="30" width="96" height="112" rx="14" fill="none" stroke="#A83A2F" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="630" y="245" text-anchor="middle" fill="#A83A2F">hai tam giác vẫn chung nhóm xanh nhưng không còn đường nối</text>
+  </g>
+</svg>
+<figcaption>Hình 3. Ở bước ②, Louvain chỉ xét từng node riêng lẻ. Nó không quay lại kiểm tra rằng nhóm xanh giờ là hai mảnh rời. Bài báo năm 2019 đo được trên graph thật: tới 25% cộng đồng của Louvain kết nối kém, và tới 16% bị đứt hẳn.</figcaption>
+</figure>
+
+<h3>Leiden thêm một pha ở giữa</h3>
+<div class="tablewrap"><table>
+<tr><th>Pha</th><th>Louvain</th><th>Leiden</th></tr>
+<tr><td>1. Di chuyển cục bộ</td><td>Quét lần lượt mọi node, nhiều vòng</td><td>Như vậy, nhưng chỉ xét lại những node có hàng xóm vừa đổi nhóm (dùng hàng đợi), nên nhanh hơn</td></tr>
+<tr><td>2. <b>Tinh chỉnh</b></td><td>Không có</td><td>Trong mỗi cộng đồng, chia nhỏ lại thành các nhóm con <b>chắc chắn liền mạch</b>. Gộp ở pha sau dựa trên nhóm con này</td></tr>
+<tr><td>3. Gộp</td><td>Theo cộng đồng của pha 1</td><td>Theo nhóm con của pha 2, nhưng vẫn khởi đầu từ cộng đồng của pha 1</td></tr>
+<tr><td>Bảo đảm</td><td>Không</td><td>Mọi cộng đồng đều liền mạch; chạy đủ lâu thì không node nào muốn đổi nhóm nữa</td></tr>
+</table></div>
+<div class="callout"><p><b>Tóm lại:</b> Leiden là Louvain có thêm bước kiểm tra chất lượng. Nhanh hơn hoặc bằng, kết quả tốt hơn hoặc bằng. Nếu được chọn, cứ dùng Leiden. Louvain vẫn đáng biết vì nó dễ hiểu và có sẵn ở nhiều nơi hơn (ví dụ thư viện JavaScript <code>graphology</code> có Louvain).</p></div>
+<p>Bản chạy thử ở tab 07 có kiểm tra liên thông: bên cạnh mỗi cộng đồng sẽ hiện ✓ nếu liền mạch. Trên graph nhỏ và rõ như vậy Louvain gần như luôn ổn; lỗi đứt ruột hay gặp trên graph lớn, chạy nhiều tầng.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s9">
+<h2><span class="n">09</span>Dùng trong radard</h2>
+<h3>Thiết kế đang ghi gì</h3>
+<div class="tablewrap"><table>
+<tr><th>Chỗ</th><th>Nội dung</th></tr>
+<tr><td>Tính năng</td><td>“Topic modeling: BERTopic gom chủ đề động theo thời gian”, <b>tuỳ chọn</b>. Phục vụ dashboard “chủ đề nóng lên” (giai đoạn 3)</td></tr>
+<tr><td>Công nghệ</td><td>Sidecar Python: <code>uv</code> + BERTopic, job hằng đêm đọc embedding từ Postgres, ghi chủ đề ngược lại. Tách riêng nên không ảnh hưởng daemon. Lý do không làm bằng TS: thư viện gom cụm TS yếu</td></tr>
+<tr><td>Thuật toán</td><td>“Leiden / Louvain: tìm cụm chủ đề trên graph đồng xuất hiện thực thể. Thay hoặc bổ sung cho BERTopic, dùng chính graph đã có”</td></tr>
+<tr><td>Rủi ro</td><td>Đứng <b>số 1</b> trong danh sách cắt nếu chậm; lộ trình ghi “BERTopic nếu còn thời gian”</td></tr>
+</table></div>
+
+<h3>So sánh để chọn</h3>
+<div class="tablewrap"><table>
+<tr><th></th><th>BERTopic</th><th>Leiden trên graph thực thể</th></tr>
+<tr><td>Cần có trước</td><td>Embedding (đã có)</td><td>Trích thực thể và graph (tuần 6–7, chưa có)</td></tr>
+<tr><td>Chủ đề trông thế nào</td><td>Danh sách từ khoá + các bài</td><td>Nhóm thực thể có tên: {llama.cpp, GGUF, Ollama}</td></tr>
+<tr><td>Bắt được</td><td>Chủ đề không gắn với tên riêng nào (“đánh giá code review bằng AI”)</td><td>Quan hệ giữa các bên (“Microsoft, Mistral và EU đang dính vào nhau”)</td></tr>
+<tr><td>Ngôn ngữ</td><td>Python (sidecar)</td><td>Python (<code>leidenalg</code>, <code>igraph</code>) hoặc JS (<code>graphology</code>, chỉ có Louvain)</td></tr>
+<tr><td>Chi phí chạy</td><td>Vài phút CPU mỗi đêm cho vài chục nghìn bài</td><td>Vài giây</td></tr>
+<tr><td>Giải thích được</td><td>Vừa: từ khoá đôi khi khó hiểu</td><td>Tốt: thấy rõ thực thể nào, cạnh nào</td></tr>
+</table></div>
+
+<h3>Bài học radard đã có, áp vào đây</h3>
+<div class="callout warn">
+<b class="t">Số hiệu chủ đề không bền</b>
+<p>Mỗi đêm chạy lại BERTopic (hay Leiden) là ra một bộ chủ đề mới với số hiệu mới. “Chủ đề 7” hôm nay có thể là “chủ đề 12” ngày mai. Đây đúng là bài toán của <code>events</code> và <code>deliveries.document_ids</code> trong tuần 3: dữ liệu dẫn xuất bị dựng lại thì id đổi.</p>
+<p>Hướng xử lý giống vậy:</p>
+<ul>
+  <li>Bảng chủ đề là <b>dữ liệu dẫn xuất</b>, xoá và dựng lại được; không trỏ khoá ngoại từ dữ liệu của bạn vào đó.</li>
+  <li>Muốn vẽ một chủ đề qua nhiều tuần, <b>nối chủ đề đêm nay với đêm qua</b> theo độ trùng tài liệu (Jaccard trên tập <code>document_id</code>) hoặc cosine giữa tâm cụm, rồi gán một “id dòng” bền.</li>
+  <li>Hoặc huấn luyện mô hình một lần rồi hằng đêm chỉ <b>gán</b> bài mới vào chủ đề cũ (<code>model.transform</code>), vài tuần mới huấn luyện lại. BERTopic còn có <code>merge_models</code> để gộp mô hình cũ với mô hình học trên dữ liệu mới.</li>
+  <li>Đặt <code>random_state</code> để chạy lại ra y hệt khi gỡ lỗi.</li>
+</ul>
+</div>
+<div class="callout blue">
+<b class="t">Chủ đề −1 thường rất lớn</b>
+<p>Với tin tức ngắn, HDBSCAN có thể đẩy 30–50% số bài vào “nhiễu”. Không phải lỗi: phần lớn là bài lẻ. Nếu dashboard cần mọi bài có chủ đề, BERTopic có <code>reduce_outliers</code> để gán bài nhiễu vào chủ đề gần nhất.</p>
+</div>
+
+<h3>Gợi ý thứ tự (ý kiến của tôi)</h3>
+<ol>
+  <li><b>Chưa cần làm gì</b> trong giai đoạn MVP. Dữ liệu cứ tích luỹ; embedding đã lưu sẵn là đủ cho BERTopic về sau.</li>
+  <li>Trước khi làm dashboard, thử BERTopic <b>một lần bằng notebook</b> trên dữ liệu thật để xem chủ đề có ra hồn không. Rẻ, nhanh, và trả lời được câu “có đáng làm không”.</li>
+  <li>Khi đã có graph thực thể, thử Leiden. Nếu kết quả đủ tốt, có thể bỏ hẳn sidecar Python như thiết kế gợi ý.</li>
+</ol>
+</section>
+
+<!-- ============================================================ -->
+<section class="tab" id="s10">
+<h2><span class="n">10</span>Tự kiểm tra</h2>
+<details><summary>1. Vì sao BERTopic không dùng k-means?</summary><p>k-means bắt chọn trước số cụm, coi cụm là hình tròn và ép mọi bài vào một cụm. Tin tức thì không biết trước có mấy chủ đề, và có nhiều bài lẻ. HDBSCAN tự tìm số cụm và để bài lẻ vào nhiễu. (Nhưng BERTopic cho phép thay HDBSCAN bằng k-means nếu bạn muốn mọi bài đều có chủ đề.)</p></details>
+<details><summary>2. Hai bài “Run a 70B model on a laptop” và “GGUF explained” không chung từ nào. Vì sao vẫn chung cụm?</summary><p>Bước 1–3 gom cụm theo embedding, tức theo nghĩa, không theo từ. Chỉ bước 4 (c-TF-IDF) mới nhìn vào chữ, và chỉ để đặt tên cho cụm.</p></details>
+<details><summary>3. Vì sao “ai” đứng cao khi đếm thô nhưng tụt hạng với c-TF-IDF?</summary><p>“ai” xuất hiện nhiều ở cả ba cụm, nên f(t) lớn, log(1 + A/f(t)) nhỏ, kéo điểm xuống. c-TF-IDF thưởng cho từ <b>đặc trưng</b> của cụm, không phải từ <b>phổ biến</b>.</p></details>
+<details><summary>4. Modularity của cách chia “tất cả vào một nhóm” là bao nhiêu?</summary><p>0. Mọi cạnh nằm trong nhóm (L/m = 1) nhưng mức “nên có nếu ngẫu nhiên” cũng là (2m/2m)² = 1.</p></details>
+<details><summary>5. Muốn dashboard hiện chủ đề hẹp hơn (tách “quantization” khỏi “chạy model local”), vặn núm nào?</summary><p>Với Leiden/Louvain: tăng độ phân giải γ. Với BERTopic: giảm <code>min_topic_size</code> (cụm nhỏ hơn được chấp nhận).</p></details>
+<details><summary>6. Leiden khác Louvain ở đâu, nói trong một câu?</summary><p>Leiden thêm pha tinh chỉnh giữa “di chuyển” và “gộp”, bảo đảm mọi cộng đồng đều liền mạch; Louvain không bảo đảm điều đó.</p></details>
+<details><summary>7. Ghi “bạn đã 👍 chủ đề 7” vào bảng feedback có ổn không?</summary><p>Không. Số hiệu chủ đề đổi mỗi lần chạy lại (dữ liệu dẫn xuất), giống <code>event_id</code>. Ghi theo thứ bền: các <code>document_id</code> hoặc thực thể, rồi tra lại chủ đề hiện tại khi cần.</p></details>
+</section>
+
+<footer>radard · docs/gom-cum-chu-de.html · Viết ngày 13/10/2026 để giải thích mục topic modeling trong <code>radard-thiet-ke.html</code> và <code>radard-bao-cao.html</code>. Mọi dữ liệu trong các bản chạy thử là dữ liệu tự soạn để minh hoạ, không phải số liệu thật của radard.</footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+// ---------- tabs ----------
+(function(){
+  const tabs = [...document.querySelectorAll("section.tab")];
+  const links = [...document.querySelectorAll("#tabs a")];
+  const titles = links.map(a => a.textContent.replace(/^\d+/, "").trim());
+  tabs.forEach((t, i) => {
+    const pager = document.createElement("div"); pager.className = "pager";
+    pager.innerHTML = (i > 0 ? `<a href="#s${i}">← ${String(i).padStart(2,"0")} ${titles[i-1]}</a>` : "<span></span>")
+      + (i < tabs.length - 1 ? `<a href="#s${i+2}">${String(i+2).padStart(2,"0")} ${titles[i+1]} →</a>` : "<span></span>");
+    t.append(pager);
+  });
+  function show(){
+    const id = (location.hash || "#s1").slice(1);
+    const target = tabs.find(t => t.id === id) ? id : "s1";
+    tabs.forEach(t => t.classList.toggle("active", t.id === target));
+    links.forEach(a => {
+      const on = a.getAttribute("href") === "#" + target;
+      a.classList.toggle("active", on);
+      if (on) a.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    const nav = document.getElementById("tabs");
+    if (window.scrollY > nav.offsetTop) window.scrollTo({ top: nav.offsetTop });
+  }
+  window.addEventListener("hashchange", show);
+  show();
+})();
+
+const SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#4a3aa7"];
+const NOISE = "#A9B3AF";
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.append(e); return e; };
+const fmt = (x, d = 2) => x.toFixed(d).replace(".", ",");
+const tip = document.getElementById("tip");
+function showTip(html, x, y){ tip.innerHTML = html; tip.classList.add("show"); const w = tip.offsetWidth; tip.style.left = Math.min(x + 14, innerWidth - w - 8) + "px"; tip.style.top = (y + 14) + "px"; }
+function hideTip(){ tip.classList.remove("show"); }
+
+// hình dạng điểm: lớp mã hoá thứ hai, để không phụ thuộc màu
+function shape(parent, kind, x, y, fill, r = 5){
+  const common = { fill, stroke: "#FCFCFB", "stroke-width": 1.5 };
+  if (kind === 0) return el("circle", { cx: x, cy: y, r, ...common }, parent);
+  if (kind === 1) return el("rect", { x: x - r, y: y - r, width: 2*r, height: 2*r, rx: 1.5, ...common }, parent);
+  if (kind === 2) return el("path", { d: `M${x},${y-r-1} L${x+r+1},${y+r} L${x-r-1},${y+r} Z`, ...common }, parent);
+  return el("path", { d: `M${x},${y-r-1.5} L${x+r+1.5},${y} L${x},${y+r+1.5} L${x-r-1.5},${y} Z`, ...common }, parent);
+}
+function legendSwatch(kind, color){
+  const s = document.createElementNS(NS, "svg"); s.setAttribute("width", 14); s.setAttribute("height", 14);
+  if (kind === -1) el("circle", { cx: 7, cy: 7, r: 4, fill: "none", stroke: NOISE, "stroke-width": 1.5 }, s);
+  else shape(s, kind, 7, 7, color, 5);
+  return s;
+}
+
+// ---------- tab 02: gom cụm điểm ----------
+(function(){
+  function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const R = rng(42);
+  const gauss = () => { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const P = [];
+  for (let i = 0; i < 45; i++) P.push({ x: 150 + gauss() * 24, y: 105 + gauss() * 22, t: 0 });
+  for (let i = 0; i < 35; i++) P.push({ x: 455 + gauss() * 18, y: 95 + gauss() * 18, t: 1 });
+  for (let i = 0; i < 50; i++) { const a = Math.PI * (0.15 + 0.7 * R()); P.push({ x: 300 + Math.cos(a) * 170 + gauss() * 7, y: 140 + Math.sin(a) * 170 + gauss() * 7, t: 2 }); }
+  for (let i = 0; i < 16; i++) P.push({ x: 545 + gauss() * 10, y: 290 + gauss() * 10, t: 3 });
+  for (let i = 0; i < 24; i++) P.push({ x: 30 + R() * 580, y: 25 + R() * 330, t: -1 });
+  const NAMES = ["agent & tool calling", "chạy model local", "quản lý AI (cụm cong)", "benchmark"];
+
+  const svg = document.getElementById("scatter"), legend = document.getElementById("scLegend"), status = document.getElementById("scStatus");
+  let alg = "truth";
+  const d2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+
+  function kmeans(k){
+    const r = rng(7); const C = [P[Math.floor(r() * P.length)]];
+    while (C.length < k) { // k-means++
+      const ds = P.map(p => Math.min(...C.map(c => d2(p, c)))); const tot = ds.reduce((a, b) => a + b); let x = r() * tot, i = 0;
+      while (x > ds[i]) x -= ds[i++]; C.push(P[i]);
+    }
+    let cs = C.map(c => ({ x: c.x, y: c.y })), lab = [];
+    for (let it = 0; it < 30; it++) {
+      lab = P.map(p => { let b = 0; cs.forEach((c, j) => { if (d2(p, c) < d2(p, cs[b])) b = j; }); return b; });
+      cs = cs.map((c, j) => { const m = P.filter((_, i) => lab[i] === j); return m.length ? { x: m.reduce((s, p) => s + p.x, 0) / m.length, y: m.reduce((s, p) => s + p.y, 0) / m.length } : c; });
+    }
+    return { lab, cs };
+  }
+  function dbscan(eps, minPts = 5){
+    const lab = new Array(P.length).fill(undefined); let c = -1;
+    const nb = i => P.map((_, j) => j).filter(j => d2(P[i], P[j]) <= eps * eps);
+    for (let i = 0; i < P.length; i++) {
+      if (lab[i] !== undefined) continue;
+      const N = nb(i); if (N.length < minPts) { lab[i] = -1; continue; }
+      c++; lab[i] = c; const q = N.filter(j => j !== i);
+      while (q.length) { const j = q.shift(); if (lab[j] === -1) lab[j] = c; if (lab[j] !== undefined) continue; lab[j] = c; const Nj = nb(j); if (Nj.length >= minPts) q.push(...Nj); }
+    }
+    return lab;
+  }
+  // xếp cụm theo kích thước giảm dần: màu bám theo cụm, cụm thứ 5 trở đi không lấy màu mới
+  function rank(lab){
+    const cnt = {}; lab.forEach(l => { if (l >= 0) cnt[l] = (cnt[l] || 0) + 1; });
+    const order = Object.keys(cnt).map(Number).sort((a, b) => cnt[b] - cnt[a]);
+    // cụm nào trùng phần lớn với nhóm thật t thì lấy màu của t; cụm thứ 5 trở đi không lấy màu mới
+    const map = {}, used = new Set();
+    order.forEach(l => {
+      const votes = {}; lab.forEach((x, i) => { if (x === l && P[i].t >= 0) votes[P[i].t] = (votes[P[i].t] || 0) + 1; });
+      const t = Object.keys(votes).map(Number).sort((a, b) => votes[b] - votes[a])[0];
+      if (t !== undefined && !used.has(t)) { map[l] = t; used.add(t); }
+    });
+    order.forEach(l => { if (map[l] === undefined) { const free = [0, 1, 2, 3].find(k => !used.has(k)); map[l] = free === undefined ? 99 : free; if (free !== undefined) used.add(free); } });
+    return { map, n: order.length, cnt, order };
+  }
+  function draw(){
+    svg.replaceChildren(); legend.replaceChildren();
+    let lab, info = "", centers = null;
+    if (alg === "truth") { lab = P.map(p => p.t); }
+    else if (alg === "kmeans") { const k = +kIn.value; const r = kmeans(k); lab = r.lab; centers = r.cs; }
+    else { lab = dbscan(+eIn.value); }
+    const rk = alg === "truth" ? { map: { 0: 0, 1: 1, 2: 2, 3: 3 }, n: 4 } : rank(lab);
+    P.forEach((p, i) => {
+      const l = lab[i];
+      if (l < 0) { el("circle", { cx: p.x, cy: p.y, r: 3.5, fill: "none", stroke: NOISE, "stroke-width": 1.5 }, svg); return; }
+      const r = rk.map[l];
+      if (r < 4) shape(svg, r, p.x, p.y, SERIES[r]);
+      else el("circle", { cx: p.x, cy: p.y, r: 4, fill: "#16201D", stroke: "#FCFCFB", "stroke-width": 1.5 }, svg);
+    });
+    if (centers) centers.forEach(c => { el("path", { d: `M${c.x-7},${c.y} L${c.x+7},${c.y} M${c.x},${c.y-7} L${c.x},${c.y+7}`, stroke: "#16201D", "stroke-width": 2.5 }, svg); });
+    const add = (kind, color, text) => { const s = document.createElement("span"); s.append(legendSwatch(kind, color), text); legend.append(s); };
+    if (alg === "truth") { NAMES.forEach((n, i) => add(i, SERIES[i], n)); add(-1, NOISE, "bài lẻ"); }
+    else {
+      const slots = [...new Set(Object.values(rk.map))].filter(k => k < 4).sort();
+      slots.forEach(k => add(k, SERIES[k], `cụm gần “${NAMES[k]}”`));
+      if (rk.n > 4) { const s = document.createElement("span"); const sv = document.createElementNS(NS, "svg"); sv.setAttribute("width", 14); sv.setAttribute("height", 14); el("circle", { cx: 7, cy: 7, r: 4, fill: "#16201D" }, sv); s.append(sv, `${rk.n - 4} cụm nhỏ khác`); legend.append(s); }
+      if (lab.some(l => l < 0)) add(-1, NOISE, "nhiễu");
+    }
+    const noise = lab.filter(l => l < 0).length;
+    if (alg === "truth") info = "<b>Đáp án:</b> 4 nhóm thật và 24 bài lẻ. Cụm xanh lá có hình vòng cung.";
+    else if (alg === "kmeans") info = `<b>k-means, k = ${kIn.value}:</b> mọi điểm bị ép vào một cụm, kể cả 24 bài lẻ. Dấu + là tâm cụm. ${+kIn.value < 4 ? "k nhỏ hơn số nhóm thật nên các nhóm bị gộp." : "Kể cả với k = 4 đúng số nhóm, cụm vòng cung vẫn bị cắt vì k-means chỉ hiểu cụm hình tròn."}`;
+    else info = `<b>Theo mật độ, bán kính ${eIn.value}:</b> tìm được <b>${rk.n}</b> cụm, <b>${noise}</b> điểm nhiễu. ${rk.n > 4 ? "Bán kính nhỏ quá: cụm bị vụn ra." : rk.n < 4 ? "Bán kính lớn quá: các cụm dính vào nhau." : "Đúng 4 cụm, kể cả cụm vòng cung."}`;
+    status.innerHTML = info;
+    document.getElementById("kCtl").style.display = alg === "kmeans" ? "" : "none";
+    document.getElementById("eCtl").style.display = alg === "dbscan" ? "" : "none";
+  }
+  const kIn = document.getElementById("kIn"), eIn = document.getElementById("eIn");
+  kIn.addEventListener("input", () => { document.getElementById("kVal").textContent = kIn.value; draw(); });
+  eIn.addEventListener("input", () => { document.getElementById("eVal").textContent = eIn.value; draw(); });
+  document.querySelectorAll("#algSeg button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#algSeg button").forEach(x => x.classList.toggle("on", x === b)); alg = b.dataset.a; draw();
+  }));
+  draw();
+})();
+
+// ---------- tab 04: c-TF-IDF ----------
+(function(){
+  const C = [
+    { name: "Cụm 0", docs: [
+      "Building AI agents with tool calling in TypeScript",
+      "MCP server lets AI agents call tools safely",
+      "Agent model loops: when tool calling fails",
+      "New AI model improves agent tool use benchmarks",
+      "Open source agent framework adds MCP tool support"] },
+    { name: "Cụm 1", docs: [
+      "Run a 70B model on a laptop with 4-bit quantization",
+      "GGUF quantization explained for local AI model inference",
+      "llama.cpp adds faster 4-bit quantization kernels",
+      "Quantization hurts small model accuracy, study finds",
+      "Local AI: best quantization for your GPU"] },
+    { name: "Cụm 2", docs: [
+      "EU Act rules for general purpose model providers",
+      "AI regulation: what the EU Act means for startups",
+      "US states propose new safety laws for AI",
+      "Model providers face new transparency rules",
+      "Safety law vetoed after industry pushback"] },
+  ];
+  const STOP = new Set("the a an with in on for of to and your what when after lets means finds best run face how is".split(" "));
+  const tok = s => s.toLowerCase().split(/[^a-z0-9.]+/).map(w => w.replace(/\.$/, "")).filter(w => w.length >= 2 && !STOP.has(w));
+  const tf = C.map(c => { const m = {}; c.docs.flatMap(tok).forEach(w => m[w] = (m[w] || 0) + 1); return m; });
+  const f = {}; tf.forEach(m => { for (const w in m) f[w] = (f[w] || 0) + m[w]; });
+  const A = tf.reduce((s, m) => s + Object.values(m).reduce((a, b) => a + b, 0), 0) / C.length;
+  const score = (w, i, mode) => mode === "raw" ? tf[i][w] : tf[i][w] * Math.log(1 + A / f[w]);
+  let mode = "ctf", sel = null;
+  const box = document.getElementById("ctf"), calc = document.getElementById("ctfCalc");
+  function draw(){
+    box.replaceChildren();
+    C.forEach((c, i) => {
+      const col = document.createElement("div"); col.className = "col";
+      col.innerHTML = `<h4>${c.name}</h4><ul class="docs">${c.docs.map(d => `<li>${d}</li>`).join("")}</ul>`;
+      const words = Object.keys(tf[i]).sort((a, b) => score(b, i, mode) - score(a, i, mode) || a.localeCompare(b)).slice(0, 6);
+      const max = score(words[0], i, mode);
+      const wl = document.createElement("div"); wl.className = "words";
+      words.forEach(w => {
+        const r = document.createElement("div"); r.className = "word" + (sel && sel.w === w && sel.i === i ? " sel" : "");
+        const v = score(w, i, mode);
+        r.innerHTML = `<span>${w}</span><span><span class="bar" style="display:block;width:${Math.max(4, v / max * 100)}%"></span></span><span class="v">${mode === "raw" ? v : fmt(v)}</span>`;
+        r.addEventListener("click", () => { sel = { w, i }; explain(); draw(); });
+        wl.append(r);
+      });
+      col.append(wl); box.append(col);
+    });
+  }
+  function explain(){
+    if (!sel) return;
+    const { w, i } = sel; const t = tf[i][w], ft = f[w];
+    const where = tf.map((m, j) => `${C[j].name}: ${m[w] || 0}`).join(" · ");
+    calc.textContent = `từ "${w}" trong ${C[i].name}\n` +
+      `tf = ${t}   (số lần trong cụm này)\n` +
+      `f  = ${ft}   (tổng mọi cụm → ${where})\n` +
+      `A  = ${fmt(A, 1)}   (số từ trung bình mỗi cụm)\n` +
+      `điểm = ${t} × log(1 + ${fmt(A, 1)} / ${ft}) = ${t} × ${fmt(Math.log(1 + A / ft), 3)} = ${fmt(t * Math.log(1 + A / ft), 2)}`;
+  }
+  document.querySelectorAll("#ctfSeg button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#ctfSeg button").forEach(x => x.classList.toggle("on", x === b)); mode = b.dataset.m; draw();
+  }));
+  draw();
+})();
+
+// ---------- tab 05: chủ đề theo thời gian ----------
+(function(){
+  const days = Array.from({ length: 14 }, (_, i) => { const d = new Date(Date.UTC(2026, 9, 6 + i)); return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`; });
+  const S = [
+    { name: "agent & tool calling", v: [38, 41, 36, 40, 43, 39, 37, 42, 40, 38, 44, 41, 39, 42] },
+    { name: "quantization", v: [9, 8, 11, 10, 9, 12, 10, 11, 9, 41, 33, 22, 16, 13] },
+    { name: "quản lý AI", v: [5, 6, 5, 8, 7, 9, 10, 9, 12, 13, 15, 14, 18, 20] },
+  ];
+  const svg = document.getElementById("ts"), W = 760, H = 300, m = { l: 44, r: 150, t: 16, b: 34 };
+  const x = i => m.l + i * (W - m.l - m.r) / (days.length - 1);
+  const ymax = 50, y = v => m.t + (1 - v / ymax) * (H - m.t - m.b);
+  [0, 10, 20, 30, 40, 50].forEach(v => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: v ? "#E7ECEA" : "#9AA6A2", "stroke-width": 1 }, svg);
+    el("text", { x: m.l - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "#6B7773" }, svg).textContent = v;
+  });
+  days.forEach((d, i) => { if (i % 2 === 0) el("text", { x: x(i), y: H - 12, "text-anchor": "middle", "font-size": 11, fill: "#6B7773" }, svg).textContent = d; });
+  S.forEach((s, k) => {
+    el("path", { d: s.v.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" "), fill: "none", stroke: SERIES[k], "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    const last = s.v.length - 1;
+    el("circle", { cx: x(last), cy: y(s.v[last]), r: 4, fill: SERIES[k], stroke: "#FCFCFB", "stroke-width": 2 }, svg);
+    const ly = [y(s.v[last]), y(s.v[last]) + 2, y(s.v[last]) + 14][k];
+    el("text", { x: x(last) + 10, y: ly + 4, "font-size": 12, fill: "#16201D" }, svg).textContent = `${s.name} · ${s.v[last]}`;
+  });
+  el("text", { x: x(9) - 8, y: y(47), "text-anchor": "end", "font-size": 11.5, fill: "#4A5753" }, svg).textContent = "llama.cpp ra bản mới →";
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "#4A5753", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0 }, svg);
+  const dots = S.map((s, k) => el("circle", { r: 5, fill: SERIES[k], stroke: "#FCFCFB", "stroke-width": 2, opacity: 0 }, svg));
+  const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(days.length - 1, Math.round((px - m.l) / ((W - m.l - m.r) / (days.length - 1)))));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 1);
+    dots.forEach((d, k) => { d.setAttribute("cx", x(i)); d.setAttribute("cy", y(S[k].v[i])); d.setAttribute("opacity", 1); });
+    showTip(`<b>${days[i]}</b>` + S.map((s, k) => `<div class="row"><span class="dot" style="background:${SERIES[k]}"></span>${s.name}: <b>${s.v[i]}</b></div>`).join(""), e.clientX, e.clientY);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); dots.forEach(d => d.setAttribute("opacity", 0)); hideTip(); });
+  const lg = document.getElementById("tsLegend");
+  S.forEach((s, k) => { const sp = document.createElement("span"); sp.innerHTML = `<svg width="18" height="10"><line x1="1" y1="5" x2="17" y2="5" stroke="${SERIES[k]}" stroke-width="2.5" stroke-linecap="round"/></svg>${s.name}`; lg.append(sp); });
+  document.getElementById("tsTable").innerHTML = `<table><tr><th>Ngày</th>${S.map(s => `<th class="num">${s.name}</th>`).join("")}</tr>` +
+    days.map((d, i) => `<tr><td>${d}</td>${S.map(s => `<td class="num">${s.v[i]}</td>`).join("")}</tr>`).join("") + "</table>";
+})();
+
+// ---------- tab 07: Louvain ----------
+(function(){
+  const N = [
+    ["OpenAI", 90, 70], ["GPT-6", 200, 50], ["Microsoft", 70, 175], ["Sam Altman", 190, 150],
+    ["Anthropic", 420, 60], ["Claude", 535, 85], ["AWS", 440, 165], ["MCP", 545, 185],
+    ["llama.cpp", 90, 300], ["GGUF", 200, 280], ["Ollama", 75, 395], ["Qwen", 200, 385],
+    ["EU", 420, 290], ["AI Act", 540, 280], ["Mistral", 410, 390], ["California", 545, 385],
+  ].map(([label, x, y]) => ({ label, x, y }));
+  const id = Object.fromEntries(N.map((n, i) => [n.label, i]));
+  const E = [
+    ["OpenAI","GPT-6",6],["OpenAI","Microsoft",5],["OpenAI","Sam Altman",6],["GPT-6","Sam Altman",3],["Microsoft","Sam Altman",1],["GPT-6","Microsoft",1],
+    ["Anthropic","Claude",6],["Anthropic","AWS",4],["Claude","MCP",5],["Anthropic","MCP",3],["Claude","AWS",1],
+    ["llama.cpp","GGUF",6],["llama.cpp","Ollama",4],["GGUF","Ollama",3],["Ollama","Qwen",4],["GGUF","Qwen",1],["llama.cpp","Qwen",1],
+    ["EU","AI Act",6],["EU","Mistral",3],["AI Act","California",3],["EU","California",1],["AI Act","Mistral",2],
+    ["Claude","GPT-6",3],["MCP","OpenAI",2],["Anthropic","OpenAI",2],["Mistral","GGUF",2],["Mistral","Ollama",2],["Microsoft","Mistral",1],["OpenAI","EU",1],["AWS","Ollama",1],
+  ].map(([a, b, w]) => [id[a], id[b], w]);
+  const m = E.reduce((s, e) => s + e[2], 0);
+  const deg = N.map(() => 0); E.forEach(([a, b, w]) => { deg[a] += w; deg[b] += w; });
+  const adj = N.map(() => []); E.forEach(([a, b]) => { adj[a].push(b); adj[b].push(a); });
+  let gamma = 1;
+
+  function Q(memb){
+    const L = {}, D = {};
+    E.forEach(([a, b, w]) => { if (memb[a] === memb[b]) L[memb[a]] = (L[memb[a]] || 0) + w; });
+    N.forEach((_, i) => D[memb[i]] = (D[memb[i]] || 0) + deg[i]);
+    let q = 0; for (const c in D) q += (L[c] || 0) / m - gamma * (D[c] / (2 * m)) ** 2;
+    return q;
+  }
+  let st;
+  function reset(){
+    st = { level: 1, pass: 1, sup: N.map((_, i) => [i]), comm: N.map((_, i) => i), ptr: 0, moved: false, done: false, moves: 0 };
+    log.textContent = "";
+    line("d", `Bắt đầu: mỗi node một cộng đồng. Q = ${fmt(Q(memb()), 3)}`);
+    line("t", `— Cấp 1, vòng 1: di chuyển cục bộ —`);
+    draw();
+  }
+  const memb = () => { const r = []; st.sup.forEach((s, si) => s.forEach(i => r[i] = st.comm[si])); return r; };
+  const supName = s => st.sup[s].length === 1 ? N[st.sup[s][0]].label : `{${st.sup[s].map(i => N[i].label).join(", ")}}`;
+  const log = document.getElementById("lvLog");
+  const line = (cls, t) => { const d = document.createElement("div"); d.className = cls; d.textContent = t; log.append(d); log.scrollTop = log.scrollHeight; };
+
+  // một lần xét một siêu node; trả về true nếu có việc đáng hiển thị
+  function tick(){
+    if (st.done) return true;
+    if (st.ptr >= st.sup.length) {
+      if (st.moved) { st.pass++; st.ptr = 0; st.moved = false; line("t", `— Cấp ${st.level}, vòng ${st.pass}: còn node vừa đổi nhóm, quét lại —`); return true; }
+      const groups = {}; st.sup.forEach((s, si) => (groups[st.comm[si]] ||= []).push(...s));
+      const ns = Object.values(groups);
+      if (ns.length === st.sup.length) { st.done = true; line("t", `Xong. Không còn bước nào làm Q tăng. Q = ${fmt(Q(memb()), 3)}, ${ns.length} cộng đồng.`); return true; }
+      st.sup = ns; st.comm = ns.map((_, i) => i); st.level++; st.pass = 1; st.ptr = 0; st.moved = false;
+      line("t", `— Gộp: mỗi cộng đồng thành một siêu node (${ns.length} siêu node). Cấp ${st.level} —`);
+      return true;
+    }
+    const s = st.ptr++, cur = st.comm[s];
+    const cand = new Set([cur]); st.sup[s].forEach(i => adj[i].forEach(j => { const sj = st.sup.findIndex(g => g.includes(j)); cand.add(st.comm[sj]); }));
+    const base = Q(memb()); let best = cur, bq = base;
+    cand.forEach(c => { st.comm[s] = c; const q = Q(memb()); if (q > bq + 1e-12) { bq = q; best = c; } });
+    st.comm[s] = best;
+    if (best !== cur) {
+      st.moved = true; st.moves++;
+      const mate = st.sup.findIndex((g, gi) => gi !== s && st.comm[gi] === best);
+      line("x", `${supName(s)} → nhóm của ${mate >= 0 ? supName(mate) : "?"}   Q ${fmt(base, 3)} → ${fmt(bq, 3)}`);
+      return true;
+    }
+    line("d", `${supName(s)}: đứng yên (không nơi nào làm Q tăng)`);
+    return false;
+  }
+  function step(){ let n = 0; while (!tick() && n++ < 40); draw(); }
+  function runAll(){ let n = 0; while (!st.done && n++ < 2000) tick(); draw(); }
+
+  const svg = document.getElementById("graph");
+  function draw(){
+    const mb = memb();
+    // tên cộng đồng: theo node có chỉ số nhỏ nhất, để nhãn ổn định; màu cho 4 cộng đồng lớn nhất
+    const groups = {}; mb.forEach((c, i) => (groups[c] ||= []).push(i));
+    const list = Object.values(groups).sort((a, b) => a[0] - b[0]);
+    const letter = {}; list.forEach((g, k) => g.forEach(i => letter[i] = String.fromCharCode(65 + k)));
+    const big = [...list].filter(g => g.length > 1).sort((a, b) => b.length - a.length || a[0] - b[0]).slice(0, 4);
+    const color = {}; big.sort((a, b) => a[0] - b[0]).forEach((g, k) => g.forEach(i => color[i] = SERIES[k]));
+    svg.replaceChildren();
+    E.forEach(([a, b, w]) => {
+      const inside = mb[a] === mb[b];
+      el("line", { x1: N[a].x, y1: N[a].y, x2: N[b].x, y2: N[b].y, stroke: inside ? (color[a] || "#9AA6A2") : "#C9D2CF", "stroke-width": 1 + w * 0.9, "stroke-opacity": inside ? 0.55 : 0.9, "stroke-dasharray": inside ? "" : "4 4", "stroke-linecap": "round" }, svg);
+    });
+    N.forEach((n, i) => {
+      const g = el("g", {}, svg);
+      el("circle", { cx: n.x, cy: n.y, r: 15, fill: color[i] || "#FFFFFF", stroke: color[i] ? "#FCFCFB" : "#6B7773", "stroke-width": 2 }, g);
+      el("text", { x: n.x, y: n.y + 4.5, "text-anchor": "middle", "font-size": 12, "font-weight": 700, "font-family": "IBM Plex Mono", fill: color[i] ? "#fff" : "#16201D" }, g).textContent = letter[i];
+      el("text", { x: n.x, y: n.y + 31, "text-anchor": "middle", "font-size": 12, fill: "#16201D", stroke: "#FCFCFB", "stroke-width": 4, "paint-order": "stroke", "stroke-linejoin": "round" }, g).textContent = n.label;
+      g.addEventListener("pointermove", e => showTip(`<b>${n.label}</b><br>cộng đồng ${letter[i]} · bậc ${deg[i]}<br>${adj[i].map(j => N[j].label).join(", ")}`, e.clientX, e.clientY));
+      g.addEventListener("pointerleave", hideTip);
+    });
+    const q = Q(mb);
+    document.getElementById("lvStatus").innerHTML = st.done
+      ? `<b>Hoàn tất</b> · ${list.length} cộng đồng · Q = <b>${fmt(q, 3)}</b> · γ = ${fmt(gamma, 1)} · ${st.moves} lần di chuyển`
+      : `Cấp <b>${st.level}</b> · vòng ${st.pass} · ${st.sup.length} ${st.level > 1 ? "siêu node" : "node"} · ${list.length} cộng đồng · Q = <b>${fmt(q, 3)}</b>`;
+    const cm = document.getElementById("lvComms"); cm.replaceChildren();
+    list.filter(g => g.length > 1).forEach(g => {
+      const conn = (() => { const set = new Set(g), seen = new Set([g[0]]), q2 = [g[0]]; while (q2.length) { const v = q2.pop(); adj[v].forEach(u => { if (set.has(u) && !seen.has(u)) { seen.add(u); q2.push(u); } }); } return seen.size === g.length; })();
+      const d = document.createElement("div");
+      d.innerHTML = `<span class="sw" style="background:${color[g[0]] || "#16201D"}">${letter[g[0]]}</span><span>${g.map(i => N[i].label).join(", ")} <span class="muted">${conn ? "✓ liền mạch" : "✗ bị đứt"}</span></span>`;
+      cm.append(d);
+    });
+  }
+  document.getElementById("lvStep").addEventListener("click", step);
+  document.getElementById("lvRun").addEventListener("click", runAll);
+  document.getElementById("lvReset").addEventListener("click", reset);
+  document.querySelectorAll("#gSeg button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#gSeg button").forEach(x => x.classList.toggle("on", x === b)); gamma = +b.dataset.g; reset();
+  }));
+  reset();
+})();
+</script>
+</body>
+</html>
