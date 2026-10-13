@@ -1,0 +1,140 @@
+{
+  "exhaustive": { "nbHits": true, "typo": true },
+  "exhaustiveNbHits": true,
+  "exhaustiveTypo": true,
+  "hits": [
+    {
+      "_highlightResult": {
+        "author": { "matchLevel": "none", "matchedWords": [], "value": "kevinmannix" },
+        "title": { "matchLevel": "none", "matchedWords": [], "value": "Trust No Bot" },
+        "url": { "matchLevel": "none", "matchedWords": [], "value": "https://trustnobot.com" }
+      },
+      "_tags": ["story", "author_kevinmannix", "story_49872034"],
+      "author": "kevinmannix",
+      "created_at": "2026-09-27T23:56:14Z",
+      "created_at_i": 1790553374,
+      "num_comments": 0,
+      "objectID": "49872034",
+      "points": 1,
+      "story_id": 49872034,
+      "title": "Trust No Bot",
+      "updated_at": "2026-09-27T23:57:02Z",
+      "url": "https://trustnobot.com"
+    },
+    {
+      "_highlightResult": {
+        "author": { "matchLevel": "none", "matchedWords": [], "value": "cipherdc" },
+        "story_text": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "I previously contributed to OpenStack and Kubernetes and I am looking to get back into open source. With the advancement of AI coding tools, I am wondering how is the space for contributors who wants to contribute to open source projects"
+        },
+        "title": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "Is open source contribution still relevant?"
+        }
+      },
+      "_tags": ["story", "author_cipherdc", "story_49872028", "ask_hn"],
+      "author": "cipherdc",
+      "created_at": "2026-09-27T23:55:26Z",
+      "created_at_i": 1790553326,
+      "num_comments": 0,
+      "objectID": "49872028",
+      "points": 1,
+      "story_id": 49872028,
+      "story_text": "I previously contributed to OpenStack and Kubernetes and I am looking to get back into open source. With the advancement of AI coding tools, I am wondering how is the space for contributors who wants to contribute to open source projects",
+      "title": "Is open source contribution still relevant?",
+      "updated_at": "2026-09-27T23:57:02Z"
+    },
+    {
+      "_highlightResult": {
+        "author": { "matchLevel": "none", "matchedWords": [], "value": "1vuio0pswjnm7" },
+        "title": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "How to Know When the AI Boom Is About to Go Bust"
+        },
+        "url": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "https://www.wsj.com/finance/stocks/how-to-know-when-the-ai-boom-is-about-to-go-bust-61af3d26"
+        }
+      },
+      "_tags": ["story", "author_1vuio0pswjnm7", "story_49872025"],
+      "author": "1vuio0pswjnm7",
+      "created_at": "2026-09-27T23:54:44Z",
+      "created_at_i": 1790553284,
+      "num_comments": 0,
+      "objectID": "49872025",
+      "points": 1,
+      "story_id": 49872025,
+      "title": "How to Know When the AI Boom Is About to Go Bust",
+      "updated_at": "2026-09-27T23:57:02Z",
+      "url": "https://www.wsj.com/finance/stocks/how-to-know-when-the-ai-boom-is-about-to-go-bust-61af3d26"
+    },
+    {
+      "_highlightResult": {
+        "author": { "matchLevel": "none", "matchedWords": [], "value": "serengil" },
+        "story_text": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "In early 2020, tensorflow was the dominant deep learning framework. So, deepface was built to run on top of tensorflow. Thereafter, pytorch becomes the dominant framework for deep learning. We got many requests from community to support pytorch.<p>In the latest release (v0.0.101), DeepFace can now run on top of PyTorch alongside TensorFlow!<p>Users has been installing deepface as `pip install deepface` commmand and this was installing its tensorflow dependency. Now, users should install the library as `pip install deepface[tensorflow]` or `pip install deepface[pytorch]` commands to install its deep learning framework dependency. To avoid releasing breaking change, the default `pip install deepface` command will continue to install tensorflow for a while.<p>Be appreciate it if you share your comments, feedbacks and opinions."
+        },
+        "title": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "Show HN: DeepFace is now running on PyTorch alongside TensorFlow"
+        },
+        "url": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "https://github.com/serengil/deepface"
+        }
+      },
+      "_tags": ["story", "author_serengil", "story_49872023", "show_hn"],
+      "author": "serengil",
+      "created_at": "2026-09-27T23:54:43Z",
+      "created_at_i": 1790553283,
+      "num_comments": 0,
+      "objectID": "49872023",
+      "points": 1,
+      "story_id": 49872023,
+      "story_text": "In early 2020, tensorflow was the dominant deep learning framework. So, deepface was built to run on top of tensorflow. Thereafter, pytorch becomes the dominant framework for deep learning. We got many requests from community to support pytorch.<p>In the latest release (v0.0.101), DeepFace can now run on top of PyTorch alongside TensorFlow!<p>Users has been installing deepface as `pip install deepface` commmand and this was installing its tensorflow dependency. Now, users should install the library as `pip install deepface[tensorflow]` or `pip install deepface[pytorch]` commands to install its deep learning framework dependency. To avoid releasing breaking change, the default `pip install deepface` command will continue to install tensorflow for a while.<p>Be appreciate it if you share your comments, feedbacks and opinions.",
+      "title": "Show HN: DeepFace is now running on PyTorch alongside TensorFlow",
+      "updated_at": "2026-09-27T23:57:02Z",
+      "url": "https://github.com/serengil/deepface"
+    },
+    {
+      "_highlightResult": {
+        "author": { "matchLevel": "none", "matchedWords": [], "value": "birdculture" },
+        "title": { "matchLevel": "none", "matchedWords": [], "value": "How a Zig IDE Could Work" },
+        "url": {
+          "matchLevel": "none",
+          "matchedWords": [],
+          "value": "https://matklad.github.io/2023/02/10/how-a-zig-ide-could-work.html"
+        }
+      },
+      "_tags": ["story", "author_birdculture", "story_49872007"],
+      "author": "birdculture",
+      "created_at": "2026-09-27T23:51:51Z",
+      "created_at_i": 1790553111,
+      "num_comments": 0,
+      "objectID": "49872007",
+      "points": 1,
+      "story_id": 49872007,
+      "title": "How a Zig IDE Could Work",
+      "updated_at": "2026-09-27T23:54:22Z",
+      "url": "https://matklad.github.io/2023/02/10/how-a-zig-ide-could-work.html"
+    }
+  ],
+  "hitsPerPage": 5,
+  "nbHits": 31,
+  "nbPages": 7,
+  "page": 0,
+  "params": "tags=story&numericFilters=created_at_i%3E1790549832&hitsPerPage=5&advancedSyntax=true&analyticsTags=backend",
+  "processingTimeMS": 1,
+  "processingTimingsMS": { "_request": { "queue": 4, "roundTrip": 22 }, "total": 1 },
+  "query": "",
+  "serverTimeMS": 6
+}
