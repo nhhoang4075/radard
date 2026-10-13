@@ -118,7 +118,7 @@ async function addCall(at: string, task: string, costUsd: number) {
   });
 }
 
-async function addDoc(sourceId: number, fetchedAt: string) {
+async function addDoc(sourceId: number, fetchedAt: string, publishedAt?: string) {
   const id = ++msg;
   await db.insert(documents).values({
     sourceId,
@@ -126,6 +126,7 @@ async function addDoc(sourceId: number, fetchedAt: string) {
     url: `https://x.com/${id}`,
     urlCanonical: `https://x.com/${id}`,
     fetchedAt: new Date(fetchedAt),
+    ...(publishedAt ? { publishedAt: new Date(publishedAt) } : {}),
     contentSha256: `s${id}`,
     rawKey: `r/${id}`,
     contentType: "application/json",
@@ -355,6 +356,32 @@ describe("buildReport", () => {
     ]);
   });
 
+  test("số liệu: tài liệu theo ngày đăng, bài lấy bù tính về ngày đăng; 'lấy về' theo fetched_at", async () => {
+    // Lấy bù: đăng 17/10 10:00 VN, tải về 19/10 10:00 VN.
+    await addDoc(hn, "2026-10-19T03:00:00Z", "2026-10-17T03:00:00Z");
+    const m = (await report()).metrics;
+    const day = (d: string) => m.docsPerDay.find((x) => x.day === d);
+    expect(day("2026-10-17")).toEqual({
+      day: "2026-10-17",
+      bySource: { "GitHub Trending": 0, HN: 1 },
+      total: 1,
+      fetched: 0,
+    });
+    expect(day("2026-10-19")).toEqual({
+      day: "2026-10-19",
+      bySource: { "GitHub Trending": 0, HN: 0 },
+      total: 0,
+      fetched: 1,
+    });
+    // Không có published_at (3 tài liệu cũ) thì đếm theo fetched_at ở cả hai cột.
+    expect(day("2026-10-13")).toMatchObject({ total: 2, fetched: 2 });
+    expect(day("2026-10-14")).toMatchObject({ total: 1, fetched: 1 });
+    const block = formatReport(await report()).find(
+      (b) => Array.isArray(b) && b[0] && "lấy về" in b[0],
+    ) as Record<string, unknown>[];
+    expect(block[4]).toMatchObject({ "tổng tài liệu đăng": 1, "lấy về": 0 });
+  });
+
   test("số liệu: tài liệu/ngày theo nguồn, sự kiện/ngày", async () => {
     const m = (await report()).metrics;
     expect(m.sources).toEqual(["GitHub Trending", "HN"]);
@@ -362,6 +389,7 @@ describe("buildReport", () => {
       day: "2026-10-13",
       bySource: { "GitHub Trending": 0, HN: 2 },
       total: 2,
+      fetched: 2,
     });
     expect(m.docsPerDay[1]?.bySource).toEqual({ "GitHub Trending": 1, HN: 0 });
     expect(m.docsPerDay.reduce((a, d) => a + d.total, 0)).toBe(3);

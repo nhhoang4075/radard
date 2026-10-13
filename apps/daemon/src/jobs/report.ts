@@ -9,7 +9,7 @@
  *   3. ≥ 70% tin sự kiện có ít nhất một 👍/👎 (D6, chốt 13/10/2026). Chỉ `deliveries.kind = 'event'`; mỗi tin lấy
  *      lượt bấm MỚI NHẤT (feedback chỉ ghi thêm, đổi ý là dòng mới).
  *   4. Chi phí model < $0,1 mỗi ngày lịch giờ VN.
- *   5. Số liệu đầu tiên: tài liệu/ngày theo nguồn, sự kiện/ngày, số sự kiện qua cổng mỗi digest,
+ *   5. Số liệu đầu tiên: tài liệu đăng/ngày theo nguồn (kèm tổng lấy về), sự kiện/ngày, số sự kiện qua cổng mỗi digest,
  *      tỉ lệ 👍.
  *
  * Cửa sổ: các khoảng 24 giờ của digest kết thúc ở khung 07:00 gần nhất đã quá hạn gửi. Fetch,
@@ -131,7 +131,16 @@ export interface CostReport {
 
 export interface MetricsReport {
   sources: string[];
-  docsPerDay: { day: string; bySource: Record<string, number>; total: number }[];
+  /**
+   * Theo NGÀY ĐĂNG `coalesce(published_at, fetched_at)` (cùng mốc điểm tin của digest/rank); nguồn
+   * không có ngày đăng (GitHub repo) rơi về giờ lấy về. `fetched` là tổng tài liệu theo `fetched_at`.
+   */
+  docsPerDay: {
+    day: string;
+    bySource: Record<string, number>;
+    total: number;
+    fetched: number;
+  }[];
   /** Theo `events.first_seen_at` (bảng events không có giờ tạo; `events rebuild` dựng lại). */
   eventsPerDay: { day: string; n: number }[];
 }
@@ -396,13 +405,24 @@ async function costReport(db: Database, w: ReportWindow): Promise<CostReport> {
 // 5. Số liệu đầu tiên
 
 async function metricsReport(db: Database, w: ReportWindow): Promise<MetricsReport> {
+  // Ngày đăng: cùng mốc `coalesce(published_at, fetched_at)` mà rank.ts dùng để chọn tin 24 giờ qua.
   const docs = [
     ...(await db.execute<{ day: string; source: string; n: number }>(sql`
-      select to_char(d.fetched_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day,
+      select to_char(coalesce(d.published_at, d.fetched_at) at time zone 'Asia/Ho_Chi_Minh',
+          'YYYY-MM-DD') as day,
         s.name source, count(*)::int n
       from documents d join sources s on s.id = d.source_id
-      where d.fetched_at >= ${w.dayStart} and d.fetched_at < ${w.dayEnd}
+      where coalesce(d.published_at, d.fetched_at) >= ${w.dayStart}
+        and coalesce(d.published_at, d.fetched_at) < ${w.dayEnd}
       group by 1, 2`)),
+  ];
+  // Ngày lấy về: để các ngày lấy bù hoặc daemon tắt vẫn hiện ra.
+  const fetchedRows = [
+    ...(await db.execute<{ day: string; n: number }>(sql`
+      select to_char(fetched_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day,
+        count(*)::int n
+      from documents where fetched_at >= ${w.dayStart} and fetched_at < ${w.dayEnd}
+      group by 1`)),
   ];
   const evs = [
     ...(await db.execute<{ day: string; n: number }>(sql`
@@ -415,7 +435,12 @@ async function metricsReport(db: Database, w: ReportWindow): Promise<MetricsRepo
   const docsPerDay = w.days.map((day) => {
     const bySource: Record<string, number> = Object.fromEntries(sources.map((s) => [s, 0]));
     for (const d of docs) if (d.day === day) bySource[d.source] = d.n;
-    return { day, bySource, total: Object.values(bySource).reduce((a, n) => a + n, 0) };
+    return {
+      day,
+      bySource,
+      total: Object.values(bySource).reduce((a, n) => a + n, 0),
+      fetched: fetchedRows.find((f) => f.day === day)?.n ?? 0,
+    };
   });
   const eventsPerDay = w.days.map((day) => ({
     day,
@@ -544,20 +569,27 @@ function costBlocks(c: CostReport): Block[] {
 
 function metricsBlocks(r: Report): Block[] {
   const m = r.metrics;
-  const out: Block[] = ["5. Số liệu đầu tiên", "   Tài liệu mỗi ngày theo nguồn, và sự kiện mới:"];
+  const out: Block[] = [
+    "5. Số liệu đầu tiên",
+    "   Tài liệu đăng mỗi ngày theo nguồn, tài liệu lấy về, và sự kiện mới:",
+  ];
   out.push(
     m.docsPerDay.map((d, i) => ({
       ngày: d.day,
       ...d.bySource,
-      "tổng tài liệu": d.total,
+      "tổng tài liệu đăng": d.total,
+      "lấy về": d.fetched,
       "sự kiện mới": m.eventsPerDay[i]?.n ?? 0,
     })),
+  );
+  out.push(
+    "   Đăng: ngày bài được đăng (cùng mốc điểm tin dùng). Lấy về: ngày radard tải về; chênh nhiều là ngày lấy bù hoặc daemon tắt.",
   );
   const n = Math.max(1, m.docsPerDay.length);
   const avg = m.sources.map(
     (s) => `${s} ${dec(m.docsPerDay.reduce((a, d) => a + (d.bySource[s] ?? 0), 0) / n, 1)}`,
   );
-  if (avg.length) out.push(`   Trung bình tài liệu/ngày: ${avg.join(", ")}`);
+  if (avg.length) out.push(`   Trung bình tài liệu đăng/ngày: ${avg.join(", ")}`);
   out.push("   Sự kiện qua cổng chủ đề mỗi digest:");
   out.push(
     r.digests.days.map((d) => ({
