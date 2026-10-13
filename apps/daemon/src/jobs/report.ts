@@ -4,8 +4,9 @@
  *
  *   1. ≥ 95% lượt fetch thành công (ok, not_modified, behind): chung và theo từng nguồn, vì một
  *      trang cào (GitHub Trending) hỏng không được che mất việc các nguồn còn lại có khoẻ không.
- *   2. Mọi digest đến đúng giờ: `sent`, `sent_at` lệch < 10 phút sau khung 07:00 giờ VN.
- *   3. ≥ 70% tin sự kiện có ít nhất một 👍/👎 (D6). Chỉ `deliveries.kind = 'event'`; mỗi tin lấy
+ *   2. Mọi digest đến đúng giờ: `sent`, tin MỞ ĐẦU tới người dùng lệch < 10 phút sau khung 07:00
+ *      giờ VN (`deliveries.sent_at` của tin header, vị trí 0; chưa có thì dùng `digests.sent_at`).
+ *   3. ≥ 70% tin sự kiện có ít nhất một 👍/👎 (D6, chốt 13/10/2026). Chỉ `deliveries.kind = 'event'`; mỗi tin lấy
  *      lượt bấm MỚI NHẤT (feedback chỉ ghi thêm, đổi ý là dòng mới).
  *   4. Chi phí model < $0,1 mỗi ngày lịch giờ VN.
  *   5. Số liệu đầu tiên: tài liệu/ngày theo nguồn, sự kiện/ngày, số sự kiện qua cổng mỗi digest,
@@ -80,8 +81,11 @@ export interface DigestDay {
   date: string;
   digestId: number | null;
   status: "sent" | "sending" | "failed" | "missing";
+  /** Lúc tin mở đầu tới người dùng; chưa có tin mở đầu thì là `digests.sent_at`. */
   sentAt: Date | null;
-  /** Phút từ khung 07:00 tới `sent_at`; trống khi chưa gửi xong. */
+  /** Chưa có delivery tin mở đầu nên `sentAt` lấy từ `digests.sent_at` (sau tin cuối). */
+  headerFallback: boolean;
+  /** Phút từ khung 07:00 tới `sentAt`; trống khi digest chưa `sent`. */
   delayMin: number | null;
   onTime: boolean;
   /** Số tin sự kiện đã gửi (deliveries `event`), không tính tin mở đầu. */
@@ -216,6 +220,7 @@ async function fetchReport(db: Database, w: ReportWindow): Promise<FetchReport> 
   const total = rows.reduce((a, r) => a + r.total, 0);
   const ok = rows.reduce((a, r) => a + r.ok, 0);
   const rate = ratio(ok, total);
+  // Cố ý: lượt kẹt ở `running` không nằm trong FETCH_OK_STATUSES nên tính là hỏng (lượt chưa xong là lượt hỏng).
   return {
     pass: rate !== null && rate >= FETCH_MIN_SUCCESS,
     total,
@@ -240,6 +245,8 @@ type DigestRow = {
   periodEnd: Date;
   status: string;
   sentAt: Date | null;
+  /** `deliveries.sent_at` của tin mở đầu (kind `header`, vị trí 0); trống khi chưa có. */
+  headerSentAt: Date | null;
   meta: Record<string, unknown>;
   items: number;
 };
@@ -252,6 +259,7 @@ function digestDay(slot: Date, row: DigestRow | undefined): DigestDay {
       digestId: null,
       status: "missing",
       sentAt: null,
+      headerFallback: false,
       delayMin: null,
       onTime: false,
       items: 0,
@@ -259,15 +267,18 @@ function digestDay(slot: Date, row: DigestRow | undefined): DigestDay {
       passedGate: null,
     };
   }
-  const sent = row.status === "sent" && row.sentAt !== null;
+  const headerFallback = row.headerSentAt === null;
+  const arrivedAt = row.headerSentAt ?? row.sentAt;
+  const sent = row.status === "sent" && arrivedAt !== null;
   const delayMin =
-    sent && row.sentAt ? Math.round((row.sentAt.getTime() - slot.getTime()) / 6_000) / 10 : null;
+    sent && arrivedAt ? Math.round((arrivedAt.getTime() - slot.getTime()) / 6_000) / 10 : null;
   const ranking = (row.meta.plan as DigestPlan | undefined)?.ranking;
   return {
     ...base,
     digestId: row.id,
     status: row.status as DigestDay["status"],
-    sentAt: row.sentAt,
+    sentAt: arrivedAt,
+    headerFallback: headerFallback && arrivedAt !== null,
     delayMin,
     onTime: delayMin !== null && delayMin >= 0 && delayMin < DIGEST_MAX_DELAY_MIN,
     items: row.items,
@@ -283,6 +294,9 @@ async function digestReport(db: Database, w: ReportWindow): Promise<DigestReport
       periodEnd: digests.periodEnd,
       status: digests.status,
       sentAt: digests.sentAt,
+      // `digests.sent_at` đặt SAU tin cuối nên không đo được giờ người dùng nhận tin đầu.
+      headerSentAt: sql<Date | null>`(select h.sent_at from deliveries h
+        where h.digest_id = digests.id and h.kind = 'header' and h.position = 0)`,
       meta: digests.meta,
       // Ghi rõ `digests.id`: trong truy vấn con, "id" trần sẽ bị hiểu là id của deliveries.
       items: sql<number>`(select count(*)::int from deliveries x
@@ -294,7 +308,12 @@ async function digestReport(db: Database, w: ReportWindow): Promise<DigestReport
   // MVP-0 có một người nhận: mỗi khung một dòng. Nhiều dòng cùng khung thì lấy dòng tạo trước.
   const bySlot = new Map<number, DigestRow>();
   for (const r of rows) {
-    if (!bySlot.has(r.periodEnd.getTime())) bySlot.set(r.periodEnd.getTime(), r);
+    if (!bySlot.has(r.periodEnd.getTime())) {
+      bySlot.set(r.periodEnd.getTime(), {
+        ...r,
+        headerSentAt: r.headerSentAt === null ? null : new Date(r.headerSentAt),
+      });
+    }
   }
   const days = w.slots.map((s) => digestDay(s, bySlot.get(s.getTime())));
   const onTime = days.filter((d) => d.onTime).length;
@@ -481,21 +500,23 @@ const STATUS_VI: Record<DigestDay["status"], string> = {
 
 function digestBlocks(d: DigestReport): Block[] {
   return [
-    `${mark(d.pass)} 2. Digest đúng giờ (lệch < ${DIGEST_MAX_DELAY_MIN} phút sau 07:00): ${d.onTime}/${d.expected}`,
+    `${mark(d.pass)} 2. Digest đúng giờ (tin mở đầu lệch < ${DIGEST_MAX_DELAY_MIN} phút sau 07:00): ${d.onTime}/${d.expected}`,
     d.days.map((x) => ({
       ngày: x.date,
       "trạng thái": STATUS_VI[x.status],
-      "gửi lúc": x.sentAt ? vnTime(x.sentAt) : "",
+      "tin mở đầu lúc": x.sentAt ? vnTime(x.sentAt) : "",
       "lệch (phút)": x.delayMin === null ? "" : dec(x.delayMin, 1),
       tin: x.items,
       "đúng giờ": mark(x.onTime),
+      "ghi chú": x.headerFallback ? "chưa có tin mở đầu, dùng digests.sent_at" : "",
     })),
   ];
 }
 
 function feedbackBlocks(f: FeedbackReport): Block[] {
   return [
-    `${mark(f.pass)} 3. Tin sự kiện được bấm thích/không thích ≥ ${pct(FEEDBACK_MIN_RATED)}: ${pct(f.rate)} (${f.rated}/${f.deliveries} tin)`,
+    // D6, chốt 13/10/2026: chỉ tiêu chí tỉ lệ này; KHÔNG có dòng đạt/không đạt theo số lượt tuyệt đối.
+    `${mark(f.pass)} 3. ≥ ${Math.round(FEEDBACK_MIN_RATED * 100)}% tin sự kiện có ít nhất một 👍 hoặc 👎: ${pct(f.rate)} (${f.rated}/${f.deliveries} tin)`,
     `   Theo lượt bấm mới nhất: ${f.likes} thích, ${f.dislikes} không thích (không tính tin thử)`,
   ];
 }

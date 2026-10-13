@@ -68,7 +68,11 @@ async function addDigest(
   return d?.id ?? 0;
 }
 
-async function addDelivery(digestId: number | null, position: number): Promise<number> {
+async function addDelivery(
+  digestId: number | null,
+  position: number,
+  sentAt?: Date,
+): Promise<number> {
   const kind = digestId === null ? "test" : position === 0 ? "header" : "event";
   const [d] = await db
     .insert(deliveries)
@@ -81,6 +85,7 @@ async function addDelivery(digestId: number | null, position: number): Promise<n
       position: digestId === null ? null : position,
       eventId: kind === "event" ? position : null,
       body: "tin",
+      ...(sentAt ? { sentAt } : {}),
     })
     .returning({ id: deliveries.id });
   return d?.id ?? 0;
@@ -178,7 +183,7 @@ beforeEach(async () => {
   await addDigest(slot(7), "sent", 1);
   const old = await addDigest(START, "sent", 1);
 
-  await addDelivery(d1, 0);
+  await addDelivery(d1, 0, new Date(slot(1).getTime() + 2 * MIN));
   for (const p of [1, 2, 3]) ev[`d1p${p}`] = await addDelivery(d1, p);
   for (const p of [1, 2]) ev[`d2p${p}`] = await addDelivery(d2, p);
   ev.test = await addDelivery(null, 0);
@@ -275,6 +280,42 @@ describe("buildReport", () => {
     expect(d.days[3]?.candidates).toBeNull();
   });
 
+  test("digest: đo theo tin mở đầu, không theo digests.sent_at", async () => {
+    // Ngày 3 (16/10, đang thiếu): tin mở đầu 1 phút nhưng digests.sent_at muộn 40 phút -> đúng giờ.
+    const onTime = await addDigest(slot(3), "sent", 40);
+    await addDelivery(onTime, 0, new Date(slot(3).getTime() + MIN));
+    // Ngày 5: digests.sent_at chỉ 1 phút nhưng tin mở đầu muộn 15 phút -> không đúng giờ.
+    await db.execute(sql`update digests set sent_at = period_end + interval '1 minute'
+      where period_end = ${slot(5)}`);
+    const late = await db.execute<{ id: number }>(
+      sql`select id from digests where period_end = ${slot(5)}`,
+    );
+    await addDelivery([...late][0]?.id ?? 0, 0, new Date(slot(5).getTime() + 15 * MIN));
+    const days = (await report()).digests.days;
+    expect([days[2]?.delayMin, days[2]?.onTime, days[2]?.headerFallback]).toEqual([1, true, false]);
+    expect([days[4]?.delayMin, days[4]?.onTime, days[4]?.headerFallback]).toEqual([
+      15,
+      false,
+      false,
+    ]);
+  });
+
+  test("digest: chưa có tin mở đầu thì dùng digests.sent_at và ghi chú", async () => {
+    const days = (await report()).digests.days;
+    // Ngày 1 có tin mở đầu; ngày 2 (digest 9,5 phút) chưa có.
+    expect([days[0]?.delayMin, days[0]?.headerFallback]).toEqual([2, false]);
+    expect([days[1]?.delayMin, days[1]?.onTime, days[1]?.headerFallback]).toEqual([
+      9.5,
+      true,
+      true,
+    ]);
+    const table = formatReport(await report()).find(
+      (b) => Array.isArray(b) && b[0] && "tin mở đầu lúc" in b[0],
+    ) as Record<string, unknown>[];
+    expect(table[0]?.["ghi chú"]).toBe("");
+    expect(String(table[1]?.["ghi chú"])).toContain("digests.sent_at");
+  });
+
   test("phản hồi: chỉ tin sự kiện trong cửa sổ, lượt bấm mới nhất thắng", async () => {
     const f = (await report()).feedback;
     // 5 tin sự kiện (tin thử và tin của khung ngoài cửa sổ không tính); 3 tin đã bấm.
@@ -334,7 +375,8 @@ describe("buildReport", () => {
       .filter((b): b is string => typeof b === "string")
       .join("\n");
     expect(text).toContain("✗ 1. Fetch thành công ≥ 95,0%: 84,0% (21/25 lượt)");
-    expect(text).toContain("✗ 2. Digest đúng giờ (lệch < 10 phút sau 07:00): 4/7");
+    expect(text).toContain("✗ 2. Digest đúng giờ (tin mở đầu lệch < 10 phút sau 07:00): 4/7");
+    expect(text).toContain("✗ 3. ≥ 70% tin sự kiện có ít nhất một 👍 hoặc 👎: 60,0% (3/5 tin)");
     expect(text).toContain("✗ Tổng: đạt 0/4 tiêu chí");
   });
 
