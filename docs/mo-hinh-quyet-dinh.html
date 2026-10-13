@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Model quyết định</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --red:#A63A2B; --red-soft:#F8E4E0;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.65}
+.wrap{max-width:980px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.5vw,38px)}
+h2{font-size:21px;margin:30px 0 10px}
+h3{font-size:16.5px;margin:0 0 6px}
+p{margin:8px 0} ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0}
+a{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:74ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button span{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-right:6px}
+.panel{display:none} .panel.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+.answer{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 12px 12px 0;padding:12px 18px;margin-top:14px}
+.answer h3{margin-bottom:4px}
+.term{display:grid;grid-template-columns:170px 1fr;gap:4px 14px;margin-top:10px}
+.term dt{font-weight:600} .term dd{margin:0;color:var(--ink-2)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px;background:var(--surface)}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--ink-3);font-weight:600;font-family:var(--mono);background:#FAFBFA}
+td.n{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.p-hi{background:var(--accent-soft);color:var(--accent)} .p-mid{background:var(--warn-soft);color:var(--warn)} .p-no{background:var(--red-soft);color:var(--red)} .p-info{background:var(--blue-soft);color:var(--blue)}
+.mock{background:#1F2A27;color:#EEF3F1;border-radius:14px;padding:14px 16px;font-size:14px;max-width:440px;margin-top:10px}
+.mock .t{font-weight:600} .mock .m{color:#B8C7C2;font-size:13px;margin-top:6px}
+.mock .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mock .btns span{background:#2F3E3A;border-radius:8px;padding:6px 10px;font-size:13px}
+.mock .btns span.go{background:#0E6E5C}
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps li{counter-increment:s;position:relative;padding-left:34px;margin:10px 0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:13px;display:grid;place-items:center}
+.note{font-size:13.5px;color:var(--ink-3);margin-top:8px}
+.src{font-size:13px;color:var(--ink-2)} .src li{margin:2px 0}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:640px){.term{grid-template-columns:1fr} td.n{white-space:normal}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">RADARD · ĐỀ XUẤT · 13/10/2026</div>
+  <h1>Model quyết định (kiểu Jev) dùng được ở đâu trong radard</h1>
+  <p class="lede">Ba câu hỏi: cảnh báo chủ đề gần giống có nên đưa model vào khi không chắc không; gợi ý chủ đề từ lời mô tả của bạn có dùng được model quyết định không; và còn chỗ nào trong radard nên dùng. Mọi kết luận dưới đây dựa trên số đo trên dữ liệu radard và các lần gọi thật 6 model ra quyết định qua Vercel AI Gateway hôm nay.</p>
+
+  <div class="answer"><h3>1. Cảnh báo chủ đề gần giống</h3><p>Nên làm, nhưng <b>số đo quyết định có cảnh báo hay không</b>, model chỉ trả lời "quan hệ là gì" (trùng, hẹp hơn, rộng hơn, khác), còn <b>bạn quyết định</b>. Thử 6 model ra quyết định trên AI Gateway với 7 ca có đáp án: Jev, Microsoft Decision-1 và GPT-6 Luna Decisions đúng 7/7; Jev nhanh nhất trong ba (~0,5 giây) và rẻ nhất (cùng giá Microsoft).</p></div>
+  <div class="answer"><h3>2. Gợi ý chủ đề từ lời mô tả</h3><p>Ý tưởng tốt, nhưng <b>model ra quyết định không hợp ở đây</b>: cả 6 model thử chỉ đúng 4–5/9 chủ đề bạn đã chọn, vì gần như mọi chủ đề đều được xác suất cao. LLM thường làm tốt hơn (8/9 chủ đề bạn đã chọn) và còn đề xuất được chủ đề mới ngoài thư viện, việc model quyết định không làm được.</p></div>
+  <div class="answer"><h3>3. Chỗ khác trong radard</h3><p>Hai chỗ đáng thử nhất: <b>phân xử cặp sự kiện "có phải cùng một chuyện"</b> ở vùng giống 0,85–0,9, và <b>kiểm lại tin ở sát cổng chủ đề</b> (lỗi kiểu Janas). Cả hai là câu hỏi có/không, số lượng lớn, cần nhanh và rẻ, đúng thế mạnh của Jev. Không dùng cho tóm tắt, tiêu đề hay công thức xếp hạng.</p></div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="jev"><span>01</span>Jev là gì</button>
+    <button role="tab" aria-selected="false" data-tab="gan-giong"><span>02</span>Chủ đề gần giống</button>
+    <button role="tab" aria-selected="false" data-tab="goi-y"><span>03</span>Gợi ý chủ đề</button>
+    <button role="tab" aria-selected="false" data-tab="cho-khac"><span>04</span>Chỗ khác</button>
+    <button role="tab" aria-selected="false" data-tab="so-sanh"><span>05</span>So sánh model</button>
+    <button role="tab" aria-selected="false" data-tab="lam-gi"><span>06</span>Làm gì tiếp</button>
+  </div>
+
+  <!-- 01 -->
+  <section class="panel on" id="jev" role="tabpanel">
+    <h2>Model quyết định khác LLM ở đâu</h2>
+    <dl class="term">
+      <dt>LLM</dt><dd>Viết văn bản. Muốn nó chọn một đáp án thì phải dặn trả JSON rồi đọc lại; không có sẵn "mức chắc chắn" đáng tin.</dd>
+      <dt>Model quyết định</dt><dd>Không viết gì. Bạn đưa một <b>trạng thái</b> (đoạn văn, JSON) và các <b>câu hỏi có kiểu</b>; nó trả đúng kiểu đó kèm xác suất: <code>boolean</code> (có/không, xác suất 0–1), <code>choice</code> (chọn 1 trong tối đa 255 phương án có mô tả), <code>score</code> (thang 2–10 mức).</dd>
+      <dt>Jev</dt><dd>Của TypeSafe AI, ra mắt 15/09/2026, tự gọi là "System One model" (theo Kahneman: nghĩ nhanh). Đóng, chạy trên dịch vụ của họ.</dd>
+      <dt>Laya</dt><dd>Bản mã nguồn mở (Apache 2.0, 322–421 triệu tham số), cùng API với Jev, chạy được trên máy; theo chính repo của nó thì chưa tinh chỉnh cho việc cụ thể thì yếu và tự tin quá mức.</dd>
+    </dl>
+
+    <h2>Số liệu đã kiểm</h2>
+    <table>
+      <tr><th>Mục</th><th>Jev</th><th>Nguồn</th></tr>
+      <tr><td>Có trên Vercel AI Gateway (radard đang dùng)</td><td>Có: <code>typesafe-ai/jev</code>, loại "evaluation". Laya cũng có: <code>convaiinnovations/laya</code>, miễn phí</td><td>Danh sách model của Gateway, tôi kiểm 13/10</td></tr>
+      <tr><td>Giá</td><td>$0,042 / 1 triệu token vào, token ra miễn phí</td><td>Tài liệu TypeSafe và Gateway, khớp nhau</td></tr>
+      <tr><td>Giới hạn</td><td>64k token mỗi request; 32k cho trạng thái + câu hỏi dài nhất</td><td>Tài liệu TypeSafe</td></tr>
+      <tr><td>Tiếng Việt</td><td>Không được nhắc. Tài liệu chỉ nói tiếng Anh tốt nhất, ngôn ngữ khác "không tốt bằng", tự thử trước</td><td>Tài liệu TypeSafe</td></tr>
+      <tr><td>Độ trễ đo được</td><td>Hãng nói 70–500 ms; Red Hat đo ~360 ms; tôi đo 0,6–0,8 giây cho 17 câu hỏi một lượt, từ máy ở Việt Nam</td><td>Red Hat; lần gọi thật 13/10</td></tr>
+      <tr><td>Xác suất có đáng tin không</td><td>Một bài đánh giá độc lập (346 nghìn request, 37 bộ dữ liệu) đo sai số hiệu chỉnh gộp ECE 0,028: tốt. Nhưng câu có/không thì hơi thiếu tự tin, và khi không phương án nào đúng nó vẫn tự tin trung bình 54% (LLM chỉ 6–22%)</td><td>arXiv 2609.37647; benchmark nibzard</td></tr>
+      <tr><td>Có hơn các cách khác không</td><td>Red Hat: "không vượt trội một cách đáng tin" so với LLM chấm, model phân loại đã huấn luyện, hay model quyết định mã nguồn mở, cả về tốc độ lẫn độ chính xác</td><td>Red Hat, 02/10/2026</td></tr>
+      <tr><td>Điểm yếu đã biết</td><td>Đọc theo nghĩa đen, phủ định kép, đếm và so số, ngày tháng, nội dung cố tình lừa (prompt injection), thứ tự phương án (thiên về phương án đầu)</td><td>Tài liệu TypeSafe "jaggedness"</td></tr>
+    </table>
+    <p class="note">Thông tin về Jev đều sau mốc kiến thức của tôi (06/2026), nên tôi chỉ ghi những gì đọc được từ nguồn hoặc tự đo; nguồn đầy đủ ở cuối trang.</p>
+  </section>
+
+  <!-- 02 -->
+  <section class="panel" id="gan-giong" role="tabpanel">
+    <h2>Vì sao một con số không đủ</h2>
+    <p>Hai cách đo "gần giống", trên 17 chủ đề thư viện và dữ liệu radard:</p>
+    <ul>
+      <li><b>Câu mô tả giống nhau (cosine):</b> hai chủ đề <i>khác hẳn</i> như "Phần mềm có AI" và "Công ty &amp; đầu tư AI" vẫn được 0,84. Trung vị của 136 cặp là 0,59. Không có ngưỡng nào tách được.</li>
+      <li><b>Chung bài khớp nhất</b> (trong 300 bài khớp nhất của mỗi chủ đề, bao nhiêu bài trùng): tốt hơn, vì đo đúng thứ bạn quan tâm, tức điểm tin sẽ nhận những tin nào. Nhưng chủ đề cố ý tách riêng cũng chung nhiều: "Model mới ra" và "Model mã nguồn mở" chung 48%.</li>
+    </ul>
+    <table>
+      <tr><th>Chủ đề tự thêm (thử)</th><th>Gần nhất trong thư viện</th><th>Cosine</th><th>Chung bài</th><th>Jev nói</th><th>Laya nói</th></tr>
+      <tr><td>Bảo mật AI</td><td>An toàn &amp; nguyên lý AI</td><td class="n">0,79</td><td class="n">45%</td><td><span class="pill p-hi">hẹp hơn 0,76</span></td><td><span class="pill p-mid">trùng 0,40</span></td></tr>
+      <tr><td>Chạy LLM trên máy</td><td>Model mã nguồn mở</td><td class="n">0,81</td><td class="n">70%</td><td><span class="pill p-hi">hẹp hơn 0,94</span></td><td><span class="pill p-mid">trùng 0,59</span></td></tr>
+      <tr><td>Agent cho lập trình</td><td>Agent AI</td><td class="n">—</td><td class="n">—</td><td><span class="pill p-hi">hẹp hơn 1,00</span></td><td><span class="pill p-no">rộng hơn 0,34</span></td></tr>
+    </table>
+    <p class="note">"Chạy LLM trên máy" chung tới 70% bài với "Model mã nguồn mở" nhưng không thừa: nó hẹp hơn, và chính là đề tài lớn đang bị rải ra 13 chủ đề (xem bertopic-trong-radard.html). Số đo cho biết <i>chồng lấn bao nhiêu</i>; muốn biết <i>quan hệ gì</i> thì cần phán đoán. Jev trả lời hợp lý cả 3 ca; Laya chưa tinh chỉnh thì không dùng được (đúng như repo của nó cảnh báo). Chỉ 3 ca, chưa đủ để kết luận chắc.</p>
+
+    <h2>Đề xuất cách làm</h2>
+    <ol class="steps">
+      <li><b>Đo, không gọi model.</b> Sau khi LLM viết câu mô tả tiếng Anh (như hiện tại), embed nó và tính "chung bài" với mọi chủ đề, bật hay chưa bật. Lấy 3 chủ đề chung nhiều nhất.</li>
+      <li><b>Chung dưới 30% thì thôi</b>, không cảnh báo, lưu như bình thường. Ngưỡng này để quyết định <i>có hỏi tiếp</i> hay không, không để kết luận trùng.</li>
+      <li><b>Từ 30% trở lên: hỏi Jev một lần</b> (mỗi chủ đề ứng viên một câu <code>choice</code>: trùng / hẹp hơn / rộng hơn / khác). Chưa tới $0,0001 mỗi lần thêm chủ đề.</li>
+      <li><b>Cho bạn thấy bằng chứng, rồi bạn quyết.</b> Không tự chặn, không tự gộp. Kèm 3 tin cả hai cùng bắt và 3 tin chỉ chủ đề mới bắt, để bạn thấy khác biệt bằng tin thật.</li>
+    </ol>
+    <div class="mock">
+      <div class="t">Gần giống chủ đề có sẵn</div>
+      <div class="m">"Chạy LLM trên máy" hẹp hơn <b>Model mã nguồn mở</b> (đang tắt): 70% tin của nó chủ đề kia cũng bắt.</div>
+      <div class="m">Cùng bắt: SonicBoom: llama.cpp nhanh hơn 14% · Underdog Saluki 27B …<br>Chỉ chủ đề mới bắt: How to Choose the Best Local LLM for MacBook RAM …</div>
+      <div class="btns"><span class="go">Vẫn thêm chủ đề mới</span><span>Bật Model mã nguồn mở</span><span>Sửa mô tả</span><span>Huỷ</span></div>
+    </div>
+    <p class="note">Bản phác bằng dữ liệu thật; câu chữ và nút để bạn duyệt. Với "trùng" thì nút mặc định đổi thành "Bật chủ đề có sẵn".</p>
+
+    <h2>Trả lời câu "có đưa LLM vào khi không chắc không"</h2>
+    <p>Không cần LLM viết thêm gì: câu hỏi ở đây là chọn 1 trong 4, đúng kiểu model quyết định. Nhưng thành thật: việc thêm chủ đề rất hiếm (vài lần một tháng), nên tốc độ và giá của Jev không quan trọng; LLM hiện có (Haiku) cũng làm được với JSON. Lợi thật của Jev ở đây là trả xác suất cho từng quan hệ mà không phải đọc JSON. Đề xuất dùng Jev, sau một lớp chung (xem tab 05) để đổi model dễ dàng.</p>
+
+    <h2>Đề xuất thêm</h2>
+    <ul>
+      <li><b>Gộp với "Xem trước kết quả khi chọn chủ đề"</b> (đang ở Để sau): bước 4 đã có sẵn tin thật, chỉ cần thêm "tuần qua chủ đề này bắt được N tin".</li>
+      <li><b>So cả với chủ đề bạn đang bật lẫn chưa bật.</b> Trùng với chủ đề đang bật thì nói rõ "bạn đã nhận các tin này rồi".</li>
+      <li><b>Dùng cùng phép đo cho cả thư viện</b>: cặp chủ đề thư viện chung trên 45% là dấu hiệu nên gộp hoặc viết lại mô tả cho rõ ranh giới ("Model mới ra" và "Model mã nguồn mở" 48%).</li>
+    </ul>
+  </section>
+
+  <!-- 03 -->
+  <section class="panel" id="goi-y" role="tabpanel">
+    <h2>Thử bốn cách gợi ý, trên lời mô tả thật của bạn</h2>
+    <p>Đầu vào: câu mô tả tiếng Anh trong hồ sơ (970 ký tự). Đáp án để so: 9 trong 17 chủ đề bạn đã bật. Chỉ một người, một lời mô tả, nên đây là dấu hiệu, chưa phải kết luận.</p>
+    <table>
+      <tr><th>Cách</th><th>Đúng trong top 9</th><th>Nhận xét</th></tr>
+      <tr><td>Embedding (cosine mô tả của bạn với mô tả chủ đề)</td><td class="n">5/9</td><td>Điểm dồn trong 0,48–0,63, không có ranh giới; "Agent AI" xếp thứ 13 dù bạn tự mô tả là kỹ sư xây AI agent.</td></tr>
+      <tr><td>Jev (17 câu có/không: người đọc này có muốn chủ đề X không)</td><td class="n">4/9</td><td>15/17 chủ đề được 0,69–0,95, nên xếp hạng gần như ngẫu nhiên ở đầu bảng; chỉ loại đúng 2 chủ đề cuối (đầu tư, pháp lý). 0,6 giây, chưa tới $0,0001.</td></tr>
+      <tr><td>Laya (cùng câu hỏi)</td><td class="n">5/9</td><td>Không khá hơn.</td></tr>
+      <tr><td>LLM (Haiku, một lời gọi, trả danh sách)</td><td class="n">8/9 bắt được</td><td>Chọn 14: đúng 8, sót 1 (Model ảnh, video, giọng nói), thừa 6. Sáu chủ đề thừa (benchmark, MLOps, công cụ lập trình AI…) khá hợp với lời mô tả; có thể bạn chỉ chưa bật.</td></tr>
+    </table>
+    <p class="note">Vì sao Jev kém ở đây: câu hỏi "người này có muốn đọc về X không" với một kỹ sư AI thì gần như luôn "có"; model quyết định trả lời đúng câu hỏi đó, nhưng câu hỏi đó không giúp xếp hạng. Đây là lỗi đặt câu hỏi nhiều hơn là lỗi model; có thể thử lại bằng câu <code>score</code> (mức độ trọng tâm 1–5) hoặc hỏi so sánh, nhưng chưa thử.</p>
+
+    <h2>Đề xuất</h2>
+    <ol class="steps">
+      <li><b>Dùng LLM</b> cho việc này: một lời gọi (~$0,002) đọc lời mô tả và trả về (a) các chủ đề thư viện nên bật, chia "chắc chắn" và "có thể", (b) <b>1–3 chủ đề mới ngoài thư viện</b> nếu lời mô tả có mảng thư viện chưa phủ. Model quyết định không làm được (b) vì nó chỉ chọn trong danh sách cho trước.</li>
+      <li><b>Hiện thành danh sách đã tích sẵn</b> trên Telegram ngay sau khi bạn viết mô tả: "Chắc chắn" tích sẵn, "Có thể" chưa tích, chủ đề mới có nút "Thêm". Bạn sửa rồi bấm Lưu.</li>
+      <li><b>Chủ đề mới đi qua cảnh báo gần giống</b> ở tab 02 trước khi lưu.</li>
+      <li><b>Đo lại sau</b>: lưu gợi ý và lựa chọn cuối của bạn; khi có thêm người dùng hoặc thêm lời mô tả mẫu, so lại LLM với Jev hỏi bằng <code>score</code>.</li>
+    </ol>
+  </section>
+
+  <!-- 04 -->
+  <section class="panel" id="cho-khac" role="tabpanel">
+    <h2>Những chỗ trong luồng radard là "chọn trong danh sách cho trước"</h2>
+    <table>
+      <tr><th>Chỗ</th><th>Câu hỏi cho model</th><th>Hợp?</th><th>Vì sao</th></tr>
+      <tr><td>Gộp sự kiện, cặp giống 0,85–0,9</td><td>Hai bài này có phải cùng một chuyện? (có/không)</td><td><span class="pill p-hi">Rất hợp</span></td><td>Đang ở Để sau ("LLM phân xử vùng xám"). Số cặp nhiều, chạy mỗi 5 phút: cần nhanh và rẻ, đúng thế mạnh của Jev. Có sẵn ví dụ đã kiểm tay (2 sự kiện Nvidia giống 0,901 bị tách) để đo.</td></tr>
+      <tr><td>Tin sát cổng chủ đề (R 0,5–0,7)</td><td>Bài này có thật sự thuộc chủ đề X? (có/không, mỗi chủ đề đang bật một câu, một request)</td><td><span class="pill p-hi">Rất hợp</span></td><td>Sửa lỗi kiểu Janas (qua cổng nhờ "RAG" vì chữ, thật ra là GPU &amp; inference). Chỉ hỏi phần sát cổng, vài trăm bài mỗi ngày. Đo bằng 👍/👎 của bạn.</td></tr>
+      <tr><td>Bản phát hành chỉ cập nhật phụ thuộc</td><td>Ghi chú phát hành này có thay đổi đáng kể với người dùng? (có/không)</td><td><span class="pill p-mid">Hợp, chưa cần</span></td><td>Đang ở Để sau. Nguồn releases chưa có repo nào.</td></tr>
+      <tr><td>Trang rút chữ hỏng</td><td>Đoạn chữ này là nội dung bài, hay trang chặn/cookie/đăng nhập? (có/không)</td><td><span class="pill p-mid">Hợp</span></td><td>Tránh embed nhầm chữ của trang chặn vào điểm chủ đề. Cần đo trước xem lỗi này có nhiều không.</td></tr>
+      <tr><td>Repo rác, mồi tải phần mềm độc</td><td>README này có phải mồi tải phần mềm (crack, keygen…)? (có/không)</td><td><span class="pill p-mid">Thận trọng</span></td><td>Nội dung do kẻ xấu viết, mà Jev dễ bị lừa (prompt injection). Giữ luật số liệu (dưới 10 KB, 0 fork, ≥ 300 sao) làm chính, model chỉ là lớp thêm.</td></tr>
+      <tr><td>Đề xuất chỉnh hồ sơ hằng tuần</td><td>Với các tin bạn 👍 tuần này, có nên gợi ý bật chủ đề X? (có/không)</td><td><span class="pill p-mid">Hợp, sau</span></td><td>Đang ở Để sau; cần vài tuần phản hồi trước.</td></tr>
+      <tr><td>Nhãn chủ đề trong điểm tin</td><td>—</td><td><span class="pill p-info">Giữ như cũ</span></td><td>LLM đã chọn nhãn ngay trong lời gọi viết tóm tắt, không tốn thêm gì.</td></tr>
+      <tr><td>Viết tóm tắt, tiêu đề, lời mở đầu</td><td>—</td><td><span class="pill p-no">Không</span></td><td>Phải viết văn bản: việc của LLM.</td></tr>
+      <tr><td>Công thức xếp hạng (trọng số R, P, C, A, F)</td><td>—</td><td><span class="pill p-no">Không</span></td><td>Là công thức số; khi có 👍/👎 thì học lại trọng số bằng hồi quy logistic (đã ở Để sau), không cần model.</td></tr>
+      <tr><td>Embedding, gộp theo vector, BERTopic</td><td>—</td><td><span class="pill p-no">Không</span></td><td>Bài toán khoảng cách và gom cụm, không phải chọn đáp án.</td></tr>
+    </table>
+    <p class="note">Nguyên tắc chung rút ra: model quyết định đứng <b>sau</b> phép đo rẻ (cosine, luật), chỉ được hỏi ở <b>vùng xám</b>, và mỗi câu hỏi chỉ hỏi <b>một điều</b> (đúng lời khuyên trong tài liệu của Jev). Như vậy luôn có số để so: model có làm tốt hơn ngưỡng cũ không.</p>
+  </section>
+
+  <!-- 05 -->
+  <section class="panel" id="so-sanh" role="tabpanel">
+    <h2>6 model ra quyết định trên Vercel AI Gateway, thử ngày 13/10</h2>
+    <p>Cùng hai bài, cùng câu hỏi, gọi thật qua AI Gateway. <b>Quan hệ chủ đề</b>: 7 ca có đáp án biết trước (4 hẹp hơn, 1 trùng, 1 rộng hơn, 1 khác), mỗi ca một câu <code>choice</code>. <b>Gợi ý chủ đề</b>: 17 câu có/không trên lời mô tả của bạn, so với 9 chủ đề bạn đã bật.</p>
+    <table>
+      <tr><th>Model</th><th>Giá vào / 1 triệu token</th><th>Quan hệ chủ đề</th><th>Thời gian / câu</th><th>Gợi ý chủ đề (top 9)</th><th>Ghi chú</th></tr>
+      <tr><td><code>typesafe-ai/jev</code></td><td class="n">$0,042</td><td><span class="pill p-hi">7/7</span></td><td class="n">~0,5 s</td><td class="n">4/9</td><td>Nhanh nhất trong nhóm đúng 7/7. Ca khó nhất (Bảo mật AI) vẫn 0,83.</td></tr>
+      <tr><td><code>microsoft/microsoft-decision-1</code></td><td class="n">$0,042</td><td><span class="pill p-hi">7/7</span></td><td class="n">~1,2 s</td><td class="n">4/9</td><td>Đúng như Jev, chậm gấp đôi.</td></tr>
+      <tr><td><code>openai/gpt-6-luna-decisions</code></td><td class="n">$0,10</td><td><span class="pill p-hi">7/7</span></td><td class="n">~0,6 s</td><td class="n">5/9</td><td>Xác suất thấp hơn ở hai ca khó (0,66 và 0,55): nói đúng hơn là "không chắc", nhưng giá gấp 2,4 lần. Ngữ cảnh 1 triệu token.</td></tr>
+      <tr><td><code>liquid/d1</code></td><td class="n">$0,04</td><td><span class="pill p-mid">6/7</span></td><td class="n">~0,6 s</td><td class="n">4/9</td><td>Sai ca Bảo mật AI (nói trùng, 0,42).</td></tr>
+      <tr><td><code>scaledown/scaledown-classify-1</code></td><td class="n">$0,05</td><td><span class="pill p-no">4/7</span></td><td class="n">~1,3 s</td><td class="n">5/9</td><td>Chỉ nhận trạng thái là văn bản; xác suất quanh 0,4 ở ca khó; 1 câu hết giờ; bài gợi ý mất 18,6 giây.</td></tr>
+      <tr><td><code>convaiinnovations/laya</code></td><td class="n">miễn phí</td><td><span class="pill p-no">2/7</span></td><td class="n">~0,6 s</td><td class="n">5/9</td><td>Đúng như repo của nó cảnh báo: chưa tinh chỉnh thì yếu.</td></tr>
+    </table>
+    <p class="note">Mẫu nhỏ (7 ca, 1 lời mô tả), câu chữ tiếng Anh; dùng để chọn model khởi đầu, không để kết luận model nào tốt nhất. Thời gian đo từ máy ở Việt Nam, gồm cả đường mạng. Tổng chi phí cả đợt thử dưới $0,005.</p>
+    <h2>Rút ra</h2>
+    <ul>
+      <li><b>Quan hệ chủ đề:</b> bốn model dẫn đầu đều làm được; chọn <b>Jev</b> làm mặc định (đúng 7/7, nhanh nhất, rẻ nhất), <b>Microsoft Decision-1</b> làm dự phòng cùng giá. Nhờ lớp <code>DecisionProvider</code> (tab 06), đổi model chỉ là đổi cấu hình.</li>
+      <li><b>Gợi ý chủ đề:</b> cả 6 model đều 4–5/9, tức vấn đề nằm ở <b>cách hỏi</b> ("người này có muốn X không" gần như luôn là có), không phải ở model nào. Giữ đề xuất dùng LLM.</li>
+      <li><b>Model miễn phí (Laya) và ScaleDown</b> không dùng được nếu không tinh chỉnh.</li>
+    </ul>
+  </section>
+
+  <!-- 06 -->
+  <section class="panel" id="lam-gi" role="tabpanel">
+    <h2>Thứ tự đề xuất</h2>
+    <ol class="steps">
+      <li><b>Một lớp chung <code>DecisionProvider</code></b> (giống <code>LlmProvider</code> hiện có): hỏi câu có/không và chọn đáp án, trả xác suất; adapter qua AI Gateway (cần nâng <code>ai</code> lên ≥ 7.0.139, bản có <code>experimental_decide</code>), bản giả cho test, ghi chi phí vào <code>llm_calls</code>. Đổi Jev, Laya hay model khác chỉ bằng cấu hình. Khoảng nửa ngày.</li>
+      <li><b>Cảnh báo chủ đề gần giống</b> theo tab 02, trên Telegram. Cần bạn duyệt câu chữ và nút trước.</li>
+      <li><b>Gợi ý chủ đề từ lời mô tả</b> theo tab 03, dùng LLM; nối vào bước 2 cho chủ đề mới.</li>
+      <li><b>Thử Jev ở hai chỗ "rất hợp"</b> của tab 04, mỗi chỗ đo trước trên dữ liệu thật: soạn vài chục cặp sự kiện vùng xám và vài chục tin sát cổng có đáp án, so ngưỡng hiện tại với Jev. Chỉ bật khi Jev tốt hơn rõ.</li>
+    </ol>
+    <h2>Rủi ro cần nhớ</h2>
+    <ul>
+      <li><b>Tiếng Việt chưa được hãng hỗ trợ chính thức.</b> Các câu hỏi trên đều dùng câu mô tả tiếng Anh (radard đã lưu sẵn), nên tránh được; nhưng không đưa lời gốc tiếng Việt của bạn thẳng vào Jev khi chưa thử.</li>
+      <li><b>Model mới, thay đổi nhanh</b> (bản 1.13, ra mắt chưa tới một tháng): khoá phiên bản model trong cấu hình, và giữ phép đo để biết khi nào nó thay đổi hành vi.</li>
+      <li><b>Xác suất không phải bảo đảm cho từng câu</b> (chính tài liệu Jev nói vậy): luôn để bạn quyết ở chỗ có hậu quả (chủ đề), và chỉ tự động ở chỗ sai cũng rẻ (gộp hai sự kiện).</li>
+    </ul>
+  </section>
+
+  <h2>Nguồn</h2>
+  <ul class="src">
+    <li>Tài liệu Jev: <a href="https://docs.typesafe.ai/models.md">models</a>, <a href="https://docs.typesafe.ai/api.md">API</a>, <a href="https://docs.typesafe.ai/primitives/choice.md">Choice</a>, <a href="https://docs.typesafe.ai/confidence.md">Confidence</a>, <a href="https://docs.typesafe.ai/model-jaggedness/jev-1.13.md">Jev 1.13 jaggedness</a></li>
+    <li><a href="https://vercel.com/ai-gateway/models/jev">Jev trên Vercel AI Gateway</a> · <a href="https://www.sanity.io/glossary/jev-typesafe-ai-model">Sanity: What is Jev</a></li>
+    <li>Đánh giá độc lập: <a href="https://arxiv.org/html/2609.37647v1">Evaluating and Benchmarking the System One Model Jev</a> · <a href="https://developers.redhat.com/articles/2026/10/02/benchmarking-ai-decision-models-against-traditional-guardrails">Red Hat: Benchmarking AI decision models</a> · <a href="https://github.com/nibzard/decision-model-benchmark">nibzard decision-model-benchmark</a> · <a href="https://arxiv.org/html/2609.30216v1">Jev in the Wild</a></li>
+    <li><a href="https://github.com/NandhaKishorM/laya">Laya (repo)</a> · <a href="https://www.pushkarghanekar.com/blog/2026/decision-models/">Decision models and the return of the specialist</a></li>
+  </ul>
+  <footer>radard · docs/mo-hinh-quyet-dinh.html · 13/10/2026. Số đo chủ đề: DB radard trên máy (17 chủ đề, bản sao dữ liệu tới 13/10). Lần gọi 6 model ra quyết định: qua Vercel AI Gateway, 13/10, tổng chi phí dưới $0,005. Ba cặp chủ đề và một lời mô tả là mẫu nhỏ: dấu hiệu, chưa phải kết luận.</footer>
+</div>
+<script>
+const tabs = document.querySelectorAll('.tabs button');
+const show = (id) => {
+  tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
+  try { history.replaceState(null, '', '#' + id); } catch {}
+};
+tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+const start = location.hash.slice(1);
+if (start && document.getElementById(start)) show(start);
+</script>
+</body>
+</html>
