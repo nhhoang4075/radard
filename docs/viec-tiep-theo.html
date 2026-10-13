@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Việc tiếp theo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --red:#A63A2B; --red-soft:#F8E4E0;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.6}
+.wrap{max-width:960px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.5vw,38px)}
+h2{font-size:21px;margin:30px 0 10px}
+h3{font-size:16.5px;margin:0 0 4px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:72ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+p{margin:6px 0}
+ul{margin:6px 0;padding-left:20px}
+li{margin:3px 0}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button span{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-right:6px}
+.panel{display:none}
+.panel.on{display:block}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-family:var(--display);font-size:23px}
+.stat span{font-size:13px;color:var(--ink-2)}
+
+.timeline{margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.tl{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.tl:last-child{border-bottom:0}
+.tl .when{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:500}
+.tl .what b{display:block}
+.tl .what span{font-size:14px;color:var(--ink-2)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:10px}
+.card .head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.card .meta{font-size:13.5px;color:var(--ink-2)}
+.badge{font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.b-now{background:var(--red-soft);color:var(--red)}
+.b-soon{background:var(--warn-soft);color:var(--warn)}
+.b-later{background:var(--blue-soft);color:var(--blue)}
+.b-ok{background:var(--accent-soft);color:var(--accent)}
+.rec{margin-top:8px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;font-size:14.5px}
+.rec b{color:var(--accent)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.opt{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
+.opt b{display:block;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--ink-3);font-weight:600;font-family:var(--mono)}
+.note{font-size:13.5px;color:var(--ink-3);margin-top:6px}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:640px){
+  .stats{grid-template-columns:1fr 1fr}
+  .tl{grid-template-columns:1fr;gap:2px}
+  .opts{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">RADARD · TUẦN 3 · 13/10/2026 TỐI</div>
+  <h1>Việc tiếp theo và những điểm cần bàn</h1>
+  <p class="lede">radard đã chạy trên Railway từ 13/10 tối, daemon trên máy đã tắt. Bản điểm tin đầu tiên từ server sẽ đến lúc 07:00 sáng 14/10. Trang này gom những gì còn phải làm trước và trong đợt nghiệm thu 20–26/10, và những chỗ cần bạn quyết định. Số liệu lấy từ DB trên server lúc viết.</p>
+
+  <div class="stats">
+    <div class="stat"><b>7 / 182</b><span>Điểm tin 13/10: số tin chọn / số sự kiện thuộc chủ đề của bạn</span></div>
+    <div class="stat"><b>9.621</b><span>Tài liệu lấy trong 24 giờ qua (gồm lượt lấy bù khi chuyển)</span></div>
+    <div class="stat"><b>$0,009</b><span>Chi phí viết điểm tin 13/10 (embed lại một lần: $0,094)</span></div>
+    <div class="stat"><b>152</b><span>Test qua, trên cả PostgreSQL 17 và 18</span></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="lich"><span>01</span>Lịch</button>
+    <button role="tab" aria-selected="false" data-tab="ban"><span>02</span>Việc của bạn</button>
+    <button role="tab" aria-selected="false" data-tab="toi"><span>03</span>Việc của tôi</button>
+    <button role="tab" aria-selected="false" data-tab="ban-luan"><span>04</span>Cần bàn</button>
+    <button role="tab" aria-selected="false" data-tab="de-sau"><span>05</span>Để sau</button>
+  </div>
+
+  <!-- 01 -->
+  <section class="panel on" id="lich" role="tabpanel">
+    <h2>Lịch từ giờ tới hết nghiệm thu</h2>
+    <div class="timeline">
+      <div class="tl"><div class="when">14/10 07:00</div><div class="what"><b>Điểm tin đầu tiên từ server</b><span>Kiểm tra đến đúng giờ, câu mở đầu mới ("Chọn N trong M sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua"). Bạn đọc và bấm 👍/👎.</span></div></div>
+      <div class="tl"><div class="when">14–16/10</div><div class="what"><b>Làm các việc chuẩn bị nghiệm thu</b><span><code>cli report</code>, sao lưu DB, đổi mật khẩu Postgres, chốt nguồn releases (tab 02, 03).</span></div></div>
+      <div class="tl"><div class="when">17–18/10</div><div class="what"><b>Bước 7: hai buổi sáng đọc thật</b><span>Xong khi: hai bản điểm tin đến đúng giờ, không có tin trùng chuyện, và bạn thấy đọc được. Góp ý bằng lời trong phiên làm việc.</span></div></div>
+      <div class="tl"><div class="when">19/10</div><div class="what"><b>Chốt mọi thay đổi</b><span>Sửa những gì lộ ra ở bước 7, chạy <code>cli report</code> thử trên dữ liệu 14–19/10. Sau ngày này không đổi code.</span></div></div>
+      <div class="tl"><div class="when">20–26/10</div><div class="what"><b>Bước 9: nghiệm thu 7 ngày</b><span>Mỗi ngày tôi chỉ xem số liệu, không sửa code. Phải sửa thì đếm lại 7 ngày từ đầu.</span></div></div>
+    </div>
+
+    <h2>Tiêu chí nghiệm thu, đọc từ DB</h2>
+    <table>
+      <tr><th>Tiêu chí</th><th>Đo bằng</th><th>Hiện tại</th></tr>
+      <tr><td>≥ 95% lượt fetch thành công</td><td><code>fetch_runs.status</code></td><td>50/54 (92,6%) trong 7 ngày qua. 4 lượt lỗi là "Unable to connect" lúc còn chạy trên Mac (12/10 và sáng 13/10), trước khi lên server; đợt nghiệm thu chỉ tính từ 20/10.</td></tr>
+      <tr><td>7/7 điểm tin đến đúng giờ (lệch &lt; 10 phút)</td><td><code>digests.status</code>, <code>sent_at</code></td><td>Chưa có bản tự động nào; bản 13/10 gửi tay.</td></tr>
+      <tr><td>Phản hồi (D6, chưa chốt)</td><td><code>feedback</code> nối <code>deliveries</code>, chỉ <code>kind = 'event'</code></td><td>Tin thử đã tách riêng (<code>kind = 'test'</code>), không lẫn vào.</td></tr>
+      <tr><td>Chi phí model &lt; $0,1/ngày</td><td><code>llm_calls.cost_usd</code></td><td>Bình quân 7 ngày $0,015/ngày. Riêng 13/10 $0,10 vì embed lại toàn bộ bài HN một lần.</td></tr>
+      <tr><td>Có số liệu đầu tiên</td><td>in trong <code>cli report</code></td><td>Chưa có lệnh report.</td></tr>
+    </table>
+  </section>
+
+  <!-- 02 -->
+  <section class="panel" id="ban" role="tabpanel">
+    <h2>Việc chỉ bạn làm được</h2>
+
+    <div class="card"><div class="head"><h3>Đọc và bấm 👍/👎 mỗi sáng</h3><span class="badge b-now">Từ 14/10</span></div>
+      <p class="meta">Bắt đầu với bản 13/10 đã gửi. Bấm cả những tin bạn thấy bình thường: tin không bấm thì không biết là "không hay" hay "chưa đọc". Tin số 7 (bản vá <code>@ai-sdk/zai</code>) là ví dụ rõ nhất cho câu hỏi ở tab 04, mục 1.</p></div>
+
+    <div class="card"><div class="head"><h3>Đổi mật khẩu Postgres</h3><span class="badge b-now">Nên làm sớm</span></div>
+      <p class="meta">Mật khẩu hiện tại đã nằm trong lịch sử cuộc trò chuyện. Trên Railway: service <code>postgres</code> → Variables → tạo lại <code>POSTGRES_PASSWORD</code> (và các URL đi kèm), redeploy postgres. Service <code>radard</code> dùng tham chiếu <code>${{postgres.DATABASE_URL}}</code> nên tự nhận URL mới, chỉ cần redeploy. Sau đó cập nhật kết nối "radard (Railway)" trong TablePlus.</p></div>
+
+    <div class="card"><div class="head"><h3>Nguồn GitHub releases: chọn repo hoặc tắt</h3><span class="badge b-soon">Trước 20/10</span></div>
+      <p class="meta">Đã xoá hết 10 repo mặc định theo ý bạn; nguồn vẫn bật nhưng không lấy gì. Muốn theo dõi bản phát hành thì gửi tên repo (dạng <code>owner/repo</code>). Không dùng thì tôi tắt hẳn nguồn để báo cáo gọn. Nên chốt trước 20/10 để 7 ngày nghiệm thu chạy đúng như lúc dùng thật.</p></div>
+
+    <div class="card"><div class="head"><h3>Chốt D6 và D8</h3><span class="badge b-soon">Trước 20/10</span></div>
+      <p class="meta">Chi tiết ở tab 04, mục 2 và 3. D2, D3, D5, D7 đã xong.</p></div>
+
+    <div class="card"><div class="head"><h3>Hai việc nhỏ đang treo</h3><span class="badge b-later">Lúc nào cũng được</span></div>
+      <ul class="meta">
+        <li><code>docs/gom-cum-chu-de.html</code> (tạo 19:27 ngày 13/10) chưa commit. Giữ thì tôi commit, không thì bỏ.</li>
+        <li>Lịch sử commit: việc xoá <code>railway.json</code> nằm nhầm trong commit docs <code>4d59163</code>. Giữ nguyên (đề xuất) hay viết lại lịch sử và force push.</li>
+      </ul></div>
+  </section>
+
+  <!-- 03 -->
+  <section class="panel" id="toi" role="tabpanel">
+    <h2>Việc tôi làm, theo thứ tự</h2>
+
+    <div class="card"><div class="head"><h3>1. <code>cli report --since 7d</code></h3><span class="badge b-now">Trước 19/10</span></div>
+      <p class="meta">Chấm từng tiêu chí ở tab 01, đọc thẳng từ các bảng trên server: tỉ lệ fetch theo nguồn, điểm tin đến đúng giờ không (lệch so với 07:00), tỉ lệ sự kiện có phản hồi (trạng thái mới nhất của mỗi tin, chỉ <code>kind = 'event'</code>), chi phí theo ngày, và số liệu đầu tiên: tài liệu/ngày, số sự kiện, số qua cổng chủ đề, tỉ lệ 👍. Chạy được từ máy với <code>DATABASE_URL</code> trỏ lên server.</p></div>
+
+    <div class="card"><div class="head"><h3>2. Sao lưu DB mỗi đêm lên R2</h3><span class="badge b-now">Trước 20/10</span></div>
+      <p class="meta">Hiện DB chỉ nằm trên volume của Railway; mất volume là mất phản hồi, thứ không lấy lại được (tài liệu thì lấy lại được). Cách làm và câu hỏi cần chốt ở tab 04, mục 4.</p></div>
+
+    <div class="card"><div class="head"><h3>3. Dọn dẹp</h3><span class="badge b-soon">Cùng lúc</span></div>
+      <ul class="meta">
+        <li>Thêm "Công cụ mã nguồn mở" vào <code>docs/thu-vien-chu-de.html</code> (đang ghi 16 chủ đề, thực tế 17).</li>
+        <li>Xoá file dump 257 MB và file URL DB trong thư mục tạm: chứa toàn bộ dữ liệu của bạn và mật khẩu cũ.</li>
+        <li>Checklist: mục "Mô tả lĩnh vực và hồ sơ" vẫn ghi "đang dùng mô tả TẠM" dù hồ sơ đã có mô tả tiếng Anh (970 ký tự, 13/10); sửa lại cho đúng.</li>
+      </ul></div>
+
+    <div class="card"><div class="head"><h3>4. Theo dõi sáng 14/10</h3><span class="badge b-soon">14/10</span></div>
+      <p class="meta">Xem log 06:30 (mặt bằng) và 07:00 (điểm tin) trên Railway, so plan đã lưu với những gì bạn nhận. Có lỗi thì báo ngay, chưa sửa khi chưa bàn.</p></div>
+  </section>
+
+  <!-- 04 -->
+  <section class="panel" id="ban-luan" role="tabpanel">
+    <h2>Những điểm cần bạn quyết định</h2>
+
+    <div class="card"><div class="head"><h3>1. Bản phát hành "chỉ cập nhật phụ thuộc"</h3><span class="badge b-soon">Sau vài sáng phản hồi</span></div>
+      <p class="meta">Tin số 7 ngày 13/10: <code>@ai-sdk/zai 3.0.30</code>, ghi chú phát hành chỉ có "cập nhật phụ thuộc". Trong 30 ngày, <code>vercel/ai</code> (monorepo) ra 40 bản, gần một nửa số bản phát hành. Danh sách repo hiện trống nên chuyện này chỉ quay lại khi bạn thêm repo.</p>
+      <div class="opts">
+        <div class="opt"><b>a. Luật chung cho mọi repo</b>Bỏ bản phát hành mà ghi chú chỉ gồm cập nhật phụ thuộc hoặc bump phiên bản. Không sửa riêng cho nguồn nào.</div>
+        <div class="opt"><b>b. Releases thành mục riêng cuối điểm tin</b>"Phiên bản mới của công cụ bạn dùng", không tranh chỗ 7 tin. Đã ghi ở Để sau.</div>
+      </div>
+      <div class="rec"><b>Đề xuất:</b> chờ bạn có danh sách repo thật; khi đó làm (a) trước, (b) xem sau nghiệm thu.</div></div>
+
+    <div class="card"><div class="head"><h3>2. D6 · Tiêu chí phản hồi khi nghiệm thu</h3><span class="badge b-soon">Trước 20/10</span></div>
+      <p class="meta">Kế hoạch cũ ghi "≥ 50 lượt phản hồi", nhưng tối đa chỉ có 7 tin × 7 ngày = 49 tin, nên con số đó buộc phải bấm đổi ý mới đạt, không đo được điều cần đo.</p>
+      <div class="opts">
+        <div class="opt"><b>a. ≥ 70% tin sự kiện có ít nhất một 👍 hoặc 👎</b>Đo việc bạn có thật sự đọc điểm tin không; tính trạng thái mới nhất của mỗi tin.</div>
+        <div class="opt"><b>b. Giữ con số tuyệt đối, hạ xuống ≥ 30 lượt</b>Dễ hiểu, nhưng ngày ít tin thì khó đạt dù bạn đọc hết.</div>
+      </div>
+      <div class="rec"><b>Đề xuất:</b> (a).</div></div>
+
+    <div class="card"><div class="head"><h3>3. D8 · Trọng số và hằng số khởi đầu</h3><span class="badge b-soon">Trước 20/10</span></div>
+      <p class="meta">Đang dùng: trọng số R, P, C, A, F = 0,40 / 0,25 / 0,15 / 0,10 / 0,10; cổng R ≥ 0,6; sàn điểm 0,59; tối đa 7 tin; mốc phạt trùng 0,85; P trung tính 0,3. Riêng hạn mức mỗi nguồn đã đổi từ 3 lên <b>5</b> ngày 13/10 (với 3, điểm tin 12/10 chỉ còn 4 tin dù 5 tin HN vượt sàn); <code>tuan-3-thuc-thi.html</code> còn ghi 3.</p>
+      <div class="rec"><b>Đề xuất:</b> giữ nguyên bộ này cho đợt nghiệm thu, không chỉnh giữa chừng; chỉnh sau khi có 1–2 tuần 👍/👎 (Để sau: "Chỉnh lại các hằng số", "Học lại trọng số").</div></div>
+
+    <div class="card"><div class="head"><h3>4. Sao lưu DB: làm thế nào, giữ bao lâu</h3><span class="badge b-now">Trước 20/10</span></div>
+      <div class="opts">
+        <div class="opt"><b>a. Cron service trên Railway</b>Một service chạy lúc 03:00 VN: <code>pg_dump</code> → <code>backup/</code> trong bucket <code>radard</code>, giữ 14 bản gần nhất. Cần một token R2 riêng chỉ quyền ghi, tách khỏi token của daemon.</div>
+        <div class="opt"><b>b. Job trong daemon</b>Thêm một job pg-boss, dùng sẵn token của daemon. Không thêm service, nhưng image phải có <code>pg_dump</code> đúng bản 18, và token của daemon có quyền xoá cả bản sao lưu.</div>
+      </div>
+      <div class="rec"><b>Đề xuất:</b> (a), giữ 14 bản. Cùng bucket <code>radard</code> theo thư mục, như bạn đã chọn khi đặt tên bucket.</div></div>
+
+    <div class="card"><div class="head"><h3>5. TCP Proxy của Postgres: giữ hay tắt</h3><span class="badge b-later">Khi đổi mật khẩu</span></div>
+      <p class="meta">TCP Proxy cho phép TablePlus và lệnh từ máy kết nối thẳng DB trên server (cũng là cách tôi đang đọc số liệu, gửi điểm tin tay, sẽ chạy <code>cli report</code>). Đổi lại, DB mở ra Internet, chỉ được bảo vệ bằng mật khẩu.</p>
+      <div class="rec"><b>Đề xuất:</b> giữ tới hết nghiệm thu (cần cho <code>cli report</code>), với mật khẩu mới; tắt sau đó nếu không còn cần.</div></div>
+
+    <div class="card"><div class="head"><h3>6. Nhãn chủ đề khi bạn chỉ bật một số chủ đề</h3><span class="badge b-later">Ý 2–3 sau nghiệm thu</span></div>
+      <p class="meta">Nhãn trả lời "vì sao tin này có ở đây", nên luôn là một chủ đề bạn đang bật (chốt 13/10). Ba ý đã nêu:</p>
+      <ul class="meta">
+        <li><b>Đã làm 13/10:</b> chấm mọi tài liệu với mọi chủ đề (17 chủ đề thư viện và chủ đề tự thêm), bật hay chưa bật. Mô hình gộp: <code>topics</code> chứa mọi chủ đề cùng embedding, <code>profile_topics</code> chỉ là lựa chọn của bạn; điểm và mặt bằng khoá theo <code>topic_id</code>.</li>
+        <li>Trừ điểm khi một chủ đề đang tắt khớp hơn hẳn: tin hợp chủ đề bạn đã tắt thì bớt ưu tiên.</li>
+        <li>Chủ đề "không quan tâm" (D3): schema và quy tắc khởi đầu đã có, phần tính điểm chưa bật.</li>
+      </ul>
+      <div class="rec"><b>Đề xuất:</b> chưa làm trong đợt nghiệm thu; xem lại khi đã có phản hồi thật, ví dụ có bao nhiêu 👎 vì "không liên quan".</div></div>
+
+    <div class="card"><div class="head"><h3>7. Bỏ <code>pg_trgm</code></h3><span class="badge b-later">Nhỏ</span></div>
+      <p class="meta">Daemon bật extension này khi migrate nhưng không chỗ nào dùng. Server đã có sẵn nên không còn cản trở gì; bỏ chỉ để code nói đúng thứ nó cần.</p>
+      <div class="rec"><b>Đề xuất:</b> bỏ dòng bật trong <code>migrate.ts</code> sau nghiệm thu (đổi code trong đợt nghiệm thu sẽ phải đếm lại).</div></div>
+
+    <div class="card"><div class="head"><h3>8. Khi nào tách service</h3><span class="badge b-ok">Chưa cần</span></div>
+      <p class="meta">Đang chạy cả scheduler, worker và bot trong một service <code>radard</code>. Tách khi: cần nhiều worker, job nặng làm bot trả lời chậm, hoặc deploy worker không được làm bot ngắt. Cùng image, chỉ khác <code>SERVICE_ROLE</code>.</p>
+      <div class="rec"><b>Đề xuất:</b> giữ một service tới hết MVP-0.</div></div>
+  </section>
+
+  <!-- 05 -->
+  <section class="panel" id="de-sau" role="tabpanel">
+    <h2>Để sau: đã bàn, chưa làm (27 việc)</h2>
+    <p class="meta">Bản đầy đủ, có mô tả và ngày quyết định: <a href="checklist.html#de-sau">checklist.html, mục "Để sau"</a>. Không làm gì ở đây trước khi xong nghiệm thu 26/10. Repo GitHub đang nổi là một mục riêng trong checklist ("Sau digest · Repo GitHub đang nổi"), không nằm trong danh sách này.</p>
+    <table>
+      <tr><th>Nhóm</th><th>Việc</th></tr>
+      <tr><td>Trải nghiệm (9)</td><td>Xem trước điểm tin khi chọn chủ đề · 👎 có lý do · đề xuất chỉnh hồ sơ hằng tuần · lệnh nhanh <code>/add</code>, <code>/remove</code> · chế độ nâng cao · nhận xét bằng chữ cho từng tin · xoá chủ đề tự thêm · cảnh báo chủ đề gần giống khi tự thêm · giao diện web</td></tr>
+      <tr><td>Xếp hạng (8)</td><td>Cá nhân hoá U · học lại trọng số (hồi quy logistic) · chỉnh lại các hằng số · releases thành mục riêng · LLM phân xử vùng xám khi gộp sự kiện · bớt ưu tiên khi chủ đề đang tắt khớp hơn hẳn · tính điểm chủ đề "không quan tâm" (D3) · bỏ bản phát hành chỉ cập nhật phụ thuộc</td></tr>
+      <tr><td>Vận hành (7)</td><td>Xem lại 2 index không dùng · nguồn 814 lần dùng HNSW · HNSW iterative scan khi dữ liệu lớn · bỏ <code>pg_trgm</code> · tách service khi cần · tắt TCP Proxy của Postgres · tải bù trang nhanh hơn</td></tr>
+      <tr><td>Khám phá đề tài (3)</td><td>Thử BERTopic bằng notebook · sidecar BERTopic mỗi đêm (nếu thử tốt) · Leiden trên graph thực thể</td></tr>
+    </table>
+  </section>
+
+  <footer>radard · docs/viec-tiep-theo.html · lập 13/10/2026 tối, sau khi lên Railway. Số liệu: DB radard trên Railway lúc viết; kế hoạch gốc ở tuan-3-thuc-thi.html và checklist.html.</footer>
+</div>
+<script>
+const tabs = document.querySelectorAll('.tabs button');
+const show = (id) => {
+  tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
+  try { history.replaceState(null, '', '#' + id); } catch {}
+};
+tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+const start = location.hash.slice(1);
+if (start && document.getElementById(start)) show(start);
+</script>
+</body>
+</html>

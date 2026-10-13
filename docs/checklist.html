@@ -206,7 +206,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <span class="note">12/10: code + 10 test, <code>bun run check</code> 79/79; migration và <code>topics seed</code> đã chạy trên DB thật. Thử thư viện: 2 request embed, $0,000011; viết lại 4 câu mô tả yếu. Chờ bạn duyệt <a href="thu-vien-chu-de.html">thu-vien-chu-de.html</a> và chọn chủ đề. 13/10: bạn chọn 8 chủ đề; đổi tên "An toàn &amp; giải thích AI" → "An toàn &amp; nguyên lý AI". Bối cảnh hồ sơ viết lại bằng tiếng Anh từ lời bạn (nghề, stack, sẵn lòng học stack mới và thuật toán/ML, cách giải thích tin); <code>profile set</code> sửa lỗi tạo thêm dòng hồ sơ mỗi lần chạy.</span></div>
   <div class="task"><input type="checkbox" disabled><span class="name">2 · Điểm theo chủ đề, tín hiệu, mặt bằng</span><span class="badge s-done">Xong</span>
     <span class="desc">Migration 0008: <code>doc_topic_scores</code>, <code>doc_signals</code>, <code>baselines</code>; bỏ <code>doc_text.relevance</code>, embedding của <code>profile</code>, ngưỡng 0,58 và <code>minRelevance</code>. Job process gộp MỌI tài liệu (D4), có trần 3.000/lượt. Job <code>baselines</code> 06:30 giờ VN. CLI <code>signals refresh</code>, <code>baselines</code>, <code>events rebuild</code>.</span>
-    <span class="note">12/10 trên DB thật: 200.880 điểm (25.110 tài liệu × 8 chủ đề, 1 câu SQL). <code>events rebuild</code>: 25.110 tài liệu → 23.398 sự kiện, 1.018 giây (41 ms/tài liệu). Điểm HN 30 ngày: 307 request, 15.276/15.316 bài (40 bài đã bị xoá khỏi HN); điểm trung bình 17,4 (lúc lấy bài: 1,6). Mặt bằng độ nổi HN: trung vị 1,253, mốc 0,1% 7,113 (đo tay 11/10: 1,099 / 7,04). Test 102/102 + 2 test rank.</span></div>
+    <span class="note">12/10 trên DB thật: 200.880 điểm (25.110 tài liệu × 8 chủ đề, 1 câu SQL). <code>events rebuild</code>: 25.110 tài liệu → 23.398 sự kiện, 1.018 giây (41 ms/tài liệu). Điểm HN 30 ngày: 307 request, 15.276/15.316 bài (40 bài đã bị xoá khỏi HN); điểm trung bình 17,4 (lúc lấy bài: 1,6). Mặt bằng độ nổi HN: trung vị 1,253, mốc 0,1% 7,113 (đo tay 11/10: 1,099 / 7,04). Test 102/102 + 2 test rank.</span> <span class="note">13/10 tối: chấm mọi tài liệu với MỌI chủ đề (thư viện và tự thêm, bật hay chưa bật), đúng D4. Migration 0013–0014: embedding chuyển sang <code>topics</code>, chủ đề tự thêm thành dòng <code>topics</code> của hồ sơ, <code>profile_topics</code> chỉ còn lựa chọn (bật/tắt, include/exclude), điểm và mặt bằng khoá theo <code>topic_id</code>. Thử trên DB máy: 261.643 điểm, 36 mặt bằng, 9 chủ đề đang bật giữ nguyên; thử đường chủ đề tự thêm trên bản dump cũ: nhãn, lời gốc, embedding, trạng thái, 1.000 điểm, mặt bằng giữ nguyên. Chấm thêm 6 chủ đề còn lại: 183.536 cặp trong 7,2 giây. Xếp hạng và nhãn vẫn chỉ dùng chủ đề đang bật.</span></div>
   <div class="task done"><input type="checkbox" checked disabled><span class="name">2b · Nội dung trang cho bài HN</span><span class="badge s-done">Xong</span>
     <span class="desc">13/10: 91,5% tài liệu HN chỉ có tiêu đề để embed (bài HN là một link sang blog, GitHub, báo; API không trả nội dung trang). Hệ quả: gán chủ đề theo 10–15 chữ (Janas "streaming experts from SSD" → RAG) và bỏ sót tin có tiêu đề mơ hồ. Sửa: <code>SourceAdapter.articleUrl</code> (HN khai báo); job <code>pages</code> (5 phút/lần) tải trang, tôn trọng robots.txt, chỉ HTML, ≤ 2 MB, lưu HTML gốc vào ObjectStore + bảng <code>linked_pages</code> (migration 0010, mỗi URL một dòng); job process đợi trang tối đa 30 phút rồi embed tiêu đề + 1.500 ký tự đầu phần chữ chính (Readability trên linkedom). CLI <code>pages</code>, <code>pages fetch --since</code>, <code>reprocess --pages</code>.</span>
     <span class="note">13/10: thử 40 link thật: 30 rút được chữ (trung vị 7.800 ký tự), 4 chặn 401/403 (WSJ, Reuters, NYT), 6 gần như không có chữ (YouTube, trang cần JS); 0,6 giây/trang. 30 ngày: 14.267 URL khác nhau. 7 test mới, <code>bun run check</code> 144/144. Lấy bù 30 ngày (28 phút): 14.817 URL → ok 11.798 (79,6%), failed 1.571 (10,6%, chủ yếu 401/403), blocked 809 (5,5%, robots.txt), skipped 639 (4,3%, Ask HN/PDF/video); rút được chữ ở 88% trang ok (mẫu 300, trung vị 5.455 ký tự). Embed lại 12.936 tài liệu: 4,0 triệu token, $0,04. <b>Phát hiện khi gộp lại:</b> gộp theo vector giảm 449 → 303; 292 cặp cũ bị tách hầu hết là cùng chuyện (Character.ai phá sản ở hai báo, "Firefox 157"…), cosine với nội dung trang chỉ 0,6–0,88 vì hai trang viết khác nhau. Sửa: mỗi tài liệu hai vector, <code>embedding</code> (bản thô, để gộp, ngưỡng 0,9 giữ nguyên) và <code>content_embedding</code> (bản thô + trang, để chấm chủ đề), migration 0011. Gộp lại lần hai: 445/449 cặp cũ vẫn cùng sự kiện, gộp theo vector 457. Mặt bằng tính lại. Khung 13/10: 182 qua cổng (trước 171), 7 tin; "Just say no to OpenAI and Anthropic" (bài bình luận) rớt cổng vì R 0,98 → 0,45 khi đọc nội dung. Chạy thật 11:05 UTC: 63 bài HN mới → job pages tải 50 trang (43 ok) → process embed 63 bài, 46 có vector nội dung. Kèm theo: nhãn "Chủ đề" do LLM chọn trong danh sách chủ đề của bạn khi viết tóm tắt (nhãn embedding chỉ là dự phòng); prompt cấm model bình luận về đầu vào.</span></div>
@@ -260,7 +260,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <span class="desc">Thay 10 repo TẠM bằng các công cụ bạn thật sự dùng.</span></div>
 </div>
 
-<h2>Để sau · Đã bàn, chưa làm</h2>
+<h2 id="de-sau">Để sau · Đã bàn, chưa làm</h2>
 <p class="lede">Những việc đã thống nhất là làm sau, ghi lại để không quên. Ngày ghi là ngày quyết định để sau.</p>
 <div class="group">
   <div class="group-head"><b>Hồ sơ và trải nghiệm người dùng</b><span>12/10 · xep-hang.html</span></div>
@@ -288,6 +288,9 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   <div class="task"><input type="checkbox" disabled><span class="name">Cảnh báo chủ đề gần giống khi tự thêm</span><span class="badge s-todo">Để sau</span>
     <span class="desc">Ở bước xem trước, so chủ đề mới với mọi chủ đề trong thư viện và trong hồ sơ; nếu gần giống thì hiện "Gần giống: X" kèm nút bật X thay vào, vẫn cho Lưu cả hai. Cần embed cả 16 mô tả thư viện (hiện chỉ chủ đề đã bật mới có embedding).</span>
     <span class="note">13/10: "Bảo mật AI" trùng một phần với "An toàn &amp; nguyên lý AI" mà không ai báo. Ngưỡng "gần giống" chưa đo, phải đo trên các cặp thật trước khi chọn. Cần bàn thêm trước khi làm.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Giao diện web</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Xem lại các điểm tin cũ, quản lý chủ đề, xem số liệu. Telegram vẫn là nơi đọc tin hằng ngày.</span>
+    <span class="note">13/10. Sau MVP-0.</span></div>
 </div>
 <div class="group">
   <div class="group-head"><b>Xếp hạng và học từ phản hồi</b><span>11–12/10 · xep-hang.html</span></div>
@@ -306,6 +309,15 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   <div class="task"><input type="checkbox" disabled><span class="name">LLM phân xử vùng xám khi gộp sự kiện</span><span class="badge s-todo">Để sau</span>
     <span class="desc">Cặp sự kiện giống 0,85–0,9 (ví dụ 2 sự kiện Nvidia giống 0,901 bị tách): hỏi LLM có cùng chuyện không.</span>
     <span class="note">MVP-1. Hiện bước đa dạng (MMR) tạm che vấn đề này trong digest.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Bớt ưu tiên khi chủ đề đang tắt khớp hơn hẳn</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Tin qua cổng nhờ một chủ đề đang bật nhưng hợp với một chủ đề bạn đã tắt hơn nhiều (ví dụ Janas: qua cổng nhờ "RAG", hợp nhất "GPU &amp; inference") thì giảm điểm. Điểm với mọi chủ đề đã có từ 13/10 tối; còn thiếu ngưỡng "hơn hẳn".</span>
+    <span class="note">13/10. Chọn ngưỡng từ phản hồi thật, sau nghiệm thu.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Tính điểm chủ đề "không quan tâm" (D3)</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Schema đã có <code>profile_topics.kind = exclude</code>. Quy tắc khởi đầu: tài liệu có z với chủ đề exclude ≥ 0,6 và lớn hơn R thì không tính vào R.</span>
+    <span class="note">12/10. Bật khi bạn có chủ đề muốn loại.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Bỏ bản phát hành chỉ cập nhật phụ thuộc</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Luật chung cho mọi repo: ghi chú phát hành chỉ có cập nhật phụ thuộc hoặc bump phiên bản thì không đưa vào điểm tin. Ví dụ tin số 7 ngày 13/10 (<code>@ai-sdk/zai 3.0.30</code>); <code>vercel/ai</code> ra 40 bản trong 30 ngày.</span>
+    <span class="note">13/10. Khi nguồn releases có danh sách repo thật (đã xoá 10 repo mặc định 13/10).</span></div>
 </div>
 <div class="group">
   <div class="group-head"><b>Vận hành và dữ liệu</b><span>06–11/10</span></div>
@@ -315,15 +327,42 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   <div class="task"><input type="checkbox" disabled><span class="name">Nguồn 814 lần dùng HNSW chưa rõ</span><span class="badge s-todo">Để sau</span>
     <span class="desc">Bộ đếm cho thấy <code>events_centroid_hnsw</code> từng được dùng 814 lần; với code hiện tại một lượt process dùng 0 lần. Thử 4 kịch bản không tái hiện được.</span>
     <span class="note">hnsw.html tab 07.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Bỏ <code>pg_trgm</code></span><span class="badge s-todo">Để sau</span>
+    <span class="desc"><code>migrate.ts</code> bật extension này nhưng không chỗ nào dùng.</span>
+    <span class="note">13/10. Sau nghiệm thu (đổi code trong đợt nghiệm thu phải đếm lại).</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Tách service khi cần</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Đang chạy scheduler, worker, bot trong một service <code>radard</code>. Tách khi cần nhiều worker, job nặng làm bot chậm, hoặc deploy worker không được làm bot ngắt. Cùng image, khác <code>SERVICE_ROLE</code>.</span>
+    <span class="note">13/10. Giữ một service tới hết MVP-0.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Tắt TCP Proxy của Postgres</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">DB đang mở ra Internet, chỉ bảo vệ bằng mật khẩu; cần cho TablePlus, <code>cli report</code> và lệnh chạy từ máy.</span>
+    <span class="note">13/10. Sau nghiệm thu, nếu không còn cần.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Tải bù trang nhanh hơn</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Khi tải bù hàng loạt: timeout ngắn hơn (5 thay vì 15 giây) và chạy song song nhiều hơn 16. Đổi lại bỏ sót thêm vài phần trăm trang chậm.</span>
+    <span class="note">13/10. Ước tính nhanh gấp đôi, chưa đo. Chỉ cần khi tải bù lại.</span></div>
+</div>
+
+<div class="group">
+  <div class="group-head"><b>Khám phá đề tài</b><span>13/10 · bertopic-trong-radard.html</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Thử BERTopic bằng notebook</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Một buổi, trên 30 ngày dữ liệu thật, không đụng vào radard. Câu cần trả lời: đề tài ra có đọc hiểu được không, "chạy LLM trên máy" (179 bài, 172 sự kiện, rải 13 chủ đề) có thành một đề tài không, phần nhiễu lớn cỡ nào.</span>
+    <span class="note">13/10. Sau nghiệm thu.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Sidecar BERTopic mỗi đêm</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Chỉ khi thử bằng notebook cho kết quả tốt. Chương trình Python riêng, đọc embedding đã có, ghi bảng đề tài (dữ liệu dẫn xuất). Phục vụ bảng "đề tài nóng lên" và gợi ý chủ đề mới; không đi vào xếp hạng hay điểm tin.</span>
+    <span class="note">Bổ sung, không thay gộp sự kiện hay chủ đề.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Leiden trên graph thực thể</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Thay hoặc bổ sung cho BERTopic, dùng graph đồng xuất hiện thực thể; nếu đủ tốt thì khỏi cần Python.</span>
+    <span class="note">Cần trích thực thể và graph trước (tuần 6–7 trong lộ trình). gom-cum-chu-de.html mục 9.</span></div>
 </div>
 
 <h2>Cần bạn chuẩn bị</h2>
 <div class="group">
   <div class="group-head"><b>Thông tin và tài khoản</b><span>trước tuần 2–3</span></div>
-  <div class="task"><input type="checkbox" disabled><span class="name">Mô tả lĩnh vực và hồ sơ</span><span class="badge s-you">Cần bạn · tuần 2</span>
-    <span class="desc">5–10 dòng bằng tiếng Anh: chủ đề quan tâm, stack, dự án, những gì không quan tâm. Đặt bằng <code>bun run cli profile set "…"</code>; hiện đang dùng mô tả TẠM.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Mô tả lĩnh vực và hồ sơ</span><span class="badge s-done">Xong</span>
+    <span class="desc">5–10 dòng bằng tiếng Anh: chủ đề quan tâm, stack, dự án, những gì không quan tâm. Đặt bằng <code>bun run cli profile set "…"</code>.</span>
+    <span class="note">13/10: đã đặt mô tả tiếng Anh (970 ký tự) theo lời bạn, gồm AI software engineer, stack, sẵn lòng học stack mới, thuật toán và ML.</span></div>
   <div class="task"><input type="checkbox" disabled><span class="name">Danh sách ~10 repo GitHub</span><span class="badge s-you">Cần bạn · tuần 2</span>
-    <span class="desc">Repo muốn theo dõi release.</span></div>
+    <span class="desc">Repo muốn theo dõi release.</span>
+    <span class="note">13/10: đã xoá 10 repo mặc định theo ý bạn; nguồn vẫn bật nhưng không lấy gì. Gửi danh sách repo thật, hoặc bảo tắt nguồn. Nên chốt trước 20/10.</span></div>
   <div class="task done"><input type="checkbox" checked disabled><span class="name">Token GitHub (chỉ quyền đọc)</span><span class="badge s-done">Xong</span>
     <span class="desc">Fine-grained token, chỉ đọc repo công khai; đặt vào <code>.env</code> (<code>GITHUB_TOKEN</code>). Có token thì quota 5.000 request/giờ thay vì 60, và request 304 không bị trừ quota.</span>
     <span class="note">11/10/2026: đã kiểm. Quota REST 5.000/giờ, Search 30/phút, GraphQL 5.000; đọc repo công khai HTTP 200, thử tạo issue bị chặn HTTP 403 (đúng là chỉ đọc). Nguồn releases chạy với token: 90 lấy về, 22 mới.</span></div>

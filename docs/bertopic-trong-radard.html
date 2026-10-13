@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · BERTopic ở đâu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --plum:#7A3E8C; --plum-soft:#F1E6F4;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.65}
+.wrap{max-width:960px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.5vw,38px)}
+h2{font-size:21px;margin:30px 0 10px}
+h3{font-size:16.5px;margin:0 0 6px}
+p{margin:8px 0}
+ul,ol{margin:8px 0;padding-left:22px}
+li{margin:4px 0}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:72ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button span{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-right:6px}
+.panel{display:none}
+.panel.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+.answer{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 12px 12px 0;padding:14px 18px;margin-top:18px}
+.answer p{margin:6px 0}
+.term{display:grid;grid-template-columns:150px 1fr;gap:4px 14px;margin-top:10px}
+.term dt{font-weight:600}
+.term dd{margin:0;color:var(--ink-2)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px;background:var(--surface)}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--ink-3);font-weight:600;font-family:var(--mono);background:#FAFBFA}
+td:first-child{font-weight:600;white-space:nowrap}
+.k-ev{color:var(--blue)} .k-tp{color:var(--accent)} .k-bt{color:var(--plum)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px}
+.p-ev{background:var(--blue-soft);color:var(--blue)}
+.p-tp{background:var(--accent-soft);color:var(--accent)}
+.p-bt{background:var(--plum-soft);color:var(--plum)}
+.ex{font-family:var(--mono);font-size:13px;color:var(--ink-2);background:var(--ground);border-radius:8px;padding:10px 12px;margin-top:8px;white-space:pre-wrap}
+.bars{margin-top:10px}
+.bar{display:grid;grid-template-columns:190px 1fr 40px;gap:10px;align-items:center;font-size:13.5px;margin:4px 0}
+.bar i{display:block;height:12px;border-radius:0 4px 4px 0;background:var(--accent)}
+.bar.off i{background:#B8C3BF}
+.bar b{font-family:var(--mono);font-weight:500;font-size:13px;text-align:right}
+.note{font-size:13.5px;color:var(--ink-3);margin-top:8px}
+figure{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+figure svg{width:100%;height:auto;display:block;color:var(--ink)}
+figcaption{font-size:13.5px;color:var(--ink-2);margin-top:8px}
+.verdict{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.verdict .card{margin-top:0}
+.tag{font-family:var(--mono);font-size:12px;font-weight:500}
+.tag.no{color:var(--warn)} .tag.yes{color:var(--accent)}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:640px){
+  .term{grid-template-columns:1fr}
+  .bar{grid-template-columns:120px 1fr 34px}
+  .verdict{grid-template-columns:1fr}
+  td:first-child{white-space:normal}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">RADARD · GIẢI THÍCH · 13/10/2026</div>
+  <h1>BERTopic nằm ở đâu trong radard?</h1>
+  <p class="lede">Đọc kèm <a href="gom-cum-chu-de.html#s9">gom-cum-chu-de.html</a> (BERTopic chạy thế nào). Trang này trả lời câu khác: nếu dùng thì nó đứng chỗ nào trong radard, khác gì những thứ đang có, và bổ sung hay thay thế phần nào.</p>
+
+  <div class="answer">
+    <p><b>Trả lời ngắn:</b> BERTopic là phần <b>bổ sung</b>, không thay thế gì cả. Nó là một nhánh chạy riêng mỗi đêm, đọc embedding radard đã có sẵn, để tìm ra <b>những đề tài đang nổi lên mà chưa ai đặt tên</b>. Ba thứ đang chạy (gộp sự kiện, chấm theo chủ đề, điểm tin 07:00) giữ nguyên.</p>
+    <p>Nó dùng cho hai việc sau này: <b>bảng "đề tài nóng lên" theo tuần</b> và <b>gợi ý chủ đề mới cho bạn</b>. Chưa cần làm trong MVP-0.</p>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="ba-cach"><span>01</span>Ba cách gom bài</button>
+    <button role="tab" aria-selected="false" data-tab="vi-du"><span>02</span>Ví dụ thật</button>
+    <button role="tab" aria-selected="false" data-tab="cho-dung"><span>03</span>Đứng ở đâu</button>
+    <button role="tab" aria-selected="false" data-tab="thay-the"><span>04</span>Sao không thay thế</button>
+    <button role="tab" aria-selected="false" data-tab="dung-gi"><span>05</span>Dùng vào việc gì</button>
+  </div>
+
+  <!-- 01 -->
+  <section class="panel on" id="ba-cach" role="tabpanel">
+    <h2>Mấy từ cần thống nhất trước</h2>
+    <dl class="term">
+      <dt>Embedding</dt><dd>Dãy 1.024 con số radard tính cho mỗi bài, sao cho hai bài cùng nghĩa thì hai dãy số gần nhau. Đã tính sẵn cho mọi bài (bảng <code>doc_text</code>).</dd>
+      <dt>Gom cụm</dt><dd>Xếp các bài gần nhau (theo embedding) vào cùng một nhóm.</dd>
+      <dt><span class="k-ev">Sự kiện</span></dt><dd>Một câu chuyện cụ thể, ví dụ "Character.ai nộp đơn phá sản". Nhiều báo cùng đưa một chuyện thì gộp thành một sự kiện. Mỗi tin trong điểm tin là một sự kiện.</dd>
+      <dt><span class="k-tp">Chủ đề</span></dt><dd>Mảng bạn quan tâm, có tên đặt trước: 17 chủ đề trong thư viện ("Agent AI", "RAG & tìm kiếm"…) và chủ đề bạn tự thêm.</dd>
+      <dt><span class="k-bt">Đề tài tự nổi</span></dt><dd>Thứ BERTopic tìm ra: một nhóm nhiều sự kiện cùng xoay quanh một chuyện, <b>không ai đặt tên trước</b>, máy tự đặt tên bằng vài từ khoá. Gọi là "đề tài" để khỏi lẫn với "chủ đề" của bạn.</dd>
+    </dl>
+
+    <h2>Ba cách gom bài, ba câu hỏi khác nhau</h2>
+    <table>
+      <tr><th></th><th><span class="pill p-ev">Sự kiện</span></th><th><span class="pill p-tp">Chủ đề</span></th><th><span class="pill p-bt">Đề tài tự nổi (BERTopic)</span></th></tr>
+      <tr><td>Trả lời câu</td><td>"Mấy bài này có phải <b>cùng một chuyện</b> không?"</td><td>"Bài này có thuộc <b>mảng bạn quan tâm</b> không?"</td><td>"Dạo này <b>người ta hay nói về gì</b>?"</td></tr>
+      <tr><td>Độ rộng</td><td>Hẹp nhất: 1 chuyện, thường 1–5 bài</td><td>Rộng nhất: cả một mảng, hàng nghìn bài/tháng</td><td>Ở giữa: vài chục tới vài trăm bài, nhiều chuyện khác nhau quanh một đề tài</td></tr>
+      <tr><td>Ai đặt tên</td><td>Lấy tiêu đề bài</td><td>Bạn (hoặc radard soạn sẵn)</td><td>Máy, bằng từ khoá ("gguf, llama.cpp, local, quantization")</td></tr>
+      <tr><td>Cách làm</td><td>Bài mới đến là so ngay với sự kiện gần đây: giống ≥ 0,9 thì gộp</td><td>So bài với câu mô tả của từng chủ đề, ra điểm 0–1</td><td>Mỗi đêm nhìn cả đống bài một lượt, tự tìm các vùng dày đặc</td></tr>
+      <tr><td>Khi nào chạy</td><td>Liên tục, mỗi 5 phút</td><td>Liên tục, mỗi 5 phút</td><td>Một lần mỗi đêm (cần nhìn nhiều bài cùng lúc)</td></tr>
+      <tr><td>radard có chưa</td><td>Có (bảng <code>events</code>)</td><td>Có (<code>topics</code>, <code>doc_topic_scores</code>)</td><td>Chưa. Thiết kế ghi là tuỳ chọn, giai đoạn 3</td></tr>
+      <tr><td>Dùng cho</td><td>Không gửi trùng tin, gom link liên quan</td><td>Lọc và xếp hạng điểm tin</td><td>Xem xu hướng, gợi ý chủ đề mới</td></tr>
+    </table>
+    <p class="note">Ba cách đều dựa trên cùng một embedding, nên BERTopic không cần tính thêm gì đắt: nó dùng lại thứ radard đã lưu.</p>
+  </section>
+
+  <!-- 02 -->
+  <section class="panel" id="vi-du" role="tabpanel">
+    <h2>Ví dụ thật từ dữ liệu radard (30 ngày tới 13/10)</h2>
+
+    <div class="card">
+      <h3><span class="pill p-ev">Sự kiện</span> làm tốt việc của nó</h3>
+      <p>4 bài từ nhiều báo về cùng một chuyện, gộp thành một sự kiện, nên điểm tin chỉ gửi một tin:</p>
+      <div class="ex">Character.ai files for Chapter 11 bankruptcy
+Character.ai files for bankruptcy, agrees to sell some assets for $20M
+Character.ai Files for Bankruptcy
+Disney Bids on Character.ai Assets as Chatbot Files for Chapter 11 Ban…</div>
+    </div>
+
+    <div class="card">
+      <h3>Nhưng có một đề tài cả <span class="pill p-ev">sự kiện</span> lẫn <span class="pill p-tp">chủ đề</span> đều không nhìn thấy</h3>
+      <p>Lọc các bài nói về <b>chạy LLM trên máy cá nhân</b> (tiêu đề có GGUF, llama.cpp, quantization, MLX, "local LLM", "run … locally"): <b>179 bài, nằm trong 172 sự kiện khác nhau</b>. Vài tiêu đề:</p>
+      <div class="ex">SonicBoom – llama.cpp's own kernels, 14% faster decode via a graph compiler
+How to Choose the Best Local LLM Basis MacBook RAM Size
+Underdog Saluki 27B: A 7.89 GB quantization focused on tool calling
+Show HN: Reflex – A GGUF-native Rust/CUDA engine for scale-to-zero LLM routing
+Ask HN: Best Local LLM Box ?</div>
+      <ul>
+        <li><b>Với sự kiện:</b> mỗi bài là một chuyện riêng (một công cụ, một câu hỏi, một bản quantization), nên 179 bài ra 172 sự kiện. Đúng: chúng không phải cùng một chuyện.</li>
+        <li><b>Với chủ đề:</b> chủ đề hợp nhất của các bài này rải ra <b>13 chủ đề thư viện</b> (đếm theo chủ đề có điểm cao nhất của từng bài, trong 17 chủ đề):</li>
+      </ul>
+      <div class="bars">
+        <div class="bar off"><span>Model mã nguồn mở</span><i style="width:100%"></i><b>59</b></div>
+        <div class="bar"><span>Nghiên cứu ML</span><i style="width:47%"></i><b>28</b></div>
+        <div class="bar"><span>Huấn luyện &amp; fine-tune</span><i style="width:36%"></i><b>21</b></div>
+        <div class="bar off"><span>Đánh giá &amp; benchmark</span><i style="width:24%"></i><b>14</b></div>
+        <div class="bar"><span>Model mới ra</span><i style="width:19%"></i><b>11</b></div>
+        <div class="bar off"><span>Công cụ lập trình AI</span><i style="width:12%"></i><b>7</b></div>
+        <div class="bar off"><span>GPU &amp; inference</span><i style="width:10%"></i><b>6</b></div>
+        <div class="bar"><span>6 chủ đề khác</span><i style="width:22%"></i><b>13</b></div>
+      </div>
+      <p class="note">Thanh xanh: chủ đề bạn đang bật; thanh xám: chưa bật. Số liệu từ DB trên máy, đã chấm với đủ 17 chủ đề (thay đổi tối 13/10).</p>
+      <p><b>Điều này nghĩa là:</b> radard <i>có</i> thấy từng bài, nhưng không thấy rằng <b>"chạy LLM trên máy" là một đề tài lớn đang diễn ra</b>, vì nó bị chia nhỏ ra 172 sự kiện và rải ra 13 chủ đề. Bạn cũng không có chủ đề nào tên như vậy để bật.</p>
+    </div>
+
+    <div class="card">
+      <h3><span class="pill p-bt">Đề tài tự nổi</span> sẽ thấy gì (dự đoán, chưa chạy BERTopic)</h3>
+      <p>Các bài trên gần nhau về nghĩa, nên nhiều khả năng BERTopic gom chúng thành <b>một đề tài</b>, tự đặt tên kiểu:</p>
+      <div class="ex">Đề tài 7 · 160 bài · từ khoá: gguf, llama.cpp, local, quantization, mlx, ram
+tuần 40: 31 bài · tuần 41: 44 bài · tuần 42: 58 bài   ← đang nóng lên</div>
+      <p class="note">Đây là minh hoạ để thấy hình dạng kết quả. Số bài theo tuần và từ khoá là tôi đặt ra, không phải kết quả chạy thật. Muốn biết thật thì phải thử (tab 05).</p>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section class="panel" id="cho-dung" role="tabpanel">
+    <h2>BERTopic đứng ở đâu trong luồng của radard</h2>
+    <figure>
+      <svg viewBox="0 0 900 360" role="img" aria-label="Luồng radard: thu thập, xử lý (embedding, gộp sự kiện, chấm chủ đề), điểm tin 07:00. BERTopic là nhánh riêng chạy mỗi đêm, đọc embedding, ghi bảng đề tài, phục vụ bảng xu hướng và gợi ý chủ đề; không đi vào điểm tin.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+          <marker id="arp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7A3E8C"/></marker>
+        </defs>
+        <!-- main lane -->
+        <text x="20" y="28" font-size="12" fill="#6B7773" font-family="IBM Plex Mono, monospace">ĐANG CHẠY · MỖI 5 PHÚT VÀ 07:00</text>
+        <rect x="20" y="44" width="150" height="70" rx="10" fill="#FFFFFF" stroke="currentColor"/>
+        <text x="95" y="74" text-anchor="middle" font-size="14" font-weight="600">Thu thập</text>
+        <text x="95" y="94" text-anchor="middle" font-size="12" fill="#4A5753">HN, arXiv…</text>
+
+        <rect x="215" y="44" width="300" height="190" rx="10" fill="#FFFFFF" stroke="currentColor"/>
+        <text x="365" y="66" text-anchor="middle" font-size="14" font-weight="600">Xử lý</text>
+        <rect x="235" y="78" width="260" height="38" rx="8" fill="#F4F6F5" stroke="#D9E0DD"/>
+        <text x="365" y="102" text-anchor="middle" font-size="13">Embedding mỗi bài</text>
+        <rect x="235" y="128" width="125" height="46" rx="8" fill="#E3ECF8" stroke="#2F5DA8"/>
+        <text x="297" y="148" text-anchor="middle" font-size="13" fill="#2F5DA8" font-weight="600">Gộp sự kiện</text>
+        <text x="297" y="165" text-anchor="middle" font-size="11" fill="#2F5DA8">cùng một chuyện</text>
+        <rect x="370" y="128" width="125" height="46" rx="8" fill="#DDEEE9" stroke="#0E6E5C"/>
+        <text x="432" y="148" text-anchor="middle" font-size="13" fill="#0E6E5C" font-weight="600">Chấm chủ đề</text>
+        <text x="432" y="165" text-anchor="middle" font-size="11" fill="#0E6E5C">17 chủ đề + tự thêm</text>
+        <text x="365" y="210" text-anchor="middle" font-size="12" fill="#4A5753">ghi vào Postgres</text>
+        <line x1="297" y1="116" x2="297" y2="128" stroke="currentColor"/>
+        <line x1="432" y1="116" x2="432" y2="128" stroke="currentColor"/>
+
+        <rect x="560" y="44" width="160" height="70" rx="10" fill="#FFFFFF" stroke="currentColor"/>
+        <text x="640" y="74" text-anchor="middle" font-size="14" font-weight="600">Xếp hạng</text>
+        <text x="640" y="94" text-anchor="middle" font-size="12" fill="#4A5753">chủ đề bạn bật</text>
+        <rect x="760" y="44" width="120" height="70" rx="10" fill="#FFFFFF" stroke="currentColor"/>
+        <text x="820" y="74" text-anchor="middle" font-size="14" font-weight="600">Điểm tin</text>
+        <text x="820" y="94" text-anchor="middle" font-size="12" fill="#4A5753">07:00 Telegram</text>
+
+        <line x1="170" y1="79" x2="213" y2="79" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+        <line x1="515" y1="79" x2="558" y2="79" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+        <line x1="720" y1="79" x2="758" y2="79" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar)"/>
+
+        <!-- new lane -->
+        <text x="20" y="268" font-size="12" fill="#7A3E8C" font-family="IBM Plex Mono, monospace">MỚI, TUỲ CHỌN · MỖI ĐÊM</text>
+        <rect x="215" y="282" width="300" height="60" rx="10" fill="#F1E6F4" stroke="#7A3E8C" stroke-dasharray="6 4"/>
+        <text x="365" y="307" text-anchor="middle" font-size="14" font-weight="600" fill="#7A3E8C">BERTopic (sidecar Python)</text>
+        <text x="365" y="326" text-anchor="middle" font-size="12" fill="#7A3E8C">gom cả tháng bài → đề tài + từ khoá</text>
+        <line x1="365" y1="234" x2="365" y2="280" stroke="#7A3E8C" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arp)"/>
+        <text x="372" y="262" font-size="11.5" fill="#7A3E8C">chỉ đọc embedding</text>
+
+        <rect x="600" y="282" width="280" height="60" rx="10" fill="#FFFFFF" stroke="#7A3E8C" stroke-dasharray="6 4"/>
+        <text x="740" y="307" text-anchor="middle" font-size="13" font-weight="600" fill="#7A3E8C">Bảng "đề tài nóng lên"</text>
+        <text x="740" y="326" text-anchor="middle" font-size="12" fill="#7A3E8C">gợi ý chủ đề mới cho bạn</text>
+        <line x1="515" y1="312" x2="598" y2="312" stroke="#7A3E8C" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arp)"/>
+      </svg>
+      <figcaption>Hàng trên là radard hôm nay, không đổi gì. Hàng dưới (nét đứt) là BERTopic: chỉ <b>đọc</b> embedding đã có, ghi kết quả vào bảng riêng, và <b>không có mũi tên nào đi vào xếp hạng hay điểm tin</b>.</figcaption>
+    </figure>
+
+    <h2>Cụ thể khi làm</h2>
+    <ol>
+      <li><b>Một chương trình Python riêng</b> (thiết kế gọi là "sidecar"), vì BERTopic chỉ có cho Python. Chạy mỗi đêm, có thể là một cron service nữa trên Railway, như cách đang tính cho sao lưu DB.</li>
+      <li><b>Đọc</b> embedding và tiêu đề của bài 30 ngày gần nhất từ Postgres. Không embed lại, không tốn tiền model.</li>
+      <li><b>Ghi</b> kết quả vào bảng mới, ví dụ <code>trend_topics</code> (đề tài, từ khoá, số bài theo tuần) và <code>trend_topic_documents</code> (bài nào thuộc đề tài nào).</li>
+      <li>Các bảng này là <b>dữ liệu dẫn xuất</b>: xoá đi chạy lại được, giống bảng sự kiện. Không bảng nào của bạn (phản hồi, lựa chọn chủ đề) trỏ khoá ngoại vào đó.</li>
+    </ol>
+  </section>
+
+  <!-- 04 -->
+  <section class="panel" id="thay-the" role="tabpanel">
+    <h2>Vì sao BERTopic không thay được thứ đang có</h2>
+    <div class="verdict">
+      <div class="card">
+        <span class="tag no">KHÔNG THAY</span>
+        <h3><span class="pill p-ev">Gộp sự kiện</span></h3>
+        <ul>
+          <li><b>Quá thô:</b> BERTopic gom theo đề tài, nên sẽ để 172 chuyện "chạy LLM trên máy" vào chung một cụm. Điểm tin mà dùng nó để chống trùng thì sẽ chỉ gửi 1 trong 172 chuyện khác nhau.</li>
+          <li><b>Quá chậm:</b> nó cần nhìn cả đống bài một lượt, mỗi đêm. Gộp sự kiện phải chạy ngay khi bài đến (mỗi 5 phút), để 07:00 sáng đã biết bài nào trùng.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="tag no">KHÔNG THAY</span>
+        <h3><span class="pill p-tp">Chủ đề của bạn</span></h3>
+        <ul>
+          <li><b>Chủ đề là ý của bạn,</b> đề tài là thứ máy thấy trong dữ liệu. "Tôi quan tâm Agent AI" là lựa chọn, không phải thứ tự nổi lên.</li>
+          <li><b>Đề tài không bền:</b> mỗi lần chạy lại, BERTopic ra bộ đề tài mới với số hiệu mới ("đề tài 7" hôm nay có thể thành "đề tài 12" mai). Bạn không thể bật/tắt hay bấm 👍 cho một thứ đổi tên mỗi đêm.</li>
+          <li><b>Có phần "nhiễu":</b> với tin ngắn, BERTopic thường để 30–50% số bài ngoài mọi đề tài (đề tài −1). Xếp hạng dựa vào đó thì nửa số bài không có điểm.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <span class="tag yes">BỔ SUNG</span>
+      <h3>Chỗ BERTopic làm được mà radard chưa có</h3>
+      <p>Thấy được <b>tầng giữa</b>: nhiều sự kiện khác nhau cùng thuộc một đề tài, và đề tài đó đang to dần hay nhỏ dần qua các tuần. Như ví dụ ở tab 02: radard thấy 172 chuyện riêng lẻ và 13 nhãn chủ đề rải rác, nhưng không thấy "chạy LLM trên máy đang nóng".</p>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section class="panel" id="dung-gi" role="tabpanel">
+    <h2>Dùng vào việc gì</h2>
+    <div class="card">
+      <h3>1. Bảng "đề tài nóng lên" (giai đoạn 3 trong thiết kế)</h3>
+      <p>Mỗi tuần: những đề tài có số bài tăng mạnh nhất, kèm vài bài tiêu biểu. Trả lời câu "tuần này giới AI đang bàn chuyện gì", thứ điểm tin 7 tin mỗi sáng không trả lời được.</p>
+    </div>
+    <div class="card">
+      <h3>2. Gợi ý chủ đề mới cho bạn</h3>
+      <p>Nối với mục Để sau "Đề xuất chỉnh hồ sơ hằng tuần": nếu bạn hay 👍 các bài cùng một đề tài mà không chủ đề nào bạn bật gom được nó, radard gợi ý <i>"Thêm chủ đề 'Chạy LLM trên máy'? [Thêm] [Bỏ qua]"</i>. Bạn duyệt; radard không tự sửa hồ sơ.</p>
+    </div>
+    <div class="card">
+      <h3>3. Tìm chỗ thiếu trong thư viện 17 chủ đề</h3>
+      <p>Chủ đề "Công cụ mã nguồn mở" được thêm ngày 13/10 là do bạn tình cờ thấy nhãn sai. Đề tài lớn mà rải ra nhiều chủ đề (như ví dụ tab 02) là dấu hiệu thư viện đang thiếu một chủ đề. BERTopic chỉ ra chỗ đó một cách có hệ thống.</p>
+    </div>
+
+    <h2>Nên làm khi nào</h2>
+    <ol>
+      <li><b>Bây giờ (MVP-0, nghiệm thu 20–26/10): không làm gì.</b> Embedding đã lưu đủ; dữ liệu cứ tích luỹ.</li>
+      <li><b>Sau nghiệm thu, thử một lần bằng notebook</b> trên 30 ngày dữ liệu thật: khoảng một buổi, không đụng vào radard. Câu cần trả lời: đề tài ra có đọc hiểu được không, "chạy LLM trên máy" có hiện ra thành một đề tài không, phần nhiễu lớn cỡ nào.</li>
+      <li><b>Nếu kết quả tốt,</b> mới làm sidecar chạy mỗi đêm và bảng đề tài. Nếu không, bỏ, không mất gì.</li>
+      <li><b>Khi có graph thực thể (tuần 6–7 trong lộ trình),</b> thử thêm Leiden như mục 9 của <a href="gom-cum-chu-de.html#s9">gom-cum-chu-de.html</a>; nếu đủ tốt thì có thể khỏi cần Python.</li>
+    </ol>
+  </section>
+
+  <footer>radard · docs/bertopic-trong-radard.html · 13/10/2026. Số liệu tab 02: DB radard trên máy (bản sao dữ liệu tới chiều 13/10), lọc tiêu đề bằng từ khoá nên chỉ gần đúng; phần "BERTopic sẽ thấy gì" là minh hoạ, chưa chạy thật.</footer>
+</div>
+<script>
+const tabs = document.querySelectorAll('.tabs button');
+const show = (id) => {
+  tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
+  try { history.replaceState(null, '', '#' + id); } catch {}
+};
+tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+const start = location.hash.slice(1);
+if (start && document.getElementById(start)) show(start);
+</script>
+</body>
+</html>
