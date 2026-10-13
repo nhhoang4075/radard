@@ -1,0 +1,26 @@
+{
+  "name": "radard",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun apps/daemon/src/main.ts",
+    "cli": "bun apps/daemon/src/cli.ts",
+    "check": "bun run typecheck && bun run lint && bun test",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "biome check .",
+    "fix": "biome check --write .",
+    "db:generate": "bun run --filter '@radard/db' generate"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/bun": "1.4.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  }
+}
