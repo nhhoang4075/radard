@@ -61,13 +61,35 @@ export interface HttpClientOptions {
 
 export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
   const minInterval = opts.minIntervalMs ?? 1000;
-  const nextAllowed = new Map<string, number>();
+  /** Request trước tới mỗi host: xong lượt chờ của nó thì mới tới lượt request sau. */
+  const queues = new Map<string, Promise<void>>();
+  /** Lúc request gần nhất tới mỗi host thật sự được gửi đi. */
+  const lastSent = new Map<string, number>();
 
+  /**
+   * Xếp hàng theo host, rồi chờ đủ khoảng cách tính từ lúc request TRƯỚC THẬT SỰ GỬI. Trước 13/10/2026
+   * lượt sau được hẹn theo giờ hẹn của lượt trước, nên lượt trước gửi trễ vài ms (máy bận) thì
+   * khoảng cách thật ngắn đi đúng chừng đó (đo được 142 ms cho luật 150 ms).
+   */
   async function waitTurn(host: string): Promise<void> {
-    const now = Date.now();
-    const at = Math.max(now, nextAllowed.get(host) ?? 0);
-    nextAllowed.set(host, at + (opts.perHostIntervalMs?.[host] ?? minInterval));
-    if (at > now) await Bun.sleep(at - now);
+    const prev = queues.get(host) ?? Promise.resolve();
+    let release = () => {};
+    const mine = new Promise<void>((r) => {
+      release = r;
+    });
+    queues.set(
+      host,
+      prev.then(() => mine),
+    );
+    await prev;
+    try {
+      const interval = opts.perHostIntervalMs?.[host] ?? minInterval;
+      const wait = (lastSent.get(host) ?? Number.NEGATIVE_INFINITY) + interval - performance.now();
+      if (wait > 0) await Bun.sleep(wait);
+      lastSent.set(host, performance.now());
+    } finally {
+      release();
+    }
   }
 
   /** Phần chung của GET và POST: chờ lượt theo host, quá giờ thì huỷ, mã ≥ 400 thành `HttpError`. */
