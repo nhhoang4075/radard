@@ -11,6 +11,7 @@ import {
   describeError,
   escapeHtml,
   feedbackKeyboard,
+  keepPolling,
   parseTopicInput,
   render,
   telegramNotifier,
@@ -339,5 +340,32 @@ describe("bot: chọn chủ đề", () => {
     });
     expect(parseTopicInput("Chỉ tên")).toEqual({ label: "Chỉ tên", description: "Chỉ tên" });
     expect(parseTopicInput(" \n ")).toBeNull();
+  });
+});
+
+describe("keepPolling", () => {
+  test("polling dừng vì lỗi (409 lúc chuyển bản deploy) thì chạy lại; đã tắt thì thôi", async () => {
+    let calls = 0;
+    let stopped = false;
+    const delays: number[] = [];
+    await new Promise<void>((done) => {
+      keepPolling({
+        start: async (onStarted) => {
+          calls++;
+          if (calls <= 2) throw new Error("409: Conflict: terminated by other getUpdates request");
+          onStarted();
+          stopped = true; // daemon tắt: lần lỗi sau không chạy lại
+          done();
+          throw new Error("đã dừng");
+        },
+        stopped: () => stopped,
+        baseDelayMs: 1,
+        maxDelayMs: 2,
+        onRetry: (_err, ms) => delays.push(ms),
+      });
+    });
+    await Bun.sleep(10);
+    expect(calls).toBe(3);
+    expect(delays).toEqual([1, 2]);
   });
 });

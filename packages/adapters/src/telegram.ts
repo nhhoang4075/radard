@@ -349,15 +349,50 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
   return bot;
 }
 
+/**
+ * Chạy `start` (long polling, chỉ trả về khi dừng) và chạy lại khi nó dừng vì lỗi, chờ 5, 10, 20…
+ * giây, tối đa `maxDelayMs`. Lỗi 409 "terminated by other getUpdates request" xảy ra lúc chuyển giữa
+ * hai bản deploy (13/10/2026: bot dừng hẳn 17 giây sau khi bản mới lên, lượt bấm không được ghi).
+ * `onStarted` gọi khi polling chạy được, để đặt lại thời gian chờ. Dừng hẳn khi `stopped()` đúng.
+ */
+export function keepPolling(opts: {
+  start: (onStarted: () => void) => Promise<void>;
+  stopped: () => boolean;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  onRetry?: (err: unknown, delayMs: number) => void;
+}): void {
+  const base = opts.baseDelayMs ?? 5_000;
+  const max = opts.maxDelayMs ?? 60_000;
+  let attempt = 0;
+  const run = () => {
+    opts
+      .start(() => {
+        attempt = 0;
+      })
+      .catch((err) => {
+        if (opts.stopped()) return;
+        const delay = Math.min(max, base * 2 ** attempt++);
+        opts.onRetry?.(err, delay);
+        setTimeout(() => {
+          if (!opts.stopped()) run();
+        }, delay);
+      });
+  };
+  run();
+}
+
 export function telegramChat(opts: TelegramChatOptions): ChatChannel {
   let bot: Bot | null = null;
+  let stopping = false;
   return {
     channel: CHANNEL,
     async start(handlers) {
-      bot = createTelegramBot(opts, handlers);
+      const b = createTelegramBot(opts, handlers);
+      bot = b;
       if (handlers.topics) {
         // Menu lệnh khi gõ "/". Tên lệnh tiếng Anh, mô tả tiếng Việt (quyết định 12/10/2026).
-        await bot.api
+        await b.api
           .setMyCommands([
             { command: "topics", description: "Chọn chủ đề theo dõi" },
             { command: "start", description: "Bắt đầu" },
@@ -366,14 +401,22 @@ export function telegramChat(opts: TelegramChatOptions): ChatChannel {
       }
       // Không await: bot.start() chỉ trả về khi bot dừng. Không dùng drop_pending_updates: nó
       // xoá cả lượt 👍 bạn bấm lúc bot tắt; khoá "cb:" + id đã lo phần giao lại.
-      void bot
-        .start({
-          allowed_updates: ["callback_query", "message"],
-          onStart: (me) => log.info("bot đang nhận update", { username: me.username }),
-        })
-        .catch((err) => log.error("long polling dừng vì lỗi", describeError(err)));
+      keepPolling({
+        start: (onStarted) =>
+          b.start({
+            allowed_updates: ["callback_query", "message"],
+            onStart: (me) => {
+              onStarted();
+              log.info("bot đang nhận update", { username: me.username });
+            },
+          }),
+        stopped: () => stopping,
+        onRetry: (err, delayMs) =>
+          log.error("long polling dừng vì lỗi, sẽ chạy lại", { ...describeError(err), delayMs }),
+      });
     },
     async stop() {
+      stopping = true;
       // Xác nhận offset cuối với Telegram rồi đóng kết nối.
       await bot?.stop();
     },
