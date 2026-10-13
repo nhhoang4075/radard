@@ -1,5 +1,5 @@
 /**
- * HTTP cho adapter nguồn: GET có điều kiện và giới hạn tốc độ theo host.
+ * HTTP cho adapter nguồn: GET có điều kiện, POST (GraphQL của GitHub) và giới hạn tốc độ theo host.
  *
  * Crawl lịch sự không phải chỉ để khỏi bị chặn: 304 không tải lại body, và với GitHub
  * một request 304 có kèm token (`Authorization`) không bị trừ quota; không có token thì
@@ -27,8 +27,17 @@ export interface GetOptions {
   maxBytes?: number;
 }
 
+export type PostOptions = Pick<GetOptions, "headers" | "timeoutMs" | "maxBytes">;
+
+/**
+ * `post` bắt buộc chứ không tuỳ chọn: mọi client thật đều POST được, còn để tuỳ chọn thì chỗ gọi
+ * phải xử lý trường hợp "không có post" vốn chỉ xảy ra trong test. Bản giả trong test chỉ cần khai
+ * báo thêm một hàm ném lỗi.
+ */
 export interface HttpClient {
   get(url: string, opts?: GetOptions): Promise<HttpResponse>;
+  /** Gửi `body` nguyên văn, người gọi tự đặt `content-type`. Cùng giãn theo host, cùng `HttpError`. */
+  post(url: string, body: string, opts?: PostOptions): Promise<HttpResponse>;
 }
 
 export class HttpError extends Error {
@@ -61,32 +70,44 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
     if (at > now) await Bun.sleep(at - now);
   }
 
+  /** Phần chung của GET và POST: chờ lượt theo host, quá giờ thì huỷ, mã ≥ 400 thành `HttpError`. */
+  async function send(
+    url: string,
+    init: { method: "GET" | "POST"; headers: Record<string, string>; body?: string },
+    o: PostOptions,
+  ): Promise<HttpResponse> {
+    await waitTurn(new URL(url).host);
+    const res = await fetch(url, {
+      ...init,
+      headers: { "user-agent": USER_AGENT, ...init.headers },
+      signal: AbortSignal.timeout(o.timeoutMs ?? 30_000),
+    });
+    if (res.status >= 400) {
+      const snippet = await res.text().catch(() => "");
+      throw new HttpError(res.status, url, snippet.slice(0, 300));
+    }
+    const { body, truncated } =
+      res.status === 304 ? { body: "", truncated: false } : await readBody(res, o.maxBytes);
+    return {
+      status: res.status,
+      body,
+      url: res.url || url,
+      truncated,
+      etag: res.headers.get("etag") ?? undefined,
+      lastModified: res.headers.get("last-modified") ?? undefined,
+      headers: res.headers,
+    };
+  }
+
   return {
     async get(url, o = {}) {
-      await waitTurn(new URL(url).host);
-      const headers: Record<string, string> = { "user-agent": USER_AGENT, ...o.headers };
+      const headers: Record<string, string> = { ...o.headers };
       if (o.etag) headers["if-none-match"] = o.etag;
       if (o.lastModified) headers["if-modified-since"] = o.lastModified;
-
-      const res = await fetch(url, {
-        headers,
-        signal: AbortSignal.timeout(o.timeoutMs ?? 30_000),
-      });
-      if (res.status >= 400) {
-        const snippet = await res.text().catch(() => "");
-        throw new HttpError(res.status, url, snippet.slice(0, 300));
-      }
-      const { body, truncated } =
-        res.status === 304 ? { body: "", truncated: false } : await readBody(res, o.maxBytes);
-      return {
-        status: res.status,
-        body,
-        url: res.url || url,
-        truncated,
-        etag: res.headers.get("etag") ?? undefined,
-        lastModified: res.headers.get("last-modified") ?? undefined,
-        headers: res.headers,
-      };
+      return send(url, { method: "GET", headers }, o);
+    },
+    async post(url, body, o = {}) {
+      return send(url, { method: "POST", headers: { ...o.headers }, body }, o);
     },
   };
 }

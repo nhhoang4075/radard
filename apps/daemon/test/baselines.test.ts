@@ -82,6 +82,7 @@ describe("refreshSignals", () => {
     const x = await addDoc(arxiv, new Date(NOW.getTime() - DAY));
     let points = 10;
     const http: HttpClient = {
+      post: () => Promise.reject(new Error("test này không POST")),
       async get(url) {
         expect(url).toContain("story_1");
         // Chỉ trả bài 1: bài 2 coi như đã bị xoá khỏi HN.

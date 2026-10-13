@@ -18,6 +18,7 @@ function fakeHttp(routes: Record<string, () => HttpResponse>): HttpClient & { as
   const asked: string[] = [];
   return {
     asked,
+    post: () => Promise.reject(new Error("test này không POST")),
     async get(url) {
       asked.push(url);
       const route = routes[url];

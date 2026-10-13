@@ -108,6 +108,7 @@ describe("rankPeriod", () => {
     await addEvent(0.79, new Date("2026-10-03T00:00:00Z")); // ngoài khoảng 24 giờ
     const asked: string[] = [];
     const http: HttpClient = {
+      post: () => Promise.reject(new Error("test này không POST")),
       async get(url) {
         asked.push(url);
         const hits = [

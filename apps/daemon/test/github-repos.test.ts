@@ -21,6 +21,7 @@ function fakeHttp(reply: (url: string) => string) {
       urls.push(url);
       return { status: 200, body: reply(url), headers: new Headers() };
     },
+    post: () => Promise.reject(new Error("test này không POST")),
   };
   return { http, urls };
 }

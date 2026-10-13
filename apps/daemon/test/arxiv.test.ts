@@ -33,6 +33,7 @@ function fakeArxiv(papers: Array<{ id: string; published: string }>) {
       +s.slice(10, 12),
     ) / 60_000;
   const http: HttpClient = {
+    post: () => Promise.reject(new Error("test này không POST")),
     async get(url) {
       urls.push(url);
       const q = new URL(url).searchParams;

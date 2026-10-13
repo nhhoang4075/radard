@@ -48,7 +48,10 @@ function deps(adapter: SourceAdapter): FetchDeps {
   return {
     db,
     store: fsObjectStore(root),
-    http: { get: () => Promise.reject(new Error("không được gọi mạng trong test")) },
+    http: {
+      get: () => Promise.reject(new Error("không được gọi mạng trong test")),
+      post: () => Promise.reject(new Error("không được gọi mạng trong test")),
+    },
     resolveAdapter: () => adapter,
   };
 }

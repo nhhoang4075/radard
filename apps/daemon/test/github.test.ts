@@ -9,6 +9,7 @@ type Reply = Partial<HttpResponse> | Error;
 function fakeHttp(replies: Record<string, Reply>) {
   const sent: Array<{ repo: string; headers?: Record<string, string>; etag?: string }> = [];
   const http: HttpClient = {
+    post: () => Promise.reject(new Error("test này không POST")),
     async get(url, opts) {
       const repo = /repos\/([^/]+\/[^/]+)\/releases/.exec(url)?.[1] ?? "";
       sent.push({ repo, headers: opts?.headers, etag: opts?.etag });

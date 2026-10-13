@@ -33,6 +33,7 @@ function fakeAlgolia(times: number[], opts: { failAt?: number } = {}) {
     created_at_i: t,
   }));
   const http: HttpClient = {
+    post: () => Promise.reject(new Error("test này không POST")),
     async get(url) {
       urls.push(url);
       if (opts.failAt === urls.length) throw new Error("mạng chập chờn");
