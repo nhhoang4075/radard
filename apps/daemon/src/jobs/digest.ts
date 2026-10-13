@@ -434,8 +434,8 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
       lines: [
         "Hôm nay không có tin tức đáng chú ý.",
         rank.passedGate > 0
-          ? `Có ${rank.passedGate.toLocaleString("vi-VN")} tin thuộc chủ đề của bạn nhưng chưa đủ mức đáng đọc.`
-          : "Không có tin nào thuộc chủ đề của bạn trong 24 giờ qua.",
+          ? `Có ${rank.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm nhưng chưa đủ mức đáng đọc.`
+          : "Không có sự kiện nào thuộc các chủ đề bạn quan tâm trong 24 giờ qua.",
       ],
     };
     return { ...base, header, items: [], summarized: false, llm: null };
@@ -493,7 +493,7 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
     };
   });
 
-  const count = `${items.length} tin, chọn từ ${rank.candidates} sự kiện trong 24 giờ qua.`;
+  const count = `Chọn ${items.length} trong ${rank.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`;
   const header: Message = {
     kind: "digest",
     title: `Điểm tin ${date}`,

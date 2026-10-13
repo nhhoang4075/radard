@@ -154,6 +154,9 @@ describe("runDigest", () => {
     const [header, item] = notifier.sent.map((s) => s.msg);
     expect(header?.title).toBe("Điểm tin 06/10");
     expect(header?.lines[0]).toBe("Sáng nay nổi bật là agent.");
+    expect(header?.lines[1]).toBe(
+      "Chọn 4 trong 4 sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.",
+    );
     expect(item?.title).toBe("1. Tiêu đề 1");
     expect(item?.lines).toEqual([
       "Tóm tắt tin số 1, đủ dài để qua kiểm tra.",
@@ -246,7 +249,7 @@ describe("runDigest", () => {
     expect(calls).toBe(0);
     expect(notifier.sent[0]?.msg.lines).toEqual([
       "Hôm nay không có tin tức đáng chú ý.",
-      "Không có tin nào thuộc chủ đề của bạn trong 24 giờ qua.",
+      "Không có sự kiện nào thuộc các chủ đề bạn quan tâm trong 24 giờ qua.",
     ]);
   });
 
@@ -256,7 +259,7 @@ describe("runDigest", () => {
     const notifier = fakeNotifier();
     await runDigest({ db, llm: null, notifier, recipient: RECIPIENT }, SLOT);
     expect(notifier.sent[0]?.msg.lines[1]).toBe(
-      "Có 2 tin thuộc chủ đề của bạn nhưng chưa đủ mức đáng đọc.",
+      "Có 2 sự kiện thuộc các chủ đề bạn quan tâm nhưng chưa đủ mức đáng đọc.",
     );
   });
 
