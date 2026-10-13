@@ -31,6 +31,7 @@ import { type FetchDeps, runFetch } from "./jobs/fetch.ts";
 import { fetchPages } from "./jobs/pages.ts";
 import { runProcess } from "./jobs/process.ts";
 import { periodEndingAt, rankPeriod } from "./jobs/rank.ts";
+import { buildReport, formatReport, reportWindow } from "./jobs/report.ts";
 import { refreshSince } from "./jobs/signals.ts";
 import {
   addCustomTopic,
@@ -74,6 +75,8 @@ radard — CLI
   reprocess --all            Xoá toàn bộ dữ liệu dẫn xuất (doc_text, events) để tính lại;
                              dữ liệu thu thập giữ nguyên
   costs [--since=24h]        Chi phí gọi model theo việc
+  report [--since=7d]        Chấm các tiêu chí nghiệm thu 7 ngày (fetch, digest đúng giờ, phản hồi,
+                             chi phí) cho các khung 07:00 tới khung gần nhất; chỉ đọc DB
   store check                Ghi, đọc lại rồi kiểm một key thử trên kho bản thô (đĩa hoặc R2)
   store push [--limit=N]     Chép bản thô từ DATA_DIR lên R2 (cần biến R2_*); key đã có thì bỏ qua
 
@@ -107,11 +110,15 @@ function flag(name: string, fallback: string): string {
   return hit ? hit.slice(name.length + 3) : fallback;
 }
 
-function parseSince(v: string): Date {
+/** `24h` → 24, `7d` → 168. */
+function parseHours(v: string): number {
   const m = /^(\d+)([hd])$/.exec(v);
   if (!m) throw new Error(`--since phải dạng 24h hoặc 7d, nhận "${v}"`);
-  const hours = Number(m[1]) * (m[2] === "d" ? 24 : 1);
-  return new Date(Date.now() - hours * 3600_000);
+  return Number(m[1]) * (m[2] === "d" ? 24 : 1);
+}
+
+function parseSince(v: string): Date {
+  return new Date(Date.now() - parseHours(v) * 3600_000);
 }
 
 const since = () => parseSince(flag("since", "24h"));
@@ -581,6 +588,14 @@ const COMMANDS: Record<string, Command> = {
       { limit: limit ? Number(limit) : undefined, onProgress: (n) => console.log(`… ${n}`) },
     );
     console.log(`${out.files} file: đẩy ${out.uploaded}, đã có ${out.skipped}`);
+  },
+
+  report: async ({ db }) => {
+    const window = reportWindow(new Date(), parseHours(flag("since", "7d")));
+    for (const block of formatReport(await buildReport(db, window))) {
+      if (typeof block === "string") console.log(block);
+      else console.table(block);
+    }
   },
 
   costs: async ({ db }) => {
