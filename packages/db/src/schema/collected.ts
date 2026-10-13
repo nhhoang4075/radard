@@ -125,3 +125,32 @@ export const linkedPages = pgTable(
     check("linked_pages_raw_ck", sql`(${t.status} = 'ok') = (${t.rawKey} is not null)`),
   ],
 );
+
+/**
+ * Số sao của repo GitHub theo thời gian (github-theo-doi.html tab 05), mỗi lần đo một dòng, chỉ ghi
+ * thêm. Không nằm trong `documents`: khoá (source_id, external_id) giữ một dòng mỗi repo, trong khi
+ * số sao đổi mỗi ngày và cần giữ mọi lần đo để tính tăng trong 24 giờ và tăng tốc.
+ *
+ * `repo` là `owner/repo` viết thường (GitHub không phân biệt hoa thường), để repo thấy qua Search,
+ * Trending hay link trong bài HN là một. Không khoá ngoại sang `documents`: một repo có thể đến từ
+ * nhiều tài liệu của nhiều nguồn.
+ */
+export const repoStats = pgTable(
+  "repo_stats",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    repo: text("repo").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    stars: integer("stars").notNull(),
+    /** Dòng trên trang Trending có thể thiếu số fork, nên để trống được. */
+    forks: integer("forks"),
+    /** github_stars (radard tự chụp qua GraphQL) | trending_daily (đọc trang Trending) */
+    source: text("source").notNull(),
+    /** Số tăng do nguồn tự báo ("N stars today" của Trending); radard tự chụp thì trống. */
+    reportedGain: integer("reported_gain"),
+  },
+  (t) => [
+    index("repo_stats_repo_observed_idx").on(t.repo, t.observedAt),
+    check("repo_stats_source_ck", sql`${t.source} in ('github_stars', 'trending_daily')`),
+  ],
+);
