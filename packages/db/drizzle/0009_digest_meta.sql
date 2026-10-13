@@ -1,0 +1,2 @@
+ALTER TABLE "digests" ADD COLUMN "meta" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "deliveries_digest_position_uq" ON "deliveries" USING btree ("digest_id","position");

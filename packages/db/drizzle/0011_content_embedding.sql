@@ -1,0 +1,1 @@
+ALTER TABLE "doc_text" ADD COLUMN "content_embedding" halfvec(1024);
