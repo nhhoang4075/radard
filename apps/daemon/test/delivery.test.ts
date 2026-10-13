@@ -163,6 +163,31 @@ describe("deliveries + feedback", () => {
     await expect(attempt(db.insert(feedback).values(c))).rejects.toThrow();
   });
 
+  test("ràng buộc: tin sự kiện phải thuộc digest và sự kiện; tin thử đứng ngoài digest", async () => {
+    const base = { channel: "telegram", recipient, body: "x" };
+    const [dg] = await db.select({ id: digests.id }).from(digests);
+    // Tin sự kiện không có digest (kiểu notify test cũ) hoặc không có event_id: bị chặn.
+    await expect(
+      attempt(db.insert(deliveries).values({ ...base, messageId: "70", kind: "event" })),
+    ).rejects.toThrow();
+    await expect(
+      attempt(
+        db
+          .insert(deliveries)
+          .values({ ...base, messageId: "71", kind: "event", digestId: dg?.id, position: 2 }),
+      ),
+    ).rejects.toThrow();
+    // Tin thử nằm trong digest: bị chặn. Tin thử đứng riêng: ghi được.
+    await expect(
+      attempt(
+        db
+          .insert(deliveries)
+          .values({ ...base, messageId: "72", kind: "test", digestId: dg?.id, position: 3 }),
+      ),
+    ).rejects.toThrow();
+    await db.insert(deliveries).values({ ...base, messageId: "73", kind: "test" });
+  });
+
   test("một khoảng thời gian chỉ một digest cho một người nhận", async () => {
     await expect(
       attempt(

@@ -366,15 +366,15 @@ const COMMANDS: Record<string, Command> = {
       ],
     };
     const { messageId } = await n.notifier.send(n.recipient, msg);
-    // Không có digest: delivery đứng riêng, để lượt bấm vẫn nối được về một tin.
+    // Không có digest: delivery `test` đứng riêng, để lượt bấm vẫn nối được về một tin mà không lẫn
+    // vào phản hồi thật (phân tích chỉ lấy `kind = 'event'`).
     await db.insert(deliveries).values({
       channel: n.notifier.channel,
       recipient: n.recipient,
       messageId,
-      kind: "event",
+      kind: "test",
       title: msg.title,
       body: msg.lines.join("\n"),
-      meta: { test: true },
     });
     console.log(`đã gửi tin thử, message_id ${messageId}`);
   },

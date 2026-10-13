@@ -44,7 +44,11 @@ export const digests = pgTable(
   ],
 );
 
-/** Mỗi tin đã gửi một dòng: tin mở đầu của digest, hoặc tin của một sự kiện. */
+/**
+ * Mỗi tin đã gửi một dòng: tin mở đầu của digest, tin của một sự kiện, hoặc tin thử (`notify test`).
+ * Phân tích phản hồi chỉ lấy `kind = 'event'`; ràng buộc bên dưới bảo đảm dòng đó luôn thuộc một
+ * digest và một sự kiện, nên tin thử không bao giờ lẫn vào.
+ */
 export const deliveries = pgTable(
   "deliveries",
   {
@@ -56,7 +60,7 @@ export const deliveries = pgTable(
     recipient: text("recipient").notNull(),
     /** Id tin phía kênh (Telegram: message_id). Reply và bấm nút được nối về đây. */
     messageId: text("message_id").notNull(),
-    /** header (tin mở đầu) | event (tin của một sự kiện) */
+    /** header (tin mở đầu) | event (tin của một sự kiện) | test (tin thử, ngoài digest) */
     kind: text("kind").notNull(),
     /** Vị trí trong digest (1…7), để hiển thị và đo "tin đầu được bấm nhiều hơn không". */
     position: bigint("position", { mode: "number" }),
@@ -75,7 +79,14 @@ export const deliveries = pgTable(
     index("deliveries_digest_idx").on(t.digestId),
     // Mỗi vị trí của một digest gửi đúng một lần (tin thử ngoài digest có digest_id trống).
     uniqueIndex("deliveries_digest_position_uq").on(t.digestId, t.position),
-    check("deliveries_kind_ck", sql`${t.kind} in ('header', 'event')`),
+    check("deliveries_kind_ck", sql`${t.kind} in ('header', 'event', 'test')`),
+    // Chỉ tin thử đứng ngoài digest; chỉ tin sự kiện có event_id; tin trong digest luôn có vị trí.
+    check(
+      "deliveries_shape_ck",
+      sql`(${t.kind} = 'test') = (${t.digestId} is null)
+        and (${t.kind} = 'event') = (${t.eventId} is not null)
+        and (${t.digestId} is null) = (${t.position} is null)`,
+    ),
   ],
 );
 

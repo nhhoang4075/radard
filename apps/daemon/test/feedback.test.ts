@@ -25,7 +25,7 @@ beforeEach(async () => {
     channel: "telegram",
     recipient: ME,
     messageId: "58",
-    kind: "event",
+    kind: "test",
     body: "tin",
     documentIds: [1, 2],
   });

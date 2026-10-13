@@ -152,6 +152,8 @@ describe("rankPeriod", () => {
       recipient: "1",
       messageId: "10",
       kind: "event",
+      position: 1,
+      eventId: e.eventId,
       documentIds: [e.docId],
       body: "đã gửi",
       sentAt: new Date("2026-10-05T23:00:00Z"),
