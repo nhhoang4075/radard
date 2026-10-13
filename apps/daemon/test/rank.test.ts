@@ -17,7 +17,7 @@ import {
   runMigrations,
   sources,
 } from "@radard/db";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { periodEndingAt, rankPeriod } from "../src/jobs/rank.ts";
 
 import { addTopic } from "./topic-fixture.ts";
@@ -129,6 +129,18 @@ describe("rankPeriod", () => {
     // P lấy từ điểm vừa lấy lại: ln(1 + 300 + 50) so với mặt bằng (1, 7).
     expect(r.picked[0]?.c.P ?? 0).toBeCloseTo((Math.log1p(350) - 1) / 6, 6);
     expect(r.rejected.map((x) => x.reason)).toEqual(["gate"]);
+  });
+
+  test("tài liệu nguồn đánh dấu đáng ngờ (meta.suspicious) không thành ứng viên", async () => {
+    const ok = await addEvent(0.79);
+    const bad = await addEvent(0.79);
+    await db
+      .update(documents)
+      .set({ meta: { suspicious: true } })
+      .where(eq(documents.id, bad.docId));
+    const r = await rankPeriod(db, periodEndingAt(END));
+    expect(r.candidates).toBe(1);
+    expect(r.picked.map((p) => p.event.eventId)).toEqual([ok.eventId]);
   });
 
   test("tin đã gửi trong 7 ngày mà không có tài liệu mới thì bị loại (N = 0)", async () => {

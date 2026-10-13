@@ -101,12 +101,14 @@ export async function rankPeriod(
 
   // Ứng viên: sự kiện có ít nhất một tài liệu mới trong khoảng.
   const at = sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt})`;
+  // Tài liệu nguồn đánh dấu đáng ngờ (repo sao giả…) không vào điểm tin, dù vẫn được lưu và chấm.
+  const trusted = sql`(${documents.meta}->>'suspicious') is distinct from 'true'`;
   const evIds = (
     await db
       .selectDistinct({ id: eventDocuments.eventId })
       .from(eventDocuments)
       .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
-      .where(and(gte(at, period.start), lt(at, period.end)))
+      .where(and(gte(at, period.start), lt(at, period.end), trusted))
   ).map((r) => r.id);
 
   const evRows = evIds.length
@@ -132,7 +134,7 @@ export async function rankPeriod(
         })
         .from(eventDocuments)
         .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
-        .where(and(inArray(eventDocuments.eventId, evIds), lt(at, period.end)))
+        .where(and(inArray(eventDocuments.eventId, evIds), lt(at, period.end), trusted))
     : [];
   const docIds = docRows.map((d) => d.id);
 
