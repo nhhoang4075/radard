@@ -248,16 +248,21 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   <div class="task done"><input type="checkbox" checked disabled><span class="name">GITHUB_TOKEN chỉ quyền đọc</span><span class="badge s-done">Xong</span>
     <span class="desc">Fine-grained token, quyền "Public repositories (read-only)", đặt vào <code>.env</code>.</span>
     <span class="note">11/10/2026: đã kiểm. Quota REST 5.000/giờ, Search 30/phút, GraphQL 5.000; đọc repo công khai HTTP 200, thử tạo issue bị chặn HTTP 403 (đúng là chỉ đọc). Nguồn releases chạy với token: 90 lấy về, 22 mới.</span></div>
-  <div class="task"><input type="checkbox" disabled><span class="name">Nguồn github_new_repos (Search API) + lọc rác</span><span class="badge s-todo">Chưa làm</span>
-    <span class="desc">Repo tạo trong 7 ngày, nhiều sao; quy tắc "&lt; 10 KB, 0 fork, ≥ 300 sao" → <code>meta.suspicious</code>, không vào digest.</span></div>
-  <div class="task"><input type="checkbox" disabled><span class="name">Nguồn github_trending</span><span class="badge s-todo">Chưa làm</span>
-    <span class="desc">Ngày + tuần; lưu HTML gốc; kiểm tra hợp lý (có repo, có "stars today", ≤ tổng sao) sai thì ghi lỗi. Thử chạy từ Railway.</span></div>
-  <div class="task"><input type="checkbox" disabled><span class="name">README cho repo và bảng repo_stats</span><span class="badge s-todo">Chưa làm</span>
-    <span class="desc">Embed README (đoạn đầu); chụp số sao mỗi ngày (GraphQL, 100 repo/request); tính tăng_24h, tăng_tốc.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Nguồn github_new_repos (Search API) + lọc rác</span><span class="badge s-done">Xong</span>
+    <span class="desc">Repo tạo trong 7 ngày, nhiều sao; quy tắc "&lt; 10 KB, 0 fork, ≥ 300 sao" → <code>meta.suspicious</code>, không vào digest.</span>
+    <span class="note">13/10: nguồn "GitHub repo mới" (<code>github_new_repos</code>) chạy trên Railway lúc 06:00 giờ VN: Search API, repo tạo trong 7 ngày qua có &gt; 50 sao, lấy 100 repo đầu mỗi ngày; độ tin cậy 0,5. Repo dính quy tắc rác (&lt; 10 KB, 0 fork, ≥ 300 sao) được đánh <code>meta.suspicious</code> và bị loại khỏi xếp hạng. Mỗi repo là một tài liệu (<code>external_id</code> owner/repo, url là trang repo), gộp với sự kiện HN có cùng URL, không gộp theo vector. Độ nổi tạm thời: số sao / số ngày tuổi, lấy mới từ <code>GET /repos</code> lúc xếp hạng. Lần lấy đầu: 100 repo mới, 0 repo bị đánh dấu rác.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Nguồn github_trending</span><span class="badge s-done">Xong</span>
+    <span class="desc">Ngày + tuần; lưu HTML gốc; kiểm tra hợp lý (có repo, có "stars today", ≤ tổng sao) sai thì ghi lỗi. Thử chạy từ Railway.</span>
+    <span class="note">13/10: nguồn "GitHub Trending" (<code>github_trending</code>) chạy trên Railway lúc 06:10 giờ VN, độ tin cậy 0,6. Chỉ lấy trang <code>/trending</code>, bỏ bản ngày + tuần: robots.txt của GitHub cấm bot chung đọc <code>?since=daily|weekly</code> (kiểm 13/10). Kiểm tra hợp lý: có ít nhất 1 repo, repo nào cũng có "N stars today", số đó không vượt tổng sao. Mỗi repo một tài liệu như nguồn repo mới, gộp với HN theo URL. Độ nổi tạm thời: đọc lại "N stars today" của GitHub lúc xếp hạng. Lần lấy đầu: 9 repo.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">README cho repo và bảng repo_stats</span><span class="badge s-wip">Đang làm</span>
+    <span class="desc">Embed README (đoạn đầu); chụp số sao mỗi ngày (GraphQL, 100 repo/request); tính tăng_24h, tăng_tốc.</span>
+    <span class="note">13/10: README xong, đi qua job pages có sẵn (<code>articleUrl</code> là trang repo): lần chạy đầu lấy được 109/109 trang repo, embed kèm nội dung README. Bảng <code>repo_stats</code> (chụp số sao mỗi ngày) đang làm.</span></div>
   <div class="task"><input type="checkbox" disabled><span class="name">Mục "Repo nổi" trong digest</span><span class="badge s-todo">Chưa làm</span>
-    <span class="desc">Repo liên quan, xếp theo số sao tăng trong 24 giờ.</span></div>
+    <span class="desc">Repo liên quan, xếp theo số sao tăng trong 24 giờ.</span>
+    <span class="note">13/10: chưa có mục riêng; repo hiện đi qua xếp hạng chung cùng các tin khác.</span></div>
   <div class="task"><input type="checkbox" disabled><span class="name">Danh sách repo cho nguồn releases</span><span class="badge s-you">Cần bạn</span>
-    <span class="desc">Thay 10 repo TẠM bằng các công cụ bạn thật sự dùng.</span></div>
+    <span class="desc">Thay 10 repo TẠM bằng các công cụ bạn thật sự dùng.</span>
+    <span class="note">13/10: bạn chưa có repo muốn theo dõi; đã xoá 10 repo mặc định, nguồn vẫn bật nhưng không lấy gì.</span></div>
 </div>
 
 <h2 id="de-sau">Để sau · Đã bàn, chưa làm</h2>
