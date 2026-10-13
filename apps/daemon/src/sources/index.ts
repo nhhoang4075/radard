@@ -5,10 +5,14 @@
 import type { SourceAdapter } from "@radard/core";
 import { arxivSource } from "./arxiv.ts";
 import { githubSource } from "./github.ts";
+import { githubNewReposSource, githubTrendingSource } from "./github-repos.ts";
 import { hnSource } from "./hn.ts";
 
 const registry = new Map<string, SourceAdapter>(
-  [hnSource, arxivSource, githubSource].map((a) => [a.kind, a as SourceAdapter]),
+  [hnSource, arxivSource, githubSource, githubNewReposSource, githubTrendingSource].map((a) => [
+    a.kind,
+    a as SourceAdapter,
+  ]),
 );
 
 export function adapterFor(kind: string): SourceAdapter {
@@ -83,5 +87,24 @@ export const DEFAULT_SOURCES = [
     },
     defaultRole: "technical",
     trustScore: 0.8,
+  },
+  {
+    kind: "github_new_repos",
+    name: "GitHub repo mới",
+    // 06:00 giờ VN, trước điểm tin 07:00: còn thời gian cho job pages (README) và process.
+    cadence: "0 23 * * *",
+    config: { createdDays: 7, minStars: 50, maxRepos: 100, vectorJoin: false },
+    defaultRole: "technical",
+    // Thấp hơn HN: Search API lẫn repo sao giả (18% ngày 11/10/2026), dù đã có luật lọc rác.
+    trustScore: 0.5,
+  },
+  {
+    kind: "github_trending",
+    name: "GitHub Trending",
+    cadence: "10 23 * * *",
+    // Repo khác nhau mô tả gần giống nhau không phải cùng một chuyện: chỉ gộp theo URL.
+    config: { vectorJoin: false },
+    defaultRole: "community",
+    trustScore: 0.6,
   },
 ];
