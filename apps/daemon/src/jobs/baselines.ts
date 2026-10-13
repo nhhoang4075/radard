@@ -12,7 +12,7 @@
  */
 import { baselineOf, createLogger } from "@radard/core";
 import { type Database, docSignals, documents, sources } from "@radard/db";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 
 const log = createLogger("baselines");
@@ -96,8 +96,10 @@ async function engagementBaselines(db: Database, since: Date): Promise<BaselineR
       .where(
         and(
           eq(documents.sourceId, src.id),
-          gte(documents.publishedAt, since),
-          sql`${docSignals.observedAt} - ${documents.publishedAt} >= make_interval(hours => ${MATURE_HOURS})`,
+          // Nguồn không có ngày đăng (repo GitHub: "mới" là lúc radard thấy nó) tính từ lúc lấy về,
+          // giống cách xếp hạng chọn khoảng thời gian.
+          sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt}) >= ${since}`,
+          sql`${docSignals.observedAt} - coalesce(${documents.publishedAt}, ${documents.fetchedAt}) >= make_interval(hours => ${MATURE_HOURS})`,
         ),
       );
     const byDoc = new Map<number, Record<string, number>>();

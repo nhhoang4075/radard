@@ -13,7 +13,7 @@
  */
 import { createLogger, type HttpClient, type Signals } from "@radard/core";
 import { type Database, docSignals, documents, sources } from "@radard/db";
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 import { repoStatsSignals } from "./repo-stats.ts";
 
@@ -152,7 +152,12 @@ export async function refreshSince(
     .select({ id: documents.id })
     .from(documents)
     .innerJoin(sources, eq(sources.id, documents.sourceId))
-    .where(and(inArray(sources.kind, kinds), gte(documents.publishedAt, since)));
+    .where(
+      and(
+        inArray(sources.kind, kinds),
+        sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt}) >= ${since}`,
+      ),
+    );
   return refreshSignals(
     db,
     http,
