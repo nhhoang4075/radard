@@ -31,6 +31,7 @@ import { type FetchDeps, runFetch } from "./jobs/fetch.ts";
 import { fetchPages } from "./jobs/pages.ts";
 import { runProcess } from "./jobs/process.ts";
 import { periodEndingAt, rankPeriod } from "./jobs/rank.ts";
+import { listRepos, runRepoStats } from "./jobs/repo-stats.ts";
 import { buildReport, formatReport, reportWindow } from "./jobs/report.ts";
 import { refreshSince } from "./jobs/signals.ts";
 import {
@@ -94,6 +95,11 @@ radard — CLI
 
   rank [--at=<ISO>] [--refresh]  Chọn tin cho 24 giờ kết thúc ở --at (mặc định: bây giờ);
                              --refresh lấy lại điểm HN cho sự kiện qua cổng trước khi chấm
+
+  repos [--limit=20]         Repo GitHub đang theo dõi: sao, tăng 24 giờ, tăng tốc (đo từ repo_stats;
+                             chưa đủ hai lần đo thì số GitHub báo hoặc sao / tuổi, xem cột "cách tính")
+  repos snapshot             Chụp số sao ngay (job repo_stats, cần GITHUB_TOKEN); repo đã chụp trong
+                             12 giờ qua thì bỏ qua
 
   pages [--since=24h]        Trang được link tới (bài HN → blog, GitHub…): đếm theo trạng thái
   pages fetch [--since=30d]  Tải trang cho tài liệu từ mốc đó tới khi hết (lấy bù)
@@ -441,6 +447,26 @@ const COMMANDS: Record<string, Command> = {
         "lý do": x.reason,
       }));
     if (near.length) console.table(near);
+  },
+
+  repos: async ({ db }) => {
+    const basis = { measured: "đo", reported: "GitHub báo", age: "sao / tuổi" } as const;
+    const rows = (await listRepos(db)).slice(0, limit());
+    if (rows.length === 0) return console.log("chưa theo dõi repo nào");
+    console.table(
+      rows.map((r) => ({
+        repo: r.repo,
+        sao: r.stars ?? "",
+        "tăng 24h": r.gain24h ?? "",
+        "tăng tốc": r.accel ?? "",
+        "cách tính": r.basis ? basis[r.basis] : "",
+        "đo lúc": r.observedAt?.toISOString().slice(0, 16) ?? "",
+      })),
+    );
+  },
+
+  "repos snapshot": async ({ db, http }) => {
+    console.log(await runRepoStats({ db, http }));
   },
 
   pages: async ({ db }) => {
