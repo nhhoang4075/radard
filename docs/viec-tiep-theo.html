@@ -129,7 +129,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
       <p class="meta">Mật khẩu hiện tại đã nằm trong lịch sử cuộc trò chuyện. Trên Railway: service <code>postgres</code> → Variables → tạo lại <code>POSTGRES_PASSWORD</code> (và các URL đi kèm), redeploy postgres. Service <code>radard</code> dùng tham chiếu <code>${{postgres.DATABASE_URL}}</code> nên tự nhận URL mới, chỉ cần redeploy. Sau đó cập nhật kết nối "radard (Railway)" trong TablePlus.</p></div>
 
     <div class="card"><div class="head"><h3>Nguồn GitHub releases: chọn repo hoặc tắt</h3><span class="badge b-soon">Trước 20/10</span></div>
-      <p class="meta">Đã xoá hết 10 repo mặc định theo ý bạn; nguồn vẫn bật nhưng không lấy gì. Muốn theo dõi bản phát hành thì gửi tên repo (dạng <code>owner/repo</code>). Không dùng thì tôi tắt hẳn nguồn để báo cáo gọn. Nên chốt trước 20/10 để 7 ngày nghiệm thu chạy đúng như lúc dùng thật.</p></div>
+      <p class="meta">Bạn chưa có repo nào muốn theo dõi. Đã xoá hết 10 repo mặc định theo ý bạn (13/10); nguồn vẫn bật nhưng không lấy gì. Muốn theo dõi bản phát hành thì gửi tên repo (dạng <code>owner/repo</code>). Không dùng thì tôi tắt hẳn nguồn để báo cáo gọn. Nên chốt trước 20/10 để 7 ngày nghiệm thu chạy đúng như lúc dùng thật.</p></div>
 
     <div class="card"><div class="head"><h3>Chốt D6 và D8</h3><span class="badge b-soon">Trước 20/10</span></div>
       <p class="meta">Chi tiết ở tab 04, mục 2 và 3. D2, D3, D5, D7 đã xong.</p></div>
@@ -145,21 +145,24 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   <section class="panel" id="toi" role="tabpanel">
     <h2>Việc tôi làm, theo thứ tự</h2>
 
-    <div class="card"><div class="head"><h3>1. <code>cli report --since 7d</code></h3><span class="badge b-now">Trước 19/10</span></div>
-      <p class="meta">Chấm từng tiêu chí ở tab 01, đọc thẳng từ các bảng trên server: tỉ lệ fetch theo nguồn, điểm tin đến đúng giờ không (lệch so với 07:00), tỉ lệ sự kiện có phản hồi (trạng thái mới nhất của mỗi tin, chỉ <code>kind = 'event'</code>), chi phí theo ngày, và số liệu đầu tiên: tài liệu/ngày, số sự kiện, số qua cổng chủ đề, tỉ lệ 👍. Chạy được từ máy với <code>DATABASE_URL</code> trỏ lên server.</p></div>
+    <div class="card"><div class="head"><h3>1. <code>cli report --since 7d</code></h3><span class="badge b-now">Đang làm · trước 19/10</span></div>
+      <p class="meta">Đang làm ở một phiên khác (13/10). Chấm từng tiêu chí ở tab 01, đọc thẳng từ các bảng trên server: tỉ lệ fetch theo nguồn, điểm tin đến đúng giờ không (lệch so với 07:00), tỉ lệ sự kiện có phản hồi (trạng thái mới nhất của mỗi tin, chỉ <code>kind = 'event'</code>), chi phí theo ngày, và số liệu đầu tiên: tài liệu/ngày, số sự kiện, số qua cổng chủ đề, tỉ lệ 👍. Chạy được từ máy với <code>DATABASE_URL</code> trỏ lên server.</p></div>
 
     <div class="card"><div class="head"><h3>2. Sao lưu DB mỗi đêm lên R2</h3><span class="badge b-now">Trước 20/10</span></div>
       <p class="meta">Hiện DB chỉ nằm trên volume của Railway; mất volume là mất phản hồi, thứ không lấy lại được (tài liệu thì lấy lại được). Cách làm và câu hỏi cần chốt ở tab 04, mục 4.</p></div>
 
     <div class="card"><div class="head"><h3>3. Dọn dẹp</h3><span class="badge b-soon">Cùng lúc</span></div>
       <ul class="meta">
-        <li>Thêm "Công cụ mã nguồn mở" vào <code>docs/thu-vien-chu-de.html</code> (đang ghi 16 chủ đề, thực tế 17).</li>
+        <li><del>Thêm "Công cụ mã nguồn mở" vào <code>docs/thu-vien-chu-de.html</code></del>: xong 13/10, trang ghi 17 chủ đề.</li>
         <li>Xoá file dump 257 MB và file URL DB trong thư mục tạm: chứa toàn bộ dữ liệu của bạn và mật khẩu cũ.</li>
         <li>Checklist: mục "Mô tả lĩnh vực và hồ sơ" vẫn ghi "đang dùng mô tả TẠM" dù hồ sơ đã có mô tả tiếng Anh (970 ký tự, 13/10); sửa lại cho đúng.</li>
       </ul></div>
 
     <div class="card"><div class="head"><h3>4. Theo dõi sáng 14/10</h3><span class="badge b-soon">14/10</span></div>
       <p class="meta">Xem log 06:30 (mặt bằng) và 07:00 (điểm tin) trên Railway, so plan đã lưu với những gì bạn nhận. Có lỗi thì báo ngay, chưa sửa khi chưa bàn.</p></div>
+
+    <div class="card"><div class="head"><h3>Đã xong 13/10: nguồn repo GitHub</h3><span class="badge b-ok">Đang chạy</span></div>
+      <p class="meta">"GitHub repo mới" (06:00) và "GitHub Trending" (06:10) chạy trên Railway; lần đầu lấy 100 repo mới và 9 repo Trending, README của cả 109 repo đã embed. Repo hiện đi qua xếp hạng chung; bảng <code>repo_stats</code> đang làm, mục "Repo nổi" riêng trong điểm tin chưa làm. Chi tiết: <a href="checklist.html">checklist.html</a>, mục "Sau digest · Repo GitHub đang nổi".</p></div>
   </section>
 
   <!-- 04 -->
