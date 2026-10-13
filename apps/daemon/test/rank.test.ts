@@ -14,12 +14,13 @@ import {
   eventDocuments,
   events,
   profile,
-  profileTopics,
   runMigrations,
   sources,
 } from "@radard/db";
 import { sql } from "drizzle-orm";
 import { periodEndingAt, rankPeriod } from "../src/jobs/rank.ts";
+
+import { addTopic } from "./topic-fixture.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
@@ -61,7 +62,7 @@ async function addEvent(score: number, at = IN): Promise<{ eventId: number; docI
   await db
     .insert(eventDocuments)
     .values({ eventId: e?.id ?? 0, documentId: d?.id ?? 0, similarity: 1, reason: "seed" });
-  await db.insert(docTopicScores).values({ documentId: d?.id ?? 0, profileTopicId: topic, score });
+  await db.insert(docTopicScores).values({ documentId: d?.id ?? 0, topicId: topic, score });
   return { eventId: e?.id ?? 0, docId: d?.id ?? 0 };
 }
 
@@ -79,17 +80,13 @@ beforeEach(async () => {
     .returning({ id: sources.id });
   hn = s?.id ?? 0;
   await db.insert(profile).values({ description: "x" });
-  const [t] = await db
-    .insert(profileTopics)
-    .values({ label: "Agent", descriptionEn: "agents", origin: "custom", descriptionUser: "a" })
-    .returning({ id: profileTopics.id });
-  topic = t?.id ?? 0;
+  topic = await addTopic(db, "Agent", { descriptionEn: "agents" });
   // Mặt bằng: cosine 0,4 là bình thường, 0,8 là hiếm. 0,64 → z = 0,6 (đúng cổng).
   await db.insert(baselines).values([
     {
       metric: "relevance",
       sourceId: hn,
-      profileTopicId: topic,
+      topicId: topic,
       median: 0.4,
       p999: 0.8,
       n: 10_000,

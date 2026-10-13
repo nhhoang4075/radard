@@ -15,7 +15,6 @@ import {
   eventDocuments,
   events,
   profile,
-  profileTopics,
   runMigrations,
   sources,
 } from "@radard/db";
@@ -29,6 +28,8 @@ import {
   runDigest,
   vnDate,
 } from "../src/jobs/digest.ts";
+
+import { addTopic } from "./topic-fixture.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
@@ -71,7 +72,7 @@ async function addEvent(score = 0.79): Promise<{ eventId: number; docId: number 
   await db
     .insert(eventDocuments)
     .values({ eventId: e?.id ?? 0, documentId: d?.id ?? 0, similarity: 1, reason: "seed" });
-  await db.insert(docTopicScores).values({ documentId: d?.id ?? 0, profileTopicId: topic, score });
+  await db.insert(docTopicScores).values({ documentId: d?.id ?? 0, topicId: topic, score });
   return { eventId: e?.id ?? 0, docId: d?.id ?? 0 };
 }
 
@@ -109,16 +110,12 @@ beforeEach(async () => {
     .returning({ id: sources.id });
   hn = s?.id ?? 0;
   await db.insert(profile).values({ description: "I build AI agents.", displayLang: "vi" });
-  const [t] = await db
-    .insert(profileTopics)
-    .values({ label: "Agent AI", descriptionEn: "agents", origin: "custom", descriptionUser: "a" })
-    .returning({ id: profileTopics.id });
-  topic = t?.id ?? 0;
+  topic = await addTopic(db, "Agent AI", { descriptionEn: "agents" });
   await db.insert(baselines).values([
     {
       metric: "relevance",
       sourceId: hn,
-      profileTopicId: topic,
+      topicId: topic,
       median: 0.4,
       p999: 0.8,
       n: 10_000,
@@ -264,12 +261,7 @@ describe("runDigest", () => {
   });
 
   test("nhãn chủ đề: lấy chủ đề LLM chọn nếu nằm trong danh sách, không thì nhãn embedding", async () => {
-    await db.insert(profileTopics).values({
-      label: "GPU & inference",
-      descriptionEn: "inference",
-      origin: "custom",
-      descriptionUser: "g",
-    });
+    await addTopic(db, "GPU & inference", { descriptionEn: "inference" });
     await addEvent();
     await addEvent();
     const notifier = fakeNotifier();

@@ -15,13 +15,24 @@ const PROFILE_ID = 1;
 
 /**
  * Đưa thư viện trong code vào bảng `topics`: thêm chủ đề mới, cập nhật chủ đề đã có theo `key`.
- * Chủ đề người dùng đã chọn từ thư viện nhận câu mô tả mới và được đánh dấu embed lại.
+ * Chủ đề có câu mô tả mới thì xoá embedding để lượt process embed lại (điểm cũ xoá theo).
  */
 export async function seedLibrary(db: Database): Promise<{ topics: number; refreshed: number }> {
+  const before = new Map(
+    (
+      await db
+        .select({ key: topics.key, descriptionEn: topics.descriptionEn })
+        .from(topics)
+        .where(eq(topics.origin, "library"))
+    ).map((t) => [t.key, t.descriptionEn]),
+  );
+  let refreshed = 0;
   for (const [position, t] of TOPIC_LIBRARY.entries()) {
+    const changed = before.has(t.key) && before.get(t.key) !== t.descriptionEn;
+    if (changed) refreshed++;
     await db
       .insert(topics)
-      .values({ ...t, position })
+      .values({ ...t, position, origin: "library" })
       .onConflictDoUpdate({
         target: topics.key,
         set: {
@@ -30,34 +41,17 @@ export async function seedLibrary(db: Database): Promise<{ topics: number; refre
           descriptionEn: t.descriptionEn,
           position,
           active: true,
+          ...(changed ? { embedding: null, embeddingModel: null } : {}),
         },
       });
   }
   // Rút khỏi thư viện những chủ đề không còn trong code; người đã chọn vẫn giữ.
   const keys = TOPIC_LIBRARY.map((t) => t.key);
-  await db.update(topics).set({ active: false }).where(notInArray(topics.key, keys));
-
-  const refreshed = await db
-    .update(profileTopics)
-    .set({
-      descriptionEn: sql`${topics.descriptionEn}`,
-      label: sql`${topics.labelVi}`,
-      embedding: null,
-      embeddingModel: null,
-      updatedAt: new Date(),
-    })
-    .from(topics)
-    .where(
-      and(
-        eq(profileTopics.topicId, topics.id),
-        or(
-          ne(profileTopics.descriptionEn, topics.descriptionEn),
-          ne(profileTopics.label, topics.labelVi),
-        ),
-      ),
-    )
-    .returning({ id: profileTopics.id });
-  return { topics: TOPIC_LIBRARY.length, refreshed: refreshed.length };
+  await db
+    .update(topics)
+    .set({ active: false })
+    .where(and(eq(topics.origin, "library"), notInArray(topics.key, keys)));
+  return { topics: TOPIC_LIBRARY.length, refreshed };
 }
 
 export interface LibraryEntry {
@@ -74,8 +68,9 @@ export async function listLibrary(db: Database): Promise<LibraryEntry[]> {
   return db
     .select({
       id: topics.id,
-      key: topics.key,
-      groupVi: topics.groupVi,
+      // Chủ đề thư viện luôn có khoá và nhóm (topics_source_ck).
+      key: sql<string>`${topics.key}`,
+      groupVi: sql<string>`coalesce(${topics.groupVi}, '')`,
       labelVi: topics.labelVi,
       chosen: sql<boolean>`coalesce(${profileTopics.active}, false)`,
     })
@@ -84,7 +79,7 @@ export async function listLibrary(db: Database): Promise<LibraryEntry[]> {
       profileTopics,
       and(eq(profileTopics.topicId, topics.id), eq(profileTopics.profileId, PROFILE_ID)),
     )
-    .where(eq(topics.active, true))
+    .where(and(eq(topics.origin, "library"), eq(topics.active, true)))
     .orderBy(asc(topics.position));
 }
 
@@ -94,22 +89,15 @@ export async function pickTopics(db: Database, keys: string[]): Promise<number> 
   const found = await db
     .select()
     .from(topics)
-    .where(and(inArray(topics.key, keys), eq(topics.active, true)));
+    .where(and(eq(topics.origin, "library"), inArray(topics.key, keys), eq(topics.active, true)));
   const unknown = keys.filter((k) => !found.some((t) => t.key === k));
   if (unknown.length > 0) throw new Error(`không có trong thư viện: ${unknown.join(", ")}`);
   for (const t of found) {
     await db
       .insert(profileTopics)
-      .values({
-        profileId: PROFILE_ID,
-        topicId: t.id,
-        label: t.labelVi,
-        descriptionEn: t.descriptionEn,
-        origin: "library",
-      })
+      .values({ profileId: PROFILE_ID, topicId: t.id })
       .onConflictDoUpdate({
         target: [profileTopics.profileId, profileTopics.topicId],
-        targetWhere: sql`${profileTopics.topicId} is not null`,
         set: { active: true, updatedAt: new Date() },
       });
   }
@@ -136,8 +124,11 @@ export async function toggleLibraryTopic(db: Database, topicId: number): Promise
     await setTopicActive(db, row.id, !row.active);
     return !row.active;
   }
-  const [t] = await db.select({ key: topics.key }).from(topics).where(eq(topics.id, topicId));
-  if (!t) throw new Error(`không có chủ đề ${topicId} trong thư viện`);
+  const [t] = await db
+    .select({ key: topics.key })
+    .from(topics)
+    .where(and(eq(topics.id, topicId), eq(topics.origin, "library")));
+  if (!t?.key) throw new Error(`không có chủ đề ${topicId} trong thư viện`);
   await pickTopics(db, [t.key]);
   return true;
 }
@@ -180,49 +171,60 @@ export interface CustomTopicInput {
   kind?: "include" | "exclude";
 }
 
-/** Lưu chủ đề tự thêm. Trùng tên (không phân biệt hoa thường) với chủ đề đã có thì báo lỗi. */
+/**
+ * Lưu chủ đề tự thêm: một dòng `topics` của hồ sơ, rồi chọn nó (bật ngay). Trùng tên (không phân biệt
+ * hoa thường) với chủ đề thư viện hay chủ đề đã tự thêm thì báo lỗi. Trả về id của `profile_topics`.
+ */
 export async function addCustomTopic(db: Database, input: CustomTopicInput): Promise<number> {
   const label = nfc(input.label).trim();
   const [dup] = await db
-    .select({ id: profileTopics.id })
-    .from(profileTopics)
+    .select({ id: topics.id })
+    .from(topics)
     .where(
       and(
-        eq(profileTopics.profileId, PROFILE_ID),
-        sql`lower(${profileTopics.label}) = lower(${label})`,
+        or(eq(topics.origin, "library"), eq(topics.ownerProfileId, PROFILE_ID)),
+        sql`lower(${topics.labelVi}) = lower(${label})`,
       ),
     );
-  if (dup) throw new Error(`đã có chủ đề tên "${label}" (id ${dup.id})`);
-  const [row] = await db
-    .insert(profileTopics)
-    .values({
-      profileId: PROFILE_ID,
-      label,
-      descriptionUser: nfc(input.descriptionUser).trim(),
-      descriptionEn: input.descriptionEn,
-      origin: "custom",
-      kind: input.kind ?? "include",
-    })
-    .returning({ id: profileTopics.id });
-  if (!row) throw new Error("không ghi được chủ đề");
-  return row.id;
+  if (dup) throw new Error(`đã có chủ đề tên "${label}"`);
+  return db.transaction(async (tx) => {
+    const [topic] = await tx
+      .insert(topics)
+      .values({
+        labelVi: label,
+        descriptionUser: nfc(input.descriptionUser).trim(),
+        descriptionEn: input.descriptionEn,
+        origin: "custom",
+        ownerProfileId: PROFILE_ID,
+      })
+      .returning({ id: topics.id });
+    if (!topic) throw new Error("không ghi được chủ đề");
+    const [row] = await tx
+      .insert(profileTopics)
+      .values({ profileId: PROFILE_ID, topicId: topic.id, kind: input.kind ?? "include" })
+      .returning({ id: profileTopics.id });
+    if (!row) throw new Error("không ghi được chủ đề");
+    return row.id;
+  });
 }
 
 /**
- * Embed mọi chủ đề đang bật mà chưa có vector của model hiện tại, trong một request.
- * Gọi ở đầu mỗi lượt process, và ngay sau khi người dùng chọn hoặc thêm chủ đề.
+ * Embed mọi chủ đề chưa có vector của model hiện tại, trong một request: chủ đề trong thư viện và
+ * chủ đề đã được chọn (kể cả chủ đề tự thêm, chủ đề đã rút khỏi thư viện), bật hay tắt. Gọi ở đầu
+ * mỗi lượt process, và ngay sau khi người dùng chọn hoặc thêm chủ đề.
  */
 export async function embedPendingTopics(
   db: Database,
   embedder: EmbeddingProvider,
 ): Promise<number> {
+  const picked = db.select({ id: profileTopics.topicId }).from(profileTopics);
   const pending = await db
-    .select({ id: profileTopics.id, descriptionEn: profileTopics.descriptionEn })
-    .from(profileTopics)
+    .select({ id: topics.id, descriptionEn: topics.descriptionEn })
+    .from(topics)
     .where(
       and(
-        eq(profileTopics.active, true),
-        or(isNull(profileTopics.embedding), ne(profileTopics.embeddingModel, embedder.model)),
+        or(and(eq(topics.origin, "library"), eq(topics.active, true)), inArray(topics.id, picked)),
+        or(isNull(topics.embedding), ne(topics.embeddingModel, embedder.model)),
       ),
     );
   if (pending.length === 0) return 0;
@@ -232,11 +234,11 @@ export async function embedPendingTopics(
   );
   for (const [i, p] of pending.entries()) {
     // Vector mới (mô tả đổi, hoặc đổi model) thì điểm cũ của chủ đề không còn đúng.
-    await db.delete(docTopicScores).where(eq(docTopicScores.profileTopicId, p.id));
+    await db.delete(docTopicScores).where(eq(docTopicScores.topicId, p.id));
     await db
-      .update(profileTopics)
-      .set({ embedding: vectors[i], embeddingModel: embedder.model, updatedAt: new Date() })
-      .where(eq(profileTopics.id, p.id));
+      .update(topics)
+      .set({ embedding: vectors[i], embeddingModel: embedder.model })
+      .where(eq(topics.id, p.id));
   }
   log.info("đã embed chủ đề", { n: pending.length });
   return pending.length;
@@ -247,14 +249,16 @@ export async function listProfileTopics(db: Database) {
   return db
     .select({
       id: profileTopics.id,
-      label: profileTopics.label,
-      origin: profileTopics.origin,
+      topicId: profileTopics.topicId,
+      label: topics.labelVi,
+      origin: topics.origin,
       kind: profileTopics.kind,
       active: profileTopics.active,
-      embedded: sql<boolean>`${profileTopics.embedding} is not null`,
-      descriptionEn: profileTopics.descriptionEn,
+      embedded: sql<boolean>`${topics.embedding} is not null`,
+      descriptionEn: topics.descriptionEn,
     })
     .from(profileTopics)
+    .innerJoin(topics, eq(topics.id, profileTopics.topicId))
     .where(eq(profileTopics.profileId, PROFILE_ID))
     .orderBy(asc(profileTopics.id));
 }

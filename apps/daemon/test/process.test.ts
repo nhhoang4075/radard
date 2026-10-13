@@ -226,7 +226,7 @@ describe("runProcess", () => {
     expect(out.joinedByVector).toBe(0);
   });
 
-  test("chấm điểm mọi cặp (tài liệu, chủ đề đang bật); thêm chủ đề thì chỉ chấm cột mới", async () => {
+  test("chấm mọi cặp (tài liệu, chủ đề), bật hay tắt; bật tắt không chấm lại; chủ đề mới chỉ chấm cột mới", async () => {
     await addStory("LLM agents framework for language model tooling", "https://a.com/1");
     await addStory("Gardening tips for growing tomatoes", "https://c.com/z");
     await db.insert(topics).values({
@@ -241,22 +241,27 @@ describe("runProcess", () => {
       descriptionUser: "trồng cà chua",
       descriptionEn: "gardening tomatoes",
     });
-    const [, garden] = await listProfileTopics(db);
+    const [agents, garden] = await listProfileTopics(db);
     await setTopicActive(db, garden?.id ?? 0, false);
 
+    // Chủ đề đang tắt vẫn được embed và chấm: điểm không phụ thuộc người dùng bật gì (D4).
     const out = await runProcess(deps());
-    expect(out.topicsEmbedded).toBe(1);
-    expect(out.scored).toBe(2);
+    expect([out.topicsEmbedded, out.scored]).toEqual([2, 4]);
     const agentsScores = await db
       .select({ doc: docTopicScores.documentId, score: docTopicScores.score })
       .from(docTopicScores)
+      .where(eq(docTopicScores.topicId, agents?.topicId ?? 0))
       .orderBy(asc(docTopicScores.documentId));
     expect(agentsScores[0]?.score ?? 0).toBeGreaterThan(agentsScores[1]?.score ?? 1);
 
     await setTopicActive(db, garden?.id ?? 0, true);
-    const again = await runProcess(deps());
-    expect([again.topicsEmbedded, again.scored]).toEqual([1, 2]);
     expect(await runProcess(deps())).toMatchObject({ topicsEmbedded: 0, scored: 0 });
+    await addCustomTopic(db, {
+      label: "Ảnh",
+      descriptionUser: "ảnh",
+      descriptionEn: "image models",
+    });
+    expect(await runProcess(deps())).toMatchObject({ topicsEmbedded: 1, scored: 2 });
   });
 
   test("sửa chủ đề không đổi bảng sự kiện", async () => {

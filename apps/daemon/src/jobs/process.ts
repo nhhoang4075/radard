@@ -122,21 +122,23 @@ export function buildText(
 }
 
 /**
- * Pha S: chấm mọi cặp (tài liệu, chủ đề đang bật) còn thiếu điểm, bằng một câu SQL: cosine trên
- * vector đã có, không gọi model. Chỉ ghép vector cùng model embedding. Trả về số điểm mới ghi.
+ * Pha S: chấm mọi cặp (tài liệu, chủ đề có embedding) còn thiếu điểm, bằng một câu SQL: cosine trên
+ * vector đã có, không gọi model. Chấm với MỌI chủ đề (thư viện và tự thêm, bật hay chưa bật), để điểm
+ * không phụ thuộc người dùng đang bật gì (D4). Chỉ ghép vector cùng model embedding. Trả về số điểm
+ * mới ghi.
  */
 export async function scoreTopics(db: Database, embeddingModel: string): Promise<number> {
   const rows = await db.execute<{ n: number }>(sql`
     with ins as (
-      insert into doc_topic_scores (document_id, profile_topic_id, score)
+      insert into doc_topic_scores (document_id, topic_id, score)
       -- Chấm bằng vector có nội dung trang nếu có (xem doc_text.content_embedding).
-      select dt.document_id, pt.id, 1 - (coalesce(dt.content_embedding, dt.embedding) <=> pt.embedding)
-      from profile_topics pt
-      join doc_text dt on dt.embedding_model = pt.embedding_model
-      where pt.active and pt.embedding is not null and pt.embedding_model = ${embeddingModel}
+      select dt.document_id, t.id, 1 - (coalesce(dt.content_embedding, dt.embedding) <=> t.embedding)
+      from topics t
+      join doc_text dt on dt.embedding_model = t.embedding_model
+      where t.embedding is not null and t.embedding_model = ${embeddingModel}
         and not exists (
           select 1 from doc_topic_scores s
-          where s.document_id = dt.document_id and s.profile_topic_id = pt.id
+          where s.document_id = dt.document_id and s.topic_id = t.id
         )
       on conflict do nothing
       returning 1

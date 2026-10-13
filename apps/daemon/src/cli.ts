@@ -18,10 +18,10 @@ import {
   fetchRuns,
   llmCalls,
   profile,
-  profileTopics,
   runMigrations,
   sourceState,
   sources,
+  topics,
 } from "@radard/db";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { env } from "./env.ts";
@@ -315,15 +315,16 @@ const COMMANDS: Record<string, Command> = {
       ]),
     );
     const topicNames = new Map(
-      (
-        await db.select({ id: profileTopics.id, label: profileTopics.label }).from(profileTopics)
-      ).map((t) => [t.id, t.label]),
+      (await db.select({ id: topics.id, label: topics.labelVi }).from(topics)).map((t) => [
+        t.id,
+        t.label,
+      ]),
     );
     console.table(
       rows.map((r) => ({
         metric: r.metric,
         source: r.sourceId === null ? "(chung)" : names.get(r.sourceId),
-        topic: r.profileTopicId === null ? "" : topicNames.get(r.profileTopicId),
+        topic: r.topicId === null ? "" : topicNames.get(r.topicId),
         median: Number(r.median.toFixed(3)),
         p999: Number(r.p999.toFixed(3)),
         n: r.n,
@@ -552,7 +553,7 @@ const COMMANDS: Record<string, Command> = {
     if (!process.argv.includes("--all"))
       throw new Error("lệnh này xoá mọi dữ liệu dẫn xuất: gõ reprocess --all");
     await db.execute(sql`truncate ${eventDocuments}, ${events}, ${docTopicScores}, ${docText}`);
-    await db.update(profileTopics).set({ embedding: null, embeddingModel: null });
+    await db.update(topics).set({ embedding: null, embeddingModel: null });
     console.log("đã xoá dữ liệu dẫn xuất; chạy `process` để tính lại");
   },
 

@@ -24,7 +24,7 @@ const MATURE_HOURS = 24;
 export interface BaselineRow {
   metric: "relevance" | "engagement" | "coverage";
   sourceId: number | null;
-  profileTopicId: number | null;
+  topicId: number | null;
   median: number;
   p999: number;
   n: number;
@@ -40,10 +40,10 @@ export async function runBaselines(db: Database, now = new Date()): Promise<Base
   for (const r of rows) {
     // Khoá duy nhất là biểu thức (coalesce cột có thể trống), nên viết on conflict bằng SQL.
     await db.execute(sql`
-      insert into baselines (metric, source_id, profile_topic_id, median, p999, n, window_days, computed_at)
-      values (${r.metric}, ${r.sourceId}, ${r.profileTopicId}, ${r.median}, ${r.p999}, ${r.n},
+      insert into baselines (metric, source_id, topic_id, median, p999, n, window_days, computed_at)
+      values (${r.metric}, ${r.sourceId}, ${r.topicId}, ${r.median}, ${r.p999}, ${r.n},
               ${WINDOW_DAYS}, ${now})
-      on conflict (metric, coalesce(source_id, 0), coalesce(profile_topic_id, 0)) do update
+      on conflict (metric, coalesce(source_id, 0), coalesce(topic_id, 0)) do update
       set median = excluded.median, p999 = excluded.p999, n = excluded.n,
           window_days = excluded.window_days, computed_at = excluded.computed_at`);
   }
@@ -52,27 +52,27 @@ export async function runBaselines(db: Database, now = new Date()): Promise<Base
 }
 
 async function relevanceBaselines(db: Database, since: Date): Promise<BaselineRow[]> {
-  // grouping sets: một lần quét ra cả (nguồn × chủ đề) lẫn (chủ đề) cho mặt bằng chung.
+  // grouping sets: một lần quét ra cả (nguồn × chủ đề) lẫn (chủ đề) cho mặt bằng chung. Tính cho mọi
+  // chủ đề có điểm, bật hay chưa bật, để z của các chủ đề so được với nhau.
   const res = await db.execute<{
     source_id: number | null;
-    profile_topic_id: number;
+    topic_id: number;
     median: number;
     p999: number;
     n: number;
   }>(sql`
-    select d.source_id, s.profile_topic_id,
+    select d.source_id, s.topic_id,
       percentile_cont(0.5) within group (order by s.score) as median,
       percentile_cont(0.999) within group (order by s.score) as p999,
       count(*)::int as n
     from doc_topic_scores s
     join documents d on d.id = s.document_id
-    join profile_topics pt on pt.id = s.profile_topic_id and pt.active
     where coalesce(d.published_at, d.fetched_at) >= ${since}
-    group by grouping sets ((d.source_id, s.profile_topic_id), (s.profile_topic_id))`);
+    group by grouping sets ((d.source_id, s.topic_id), (s.topic_id))`);
   return [...res].map((r) => ({
     metric: "relevance" as const,
     sourceId: r.source_id === null ? null : Number(r.source_id),
-    profileTopicId: Number(r.profile_topic_id),
+    topicId: Number(r.topic_id),
     median: Number(r.median),
     p999: Number(r.p999),
     n: Number(r.n),
@@ -111,7 +111,7 @@ async function engagementBaselines(db: Database, since: Date): Promise<BaselineR
     out.push({
       metric: "engagement",
       sourceId: src.id,
-      profileTopicId: null,
+      topicId: null,
       ...baselineOf(values),
     });
   }
@@ -137,7 +137,7 @@ async function coverageBaselines(db: Database, since: Date): Promise<BaselineRow
     {
       metric: "coverage",
       sourceId: null,
-      profileTopicId: null,
+      topicId: null,
       median: Number(r.median),
       p999: Number(r.p999),
       n: Number(r.n),

@@ -92,6 +92,20 @@
       "when": 1791900059448,
       "tag": "0012_delivery_test_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791904248588,
+      "tag": "0013_topics_own_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791904285570,
+      "tag": "0014_profile_topics_selection_only",
+      "breakpoints": true
     }
   ]
 }

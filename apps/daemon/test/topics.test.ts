@@ -54,17 +54,20 @@ describe("thư viện chủ đề", () => {
     expect(lib.every((t) => !t.chosen)).toBe(true);
   });
 
-  test("sửa câu mô tả trong thư viện thì chủ đề đã chọn nhận câu mới và phải embed lại", async () => {
+  test("sửa câu mô tả trong thư viện thì chủ đề nhận câu mới và phải embed lại", async () => {
     await pickTopics(db, ["agents"]);
     await embedPendingTopics(db, embedder);
     await db.update(topics).set({ descriptionEn: "cũ" }).where(eq(topics.key, "agents"));
-    await db.update(profileTopics).set({ descriptionEn: "cũ" });
-    // Code giữ câu thật; seed lại đưa câu thật trở về và xoá embedding cũ.
+    // Code giữ câu thật; seed lại đưa câu thật trở về và xoá embedding cũ của đúng chủ đề đó.
     const r = await seedLibrary(db);
     expect(r.refreshed).toBe(1);
-    const [row] = await db.select().from(profileTopics);
-    expect(row?.descriptionEn).toBe(TOPIC_LIBRARY.find((t) => t.key === "agents")?.descriptionEn);
-    expect(row?.embedding).toBeNull();
+    const rows = await db.select().from(topics);
+    const agents = rows.find((t) => t.key === "agents");
+    expect(agents?.descriptionEn).toBe(
+      TOPIC_LIBRARY.find((t) => t.key === "agents")?.descriptionEn,
+    );
+    expect(agents?.embedding).toBeNull();
+    expect(rows.filter((t) => t.embedding !== null)).toHaveLength(TOPIC_LIBRARY.length - 1);
   });
 });
 
@@ -108,10 +111,18 @@ describe("tự thêm chủ đề", () => {
       descriptionUser: "pgvector, index vector, tìm kiếm",
       descriptionEn: en,
     });
-    const [row] = await db.select().from(profileTopics).where(eq(profileTopics.id, id));
-    expect(row?.origin).toBe("custom");
-    expect(row?.descriptionUser).toBe("pgvector, index vector, tìm kiếm");
+    const [row] = await db
+      .select({ kind: profileTopics.kind, active: profileTopics.active, topic: topics })
+      .from(profileTopics)
+      .innerJoin(topics, eq(topics.id, profileTopics.topicId))
+      .where(eq(profileTopics.id, id));
+    // Chủ đề tự thêm là một dòng `topics` của hồ sơ, được chọn và bật ngay.
+    expect(row?.topic.origin).toBe("custom");
+    expect(row?.topic.ownerProfileId).toBe(1);
+    expect(row?.topic.key).toBeNull();
+    expect(row?.topic.descriptionUser).toBe("pgvector, index vector, tìm kiếm");
     expect(row?.kind).toBe("include");
+    expect(row?.active).toBe(true);
   });
 
   test("model trả rỗng thì báo lỗi, không lưu", async () => {
@@ -129,14 +140,16 @@ describe("tự thêm chủ đề", () => {
   test("DB chặn chủ đề tự thêm thiếu lời của người dùng", async () => {
     // Query của Drizzle chỉ là "thenable", bọc trong async để expect bắt được lỗi.
     const insert = async () => {
-      await db.insert(profileTopics).values({ label: "x", descriptionEn: "y", origin: "custom" });
+      await db
+        .insert(topics)
+        .values({ labelVi: "x", descriptionEn: "y", origin: "custom", ownerProfileId: 1 });
     };
     await expect(insert()).rejects.toThrow();
   });
 });
 
 describe("embed chủ đề", () => {
-  test("chỉ embed chủ đề đang bật mà chưa có vector; lần hai không gọi model", async () => {
+  test("embed mọi chủ đề thư viện, bật hay chưa bật, trong một request; lần hai không gọi model", async () => {
     await pickTopics(db, ["agents", "rag_search", "evals"]);
     const mine = await listProfileTopics(db);
     await setTopicActive(db, mine[2]?.id ?? 0, false);
@@ -147,7 +160,7 @@ describe("embed chủ đề", () => {
         calls++;
       },
     });
-    expect(await embedPendingTopics(db, counting)).toBe(2);
+    expect(await embedPendingTopics(db, counting)).toBe(TOPIC_LIBRARY.length);
     expect(await embedPendingTopics(db, counting)).toBe(0);
     expect(calls).toBe(1);
   });

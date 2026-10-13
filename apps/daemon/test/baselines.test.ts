@@ -12,13 +12,14 @@ import {
   eventDocuments,
   events,
   profile,
-  profileTopics,
   runMigrations,
   sources,
 } from "@radard/db";
 import { asc, sql } from "drizzle-orm";
 import { runBaselines } from "../src/jobs/baselines.ts";
 import { refreshSignals } from "../src/jobs/signals.ts";
+
+import { addTopic } from "./topic-fixture.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
@@ -67,11 +68,7 @@ beforeEach(async () => {
   hn = h?.id ?? 0;
   arxiv = a?.id ?? 0;
   await db.insert(profile).values({ description: "x" });
-  const [t] = await db
-    .insert(profileTopics)
-    .values({ label: "Agent", descriptionEn: "agents", origin: "custom", descriptionUser: "agent" })
-    .returning({ id: profileTopics.id });
-  topicId = t?.id ?? 0;
+  topicId = await addTopic(db, "Agent", { descriptionEn: "agents" });
 });
 
 afterAll(async () => {
@@ -115,16 +112,14 @@ describe("runBaselines", () => {
     const arxivScores = [0.5, 0.6];
     for (const s of hnScores) {
       const d = await addDoc(hn, new Date(NOW.getTime() - 2 * DAY));
-      await db.insert(docTopicScores).values({ documentId: d, profileTopicId: topicId, score: s });
+      await db.insert(docTopicScores).values({ documentId: d, topicId: topicId, score: s });
     }
     for (const s of arxivScores) {
       const d = await addDoc(arxiv, new Date(NOW.getTime() - 3 * DAY));
-      await db.insert(docTopicScores).values({ documentId: d, profileTopicId: topicId, score: s });
+      await db.insert(docTopicScores).values({ documentId: d, topicId: topicId, score: s });
     }
     const old = await addDoc(hn, new Date(NOW.getTime() - 40 * DAY));
-    await db
-      .insert(docTopicScores)
-      .values({ documentId: old, profileTopicId: topicId, score: 0.99 });
+    await db.insert(docTopicScores).values({ documentId: old, topicId: topicId, score: 0.99 });
 
     const rows = (await runBaselines(db, NOW)).filter((r) => r.metric === "relevance");
     const of = (sourceId: number | null) => rows.find((r) => r.sourceId === sourceId);

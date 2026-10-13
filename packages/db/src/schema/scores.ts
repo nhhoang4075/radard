@@ -3,7 +3,7 @@
  *
  * Dẫn xuất, tính lại được: điểm chủ đề là cosine trên vector đã có (SQL, không gọi model), tín
  * hiệu lấy lại từ API của nguồn, mặt bằng tính lại mỗi ngày. Nằm riêng khỏi `derived.ts` vì
- * phụ thuộc hồ sơ người dùng.
+ * xếp hạng đọc chúng theo hồ sơ người dùng.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -18,23 +18,27 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { documents, sources } from "./collected.ts";
-import { profileTopics } from "./profile.ts";
+import { topics } from "./profile.ts";
 
-/** Cosine giữa mỗi tài liệu và mỗi chủ đề đang bật của người dùng. Tính một lần sau khi embed. */
+/**
+ * Cosine giữa mỗi tài liệu và MỌI chủ đề có embedding (thư viện và tự thêm), bật hay chưa bật. Tính một
+ * lần sau khi embed. Xếp hạng chỉ đọc điểm của chủ đề đang bật; điểm còn lại cho biết tài liệu hợp
+ * chủ đề nào nhất trong toàn thư viện.
+ */
 export const docTopicScores = pgTable(
   "doc_topic_scores",
   {
     documentId: bigint("document_id", { mode: "number" })
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
-    profileTopicId: bigint("profile_topic_id", { mode: "number" })
+    topicId: bigint("topic_id", { mode: "number" })
       .notNull()
-      .references(() => profileTopics.id, { onDelete: "cascade" }),
+      .references(() => topics.id, { onDelete: "cascade" }),
     score: real("score").notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.documentId, t.profileTopicId] }),
-    index("doc_topic_scores_topic_idx").on(t.profileTopicId),
+    primaryKey({ columns: [t.documentId, t.topicId] }),
+    index("doc_topic_scores_topic_idx").on(t.topicId),
   ],
 );
 
@@ -71,10 +75,9 @@ export const baselines = pgTable(
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
     metric: text("metric").notNull(),
     sourceId: integer("source_id").references(() => sources.id, { onDelete: "cascade" }),
-    profileTopicId: bigint("profile_topic_id", { mode: "number" }).references(
-      () => profileTopics.id,
-      { onDelete: "cascade" },
-    ),
+    topicId: bigint("topic_id", { mode: "number" }).references(() => topics.id, {
+      onDelete: "cascade",
+    }),
     median: real("median").notNull(),
     p999: real("p999").notNull(),
     /** Số mẫu: quyết định phần mặt bằng riêng w = n / (n + 1000) khi trộn với mặt bằng chung. */
@@ -86,7 +89,7 @@ export const baselines = pgTable(
     uniqueIndex("baselines_key_uq").on(
       t.metric,
       sql`coalesce(${t.sourceId}, 0)`,
-      sql`coalesce(${t.profileTopicId}, 0)`,
+      sql`coalesce(${t.topicId}, 0)`,
     ),
   ],
 );

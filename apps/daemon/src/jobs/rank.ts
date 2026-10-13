@@ -30,6 +30,7 @@ import {
   events,
   profileTopics,
   sources,
+  topics as topicsTable,
 } from "@radard/db";
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
@@ -49,7 +50,7 @@ export interface RankResult extends Selection {
   baselines: {
     metric: string;
     sourceId: number | null;
-    profileTopicId: number | null;
+    topicId: number | null;
     median: number;
     p999: number;
     n: number;
@@ -80,7 +81,7 @@ export async function rankPeriod(
   const baseRows = await db.select().from(baselines);
   const key = (m: string, s: number | null, t: number | null) => `${m}|${s ?? ""}|${t ?? ""}`;
   const baseMap = new Map<string, Baseline>(
-    baseRows.map((b) => [key(b.metric, b.sourceId, b.profileTopicId), b]),
+    baseRows.map((b) => [key(b.metric, b.sourceId, b.topicId), b]),
   );
   const base: Baselines = {
     relevance: (s, t) => baseMap.get(key("relevance", s, t)),
@@ -88,9 +89,12 @@ export async function rankPeriod(
     coverage: () => baseMap.get(key("coverage", null, null)),
   };
 
+  // Chỉ chủ đề đang bật, loại "quan tâm" mới tính vào R; thứ tự theo lúc chọn, để hoà điểm ra kết quả
+  // như nhau mỗi lần chạy.
   const topics = await db
-    .select({ id: profileTopics.id, label: profileTopics.label })
+    .select({ id: topicsTable.id, label: topicsTable.labelVi })
     .from(profileTopics)
+    .innerJoin(topicsTable, eq(topicsTable.id, profileTopics.topicId))
     .where(and(eq(profileTopics.active, true), eq(profileTopics.kind, "include")))
     .orderBy(profileTopics.id);
   const topicIds = topics.map((t) => t.id);
@@ -138,13 +142,10 @@ export async function rankPeriod(
       .select()
       .from(docTopicScores)
       .where(
-        and(
-          inArray(docTopicScores.documentId, docIds),
-          inArray(docTopicScores.profileTopicId, topicIds),
-        ),
+        and(inArray(docTopicScores.documentId, docIds), inArray(docTopicScores.topicId, topicIds)),
       )) {
       const m = scores.get(r.documentId) ?? new Map<number, number>();
-      m.set(r.profileTopicId, r.score);
+      m.set(r.topicId, r.score);
       scores.set(r.documentId, m);
     }
   }
@@ -224,14 +225,17 @@ export async function rankPeriod(
     candidates: evRows.length,
     passedGate: passing.length,
     config,
-    baselines: baseRows.map((b) => ({
-      metric: b.metric,
-      sourceId: b.sourceId,
-      profileTopicId: b.profileTopicId,
-      median: b.median,
-      p999: b.p999,
-      n: b.n,
-    })),
+    // Chỉ lưu mặt bằng đã dùng: chủ đề đang bật, cùng mặt bằng tín hiệu và độ phủ.
+    baselines: baseRows
+      .filter((b) => b.topicId === null || topicIds.includes(b.topicId))
+      .map((b) => ({
+        metric: b.metric,
+        sourceId: b.sourceId,
+        topicId: b.topicId,
+        median: b.median,
+        p999: b.p999,
+        n: b.n,
+      })),
     topicLabels: new Map(topics.map((t) => [t.id, t.label])),
     sourceNames: new Map(srcRows.map((s) => [s.id, s.name])),
     sourceKinds: kindOf,
