@@ -1,0 +1,10 @@
+**/node_modules
+**/test
+**/.tmp-*
+.git
+.env
+.env.*
+data
+docs
+*.log
+.DS_Store
