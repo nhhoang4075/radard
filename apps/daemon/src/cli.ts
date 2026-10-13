@@ -5,6 +5,7 @@
  *
  * Mỗi lệnh là một hàm trong bảng `COMMANDS`, khoá theo "lệnh" hoặc "lệnh lệnh-con".
  */
+import { pushFsToR2 } from "@radard/adapters/object-store-r2";
 import {
   deliveries,
   digests,
@@ -73,6 +74,8 @@ radard — CLI
   reprocess --all            Xoá toàn bộ dữ liệu dẫn xuất (doc_text, events) để tính lại;
                              dữ liệu thu thập giữ nguyên
   costs [--since=24h]        Chi phí gọi model theo việc
+  store check                Ghi, đọc lại rồi kiểm một key thử trên kho bản thô (đĩa hoặc R2)
+  store push [--limit=N]     Chép bản thô từ DATA_DIR lên R2 (cần biến R2_*); key đã có thì bỏ qua
 
   topics                     Thư viện chủ đề (✓ = đã chọn) và chủ đề của bạn
   topics seed                Nạp/cập nhật thư viện chủ đề từ code
@@ -551,6 +554,32 @@ const COMMANDS: Record<string, Command> = {
     await db.execute(sql`truncate ${eventDocuments}, ${events}, ${docTopicScores}, ${docText}`);
     await db.update(profileTopics).set({ embedding: null, embeddingModel: null });
     console.log("đã xoá dữ liệu dẫn xuất; chạy `process` để tính lại");
+  },
+
+  "store check": async ({ store }) => {
+    // Key nằm ngoài `raw/` để không lẫn với bản thô thật; ghi lại nhiều lần cũng vô hại.
+    const key = "check/radard.txt";
+    const body = new TextEncoder().encode(`radard ${new Date().toISOString()}`);
+    await store.put(key, body, "text/plain");
+    const back = await store.get(key);
+    const same = back !== null && Buffer.from(back).equals(Buffer.from(body));
+    if (!same || !(await store.exists(key))) throw new Error("kho bản thô: đọc lại không khớp");
+    console.log(`kho bản thô ${env.objectStore}: ghi, đọc lại và exists đều đúng`);
+  },
+
+  "store push": async () => {
+    const { endpoint, bucket, accessKeyId, secretAccessKey } = env.r2;
+    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey)
+      throw new Error(
+        "store push cần R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY",
+      );
+    const limit = flag("limit", "");
+    const out = await pushFsToR2(
+      env.dataDir,
+      { endpoint, bucket, accessKeyId, secretAccessKey },
+      { limit: limit ? Number(limit) : undefined, onProgress: (n) => console.log(`… ${n}`) },
+    );
+    console.log(`${out.files} file: đẩy ${out.uploaded}, đã có ${out.skipped}`);
   },
 
   costs: async ({ db }) => {

@@ -6,6 +6,7 @@ import { fakeEmbedding } from "@radard/adapters/ai-fake";
 import { gatewayEmbedding, gatewayLlm } from "@radard/adapters/ai-gateway";
 import { gatewayPriceBook } from "@radard/adapters/gateway-pricing";
 import { fsObjectStore } from "@radard/adapters/object-store-fs";
+import { r2ObjectStore } from "@radard/adapters/object-store-r2";
 import { createPageFetcher, extractPageText } from "@radard/adapters/pages";
 import { telegramChat, telegramNotifier } from "@radard/adapters/telegram";
 import {
@@ -14,6 +15,7 @@ import {
   type EmbeddingProvider,
   type LlmProvider,
   type Notifier,
+  type ObjectStore,
 } from "@radard/core";
 import { createDatabase, type Database, dbUsageSink, EMBED_DIMENSIONS } from "@radard/db";
 import { env } from "./env.ts";
@@ -26,9 +28,20 @@ import { HOST_INTERVALS_MS } from "./sources/index.ts";
 export function createDeps(): FetchDeps {
   return {
     db: createDatabase(env.databaseUrl),
-    store: fsObjectStore(env.dataDir),
+    store: createObjectStore(),
     http: createHttpClient({ perHostIntervalMs: HOST_INTERVALS_MS }),
   };
+}
+
+/** Kho bản thô theo `OBJECT_STORE`; thiếu biến R2 thì dừng ngay, không âm thầm ghi ra đĩa. */
+export function createObjectStore(): ObjectStore {
+  if (env.objectStore === "fs") return fsObjectStore(env.dataDir);
+  const { endpoint, bucket, accessKeyId, secretAccessKey } = env.r2;
+  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey)
+    throw new Error(
+      "OBJECT_STORE=r2 cần R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY",
+    );
+  return r2ObjectStore({ endpoint, bucket, accessKeyId, secretAccessKey });
 }
 
 /** Một bảng giá dùng chung cho cả tiến trình: đọc từ Gateway tối đa một lần mỗi ngày. */

@@ -4,13 +4,22 @@
  */
 export type Role = "scheduler" | "worker" | "bot" | "all";
 export type EmbedderKind = "gateway" | "fake" | "none";
+export type ObjectStoreKind = "fs" | "r2";
 
 const num = (v: string | undefined, fallback: number) => (v ? Number(v) : fallback);
 
 export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "postgres://localhost:5432/radard",
+  /** `fs` ghi bản thô ra `DATA_DIR` (dev); `r2` ghi lên bucket R2 (deploy), cần bốn biến `R2_*`. */
+  objectStore: (process.env.OBJECT_STORE ?? "fs") as ObjectStoreKind,
   /** Thư mục bản thô khi `OBJECT_STORE=fs`. */
   dataDir: process.env.DATA_DIR ?? "./data",
+  r2: {
+    endpoint: process.env.R2_ENDPOINT || undefined,
+    bucket: process.env.R2_BUCKET || undefined,
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || undefined,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || undefined,
+  },
   role: (process.env.SERVICE_ROLE ?? "all") as Role,
 
   /**
