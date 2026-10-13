@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Repo GitHub nổi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+
+.dim td{color:var(--ink-3)}
+.dec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:760px){.dec{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="eyebrow">RADARD · ĐỀ XUẤT · 11/10/2026</div>
+<h1>Theo dõi repo GitHub đang nổi</h1>
+<p class="lede">Mục tiêu: biết sớm khi có repo mới, lạ, hữu ích ra đời, và những repo đang tăng sao mạnh. Tài liệu này dùng dữ liệu thật lấy hôm nay để so các cách lấy dữ liệu, cho thấy lọc xong còn lại gì, đề xuất thiết kế và liệt kê các quyết định cần bạn.</p>
+
+<nav class="tabs" aria-label="Các phần">
+  <div class="tablist" role="tablist">
+    <button class="tab" role="tab" aria-controls="tong-quan"><span class="n">01</span>Tổng quan</button>
+    <button class="tab" role="tab" aria-controls="nguon"><span class="n">02</span>Nguồn dữ liệu</button>
+    <button class="tab" role="tab" aria-controls="hom-nay"><span class="n">03</span>Dữ liệu hôm nay</button>
+    <button class="tab" role="tab" aria-controls="loc"><span class="n">04</span>Lọc &amp; chống rác</button>
+    <button class="tab" role="tab" aria-controls="thiet-ke"><span class="n">05</span>Thiết kế</button>
+    <button class="tab" role="tab" aria-controls="toc-do"><span class="n">06</span>Tốc độ tăng sao</button>
+    <button class="tab" role="tab" aria-controls="quyet-dinh"><span class="n">07</span>Quyết định</button>
+  </div>
+</nav>
+
+<!-- 01 -->
+<div class="panel" role="tabpanel" id="tong-quan">
+<div class="tiles">
+  <div class="tile"><b>102</b><span>repo đang nổi hôm nay (Trending ngày/tuần/tháng + 60 repo mới nhiều sao nhất)</span></div>
+  <div class="tile"><b id="t-pass">57</b><span>qua bộ lọc liên quan của radard (ngưỡng <span class="thv">0,58</span>)</span></div>
+  <div class="tile"><b>7</b><span>đã có sẵn trong radard (qua HN). Còn lại là tín hiệu mới</span></div>
+  <div class="tile"><b>11 / 60</b><span>repo mới có dấu hiệu rác, sao giả</span></div>
+</div>
+<p class="muted" style="font-size:14px">Lấy lúc 11/10/2026: <code>github.com/trending</code> (3 trang) và GitHub Search API <code>created:&gt;04/10 stars:&gt;50</code> (445 kết quả, lấy 60 đầu). Mức liên quan chấm bằng đúng model và mô tả lĩnh vực (TẠM) của lớp 2, trên tên + mô tả repo.</p>
+
+<h2>Bạn muốn biết hai thứ khác nhau</h2>
+<div class="grid2">
+  <div class="card"><b class="h">1. Repo mới, lạ, hữu ích</b><p>Ra đời vài ngày, chưa ai nhắc trên HN. Ví dụ hôm nay: <code>openai/math</code> có 13.799 sao sau 4,7 ngày; <code>rociiu/talorys</code> (AI agent chạy trên Cloudflare của bạn).</p></div>
+  <div class="card"><b class="h">2. Repo đang tăng sao mạnh</b><p>Có thể là repo cũ bỗng hot lại. Ví dụ hôm nay: <code>huggingface/transformers</code> lên Trending ngày; <code>thedotmack/claude-mem</code> (96 nghìn sao) vẫn trong Trending tuần.</p></div>
+</div>
+<p>radard hiện chỉ có nguồn <b>GitHub releases</b> cho 10 repo cố định (danh sách TẠM), nên không thấy cả hai loại trên.</p>
+
+<h2>Tóm tắt đề xuất</h2>
+<div class="steps">
+  <div class="step"><b>Nguồn repo mới qua API chính thức (Search API)</b><p>Ổn định, đúng điều khoản; cần bộ lọc chống rác (tab 04).</p></div>
+  <div class="step"><b>radard tự chụp số sao mỗi ngày để tính tốc độ tăng</b><p>Không phụ thuộc cách GitHub xếp hạng; bắt được cả repo cũ hot lại nếu nó đã nằm trong tập theo dõi (tab 06).</p></div>
+  <div class="step"><b>Trang Trending: tuỳ bạn quyết</b><p>Tín hiệu tốt nhất cho "repo cũ hot lại", nhưng phải đọc HTML và điều khoản GitHub không rõ ràng cho mục đích này (tab 02).</p></div>
+  <div class="step"><b>Embed README chứ không chỉ mô tả</b><p>Mô tả repo quá ngắn để lọc tin cậy (tab 04). Cần <code>GITHUB_TOKEN</code>.</p></div>
+</div>
+</div>
+
+<!-- 02 -->
+<div class="panel" role="tabpanel" id="nguon">
+<h2>Bốn cách lấy dữ liệu, thử thật hôm nay</h2>
+<div class="tbl"><table>
+<thead><tr><th>Cách</th><th>Cho biết</th><th>Kết quả thử</th><th>Điểm yếu</th></tr></thead>
+<tbody>
+<tr><td><b>A. Trang Trending</b><br><span class="muted">github.com/trending?since=daily|weekly|monthly</span></td><td>Repo đang hot (mới lẫn cũ), kèm "N stars today / this week / this month"</td><td>13 / 13 / 23 repo. Ví dụ <code>morluto/rea</code> +25.793 sao hôm nay</td><td>Không có API: đọc HTML, vỡ khi GitHub đổi giao diện. Mỗi trang ~25 repo. Cách xếp hạng không công khai. Điều khoản: xem dưới</td></tr>
+<tr><td><b>B. Search API</b><br><span class="muted">created:&gt;7 ngày, stars:&gt;50, sort:stars</span></td><td>Repo <b>mới ra đời</b> đã có nhiều sao</td><td>445 repo trong 7 ngày. Không trùng repo nào với Trending hôm nay</td><td>Không thấy repo cũ hot lại. <b>18% kết quả là rác sao giả</b> (tab 04). 10 request/phút không token, 30 có token</td></tr>
+<tr><td><b>C. OSS Insight API</b><br><span class="muted">api.ossinsight.io/v1/trends/repos</span></td><td>Xếp hạng theo sự kiện sao, PR</td><td><b>Không dùng được</b>: API tự báo dữ liệu hỏng từ 01/03/2026</td><td>Luồng sự kiện công khai của GitHub chỉ còn ~0,3% so với trước. Cách nào dựa vào luồng này (có thể cả GH Archive, chưa kiểm) đều không tin được</td></tr>
+<tr><td><b>D. radard tự chụp số sao</b><br><span class="muted">GET /repos/{owner}/{repo} mỗi ngày</span></td><td>Tốc độ tăng sao thật theo số đo của chính mình</td><td>Chưa làm. API trả <code>stargazers_count</code></td><td>Chỉ đo được repo đã biết; cần <code>GITHUB_TOKEN</code> (5.000 request/giờ)</td></tr>
+</tbody></table></div>
+
+<figure>
+<svg viewBox="0 0 760 230" role="img" aria-label="Trending và Search tìm ra repo ứng viên; HN cũng đưa repo vào; radard chụp số sao mỗi ngày cho mọi ứng viên">
+  <defs><marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bp" x="20" y="20" width="180" height="46" rx="8"/><text class="t" x="110" y="40" text-anchor="middle">A. Trending (HTML)</text><text class="ts" x="110" y="57" text-anchor="middle">repo hot, mới lẫn cũ</text>
+  <rect class="ba" x="20" y="92" width="180" height="46" rx="8"/><text class="t" x="110" y="112" text-anchor="middle">B. Search API</text><text class="ts" x="110" y="129" text-anchor="middle">repo mới nhiều sao</text>
+  <rect class="bx" x="20" y="164" width="180" height="46" rx="8"/><text class="t" x="110" y="184" text-anchor="middle">HN, arXiv (đang có)</text><text class="ts" x="110" y="201" text-anchor="middle">link github.com trong bài</text>
+  <rect class="bc" x="290" y="80" width="190" height="70" rx="8"/><text class="tb" x="385" y="108" text-anchor="middle">Tập repo theo dõi</text><text class="ts" x="385" y="128" text-anchor="middle">mỗi repo một tài liệu</text>
+  <rect class="bd" x="560" y="80" width="180" height="70" rx="8"/><text class="tb" x="650" y="108" text-anchor="middle">D. Chụp số sao</text><text class="ts" x="650" y="128" text-anchor="middle">mỗi ngày, qua API</text>
+  <g class="ln" marker-end="url(#g1)"><path d="M200,43 L288,98"/><path d="M200,115 L288,115"/><path d="M200,187 L288,132"/><path d="M480,115 L558,115"/></g>
+  <text class="lb" x="519" y="106" text-anchor="middle">ứng viên</text>
+</svg>
+<figcaption><b>Hình 1.</b> A, B và các bài HN, arXiv là nguồn <b>phát hiện</b> repo; D là nguồn <b>đo</b>. Tách hai vai này để tốc độ tăng sao luôn là số radard tự đo được.</figcaption>
+</figure>
+
+<h2>Điều khoản GitHub về dùng dữ liệu</h2>
+<p>GitHub Acceptable Use Policies, mục 7 "Information Usage Restrictions" (đọc ngày 11/10/2026), trích:</p>
+<pre><code>You may use information from our Service for the following reasons, regardless of whether
+the information was scraped, collected through our API, or obtained otherwise:
+* Researchers may use public, non-personal information from the Service for research
+  purposes, only if any publications resulting from that research are open access.
+* Archivists may use public information from the Service for archival purposes.
+
+Scraping refers to extracting information from our Service via an automated process, such
+as a bot or webcrawler. Scraping does not refer to the collection of information through
+our API. Please see Section H of our Terms of Service for our API Terms.</code></pre>
+<div class="note"><b>Đọc thế nào (Claude diễn giải, không phải tư vấn pháp lý):</b> đọc HTML trang Trending là <b>scraping</b>; dùng Search API và <code>GET /repos</code> là dùng API, chịu điều khoản API (mục H Terms of Service: tôn trọng giới hạn request). radard là đồ án môn học: có thể coi là mục đích nghiên cứu nếu báo cáo công bố dạng mở, nhưng đây là vùng bạn cần tự quyết. Hướng an toàn: lõi dùng API; Trending là tuỳ chọn, tần suất thấp (vài request mỗi ngày).</div>
+
+<h2>Người khác đã đọc trang Trending thế nào, gặp vấn đề gì</h2>
+<p>GitHub chưa bao giờ có API cho Trending; một thảo luận cộng đồng năm 2025 hỏi đúng điều này và không có nhân viên GitHub nào trả lời. Vì vậy có nhiều dự án đọc HTML. Tra cứu ngày 11/10/2026 (số liệu GitHub API cùng ngày):</p>
+<div class="tbl"><table>
+<thead><tr><th>Dự án</th><th>Làm gì</th><th>Từ</th><th>Tình trạng</th><th>Sự cố đã ghi nhận</th></tr></thead>
+<tbody>
+<tr><td class="mono">bonfy/github-trending</td><td>Lưu Trending mỗi ngày (Python, Go, JS, Swift) thành file</td><td>2015</td><td>Còn chạy, cập nhật 10/10/2026</td><td>Bộ chọn <code>div.Box article.Box-row</code> không đổi; code đọc trang chỉ sửa 1 lần (08/2020). Từ 03/2020 không lần nào thiếu quá 1 ngày liền</td></tr>
+<tr><td class="mono">mshibanami/GitHubTrendingRSS</td><td>RSS cho Trending</td><td>2018</td><td>Còn chạy, cập nhật 11/10/2026</td><td>07/2026: feed hỏng vì một URL ảnh chưa escape (lỗi phía họ, không phải GitHub đổi HTML)</td></tr>
+<tr><td class="mono">andygrunwald/go-trending</td><td>Thư viện Go</td><td>2015</td><td>Còn bảo trì</td><td><b>02/2026: đọc nhầm số</b>, trả tổng số sao thay vì "stars today" mà không báo lỗi (issue #67)</td></tr>
+<tr><td class="mono">NiklasTiede/Github-Trending-API</td><td>API tự host (Python)</td><td>2021</td><td>Code còn, bản host Heroku chết 2022–2023</td><td><b>04–05/2023: GitHub đổi một thuộc tính HTML</b>, endpoint repo lỗi <code>'NoneType' object has no attribute 'a'</code>, sửa bằng PR #9</td></tr>
+<tr><td class="mono">huchenme/github-trending-api</td><td>API công khai miễn phí (836 sao)</td><td>2018</td><td>Bỏ dở từ 01/2023, 40 issue mở</td><td>10/2020: bản deploy trên now.sh bị tắt; 2023: bản thay thế ghapi.huchen.dev cũng ngừng</td></tr>
+<tr><td>GitHub</td><td></td><td></td><td></td><td><b>2022:</b> thông báo bỏ trang Trending từ 30/09/2022 "do ít người dùng", rút lại thông báo ngay hôm sau</td></tr>
+</tbody></table></div>
+
+<h3>Trang Trending ngắn dần</h3>
+<figure><svg viewBox="0 0 760 210" role="img" aria-label="Số repo trung bình mỗi trang Trending theo ngôn ngữ, giảm từ 25 năm 2023 xuống khoảng 14 năm 2026"><line x1="60" x2="700" y1="170.0" y2="170.0" stroke="#E6EBE9"/><text class="ts" x="54" y="174.0" text-anchor="end">0</text><line x1="60" x2="700" y1="142.2" y2="142.2" stroke="#E6EBE9"/><text class="ts" x="54" y="146.2" text-anchor="end">5</text><line x1="60" x2="700" y1="114.4" y2="114.4" stroke="#E6EBE9"/><text class="ts" x="54" y="118.4" text-anchor="end">10</text><line x1="60" x2="700" y1="86.7" y2="86.7" stroke="#E6EBE9"/><text class="ts" x="54" y="90.7" text-anchor="end">15</text><line x1="60" x2="700" y1="58.9" y2="58.9" stroke="#E6EBE9"/><text class="ts" x="54" y="62.9" text-anchor="end">20</text><line x1="60" x2="700" y1="31.1" y2="31.1" stroke="#E6EBE9"/><text class="ts" x="54" y="35.1" text-anchor="end">25</text><line x1="60" x2="700" y1="31.1" y2="31.1" stroke="#16201D" stroke-dasharray="5 4"/><text class="ts" x="700" y="25.1" text-anchor="end">đủ 25 repo / trang</text><rect x="68.0" y="31.1" width="75.4" height="138.9" rx="3" fill="#2F5DA8"><title>06/2023: trung bình 25.0 repo</title></rect><text class="t" x="105.7" y="48.1" text-anchor="middle" style="fill:#fff;font-weight:600">25,0</text><text class="ts" x="105.7" y="186" text-anchor="middle">06/2023</text><rect x="159.4" y="43.6" width="75.4" height="126.4" rx="3" fill="#2F5DA8"><title>06/2024: trung bình 22.75 repo</title></rect><text class="t" x="197.1" y="60.6" text-anchor="middle" style="fill:#fff;font-weight:600">22,75</text><text class="ts" x="197.1" y="186" text-anchor="middle">06/2024</text><rect x="250.9" y="60.3" width="75.4" height="109.7" rx="3" fill="#2F5DA8"><title>01/2025: trung bình 19.75 repo</title></rect><text class="t" x="288.6" y="77.3" text-anchor="middle" style="fill:#fff;font-weight:600">19,75</text><text class="ts" x="288.6" y="186" text-anchor="middle">01/2025</text><rect x="342.3" y="72.8" width="75.4" height="97.2" rx="3" fill="#2F5DA8"><title>06/2025: trung bình 17.5 repo</title></rect><text class="t" x="380.0" y="89.8" text-anchor="middle" style="fill:#fff;font-weight:600">17,5</text><text class="ts" x="380.0" y="186" text-anchor="middle">06/2025</text><rect x="433.7" y="83.9" width="75.4" height="86.1" rx="3" fill="#2F5DA8"><title>01/2026: trung bình 15.5 repo</title></rect><text class="t" x="471.4" y="100.9" text-anchor="middle" style="fill:#fff;font-weight:600">15,5</text><text class="ts" x="471.4" y="186" text-anchor="middle">01/2026</text><rect x="525.1" y="67.2" width="75.4" height="102.8" rx="3" fill="#2F5DA8"><title>06/2026: trung bình 18.5 repo</title></rect><text class="t" x="562.9" y="84.2" text-anchor="middle" style="fill:#fff;font-weight:600">18,5</text><text class="ts" x="562.9" y="186" text-anchor="middle">06/2026</text><rect x="616.6" y="89.4" width="75.4" height="80.6" rx="3" fill="#2F5DA8"><title>10/2026: trung bình 14.5 repo</title></rect><text class="t" x="654.3" y="106.4" text-anchor="middle" style="fill:#fff;font-weight:600">14,5</text><text class="ts" x="654.3" y="186" text-anchor="middle">10/2026</text></svg>
+<figcaption><b>Hình 1b.</b> Số repo trung bình mỗi trang Trending ngày (4 ngôn ngữ), đếm từ kho lưu trữ của <code>bonfy/github-trending</code>. Trước 2024 luôn đủ 25; nay 12–17. Trang chung hôm nay (11/10) chỉ có 13 repo. GitHub không giải thích; có thể họ lọc chặt hơn (đoán, chưa kiểm).</figcaption>
+</figure>
+
+<h3>Bài học áp vào radard</h3>
+<div class="tbl"><table>
+<thead><tr><th>Đã xảy ra với người khác</th><th>radard sẽ làm</th></tr></thead>
+<tbody>
+<tr><td>HTML đổi nhẹ làm vỡ parser (2023), nhưng hiếm: bộ chọn chính ổn định ít nhất từ 2020</td><td>Cùng bộ chọn <code>article.Box-row</code>; lưu nguyên HTML của trang làm bản thô (lớp 1), parser đổi thì đọc lại được dữ liệu cũ; test với HTML thật đã lưu</td></tr>
+<tr><td>Đọc nhầm số mà không báo lỗi (go-trending, 2026)</td><td>Kiểm tra hợp lý mỗi lượt: số repo &gt; 0, mọi repo có "stars today", số đó ≤ tổng sao. Sai thì lượt ghi <code>error</code>, không lưu dữ liệu sai</td></tr>
+<tr><td>Dịch vụ API trung gian chết (now.sh, Heroku, ghapi)</td><td>Không dựa vào dịch vụ của bên khác: radard tự đọc, 2–3 request/ngày</td></tr>
+<tr><td>GitHub từng định bỏ Trending (2022); trang ngắn dần</td><td>Trending chỉ là một nguồn phát hiện; lõi vẫn là Search API + tự chụp số sao. Trending mất thì radard vẫn chạy</td></tr>
+<tr><td>Repo độc hại chỉ gồm README nổi qua Search API nhưng <b>không lên Trending</b> (bài viết trên DEV, 05/10/2026, mô tả đúng mẫu radard gặp ở tab 04)</td><td>Bộ lọc rác bắt buộc cho Search API; Trending là nguồn "sạch" hơn</td></tr>
+<tr><td>429 khi gửi nhiều request; một tác giả báo trang Trending không trả lời (HTTP 000) từ máy của họ (chưa rõ nguyên nhân)</td><td>Tần suất rất thấp; dùng lại cơ chế giãn nhịp và thử lại của HttpClient. Cần thử từ Railway trước khi tin là chạy được trên server</td></tr>
+</tbody></table></div>
+<p class="muted" style="font-size:14px">Nguồn: <a href="https://github.com/bonfy/github-trending">bonfy/github-trending</a> (lịch sử commit: 3.539 commit, 3.460 ngày có dữ liệu từ 17/08/2015), <a href="https://github.com/mshibanami/GitHubTrendingRSS">GitHubTrendingRSS</a>, <a href="https://github.com/andygrunwald/go-trending/issues/67">go-trending #67</a>, <a href="https://github.com/NiklasTiede/Github-Trending-API/pull/9">Github-Trending-API PR #9</a>, <a href="https://github.com/huchenme/github-trending-api/issues/136">github-trending-api #136</a>, <a href="https://news.hada.io/topic?id=7320">GeekNews về thông báo bỏ Trending 2022</a>, <a href="https://github.com/orgs/community/discussions/161519">GitHub Community #161519</a>, <a href="https://dev.to/felixwang007/github-trending-has-no-api-i-rebuilt-it-and-it-caught-4-malware-repos-made-entirely-of-readme-1ek8">DEV: "GitHub Trending Has No API…"</a>, <a href="https://starlog.is/articles/cybersecurity/andygrunwald-go-trending/">Starlog về go-trending</a>.</p>
+</div>
+
+<!-- 03 -->
+<div class="panel" role="tabpanel" id="hom-nay">
+<div class="card sim">
+  <div class="sim-ctl"><label>Ngưỡng liên quan <input type="range" class="th" min="0.40" max="0.80" step="0.01" value="0.58"> <b class="thv">0,58</b></label><span class="muted" id="t3-count"></span></div>
+  <div class="lg sim-lg"><span><i style="background:#0E6E5C"></i>qua ngưỡng</span><span><i style="background:#C9D2CE"></i>dưới ngưỡng</span><span><i style="background:#fff;border:2px solid #C0392B"></i>dấu hiệu rác</span></div>
+</div>
+
+<h2>Trending hôm nay: số sao tăng trong ngày</h2>
+<figure><svg id="ch-trend" role="img" aria-label="Số sao tăng hôm nay của 13 repo Trending, tô màu theo mức liên quan"></svg>
+<figcaption><b>Hình 2.</b> 13 repo trên trang Trending ngày. Rê chuột lên cột để xem mô tả và điểm liên quan. Repo nổi nhất không nhất thiết liên quan tới lĩnh vực của bạn: đó là việc của bộ lọc.</figcaption></figure>
+
+<h2>Repo mới ra đời: số sao theo tuổi</h2>
+<figure><svg id="ch-new" role="img" aria-label="60 repo tạo trong 7 ngày qua: trục ngang là tuổi theo ngày, trục dọc là số sao theo thang log"></svg>
+<figcaption><b>Hình 3.</b> 60 repo nhiều sao nhất trong các repo tạo sau 04/10. Trục dọc thang log. Càng lên cao và càng sang trái (trẻ mà nhiều sao) thì càng "nổ". Vòng đỏ: dấu hiệu rác (tab 04), thường tụ thành một dải ngang ~400–600 sao ở tuổi ~2 ngày: cùng một đợt bơm sao.</figcaption></figure>
+
+<h2>Bảng đầy đủ</h2>
+<div class="tbl" style="max-height:420px;overflow-y:auto"><table id="tb-all">
+<thead><tr><th>Repo</th><th>Nguồn</th><th class="num">Sao</th><th class="num">Tăng / ngày</th><th class="num">Liên quan</th><th>Mô tả</th></tr></thead><tbody></tbody></table></div>
+<p class="muted" style="font-size:14px">"Tăng / ngày": với Trending là số GitHub báo (ngày, hoặc tuần/tháng chia đều); với repo mới là tổng sao chia tuổi. Có dấu ✓ ở cột Repo là đã có trong dữ liệu radard.</p>
+</div>
+
+<!-- 04 -->
+<div class="panel" role="tabpanel" id="loc">
+<h2>Lọc theo mức liên quan</h2>
+<div class="card sim">
+  <div class="sim-ctl"><label>Ngưỡng liên quan <input type="range" class="th" min="0.40" max="0.80" step="0.01" value="0.58"> <b class="thv">0,58</b></label><span class="muted" id="t4-count"></span></div>
+  <svg id="ch-hist" role="img" aria-label="Phân bố điểm liên quan của 102 repo, đường đứt là ngưỡng"></svg>
+</div>
+<p>Cùng ngưỡng 0,58 đang dùng cho HN. Kéo thanh trượt để xem số repo còn lại. Vùng 0,55–0,62 lẫn lộn:</p>
+<div class="grid2">
+  <div class="card"><b class="h">Liên quan nhưng điểm thấp</b><ul>
+    <li><code>NVIDIA/OpenShell</code> 0,561: "safe, private runtime for autonomous AI agents"</li>
+    <li><code>affaan-m/ECC</code> 0,589: "agent harness performance optimization system"</li>
+    <li><code>anthropics/financial-services</code> 0,576: không có mô tả</li></ul></div>
+  <div class="card"><b class="h">Không liên quan nhưng điểm khá</b><ul>
+    <li><code>DuarteSantos8/openGym</code> 0,602: ứng dụng ghi lịch tập gym</li>
+    <li><code>CoralFireRadial/StartAll-Back</code> 0,605: repo rác</li>
+    <li><code>navyofficerpipe/Discord-Server-Raider</code> 0,596: công cụ phá server Discord</li></ul></div>
+</div>
+<p><b>Vì sao:</b> mỗi repo chỉ có tên và một câu mô tả (8 repo không có mô tả). <code>openai/math</code> được 0,823 chỉ nhờ cái tên. Bài HN có tiêu đề, arXiv có cả tóm tắt; repo cần <b>README</b> (đoạn đầu, ~1.000 ký tự) mới chấm tin được. Và nên có ngưỡng riêng cho nguồn repo (như arXiv 0,55), chỉnh lại sau khi có README.</p>
+
+<h2>Chống rác: repo có sao giả</h2>
+<p>Trong 60 repo mới nhiều sao, 11 repo có cùng một mẫu: <b>dung lượng dưới 10 KB, 0 fork, 300–600 sao</b>, tạo cùng ngày 09/10. Kiểm 3 chủ repo: tài khoản đều tạo <b>cùng ngày 09/06/2026</b>, mỗi tài khoản 2 repo, 0 người theo dõi. Topic kiểu <code>startallback-pro-download</code>, <code>how-to-install-total-commander</code>. Tên như <code>KMS-Pico</code> (crack Windows), <code>Discord-Nitro-Generator</code>: mồi dụ tải phần mềm độc hại, sao được bơm bằng tài khoản ảo.</p>
+<div class="tbl"><table>
+<thead><tr><th>Dấu hiệu</th><th>Repo rác điển hình</th><th>Repo thật mới nổi</th></tr></thead>
+<tbody>
+<tr><td>Dung lượng</td><td class="mono">2 KB (chỉ README)</td><td class="mono">trung vị 4,7 MB (49 repo còn lại)</td></tr>
+<tr><td>Fork / sao</td><td class="mono">0 / 500</td><td class="mono">trung vị 0,066 (cứ 15 sao 1 fork)</td></tr>
+<tr><td>Tài khoản chủ</td><td>vài tháng tuổi, 0 người theo dõi, 2 repo, nhiều tài khoản tạo cùng ngày</td><td>tổ chức, hoặc người có lịch sử</td></tr>
+<tr><td>Topic</td><td>"download", "pro", "crack", tên phần mềm thương mại</td><td>chủ đề kỹ thuật</td></tr>
+</tbody></table></div>
+<p>Đề xuất: loại ở lớp 1 khi khớp mẫu "&lt; 10 KB và 0 fork và ≥ 300 sao", vẫn lưu bản thô nhưng đánh dấu <code>meta.suspicious</code> để không vào digest; xem lại quy tắc sau 1–2 tuần. Chưa áp quy tắc này cho repo trên Trending: trang Trending không cho biết dung lượng và số fork (cần thêm 1 request API mỗi repo).</p>
+</div>
+
+<!-- 05 -->
+<div class="panel" role="tabpanel" id="thiet-ke">
+<h2>Luồng dữ liệu đề xuất</h2>
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="Nguồn repo tạo tài liệu và dòng repo_stats; lớp 2 embed README; digest có mục repo nổi xếp theo tốc độ tăng sao">
+  <defs><marker id="g5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="ba" x="20" y="30" width="170" height="52" rx="8"/><text class="t" x="105" y="52" text-anchor="middle">github_new_repos</text><text class="ts" x="105" y="70" text-anchor="middle">Search API, ngày 1 lần</text>
+  <rect class="bp" x="20" y="100" width="170" height="52" rx="8"/><text class="t" x="105" y="122" text-anchor="middle">github_trending</text><text class="ts" x="105" y="140" text-anchor="middle">tuỳ chọn, ngày 1 lần</text>
+  <rect class="bd" x="20" y="170" width="170" height="52" rx="8"/><text class="t" x="105" y="192" text-anchor="middle">github_stars</text><text class="ts" x="105" y="210" text-anchor="middle">chụp số sao, ngày 1 lần</text>
+  <rect class="bc" x="270" y="50" width="200" height="70" rx="8"/><text class="tb" x="370" y="78" text-anchor="middle">documents</text><text class="ts" x="370" y="96" text-anchor="middle">1 dòng / repo + README</text><text class="ts" x="370" y="111" text-anchor="middle">(source_id, "owner/repo")</text>
+  <rect class="bc" x="270" y="160" width="200" height="70" rx="8"/><text class="tb" x="370" y="188" text-anchor="middle">repo_stats (mới)</text><text class="ts" x="370" y="206" text-anchor="middle">1 dòng / repo / lần đo</text><text class="ts" x="370" y="221" text-anchor="middle">chỉ ghi thêm</text>
+  <rect class="bx" x="550" y="50" width="190" height="70" rx="8"/><text class="tb" x="645" y="78" text-anchor="middle">lớp 2</text><text class="ts" x="645" y="96" text-anchor="middle">embed README, lọc liên quan,</text><text class="ts" x="645" y="111" text-anchor="middle">gộp với bài HN cùng URL</text>
+  <rect class="bx" x="550" y="160" width="190" height="70" rx="8"/><text class="tb" x="645" y="188" text-anchor="middle">digest: "Repo nổi"</text><text class="ts" x="645" y="206" text-anchor="middle">repo liên quan, xếp theo</text><text class="ts" x="645" y="221" text-anchor="middle">số sao tăng trong 24 giờ</text>
+  <g class="ln" marker-end="url(#g5)"><path d="M190,56 L268,78"/><path d="M190,126 L268,96"/><path d="M190,126 L268,182"/><path d="M190,196 L268,196"/><path d="M470,85 L548,85"/><path d="M470,195 L548,195"/><path d="M645,120 L645,158"/></g>
+  <text class="lb" x="229" y="160" text-anchor="middle">"N stars today"</text>
+</svg>
+<figcaption><b>Hình 4.</b> Repo là một tài liệu (để embed, lọc, gộp sự kiện); số sao theo thời gian là một bảng riêng (để tính tốc độ). Digest đọc cả hai.</figcaption>
+</figure>
+
+<h2>Vì sao cần bảng <code>repo_stats</code> riêng</h2>
+<p><code>documents</code> có khoá duy nhất <code>(source_id, external_id)</code>: một repo chỉ là <b>một tài liệu</b>, lần chụp thứ hai sẽ bị bỏ như bản trùng. Đó là đúng cho nội dung (README không đổi mỗi ngày), nhưng số sao thì đổi mỗi ngày và ta cần <b>giữ mọi lần đo</b>. Nên tách:</p>
+<div class="grid2">
+  <div class="card"><b class="h">documents (đã có)</b><pre><code>source_id   github_new_repos
+external_id rociiu/talorys
+url         https://github.com/rociiu/talorys
+title       rociiu/talorys
+body        JSON repo + README (bản thô)
+meta        {language, topics, suspicious}</code></pre></div>
+  <div class="card"><b class="h">repo_stats (mới, lớp 1, chỉ ghi thêm)</b><pre><code>repo         rociiu/talorys
+observed_at  2026-10-11 07:00
+stars        1.210
+forks        84
+source       github_stars | trending_daily
+reported_gain  (Trending: "N stars today")</code></pre></div>
+</div>
+<p>Repo vừa nổi trên GitHub vừa được đăng HN sẽ tự gộp: bài HN có <code>url_canonical</code> = <code>https://github.com/owner/repo</code>, trùng URL tài liệu repo, nên vào cùng sự kiện (bước "cùng URL" của pha B).</p>
+<div class="note"><b>Một chỗ khác với HN:</b> sự kiện mở khi repo được thấy lần đầu, các ngày sau repo không còn là "tài liệu mới". Mục "Repo nổi" trong digest vì vậy đọc <code>repo_stats</code> (tăng bao nhiêu sao trong 24 giờ) chứ không chỉ đọc sự kiện mới.</div>
+</div>
+
+<!-- 06 -->
+<div class="panel" role="tabpanel" id="toc-do">
+<h2>Tính tốc độ tăng sao</h2>
+<pre><code>tăng_24h(repo) = sao(lần đo mới nhất) − sao(lần đo gần nhất cách đó ≥ 20 giờ)
+tăng_tốc       = tăng_24h hôm nay − tăng_24h hôm qua        <span class="c">-- dương: đang nóng lên</span></code></pre>
+<p>Chưa có hai lần đo thì dùng tạm: với repo mới, <b>tổng sao / tuổi</b>; với repo trên Trending, số GitHub báo ("N stars today"). Ví dụ từ dữ liệu hôm nay:</p>
+<div class="tbl"><table id="tb-speed"><thead><tr><th>Repo mới</th><th class="num">Tuổi (ngày)</th><th class="num">Sao</th><th class="num">Sao / ngày</th><th class="num">Liên quan</th></tr></thead><tbody></tbody></table></div>
+
+<figure><svg id="ch-curve" viewBox="0 0 760 240" role="img" aria-label="Minh hoạ: hai repo cùng 2.000 sao nhưng một repo đang tăng tốc, một repo đang chậm lại"></svg>
+<figcaption><b>Hình 5 (minh hoạ, không phải số đo).</b> Hai repo cùng có 2.000 sao hôm nay. Repo A tăng đều rồi chậm lại (đã qua đỉnh); repo B mới bắt đầu tăng tốc. Chỉ nhìn tổng sao thì như nhau; nhìn <b>tăng_24h</b> và <b>tăng_tốc</b> từ các lần chụp mỗi ngày mới thấy B đáng báo hơn.</figcaption></figure>
+
+<h2>Tập repo được chụp</h2>
+<div class="tbl"><table>
+<thead><tr><th>Vào tập theo dõi khi</th><th>Ra khỏi tập khi</th></tr></thead>
+<tbody>
+<tr><td>Search API tìm ra (repo mới, qua lọc rác) · lên Trending (nếu dùng) · được nhắc trong bài HN/arXiv liên quan · bạn tự thêm</td><td>Không liên quan, hoặc 30 ngày không tăng quá N sao/ngày (vẫn giữ lịch sử đo)</td></tr>
+</tbody></table></div>
+<p>Ước tính: ~60 repo mới qua lọc mỗi ngày × 30 ngày ≈ 1.800 repo, mỗi ngày 1 lần đo. Dùng GraphQL API của GitHub thì 1 request lấy được 100 repo: ~18 request/ngày.</p>
+</div>
+
+<!-- 07 -->
+<div class="panel" role="tabpanel" id="quyet-dinh">
+<h2>Chi phí ước tính</h2>
+<div class="tbl"><table>
+<thead><tr><th>Việc</th><th class="num">Request GitHub / ngày</th><th class="num">Token embedding / ngày</th><th class="num">USD / tháng</th></tr></thead>
+<tbody>
+<tr><td>Search repo mới (1–2 trang)</td><td class="num">2</td><td class="num">—</td><td class="num">0</td></tr>
+<tr><td>README cho repo mới qua lọc rác (~60)</td><td class="num">60</td><td class="num">~60 × 300 = 18 nghìn</td><td class="num">~$0,005</td></tr>
+<tr><td>Trending ngày + tuần (nếu dùng)</td><td class="num">2</td><td class="num">gộp ở trên</td><td class="num">0</td></tr>
+<tr><td>Chụp số sao (~1.800 repo, GraphQL 100 repo/request)</td><td class="num">~18</td><td class="num">—</td><td class="num">0</td></tr>
+<tr><td><b>Tổng</b></td><td class="num"><b>~80</b> (quota có token: 5.000/giờ)</td><td class="num"><b>~18 nghìn</b></td><td class="num"><b>~$0,005</b></td></tr>
+</tbody></table></div>
+
+<h2>Các quyết định cần bạn</h2>
+<div class="dec">
+  <div class="card"><b class="h">1. Phạm vi</b>
+    <p><b>A (đề xuất):</b> lấy mọi repo nổi, để lớp 2 lọc theo lĩnh vực, giống HN. <b>B:</b> chỉ lấy repo có topic/từ khoá AI ngay khi tìm (bỏ sót repo AI không gắn topic, ví dụ 8/102 repo hôm nay không có cả mô tả).</p></div>
+  <div class="card"><b class="h">2. Trang Trending (HTML)</b>
+    <p>Tra cứu (tab 02) cho thấy rủi ro <b>kỹ thuật thấp</b>: bộ chọn HTML ổn định từ 2020, một dự án lưu trữ chạy 11 năm; Trending còn là nguồn sạch hơn Search (repo rác không lên Trending). Vướng mắc còn lại là <b>điều khoản</b>. <b>A:</b> dùng, 2–3 request/ngày, có kiểm tra hợp lý, lưu HTML gốc. <b>B:</b> chưa dùng; bắt "repo cũ hot lại" qua HN và tự chụp số sao. <b>C:</b> dùng sau, nếu sau 2 tuần thấy B bỏ sót nhiều. Về kỹ thuật tôi nghiêng về A; về điều khoản là bạn quyết.</p></div>
+  <div class="card"><b class="h">3. GITHUB_TOKEN</b>
+    <p>Cần cho README và chụp số sao (60 request/giờ không đủ). Fine-grained token, chỉ quyền đọc repo công khai, đặt vào <code>.env</code>. Bạn tự tạo; tôi không tạo hay đọc token.</p></div>
+  <div class="card"><b class="h">4. Nguồn releases 10 repo hiện tại</b>
+    <p><b>A:</b> giữ danh sách TẠM. <b>B:</b> bạn đưa danh sách thật. <b>C (đề xuất):</b> giữ nguồn releases nhưng thay danh sách bằng các repo bạn thật sự dùng (bun, drizzle, pg-boss, ai…), vì "phiên bản mới của công cụ mình dùng" là nhu cầu khác với "repo mới nổi".</p></div>
+  <div class="card"><b class="h">5. Thứ tự làm</b>
+    <p><b>A (đề xuất):</b> digest Telegram trước (tuần 3, là mốc nghiệm thu), rồi làm repo nổi ngay sau, khoảng 2 ngày. <b>B:</b> làm repo nổi trước để digest đầu tiên đã có mục này.</p></div>
+  <div class="card"><b class="h">6. Lọc rác</b>
+    <p><b>A (đề xuất):</b> quy tắc "&lt; 10 KB, 0 fork, ≥ 300 sao" → đánh dấu, không vào digest, vẫn lưu bản thô. <b>B:</b> thêm kiểm tài khoản chủ (tuổi, người theo dõi): tốn thêm 1 request/repo.</p></div>
+</div>
+</div>
+
+<footer>radard · docs/github-theo-doi.html · Dữ liệu lấy ngày 11/10/2026 từ github.com/trending, GitHub Search API, api.ossinsight.io; mức liên quan chấm bằng alibaba/qwen3-embedding-0.6b với mô tả lĩnh vực TẠM (102 lần embed, &lt; $0,0001).</footer>
+
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+<script>window.GH_DATA={"repos": [{"repo": "morluto/rea", "desc": "Reverse engineer anything with agents, from app behavior down to native binaries.", "lang": "TypeScript", "stars": 80230, "sources": ["trending_daily"], "gain_daily": 25793, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.687, "inRadard": false, "suspicious": false}, {"repo": "boykopovar/AnyPS5", "desc": "Tool for automatic PS5 executables porting to Linux and Windows", "lang": "C++", "stars": 27638, "sources": ["trending_daily", "trending_weekly"], "gain_daily": 5805, "gain_weekly": 21365, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.568, "inRadard": true, "suspicious": false}, {"repo": "storytold/artcraft", "desc": "ArtCraft is an intentional crafting engine for artists, designers, and filmmakers", "lang": "Rust", "stars": 15256, "sources": ["trending_daily"], "gain_daily": 3222, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.543, "inRadard": false, "suspicious": false}, {"repo": "cathrynlavery/diagram-design", "desc": "Editorial diagram design for Claude Code, Codex, GitHub Copilot, Cursor, Factory Droid, and Pi. 44 diagram types. Self-contained HTML + SVG. No shadows. No Mermaid slop.", "lang": "HTML", "stars": 49285, "sources": ["trending_daily"], "gain_daily": 1190, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.61, "inRadard": false, "suspicious": false}, {"repo": "mksglu/context-mode", "desc": "Context window optimization for AI coding agents. Sandboxes tool output (98% reduction), persists session memory, and enforces routing across 17 platforms via MCP + hooks.", "lang": "TypeScript", "stars": 26469, "sources": ["trending_daily", "trending_monthly"], "gain_daily": 178, "gain_weekly": null, "gain_monthly": 4285, "ageDays": null, "perDay": null, "relevance": 0.74, "inRadard": false, "suspicious": false}, {"repo": "mattpocock/skills", "desc": "Skills for Real Engineers. Straight from my .agents directory.", "lang": "Shell", "stars": 284945, "sources": ["trending_daily", "trending_weekly"], "gain_daily": 1736, "gain_weekly": 9179, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.621, "inRadard": false, "suspicious": false}, {"repo": "flutter/flutter", "desc": "Flutter makes it easy and fast to build beautiful apps for mobile and beyond", "lang": "Dart", "stars": 179649, "sources": ["trending_daily", "trending_weekly"], "gain_daily": 88, "gain_weekly": 263, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.552, "inRadard": false, "suspicious": false}, {"repo": "tensorflow/tensorflow", "desc": "An Open Source Machine Learning Framework for Everyone", "lang": "C++", "stars": 200797, "sources": ["trending_daily"], "gain_daily": 26, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.676, "inRadard": false, "suspicious": false}, {"repo": "hugohe3/ppt-master", "desc": "AI turns documents or topics into real, native PowerPoint decks—with native shapes, transitions and animations, data-backed charts and tables on demand, audio narration from speaker notes, and support for your own .pptx templates. · by Hugo He", "lang": "Python", "stars": 59809, "sources": ["trending_daily"], "gain_daily": 461, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.621, "inRadard": false, "suspicious": false}, {"repo": "pytorch/pytorch", "desc": "Tensors and Dynamic neural networks in Python with strong GPU acceleration", "lang": "Python", "stars": 104208, "sources": ["trending_daily"], "gain_daily": 84, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.616, "inRadard": false, "suspicious": false}, {"repo": "huggingface/transformers", "desc": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training.", "lang": "Python", "stars": 167404, "sources": ["trending_daily"], "gain_daily": 96, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.8, "inRadard": true, "suspicious": false}, {"repo": "anthropics/knowledge-work-plugins", "desc": "Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork", "lang": "Python", "stars": 28938, "sources": ["trending_daily", "trending_monthly"], "gain_daily": 625, "gain_weekly": null, "gain_monthly": 4750, "ageDays": null, "perDay": null, "relevance": 0.766, "inRadard": false, "suspicious": false}, {"repo": "multica-ai/andrej-karpathy-skills", "desc": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.", "lang": null, "stars": 218495, "sources": ["trending_daily"], "gain_daily": 278, "gain_weekly": null, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.775, "inRadard": false, "suspicious": false}, {"repo": "EpicGames/raddebugger", "desc": "A native, user-mode, multi-process, graphical debugger.", "lang": "C", "stars": 8348, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 740, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.48, "inRadard": false, "suspicious": false}, {"repo": "thedotmack/claude-mem", "desc": "Persistent Context Across Sessions for Every Agent – Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More", "lang": "TypeScript", "stars": 99396, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 4035, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.844, "inRadard": false, "suspicious": false}, {"repo": "heygen-com/hyperframes", "desc": "Write HTML. Render video. Built for agents.", "lang": "TypeScript", "stars": 60481, "sources": ["trending_weekly", "trending_monthly"], "gain_daily": null, "gain_weekly": 4081, "gain_monthly": 11826, "ageDays": null, "perDay": null, "relevance": 0.598, "inRadard": false, "suspicious": false}, {"repo": "mvschwarz/openrig", "desc": "Build your own network of agents from Claude Code, Codex and Pi: persistent teams with roles, shared context and owned work.", "lang": "TypeScript", "stars": 6788, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 2068, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.774, "inRadard": true, "suspicious": false}, {"repo": "cursor/plugins", "desc": "Cursor plugin specification and official plugins", "lang": "TypeScript", "stars": 10795, "sources": ["trending_weekly", "trending_monthly"], "gain_daily": null, "gain_weekly": 1110, "gain_monthly": 3579, "ageDays": null, "perDay": null, "relevance": 0.553, "inRadard": false, "suspicious": false}, {"repo": "earthtojake/text-to-cad", "desc": "Give your agent CAD superpowers.", "lang": "Python", "stars": 19053, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 2369, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.617, "inRadard": false, "suspicious": false}, {"repo": "pingdotgg/t3code", "desc": "", "lang": "TypeScript", "stars": 26863, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 2367, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.63, "inRadard": false, "suspicious": false}, {"repo": "ranxianglei/billion-context", "desc": "A context-compression plugin for small context windows (a 100K context is enough), token savings (5x fewer tokens), and month-long single sessions (billions of tokens).上下文压缩插件，兼顾小窗口(100k上下文足矣)省token(省5倍token)和超长会话(数月级别几十亿token单会话)。billion-context is all you need", "lang": "TypeScript", "stars": 813, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 259, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.687, "inRadard": false, "suspicious": false}, {"repo": "DuarteSantos8/openGym", "desc": "Self-hosted gym & body-weight tracker — plan routines, log workouts (supersets, warm-ups, cardio), see which muscles are trained, fatigued or detrained, import from FitNotes/Strong/Hevy, passkey login. Your data, your server.", "lang": "JavaScript", "stars": 9392, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 7369, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.602, "inRadard": false, "suspicious": false}, {"repo": "tester-army/e2e", "desc": "Next generation e2e testing framework for web and mobile apps.", "lang": "TypeScript", "stars": 8797, "sources": ["trending_weekly"], "gain_daily": null, "gain_weekly": 6564, "gain_monthly": null, "ageDays": null, "perDay": null, "relevance": 0.618, "inRadard": true, "suspicious": false}, {"repo": "alibaba/open-code-review", "desc": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.", "lang": "Go", "stars": 45954, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 23947, "ageDays": null, "perDay": null, "relevance": 0.714, "inRadard": false, "suspicious": false}, {"repo": "debpalash/VoiceStudio", "desc": "VoiceStudio is the open-source, fully-local ElevenLabs alternative — voice cloning, voice design, video dubbing, dictation, transcription & audiobook creation in 646 languages.", "lang": "Python", "stars": 57692, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 35194, "ageDays": null, "perDay": null, "relevance": 0.47, "inRadard": false, "suspicious": false}, {"repo": "anthropics/financial-services", "desc": "", "lang": "Python", "stars": 39321, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 4607, "ageDays": null, "perDay": null, "relevance": 0.576, "inRadard": false, "suspicious": false}, {"repo": "paperclipai/paperclip", "desc": "The open-source app everyone uses to manage agents at work", "lang": "TypeScript", "stars": 99913, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 19499, "ageDays": null, "perDay": null, "relevance": 0.762, "inRadard": false, "suspicious": false}, {"repo": "affaan-m/ECC", "desc": "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.", "lang": "JavaScript", "stars": 276681, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 22474, "ageDays": null, "perDay": null, "relevance": 0.589, "inRadard": false, "suspicious": false}, {"repo": "vectorize-io/hindsight", "desc": "Hindsight: Agent Memory That Learns", "lang": "Python", "stars": 48176, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 24928, "ageDays": null, "perDay": null, "relevance": 0.701, "inRadard": true, "suspicious": false}, {"repo": "Tencent/WeKnora", "desc": "Open-source LLM knowledge platform: turn raw documents into a queryable RAG, an autonomous reasoning agent, and a self-maintaining Wiki.", "lang": "Go", "stars": 33071, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 11234, "ageDays": null, "perDay": null, "relevance": 0.825, "inRadard": false, "suspicious": false}, {"repo": "anthropics/claude-code", "desc": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows - all through natural language commands.", "lang": "TypeScript", "stars": 150106, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 6240, "ageDays": null, "perDay": null, "relevance": 0.734, "inRadard": false, "suspicious": false}, {"repo": "TencentCloud/Octop", "desc": "A smarter, self-hosted AI assistant — multi-user, multi-agent.", "lang": "Python", "stars": 8572, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 7002, "ageDays": null, "perDay": null, "relevance": 0.841, "inRadard": false, "suspicious": false}, {"repo": "bilawalsidhu/gods-eye-view", "desc": "A spy satellite simulator in your browser, except the data is real. Live open source spatial intelligence on a photorealistic 3D globe.", "lang": "JavaScript", "stars": 50567, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 27862, "ageDays": null, "perDay": null, "relevance": 0.631, "inRadard": false, "suspicious": false}, {"repo": "agent-substrate/substrate", "desc": "Agent Substrate: the core system", "lang": "Go", "stars": 4811, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 2956, "ageDays": null, "perDay": null, "relevance": 0.666, "inRadard": false, "suspicious": false}, {"repo": "NVIDIA/OpenShell", "desc": "OpenShell is the safe, private runtime for autonomous AI agents.", "lang": "Rust", "stars": 15759, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 7234, "ageDays": null, "perDay": null, "relevance": 0.561, "inRadard": true, "suspicious": false}, {"repo": "JustVugg/colibri", "desc": "Run frontier MoE models on hardware you already own — pure C, zero deps, experts streamed from disk. Tiny engine, immense model. 🐦", "lang": "C", "stars": 41084, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 13894, "ageDays": null, "perDay": null, "relevance": 0.808, "inRadard": false, "suspicious": false}, {"repo": "trycua/cua", "desc": "Scale computer-use 2.0 with open-source drivers, cross-OS fleets, and benchmarks for training, evaluation, and data generation.", "lang": "Rust", "stars": 29314, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 6950, "ageDays": null, "perDay": null, "relevance": 0.637, "inRadard": false, "suspicious": false}, {"repo": "tashfeenahmed/freellmapi", "desc": "7.4 billion tokens per month. 34 free LLM providers. 635 free model endpoints. All behind one /v1 endpoint, plus any custom OpenAI-compatible endpoint. Smart routing, automatic failover, encrypted keys. Personal experimentation only.", "lang": "TypeScript", "stars": 33030, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 7700, "ageDays": null, "perDay": null, "relevance": 0.648, "inRadard": false, "suspicious": false}, {"repo": "addyosmani/agent-skills", "desc": "Production-grade engineering skills for AI coding agents.", "lang": "JavaScript", "stars": 104604, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 11706, "ageDays": null, "perDay": null, "relevance": 0.862, "inRadard": false, "suspicious": false}, {"repo": "NationalSecurityAgency/ghidra", "desc": "Ghidra is a software reverse engineering (SRE) framework", "lang": "Java", "stars": 82922, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 7897, "ageDays": null, "perDay": null, "relevance": 0.464, "inRadard": false, "suspicious": false}, {"repo": "DietrichGebert/ponytail", "desc": "Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.", "lang": "JavaScript", "stars": 160652, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 26935, "ageDays": null, "perDay": null, "relevance": 0.784, "inRadard": false, "suspicious": false}, {"repo": "longbridge/gpui-kit", "desc": "Rust GUI components for building fantastic cross-platform desktop application by using GPUI.", "lang": "Rust", "stars": 16871, "sources": ["trending_monthly"], "gain_daily": null, "gain_weekly": null, "gain_monthly": 2544, "ageDays": null, "perDay": null, "relevance": 0.498, "inRadard": false, "suspicious": false}, {"repo": "openai/math", "desc": "", "lang": "Lean", "stars": 13799, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.41, "perDay": 3129, "relevance": 0.823, "inRadard": false, "suspicious": false}, {"repo": "storytold/wordcraft", "desc": "An open-source, clean-room reimplementation of Microsoft Word in pure Rust", "lang": "Rust", "stars": 3531, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.96, "perDay": 892, "relevance": 0.575, "inRadard": false, "suspicious": false}, {"repo": "alchaincyf/huashu-art-motion", "desc": "艺术动画skill：35种艺术风格、9种解说语法，用代码让画动起来。", "lang": "JavaScript", "stars": 3279, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.12, "perDay": 640, "relevance": 0.508, "inRadard": false, "suspicious": false}, {"repo": "mhtsec/ARTEX", "desc": "AI 自主渗透测试系统 | 百度“agent+”攻防挑战赛冠军项目", "lang": "Go", "stars": 3009, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.09, "perDay": 974, "relevance": 0.564, "inRadard": false, "suspicious": false}, {"repo": "zhongerxin/iPhone-use", "desc": "让 Codex 通过 USB 操作真实 iPhone：引导安装、App 自动化、实时屏幕与截图回退。", "lang": "Python", "stars": 2719, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.68, "perDay": 581, "relevance": 0.374, "inRadard": false, "suspicious": false}, {"repo": "nullmoth/nvidia-macos-driver", "desc": "Metal driver for NVIDIA GeForce RTX cards on macOS 15 Sequoia (Intel / OpenCore). Free, source included.", "lang": "Rust", "stars": 2374, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.97, "perDay": 598, "relevance": 0.558, "inRadard": false, "suspicious": false}, {"repo": "LosaLosSantos/aurelio-finance", "desc": "Open-source personal finance app with an AI financial advisor: track your net worth, investments, ETFs, cash and debts on your own computer.", "lang": "Python", "stars": 2096, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.47, "perDay": 469, "relevance": 0.64, "inRadard": false, "suspicious": false}, {"repo": "storytold/cadcraft", "desc": "CADCraft: computer-aided design and drafting — an open-source, clean-room AutoCAD-style app in pure Rust", "lang": "Rust", "stars": 2013, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.09, "perDay": 492, "relevance": 0.531, "inRadard": false, "suspicious": false}, {"repo": "storytold/gridcraft", "desc": "GridCraft: an open-source, clean-room spreadsheet (Microsoft Excel-style) in pure Rust. By ArtCraft.", "lang": "Rust", "stars": 2011, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.1, "perDay": 490, "relevance": 0.549, "inRadard": false, "suspicious": false}, {"repo": "noahdunnagan/fsearch", "desc": "Whole-disk file search for macOS: fuzzy names, typo tolerance, indexed content grep. ~1 ms over 8M files.", "lang": "Rust", "stars": 1705, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.57, "perDay": 663, "relevance": 0.539, "inRadard": false, "suspicious": false}, {"repo": "t4t5/omdrop-owl", "desc": "airdrop for non-apple devices", "lang": "Shell", "stars": 1692, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.04, "perDay": 557, "relevance": 0.582, "inRadard": false, "suspicious": false}, {"repo": "alejandrobujan/tendedero", "desc": "Screenshots, hung out to dry. A tiny native macOS app that hangs every screenshot on a line at the top of your screen.", "lang": "Swift", "stars": 1685, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.25, "perDay": 396, "relevance": 0.421, "inRadard": false, "suspicious": false}, {"repo": "storytold/deckcraft", "desc": "Presentations and slide shows: an open-source, clean-room reimplementation of Microsoft PowerPoint in pure Rust. Part of the ArtCraft Crafting Apps.", "lang": "Rust", "stars": 1530, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.09, "perDay": 374, "relevance": 0.546, "inRadard": false, "suspicious": false}, {"repo": "storytold/soundcraft", "desc": "An open-source, clean-room reimplementation of Avid Pro Tools in pure Rust", "lang": "Rust", "stars": 1420, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.96, "perDay": 359, "relevance": 0.506, "inRadard": false, "suspicious": false}, {"repo": "LoreanXavier/pt-pc", "desc": "Native PC port of P.T. (runs from your own PS4 game files)", "lang": "C++", "stars": 1352, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.92, "perDay": 345, "relevance": 0.561, "inRadard": false, "suspicious": false}, {"repo": "shadany7824/playgta5", "desc": "A source code for playgta5.com.", "lang": "JavaScript", "stars": 1259, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.96, "perDay": 318, "relevance": 0.547, "inRadard": false, "suspicious": false}, {"repo": "HelixDB/helix-foundry", "desc": "Your company's data, connected into one ontology, on your own computer. A local-first data workspace built on HelixDB and DuckDB.", "lang": "TypeScript", "stars": 1075, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.1, "perDay": 262, "relevance": 0.618, "inRadard": false, "suspicious": false}, {"repo": "pingdotgg/ts-rust", "desc": "An experimental Rust port of the TypeScript 7 compiler (tsc)", "lang": "Rust", "stars": 999, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.1, "perDay": 244, "relevance": 0.502, "inRadard": false, "suspicious": false}, {"repo": "elstongun/leviathan", "desc": "Deep memory for agents over large datasets. Leviathan is a single static binary that turns your records (JSONL, JSON, CSV/TSV, SQLite, or anything a database CLI can export) into a ranked full-text index.", "lang": "Rust", "stars": 736, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.94, "perDay": 124, "relevance": 0.774, "inRadard": false, "suspicious": false}, {"repo": "bas3line/ascii", "desc": "Animated ascii art for web pages, in TypeScript: React, Next.js, Astro, or one HTML tag", "lang": "TypeScript", "stars": 726, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.03, "perDay": 180, "relevance": 0.612, "inRadard": false, "suspicious": false}, {"repo": "ThariqS/ai-newtab", "desc": "Claude generates a daily new tab page based on your browser history.", "lang": "TypeScript", "stars": 707, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.58, "perDay": 274, "relevance": 0.661, "inRadard": false, "suspicious": false}, {"repo": "n1tr00-10/tiktok-web-signature", "desc": "tiktok web signature reverse engineer generates valid tiktok signatures for API requets", "lang": "Python", "stars": 707, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.5, "perDay": 471, "relevance": 0.538, "inRadard": false, "suspicious": false}, {"repo": "anthropics/oss-scanner", "desc": "", "lang": "Python", "stars": 706, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.59, "perDay": 273, "relevance": 0.588, "inRadard": false, "suspicious": false}, {"repo": "ToiCF/CF-Workers-TGProxy", "desc": "基于 Cloudflare Workers 的 Telegram Web/MTProto WebSocket 代理中继，支持 bridge 鉴权、bootstrap/session 令牌、多 lane WS 复用、AES-CTR 加密、自定义帧、流控与严格 CSP。", "lang": null, "stars": 682, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.62, "perDay": 260, "relevance": 0.509, "inRadard": false, "suspicious": false}, {"repo": "Hinln/ARTEX", "desc": "ARTEX 源码备份：基于 Autumn-27/ARTEX v0.3.15，保留原始提交历史与 AGPL-3.0 许可证。", "lang": "Go", "stars": 641, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.86, "perDay": 224, "relevance": 0.473, "inRadard": false, "suspicious": false}, {"repo": "storytold/craft-launcher", "desc": "The Craft App Launcher", "lang": "Rust", "stars": 641, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.34, "perDay": 478, "relevance": 0.597, "inRadard": false, "suspicious": false}, {"repo": "KindStatesman/KMS-Pico", "desc": "Kms Pico Free optimizes your professional desktop environment by providing a tailored utility configuration that enhances workflow efficiency.' This...", "lang": null, "stars": 614, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 353, "relevance": 0.654, "inRadard": false, "suspicious": true}, {"repo": "VarnishSerpentBurn/Discord-Quest-Completer", "desc": "Discord Quest Completer optimizes user experience by providing a comprehensive solution to automate and streamline repetitive tasks within popular quests...", "lang": null, "stars": 611, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 351, "relevance": 0.65, "inRadard": false, "suspicious": true}, {"repo": "navyofficerpipe/Discord-Server-Raider", "desc": "Discord Server Raider\", an AI-driven solution designed to streamline server management tasks on GitHub without any mention of Apple or mobile devices; it...", "lang": null, "stars": 605, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 348, "relevance": 0.596, "inRadard": false, "suspicious": true}, {"repo": "franzenzenhofer/big-arrow-on-the-screen", "desc": "Let your AI agents paint big arrows, boxes and text on your Mac screen. One CLI, click-through, gone by itself. Skill for Claude Code and Codex. MIT.", "lang": "Swift", "stars": 598, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.96, "perDay": 202, "relevance": 0.735, "inRadard": false, "suspicious": false}, {"repo": "marclou/mailcheap", "desc": "Self-hosted newsletters on Amazon SES. About $0.10 per 1,000 emails.", "lang": "JavaScript", "stars": 596, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 0.78, "perDay": 764, "relevance": 0.552, "inRadard": false, "suspicious": false}, {"repo": "szabadkai/c64-keyboard-font", "desc": "Photo-based reconstruction of classic Commodore 64 keycap lettering, with desktop fonts, webfont, editable outlines, and a specimen.", "lang": "Python", "stars": 593, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.86, "perDay": 101, "relevance": 0.56, "inRadard": true, "suspicious": false}, {"repo": "zeusinsight/FinderSearch", "desc": "A native macOS file browser with fast fuzzy filename search, powered by fsearch.", "lang": "Swift", "stars": 584, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.98, "perDay": 295, "relevance": 0.618, "inRadard": false, "suspicious": false}, {"repo": "wesbos/photo-frame-dashboard", "desc": "Getting ADB, root, backups and custom apps onto locked-down Android photo frames (Skylight Calendar, BIUFRAME)", "lang": "JavaScript", "stars": 574, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.55, "perDay": 225, "relevance": 0.504, "inRadard": false, "suspicious": false}, {"repo": "GTKottman/mortiflix-oss", "desc": "A motion design studio on your own machine: Claude makes the video step by step, you approve every stage. Bring your own Claude Code or API key.", "lang": "JavaScript", "stars": 554, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.68, "perDay": 98, "relevance": 0.683, "inRadard": false, "suspicious": false}, {"repo": "sirioberati/Genjustsu-Open-Source-Workflow", "desc": "Open-source AI video replacement workflow by TEIN. Combine depth maps, SAM segmentation, face meshes, and audio processing to replace characters and objects with Seedance. Includes a local web UI to prepare inputs, review masks, preview generations, and export with original audio.", "lang": "Python", "stars": 519, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.35, "perDay": 119, "relevance": 0.691, "inRadard": false, "suspicious": false}, {"repo": "rociiu/talorys", "desc": "Your personal AI agent in your own Cloudflare account. Chat, memory, tasks, notes and scheduled reminders, deployed with one command: npx create-talorys@latest. Free-tier friendly, single-user, no telemetry.", "lang": "TypeScript", "stars": 515, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 0.91, "perDay": 566, "relevance": 0.789, "inRadard": false, "suspicious": false}, {"repo": "wheresryan22/anatomy", "desc": "A Claude Code skill that turns a technical idea into a detailed, interactive isometric figure of a real machine. It makes SVG with optional WebGL shaders and 3D, for docs, articles and landing pages.", "lang": "JavaScript", "stars": 511, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.89, "perDay": 177, "relevance": 0.665, "inRadard": false, "suspicious": false}, {"repo": "passrhymegazebo/AnyUnlock", "desc": "Anyunlock optimizes your workflow by providing a comprehensive desktop utility configuration that streamlines processes and boosts efficiency without...", "lang": null, "stars": 510, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 293, "relevance": 0.632, "inRadard": false, "suspicious": true}, {"repo": "Clawfitzfilter/Display-Fusion", "desc": "Display Fusion optimizes desktop software utility configurations by providing a robust and efficient management system that enhances productivity without...", "lang": null, "stars": 509, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 293, "relevance": 0.56, "inRadard": false, "suspicious": true}, {"repo": "powderdiverpillar/Total-Commander", "desc": "Total Commander is an advanced utility that optimizes workflow by providing a seamless interface to manage and navigate through multiple repositories...", "lang": null, "stars": 504, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.73, "perDay": 291, "relevance": 0.551, "inRadard": false, "suspicious": true}, {"repo": "hyperrobinclash/Better-Discord", "desc": "Enhances productivity by streamlining your professional desktop software utility configurations with an innovative configuration manager that provides a...", "lang": null, "stars": 503, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 289, "relevance": 0.641, "inRadard": false, "suspicious": true}, {"repo": "tcchen2026/VibeOffice", "desc": "A free office suite that runs in your browser, in the style of Office 2003. Nothing to install, no account, no server: documents are opened, edited and saved on your own computer.", "lang": "JavaScript", "stars": 471, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.07, "perDay": 153, "relevance": 0.477, "inRadard": false, "suspicious": false}, {"repo": "FeiZhuLulu/DeepSeek-Bot", "desc": "A team of long-lived bots for DeepSeek Harness, with main bots, bot-to-bot messages and group chats.", "lang": "JavaScript", "stars": 469, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.67, "perDay": 128, "relevance": 0.766, "inRadard": false, "suspicious": false}, {"repo": "nanocle/Charakuru", "desc": "", "lang": null, "stars": 459, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.96, "perDay": 93, "relevance": 0.485, "inRadard": false, "suspicious": false}, {"repo": "droogie/bbhost", "desc": "Definitive Bloodborne PC Experience", "lang": "C++", "stars": 451, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.72, "perDay": 121, "relevance": 0.499, "inRadard": false, "suspicious": false}, {"repo": "iamlukethedev/Herald-OS", "desc": "An agent-native operating system, with Hermes Agent as the interface. Independent project, not affiliated with Nous Research.", "lang": "TypeScript", "stars": 409, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.46, "perDay": 92, "relevance": 0.485, "inRadard": false, "suspicious": false}, {"repo": "CoralFireRadial/StartAll-Back", "desc": "Startall Back optimizes desktop configurations by providing a comprehensive repository that streamlines your workflow and ensures an efficient computing...", "lang": null, "stars": 409, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.73, "perDay": 236, "relevance": 0.605, "inRadard": false, "suspicious": true}, {"repo": "PatchTechnician/Ads-Blocker", "desc": "Ads Blocker optimizes your browsing experience by blocking intrusive ads on GitHub repositories and other platforms, ensuring a distraction-free workspace...", "lang": null, "stars": 408, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 234, "relevance": 0.557, "inRadard": false, "suspicious": true}, {"repo": "photonrajditch/Windows-Optimizer", "desc": "Enhance your Windows performance with this professional desktop software utility configuration that meticulously optimizes system settings and streamlines...", "lang": null, "stars": 405, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.73, "perDay": 234, "relevance": 0.544, "inRadard": false, "suspicious": true}, {"repo": "TremorBisonSurvive/Discord-Nitro-Generator", "desc": "Discord Nitro Generator optimizes your server's performance by providing a comprehensive suite of features and enhanced capabilities without any coding...", "lang": null, "stars": 404, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 1.74, "perDay": 232, "relevance": 0.65, "inRadard": false, "suspicious": true}, {"repo": "gr8rstudio/gr8r-studio", "desc": "Gr8r Studio: a calm, structured project management workspace. Vite + plain ES modules.", "lang": "JavaScript", "stars": 384, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.83, "perDay": 100, "relevance": 0.61, "inRadard": false, "suspicious": false}, {"repo": "lonewolf0622/HelixSR", "desc": "Drop-in FSR 3.1 upscaler for Direct3D 12 that runs DLSS's network (Model E) on AMD GPUs", "lang": null, "stars": 348, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.89, "perDay": 59, "relevance": 0.538, "inRadard": false, "suspicious": false}, {"repo": "Shyboy0499/antibody", "desc": "", "lang": "TypeScript", "stars": 346, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 6.23, "perDay": 56, "relevance": 0.486, "inRadard": false, "suspicious": false}, {"repo": "c22dev/muguet", "desc": "A native Mach-O port for iOS/macOS of GTA V, with multiplayer", "lang": "Rust", "stars": 342, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 0.95, "perDay": 360, "relevance": 0.566, "inRadard": false, "suspicious": false}, {"repo": "nullmoth/1401", "desc": "1401: macOS on the PC you already own. Free, never for sale.", "lang": "Python", "stars": 341, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 3.97, "perDay": 86, "relevance": 0.385, "inRadard": false, "suspicious": false}, {"repo": "ARahim3/DigUp", "desc": "Search your Mac by what's in your files: photos, PDFs, recordings, videos and code. On-device, built on Google DeepMind's EmbeddingGemma 2.", "lang": "Swift", "stars": 338, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 2.46, "perDay": 137, "relevance": 0.641, "inRadard": false, "suspicious": false}, {"repo": "marmottajr/habblaud", "desc": "", "lang": "TypeScript", "stars": 331, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 4.66, "perDay": 71, "relevance": 0.429, "inRadard": false, "suspicious": false}, {"repo": "x4gpanell/JinX-X4G", "desc": "", "lang": "HTML", "stars": 324, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.01, "perDay": 65, "relevance": 0.553, "inRadard": false, "suspicious": false}, {"repo": "Glass-HQ/liquid-glass", "desc": "Liquid Glass materials for web and Electron, built with vgpu.", "lang": "TypeScript", "stars": 322, "sources": ["new_repo"], "gain_daily": null, "gain_weekly": null, "gain_monthly": null, "ageDays": 5.3, "perDay": 61, "relevance": 0.512, "inRadard": false, "suspicious": false}]};</script>
+<script>(function(){
+  var D=window.GH_DATA, R=D.repos, NS='http://www.w3.org/2000/svg';
+  var PASS='#0E6E5C', FAIL='#C9D2CE', BAD='#C0392B', INK='#16201D', INK2='#4A5753', GRID='#E6EBE9';
+  var th=0.58;
+  var fmt=function(n){return n==null?'—':n.toLocaleString('vi-VN');};
+  var dec=function(x){return x.toFixed(2).replace('.',',');};
+  function el(n,a,p){var e=document.createElementNS(NS,n);for(var k in a) e.setAttribute(k,a[k]);if(p) p.appendChild(e);return e;}
+  function txt(p,x,y,s,a){var t=el('text',Object.assign({x:x,y:y,'font-size':12,fill:INK2},a||{}),p);t.textContent=s;return t;}
+  function tip(node,s){var t=el('title',{},node);t.textContent=s;}
+  function perDay(r){
+    if(r.gain_daily!=null) return r.gain_daily;
+    if(r.gain_weekly!=null) return Math.round(r.gain_weekly/7);
+    if(r.gain_monthly!=null) return Math.round(r.gain_monthly/30);
+    return r.perDay;
+  }
+  function srcLabel(r){return r.sources.map(function(s){return {trending_daily:'Trending ngày',trending_weekly:'Trending tuần',trending_monthly:'Trending tháng',new_repo:'Repo mới'}[s];}).join(', ');}
+  function info(r){return r.repo+'\n'+(r.desc||'(không có mô tả)')+'\nLiên quan: '+dec(r.relevance)+(r.suspicious?'\nDấu hiệu rác':'')+(r.inRadard?'\nĐã có trong radard':'');}
+
+  function drawTrend(){
+    var svg=document.getElementById('ch-trend');svg.textContent='';
+    var rows=R.filter(function(r){return r.gain_daily!=null;}).sort(function(a,b){return b.gain_daily-a.gain_daily;});
+    var H=rows.length*28+30,L=230,W=760,max=Math.max.apply(null,rows.map(function(r){return r.gain_daily;}));
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    rows.forEach(function(r,i){
+      var y=10+i*28,w=Math.max(2,(W-L-150)*r.gain_daily/max);
+      txt(svg,L-8,y+15,r.repo.length>32?r.repo.slice(0,31)+'…':r.repo,{'text-anchor':'end',fill:INK});
+      var b=el('rect',{x:L,y:y+3,width:w,height:17,rx:3,fill:r.relevance>=th?PASS:FAIL},svg);tip(b,info(r));
+      txt(svg,L+w+6,y+16,'+'+fmt(r.gain_daily)+'  ·  '+dec(r.relevance),{fill:INK});
+    });
+    txt(svg,L,H-4,'sao tăng hôm nay  ·  điểm liên quan',{'font-size':11});
+  }
+  function drawNew(){
+    var svg=document.getElementById('ch-new');svg.textContent='';
+    var W=760,H=340,L=60,B=300,T=16,Rr=740;
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    var x=function(d){return L+(Rr-L)*d/7;}, lmin=Math.log10(50), lmax=Math.log10(20000);
+    var y=function(s){return B-(B-T)*(Math.log10(Math.max(50,s))-lmin)/(lmax-lmin);};
+    [50,100,200,500,1000,2000,5000,10000,20000].forEach(function(v){
+      el('line',{x1:L,x2:Rr,y1:y(v),y2:y(v),stroke:GRID},svg);txt(svg,L-6,y(v)+4,fmt(v),{'text-anchor':'end','font-size':11});});
+    for(var d=0;d<=7;d++) txt(svg,x(d),B+16,String(d),{'text-anchor':'middle','font-size':11});
+    txt(svg,(L+Rr)/2,B+34,'tuổi repo (ngày)',{'text-anchor':'middle','font-size':11});
+    txt(svg,L,T-4,'sao (thang log)',{'font-size':11});
+    var pts=R.filter(function(r){return r.ageDays!=null;});
+    pts.forEach(function(r){
+      var c=el('circle',{cx:x(r.ageDays),cy:y(r.stars),r:r.suspicious?7:6,fill:r.relevance>=th?PASS:FAIL,stroke:r.suspicious?BAD:'#fff','stroke-width':r.suspicious?2.5:1.5},svg);
+      tip(c,info(r)+'\n'+fmt(r.stars)+' sao, '+dec(r.ageDays)+' ngày tuổi');
+    });
+    pts.filter(function(r){return !r.suspicious;}).sort(function(a,b){return b.perDay-a.perDay;}).slice(0,4).forEach(function(r){
+      txt(svg,x(r.ageDays)+9,y(r.stars)+4,r.repo,{'font-size':11,fill:INK,'paint-order':'stroke',stroke:'#fff','stroke-width':4});
+    });
+  }
+  function drawHist(){
+    var svg=document.getElementById('ch-hist');svg.textContent='';
+    var W=760,H=230,L=40,B=190,T=14,lo=0.35,hi=0.90,step=0.025,n=Math.round((hi-lo)/step);
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    var bins=new Array(n).fill(0);
+    R.forEach(function(r){var i=Math.min(n-1,Math.max(0,Math.floor((r.relevance-lo)/step)));bins[i]++;});
+    var max=Math.max.apply(null,bins),bw=(W-L-20)/n,xv=function(v){return L+(v-lo)/step*bw;};
+    [0,5,10,15].forEach(function(v){if(v>max) return;var yy=B-(B-T)*v/max;el('line',{x1:L,x2:W-20,y1:yy,y2:yy,stroke:GRID},svg);txt(svg,L-6,yy+4,String(v),{'text-anchor':'end','font-size':11});});
+    bins.forEach(function(c,i){
+      var v=lo+i*step,h=(B-T)*c/max;
+      var b=el('rect',{x:xv(v)+1,y:B-h,width:bw-2,height:Math.max(0,h),rx:2,fill:v+step/2>=th?PASS:FAIL},svg);
+      tip(b,dec(v)+'–'+dec(v+step)+': '+c+' repo');
+      if(i%2===0) txt(svg,xv(v),B+15,dec(v),{'font-size':10.5,'text-anchor':'middle'});
+    });
+    el('line',{x1:xv(th),x2:xv(th),y1:T-6,y2:B,stroke:INK,'stroke-dasharray':'5 4','stroke-width':1.5},svg);
+    txt(svg,xv(th)+5,T+4,'ngưỡng '+dec(th),{fill:INK});
+    txt(svg,L,H-6,'điểm liên quan (cosine với mô tả lĩnh vực)',{'font-size':11});
+  }
+  function fillTables(){
+    var tb=document.querySelector('#tb-all tbody');tb.textContent='';
+    R.slice().sort(function(a,b){return b.relevance-a.relevance;}).forEach(function(r){
+      var tr=document.createElement('tr');if(r.relevance<th) tr.className='dim';
+      var cells=[r.repo+(r.inRadard?' ✓':'')+(r.suspicious?' ⚠':''),srcLabel(r),fmt(r.stars),fmt(perDay(r)),dec(r.relevance),(r.desc||'—').slice(0,90)];
+      cells.forEach(function(c,i){var td=document.createElement('td');td.textContent=c;if(i>=2&&i<=4) td.className='num';if(i===0) td.className='mono';tr.appendChild(td);});
+      tb.appendChild(tr);
+    });
+    var ts=document.querySelector('#tb-speed tbody');ts.textContent='';
+    R.filter(function(r){return r.ageDays!=null&&!r.suspicious;}).sort(function(a,b){return b.perDay-a.perDay;}).slice(0,8).forEach(function(r){
+      var tr=document.createElement('tr');
+      [r.repo,dec(r.ageDays),fmt(r.stars),fmt(r.perDay),dec(r.relevance)].forEach(function(c,i){var td=document.createElement('td');td.textContent=c;if(i>0) td.className='num';else td.className='mono';tr.appendChild(td);});
+      ts.appendChild(tr);
+    });
+  }
+  function drawCurve(){
+    var svg=document.getElementById('ch-curve');svg.textContent='';
+    var L=60,B=200,T=20,Rr=520,days=14;
+    var x=function(d){return L+(Rr-L)*d/days;},y=function(s){return B-(B-T)*s/2200;};
+    [0,500,1000,1500,2000].forEach(function(v){el('line',{x1:L,x2:Rr,y1:y(v),y2:y(v),stroke:GRID},svg);txt(svg,L-6,y(v)+4,fmt(v),{'text-anchor':'end','font-size':11});});
+    for(var d=0;d<=days;d+=2) txt(svg,x(d),B+16,'ngày '+d,{'text-anchor':'middle','font-size':10.5});
+    var A=[],Bv=[];
+    for(d=0;d<=days;d++){A.push(2000*(1-Math.exp(-d/3.2))/(1-Math.exp(-days/3.2)));Bv.push(2000*Math.pow(d/days,3));}
+    var path=function(arr){return arr.map(function(v,i){return (i?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1);}).join('');};
+    el('path',{d:path(A),fill:'none',stroke:'#2F5DA8','stroke-width':2.2},svg);
+    el('path',{d:path(Bv),fill:'none',stroke:PASS,'stroke-width':2.6},svg);
+    [[A,'#2F5DA8','A: tăng_24h ≈ '+Math.round(A[14]-A[13])+', đang chậm lại'],[Bv,PASS,'B: tăng_24h ≈ '+Math.round(Bv[14]-Bv[13])+', đang tăng tốc']].forEach(function(z,i){
+      el('circle',{cx:x(14),cy:y(2000),r:4,fill:z[1]},svg);
+      txt(svg,Rr+10,y(2000)-6+i*18,z[2],{fill:z[1],'font-size':11.5,'font-weight':600});
+    });
+    txt(svg,x(5),y(A[5])-10,'A',{fill:'#2F5DA8','font-weight':700});txt(svg,x(10),y(Bv[10])-10,'B',{fill:PASS,'font-weight':700});
+  }
+  function update(v){
+    th=v;
+    [].forEach.call(document.querySelectorAll('.th'),function(s){s.value=v;});
+    [].forEach.call(document.querySelectorAll('.thv'),function(s){s.textContent=dec(v);});
+    var n=R.filter(function(r){return r.relevance>=th;}).length,ns=R.filter(function(r){return r.relevance>=th&&!r.suspicious;}).length;
+    document.getElementById('t-pass').textContent=n;
+    var msg=n+' / '+R.length+' repo qua ngưỡng; bỏ repo rác còn '+ns;
+    document.getElementById('t3-count').textContent=msg;document.getElementById('t4-count').textContent=msg;
+    drawTrend();drawNew();drawHist();fillTables();
+  }
+  [].forEach.call(document.querySelectorAll('.th'),function(s){s.addEventListener('input',function(){update(+this.value);});});
+  drawCurve();update(0.58);
+})();
+</script>
+</body>
+</html>

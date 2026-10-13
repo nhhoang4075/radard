@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Báo cáo tuần 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · BÁO CÁO TUẦN 2 · MVP-0 · 28/09/2026</div>
+<h1>Tuần 2: thêm nguồn, lọc và gộp sự kiện</h1>
+<p class="lede">Mục tiêu tuần 2: lệnh <code>events --since 24h</code> ra danh sách sự kiện có nghĩa. Đạt được: 3 nguồn chạy thật, lớp 2 chạy trên embedding thật, ngưỡng được chỉnh theo dữ liệu thật. Báo cáo này giải thích từng phần đã làm, số đo, và các lỗi gặp phải trên đường.</p>
+
+<nav class="tabs" aria-label="Các phần của báo cáo">
+  <div class="tablist" role="tablist">
+    <button class="tab" role="tab" aria-controls="tong-quan"><span class="n">01</span>Tổng quan</button>
+    <button class="tab" role="tab" aria-controls="nguon"><span class="n">02</span>Nguồn mới</button>
+    <button class="tab" role="tab" aria-controls="lop2"><span class="n">03</span>Lớp 2</button>
+    <button class="tab" role="tab" aria-controls="ai"><span class="n">04</span>AI &amp; chi phí</button>
+    <button class="tab" role="tab" aria-controls="nguong"><span class="n">05</span>Chỉnh ngưỡng</button>
+    <button class="tab" role="tab" aria-controls="loi"><span class="n">06</span>Lỗi &amp; bài học</button>
+    <button class="tab" role="tab" aria-controls="code"><span class="n">07</span>Code &amp; test</button>
+  </div>
+</nav>
+
+<!-- ============ 01 ============ -->
+<div class="panel" role="tabpanel" id="tong-quan">
+<div class="tiles">
+  <div class="tile"><b>2.569</b><span>tài liệu từ 3 nguồn</span></div>
+  <div class="tile"><b>520 → 512</b><span>tài liệu liên quan → sự kiện</span></div>
+  <div class="tile"><b>$0,0054</b><span>chi phí embedding toàn bộ</span></div>
+  <div class="tile"><b>42/42</b><span>test qua; typecheck, lint sạch</span></div>
+</div>
+
+<h2>Việc trong tuần</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Việc</th><th>Kết quả</th><th>Tab</th></tr></thead>
+  <tbody>
+    <tr><td>Một <code>cadence</code> sai không làm hỏng lịch của nguồn khác</td><td>Xong, 3 test với pg-boss thật</td><td>02</td></tr>
+    <tr><td>Bổ sung tham số theo dõi vào chuẩn hoá URL</td><td>Xong, 11 tham số đã tra tài liệu</td><td>02</td></tr>
+    <tr><td>Adapter arXiv</td><td>Xong, 1.742 bài; sửa một lỗi thiết kế về thời điểm công bố</td><td>02, 06</td></tr>
+    <tr><td>Adapter GitHub releases</td><td>Xong, 90 release; 304 khi không có gì mới</td><td>02</td></tr>
+    <tr><td>Interface AI, adapter Gateway, bảng <code>llm_calls</code></td><td>Xong phần embedding; LLM chạy thật ở tuần 3</td><td>04</td></tr>
+    <tr><td>Lớp 2: chuẩn hoá, ngôn ngữ, embedding</td><td>Xong, chạy thật trên 2.569 tài liệu</td><td>03</td></tr>
+    <tr><td>Lọc theo mức liên quan</td><td>Xong, ngưỡng chỉnh theo dữ liệu</td><td>05</td></tr>
+    <tr><td>Gộp sự kiện bằng vector</td><td>Xong, 7/8 lượt gộp đúng</td><td>05</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Dữ liệu sau tuần 2</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Nguồn</th><th>Lịch</th><th class="num">Tài liệu</th><th class="num">Giữ lại (liên quan)</th><th>Ghi chú</th></tr></thead>
+  <tbody>
+    <tr><td>Hacker News</td><td class="mono">*/15 * * * *</td><td class="num">737</td><td class="num">228 (31%)</td><td>Tuần 1</td></tr>
+    <tr><td>arXiv cs.CL/AI/LG/MA</td><td class="mono">30 1 * * *</td><td class="num">1.742</td><td class="num">202 (12%)</td><td>Mới; đọc lại cửa sổ 5 ngày mỗi lượt</td></tr>
+    <tr><td>GitHub releases (10 repo)</td><td class="mono">0 * * * *</td><td class="num">90</td><td class="num">90 (100%)</td><td>Mới; danh sách repo là TẠM</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Sự kiện tiêu biểu</h2>
+<p>Ví dụ rõ nhất cho giá trị của lớp 2: năm bài viết từ các nguồn khác nhau về cùng một chuyện được gộp thành <b>một</b> sự kiện.</p>
+<div class="card" style="margin-top:12px">
+  <b class="h">OpenAI halts training of latest models</b>
+  <ul>
+    <li><i>OpenAI halts training of latest models</i> <span class="pill">mở sự kiện</span></li>
+    <li><i>OpenAI halts training of latest models as reports mount…</i> <span class="pill">cùng URL</span></li>
+    <li><i>OpenAI to Halt Training of Some Models</i> <span class="pill">vector 0,922</span></li>
+    <li><i>OpenAI is pausing training for a second time</i> <span class="pill">vector 0,919</span></li>
+    <li><i>OpenAI pauses training of latest models after agents pr…</i> <span class="pill">vector 0,912</span></li>
+  </ul>
+</div>
+
+<div class="note"><b>Còn TẠM:</b> mô tả lĩnh vực trong <code>profile</code> do tôi viết từ những gì đã trao đổi, và danh sách 10 repo GitHub. Khi bạn thay mô tả, chạy <code>profile set</code> rồi <code>layer2 reset</code> để chấm lại (khoảng $0,005, 6 phút).</div>
+</div>
+
+<!-- ============ 02 ============ -->
+<div class="panel" role="tabpanel" id="nguon">
+<h2>arXiv</h2>
+<p>Gọi API Atom <code>export.arxiv.org/api/query</code>, truy vấn <code>cat:cs.CL OR cat:cs.AI OR cat:cs.LG OR cat:cs.MA</code>, sắp theo ngày nộp, mỗi trang 200 bài.</p>
+<div class="tbl"><table>
+  <thead><tr><th>Chi tiết</th><th>Cách làm</th><th>Vì sao</th></tr></thead>
+  <tbody>
+    <tr><td><code>external_id</code></td><td>Bỏ hậu tố phiên bản: <code>2609.31619v2</code> → <code>2609.31619</code></td><td>Bài sửa (v2, v3) vẫn là cùng một bài</td></tr>
+    <tr><td>Bản thô</td><td>Đúng khối <code>&lt;entry&gt;…&lt;/entry&gt;</code> trong phản hồi</td><td>Giữ nguyên văn, lớp 2 đọc lại được mọi trường</td></tr>
+    <tr><td>Tốc độ</td><td>Mỗi request cách nhau ≥ 3 giây</td><td>Luật của arXiv; thêm <code>perHostIntervalMs</code> vào HttpClient</td></tr>
+    <tr><td>Con trỏ</td><td>Đọc lại cửa sổ <code>lookbackDays</code> = 5 ngày tính lùi từ con trỏ</td><td>Bài được công bố trễ 1–3 ngày sau khi nộp (tab 06)</td></tr>
+    <tr><td>Lịch</td><td><code>30 1 * * *</code></td><td>arXiv công bố đợt mới khoảng 00:00–01:00 UTC</td></tr>
+  </tbody>
+</table></div>
+<p>Số đo: lượt đầu 954 bài trong 14 giây; lượt hai đọc 1.742 bài, 954 trùng bị bỏ, 788 mới (cửa sổ lùi xa hơn vì con trỏ đang ở chiều thứ Sáu).</p>
+
+<h2>GitHub releases</h2>
+<p>Mỗi repo một request tới <code>/repos/{owner}/{repo}/releases</code>, kèm <code>If-None-Match</code> theo ETag lần trước.</p>
+<ul>
+  <li>Repo không có gì mới → GitHub trả <b>304</b> không kèm body. Chạy lại ngay sau lượt đầu: cả 10 repo trả 304, lượt được ghi <code>not_modified</code>.</li>
+  <li>Bỏ bản nháp; <code>name</code> để trống thì dùng tag (ví dụ <code>proxy-1.10.0</code> của pg-boss).</li>
+  <li>Repo trả <b>404</b> (đổi tên, xoá) được ghi vào <code>state.missingRepos</code>, các repo khác vẫn chạy. Lỗi khác (mạng, 5xx, hết quota) thì ném ra để pg-boss thử lại cả lượt.</li>
+  <li>Có <code>GITHUB_TOKEN</code> thì gửi kèm; không có vẫn chạy được (10 repo mỗi giờ nằm trong quota 60 request/giờ). Đã đính chính: 304 chỉ không bị trừ quota <b>khi có token</b>.</li>
+</ul>
+
+<h2>Lịch không sập vì một cadence sai</h2>
+<p>Thử trực tiếp pg-boss: <code>"every 15 min"</code> và <code>"61 * * * *"</code> làm <code>schedule()</code> ném lỗi; <code>"*/15 * * *"</code> (thiếu một ô) vẫn được nhận. Trước đây một nguồn sai làm dừng cả vòng đồng bộ. Giờ mỗi nguồn được bắt lỗi riêng, và nguồn có <code>cadence</code> mới bị sai thì <b>giữ lịch cũ</b> thay vì bị gỡ.</p>
+
+<h2>Tham số theo dõi</h2>
+<p>Đã tra tài liệu của từng nền tảng trước khi thêm: <code>msclkid</code> (Microsoft Ads), <code>twclid</code> (X Ads), <code>ttclid</code> (TikTok), <code>li_fat_id</code> (LinkedIn), <code>yclid</code> (Yandex), <code>dclid</code>, <code>gbraid</code>, <code>wbraid</code> (Google), <code>_hsenc</code>, <code>_hsmi</code> (HubSpot), <code>mkt_tok</code> (Marketo). Kèm test cho thấy không bỏ nhầm tham số chỉ trùng một phần tên (<code>hsmi</code> không có gạch dưới, <code>gclids</code>).</p>
+</div>
+
+<!-- ============ 03 ============ -->
+<div class="panel" role="tabpanel" id="lop2">
+<h2>Lớp 2 gồm hai pha độc lập</h2>
+<p>Job <code>process</code> chạy 5 phút một lần (queue riêng, chính sách <code>stately</code> để không có hai lượt chồng nhau). Mỗi pha <b>tự tìm việc còn thiếu</b>, nên chạy lại, dừng giữa chừng hay đổi ngưỡng rồi chạy lại đều an toàn.</p>
+<figure>
+<svg viewBox="0 0 900 250" role="img" aria-label="Hai pha của lớp 2">
+  <defs><marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bx" x="10" y="20" width="150" height="70" rx="8"/><text class="tb" x="85" y="46" text-anchor="middle">documents</text><text class="ts" x="85" y="64" text-anchor="middle">chưa có doc_text</text><text class="ts" x="85" y="79" text-anchor="middle">(lô 128)</text>
+  <rect class="ba" x="190" y="20" width="160" height="70" rx="8"/><text class="tb" x="270" y="46" text-anchor="middle">rút văn bản</text><text class="ts" x="270" y="64" text-anchor="middle">adapter.toText(bản thô)</text><text class="ts" x="270" y="79" text-anchor="middle">NFC · franc</text>
+  <rect class="ba" x="380" y="20" width="160" height="70" rx="8"/><text class="tb" x="460" y="46" text-anchor="middle">embed</text><text class="ts" x="460" y="64" text-anchor="middle">qwen3-embedding-0.6b</text><text class="ts" x="460" y="79" text-anchor="middle">1 lời gọi / lô</text>
+  <rect class="bd" x="570" y="20" width="320" height="70" rx="8"/><text class="tb" x="730" y="46" text-anchor="middle">doc_text</text><text class="ts" x="730" y="64" text-anchor="middle">text · lang · embedding · relevance</text><text class="ts" x="730" y="79" text-anchor="middle">relevance = cosine(embedding, profile)</text>
+  <path class="ln" d="M160,55 L188,55" marker-end="url(#p)"/><path class="ln" d="M350,55 L378,55" marker-end="url(#p)"/><path class="ln" d="M540,55 L568,55" marker-end="url(#p)"/>
+  <text class="tb" x="10" y="130">Pha B · gộp</text>
+  <rect class="bx" x="10" y="145" width="200" height="80" rx="8"/><text class="tb" x="110" y="170" text-anchor="middle">tài liệu liên quan</text><text class="ts" x="110" y="188" text-anchor="middle">chưa thuộc sự kiện nào</text><text class="ts" x="110" y="204" text-anchor="middle">cũ trước, mới sau</text>
+  <rect class="bc" x="240" y="145" width="180" height="80" rx="8"/><text class="tb" x="330" y="170" text-anchor="middle">① cùng URL?</text><text class="ts" x="330" y="188" text-anchor="middle">url_canonical đã có</text><text class="ts" x="330" y="204" text-anchor="middle">trong sự kiện → vào đó</text>
+  <rect class="bc" x="450" y="145" width="200" height="80" rx="8"/><text class="tb" x="550" y="170" text-anchor="middle">② gần tâm cụm?</text><text class="ts" x="550" y="188" text-anchor="middle">HNSW, cửa sổ 7 ngày</text><text class="ts" x="550" y="204" text-anchor="middle">cosine ≥ 0,9 → gộp</text>
+  <rect class="bp" x="680" y="145" width="210" height="80" rx="8"/><text class="tb" x="785" y="170" text-anchor="middle">③ mở sự kiện mới</text><text class="ts" x="785" y="188" text-anchor="middle">tâm cụm = embedding</text><text class="ts" x="785" y="204" text-anchor="middle">tiêu đề = tài liệu đầu</text>
+  <path class="ln" d="M210,185 L238,185" marker-end="url(#p)"/><path class="ln" d="M420,185 L448,185" marker-end="url(#p)"/><path class="ln" d="M650,185 L678,185" marker-end="url(#p)"/>
+  <text class="lb" x="434" y="178" text-anchor="middle">không</text><text class="lb" x="664" y="178" text-anchor="middle">không</text>
+</svg>
+<figcaption><b>Hình 1.</b> Pha A chuyển tài liệu thành vector và điểm liên quan. Pha B quyết định tài liệu thuộc sự kiện nào: cùng bài trước, gần nghĩa sau, không khớp thì mở mới. Gộp theo vector cập nhật tâm cụm bằng trung bình cộng dồn.</figcaption>
+</figure>
+
+<h2>Những quyết định trong lớp 2</h2>
+<div class="grid2">
+  <div class="card"><b class="h">Mỗi nguồn tự rút văn bản</b><p>Thêm <code>toText()</code> vào <code>SourceAdapter</code>: HN lấy tiêu đề + <code>story_text</code> (bỏ HTML); arXiv lấy tiêu đề + tóm tắt; GitHub lấy tiêu đề + 1.500 ký tự đầu của ghi chú phát hành. Chỉ adapter biết bản thô của mình có cấu trúc gì.</p></div>
+  <div class="card"><b class="h">Ghi model đã tạo ra embedding</b><p>Mỗi dòng <code>doc_text</code>, <code>events</code>, <code>profile</code> có <code>embedding_model</code>. Pha B chỉ so tài liệu và sự kiện cùng model, vì vector của hai model khác nhau không so được với nhau.</p></div>
+  <div class="card"><b class="h">Lớp 2 xoá và tạo lại được</b><p><code>layer2 reset</code> xoá hết để embed lại (đổi model, đổi profile); <code>layer2 recluster</code> chỉ xoá sự kiện và gộp lại theo ngưỡng mới, giữ embedding nên không tốn tiền (4,4 giây cho 520 tài liệu).</p></div>
+  <div class="card"><b class="h">Test không cần khoá API</b><p>Adapter embedding <b>giả</b>: băm từng từ vào một chiều của vector, nên văn bản nhiều từ chung có cosine cao. Đủ để test cơ chế lọc và gộp, không dùng để đo chất lượng.</p></div>
+</div>
+
+<h2>Schema mới (migration 0001)</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Bảng</th><th>Cột chính</th><th>Ghi chú</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">doc_text</td><td>document_id · text · lang · embedding halfvec(1024) · embedding_model · relevance</td><td>Một dòng cho mỗi tài liệu đã xử lý</td></tr>
+    <tr><td class="mono">events</td><td>title · first_seen_at · last_seen_at · n_docs · centroid halfvec(1024)</td><td>Index HNSW <code>halfvec_cosine_ops</code> trên centroid</td></tr>
+    <tr><td class="mono">event_documents</td><td>event_id · document_id (khoá) · similarity · reason</td><td><code>reason</code>: seed · url · vector</td></tr>
+    <tr><td class="mono">profile</td><td>description · embedding · embedding_model · display_lang</td><td>Một người dùng ở MVP-0</td></tr>
+    <tr><td class="mono">llm_calls</td><td>task · model · token vào/ra/reasoning · cost_usd · latency_ms · ok</td><td>Chi phí thật của mỗi lời gọi (tab 04)</td></tr>
+  </tbody>
+</table></div>
+</div>
+
+<!-- ============ 04 ============ -->
+<div class="panel" role="tabpanel" id="ai">
+<h2>Kiến trúc: interface ở lõi, nhà cung cấp ở adapter</h2>
+<div class="grid3">
+  <div class="card"><b class="h"><code>@radard/core</code></b><p><code>EmbeddingProvider</code>, <code>LlmProvider</code>, <code>UsageSink</code>, <code>costUsd()</code>, <code>cosine()</code>, <code>runningMean()</code>. Không phụ thuộc gì.</p></div>
+  <div class="card"><b class="h"><code>@radard/adapters</code></b><p><code>ai-gateway.ts</code>: nơi duy nhất import <code>ai</code> (AI SDK 7). <code>ai-fake.ts</code>: embedding giả cho test.</p></div>
+  <div class="card"><b class="h"><code>@radard/db</code></b><p><code>dbUsageSink()</code> ghi mỗi lời gọi vào <code>llm_calls</code>. Adapter không biết database; database không biết nhà cung cấp.</p></div>
+</div>
+<p>Adapter Gateway <b>từ chối</b> vector sai số chiều ngay khi nhận, trước khi ghi vào cột <code>halfvec(1024)</code>. Đổi sang model chạy local hay gọi thẳng provider chỉ cần một adapter khác cùng interface.</p>
+
+<h2>Kiểm chứng với khoá thật</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Kiểm</th><th>Kết quả</th></tr></thead>
+  <tbody>
+    <tr><td>Số chiều vector</td><td><b>1.024</b>, khớp schema (trước đó là giả định)</td></tr>
+    <tr><td>Văn bản tiếng Việt</td><td>Embed được, cùng 1.024 chiều</td></tr>
+    <tr><td>Lời gọi đầu</td><td>8,6 giây (có vẻ do khởi động lạnh)</td></tr>
+    <tr><td>Toàn bộ 2.569 tài liệu</td><td>21 lời gọi, 543.208 token, 0 lỗi, khoảng 6 phút (phần lớn là chờ API)</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Chi phí thật (lệnh <code>bun run cli costs</code>)</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Việc</th><th>Model</th><th class="num">Lời gọi</th><th class="num">Token</th><th class="num">USD</th></tr></thead>
+  <tbody>
+    <tr><td>embed_document</td><td class="mono">alibaba/qwen3-embedding-0.6b</td><td class="num">21</td><td class="num">543.208</td><td class="num">0,005432</td></tr>
+    <tr><td>embed_profile</td><td class="mono">alibaba/qwen3-embedding-0.6b</td><td class="num">1</td><td class="num">69</td><td class="num">0,000001</td></tr>
+  </tbody>
+</table></div>
+<p>Trung bình khoảng 211 token mỗi tài liệu. Ở nhịp hiện tại (HN ~720 bài, arXiv ~300 bài, vài release mỗi ngày) chi phí embedding khoảng <b>$0,002/ngày</b>. Phần tốn tiền hơn sẽ là LLM ở tuần 3 (digest) và MVP-1 (trích xuất, phân xử).</p>
+
+<h2>Cấu hình</h2>
+<pre><code><span class="c"># .env (không commit; có .env.example để commit)</span>
+AI_GATEWAY_API_KEY=…
+<span class="c"># mặc định: EMBEDDER=gateway khi có khoá; EMBEDDER=fake để thử cơ chế; không có khoá thì lớp 2 tắt</span>
+<span class="c"># RELEVANCE_THRESHOLD=0.58  JOIN_THRESHOLD=0.9  CLUSTER_WINDOW_DAYS=7</span></code></pre>
+<p>Lưu ý đã gặp: Bun chỉ đọc <code>.env</code> ở <b>thư mục đang chạy lệnh</b>. Chạy từ thư mục con thì không thấy khoá, và AI SDK chuyển sang cách xác thực khác (OIDC của Vercel) rồi báo lỗi. Luôn chạy lệnh từ gốc repo.</p>
+</div>
+
+<!-- ============ 05 ============ -->
+<div class="panel" role="tabpanel" id="nguong">
+<h2>Ngưỡng tạm quá lỏng</h2>
+<p>Lần chạy đầu với embedding thật dùng ngưỡng tạm: liên quan 0,35 và gộp 0,8. Kết quả là <b>2.248/2.569 (87%)</b> tài liệu bị coi là liên quan, và nhiều lượt gộp sai. Tôi chỉnh lại bằng cách xem phân bố điểm và đọc tiêu đề mẫu ở từng khoảng.</p>
+
+<figure>
+<div class="lg"><span><i style="background:#2a78d6"></i>arXiv + GitHub</span><span><i style="background:#eb6834"></i>Hacker News</span></div>
+<svg viewBox="0 0 860 260" role="img" aria-label="Phân bố mức liên quan của 2.569 tài liệu, dồn trong khoảng 0,4 đến 0,6"><line x1="50" x2="834" y1="210.0" y2="210.0" stroke="#E6EBE9"/><text class="ts" x="44" y="214.0" text-anchor="end">0</text><line x1="50" x2="834" y1="172.0" y2="172.0" stroke="#E6EBE9"/><text class="ts" x="44" y="176.0" text-anchor="end">100</text><line x1="50" x2="834" y1="134.0" y2="134.0" stroke="#E6EBE9"/><text class="ts" x="44" y="138.0" text-anchor="end">200</text><line x1="50" x2="834" y1="96.0" y2="96.0" stroke="#E6EBE9"/><text class="ts" x="44" y="100.0" text-anchor="end">300</text><line x1="50" x2="834" y1="58.0" y2="58.0" stroke="#E6EBE9"/><text class="ts" x="44" y="62.0" text-anchor="end">400</text><line x1="50" x2="834" y1="20.0" y2="20.0" stroke="#E6EBE9"/><text class="ts" x="44" y="24.0" text-anchor="end">500</text><rect x="50" y="202.4" width="52" height="6.6" rx="2" fill="#2a78d6"><title><0,20: arXiv + GitHub 20</title></rect><text class="ts" x="76.0" y="197.4" text-anchor="middle">20</text><text class="ts" x="76.0" y="226" text-anchor="middle"><0,20</text><rect x="106" y="202.4" width="52" height="6.6" rx="2" fill="#2a78d6"><title>0,20: arXiv + GitHub 20</title></rect><rect x="106" y="200.5" width="52" height="0.0" rx="2" fill="#eb6834"><title>0,20: Hacker News 5</title></rect><text class="ts" x="132.0" y="195.5" text-anchor="middle">25</text><text class="ts" x="132.0" y="226" text-anchor="middle">0,20</text><rect x="162" y="184.5" width="52" height="24.5" rx="2" fill="#2a78d6"><title>0,25: arXiv + GitHub 67</title></rect><rect x="162" y="181.9" width="52" height="0.7" rx="2" fill="#eb6834"><title>0,25: Hacker News 7</title></rect><text class="ts" x="188.0" y="176.9" text-anchor="middle">74</text><text class="ts" x="188.0" y="226" text-anchor="middle">0,25</text><rect x="218" y="140.8" width="52" height="68.2" rx="2" fill="#2a78d6"><title>0,30: arXiv + GitHub 182</title></rect><rect x="218" y="133.2" width="52" height="5.6" rx="2" fill="#eb6834"><title>0,30: Hacker News 20</title></rect><text class="ts" x="244.0" y="128.2" text-anchor="middle">202</text><text class="ts" x="244.0" y="226" text-anchor="middle">0,30</text><rect x="274" y="96.8" width="52" height="112.2" rx="2" fill="#2a78d6"><title>0,35: arXiv + GitHub 298</title></rect><rect x="274" y="83.1" width="52" height="11.7" rx="2" fill="#eb6834"><title>0,35: Hacker News 36</title></rect><text class="ts" x="300.0" y="78.1" text-anchor="middle">334</text><text class="ts" x="300.0" y="226" text-anchor="middle">0,35</text><rect x="330" y="85.0" width="52" height="124.0" rx="2" fill="#2a78d6"><title>0,40: arXiv + GitHub 329</title></rect><rect x="330" y="56.5" width="52" height="26.5" rx="2" fill="#eb6834"><title>0,40: Hacker News 75</title></rect><text class="ts" x="356.0" y="51.5" text-anchor="middle">404</text><text class="ts" x="356.0" y="226" text-anchor="middle">0,40</text><rect x="386" y="74.7" width="52" height="134.3" rx="2" fill="#2a78d6"><title>0,45: arXiv + GitHub 356</title></rect><rect x="386" y="28.4" width="52" height="44.4" rx="2" fill="#eb6834"><title>0,45: Hacker News 122</title></rect><text class="ts" x="412.0" y="23.4" text-anchor="middle">478</text><text class="ts" x="412.0" y="226" text-anchor="middle">0,45</text><rect x="442" y="94.5" width="52" height="114.5" rx="2" fill="#2a78d6"><title>0,50: arXiv + GitHub 304</title></rect><rect x="442" y="32.9" width="52" height="59.6" rx="2" fill="#eb6834"><title>0,50: Hacker News 162</title></rect><text class="ts" x="468.0" y="27.9" text-anchor="middle">466</text><text class="ts" x="468.0" y="226" text-anchor="middle">0,50</text><rect x="498" y="142.4" width="52" height="66.6" rx="2" fill="#2a78d6"><title>0,55: arXiv + GitHub 178</title></rect><rect x="498" y="99.0" width="52" height="41.3" rx="2" fill="#eb6834"><title>0,55: Hacker News 114</title></rect><text class="ts" x="514.0" y="94.0" text-anchor="middle">292</text><text class="ts" x="524.0" y="226" text-anchor="middle">0,55</text><rect x="554" y="194.4" width="52" height="14.6" rx="2" fill="#2a78d6"><title>0,60: arXiv + GitHub 41</title></rect><rect x="554" y="165.9" width="52" height="26.5" rx="2" fill="#eb6834"><title>0,60: Hacker News 75</title></rect><text class="ts" x="580.0" y="160.9" text-anchor="middle">116</text><text class="ts" x="580.0" y="226" text-anchor="middle">0,60</text><rect x="610" y="199.7" width="52" height="9.3" rx="2" fill="#2a78d6"><title>0,65: arXiv + GitHub 27</title></rect><rect x="610" y="176.6" width="52" height="21.2" rx="2" fill="#eb6834"><title>0,65: Hacker News 61</title></rect><text class="ts" x="636.0" y="171.6" text-anchor="middle">88</text><text class="ts" x="636.0" y="226" text-anchor="middle">0,65</text><rect x="666" y="208.1" width="52" height="0.9" rx="2" fill="#2a78d6"><title>0,70: arXiv + GitHub 5</title></rect><rect x="666" y="194.0" width="52" height="12.1" rx="2" fill="#eb6834"><title>0,70: Hacker News 37</title></rect><text class="ts" x="692.0" y="189.0" text-anchor="middle">42</text><text class="ts" x="692.0" y="226" text-anchor="middle">0,70</text><rect x="722" y="208.1" width="52" height="0.9" rx="2" fill="#2a78d6"><title>0,75: arXiv + GitHub 5</title></rect><rect x="722" y="202.0" width="52" height="4.1" rx="2" fill="#eb6834"><title>0,75: Hacker News 16</title></rect><text class="ts" x="748.0" y="197.0" text-anchor="middle">21</text><text class="ts" x="748.0" y="226" text-anchor="middle">0,75</text><rect x="778" y="210.0" width="52" height="0.0" rx="2" fill="#2a78d6"><title>0,80: arXiv + GitHub 0</title></rect><rect x="778" y="207.3" width="52" height="0.7" rx="2" fill="#eb6834"><title>0,80: Hacker News 7</title></rect><text class="ts" x="804.0" y="202.3" text-anchor="middle">7</text><text class="ts" x="804.0" y="226" text-anchor="middle">0,80</text><line x1="274.0" x2="274.0" y1="15" y2="210" stroke="#16201D" stroke-dasharray="5 4" stroke-width="1.5"/><text class="t" x="279.0" y="28">tạm 0,35</text><line x1="531.6" x2="531.6" y1="15" y2="210" stroke="#16201D" stroke-dasharray="5 4" stroke-width="1.5"/><text class="t" x="536.6" y="28">mới 0,58</text><text class="ts" x="50" y="252">mức liên quan (cosine với mô tả lĩnh vực)</text></svg>
+<figcaption><b>Hình 2.</b> Số tài liệu theo khoảng mức liên quan (bước 0,05). Điểm dồn trong 0,4–0,6 nên ngưỡng phải đặt theo nội dung thật, không theo cảm giác. Đường đứt: ngưỡng tạm cũ 0,35 và ngưỡng mới 0,58. Di chuột lên cột để xem số.</figcaption>
+</figure>
+
+<h2>Liên quan: đọc tiêu đề HN ở từng mức</h2>
+<div class="tbl"><table>
+  <thead><tr><th class="num">Điểm</th><th>Tiêu đề (mẫu ngẫu nhiên)</th><th>Liên quan?</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0,348</td><td>Trump rejects Iran's conditional ceasefire proposal</td><td>không</td></tr>
+    <tr><td class="num">0,402</td><td>Oil Slips as Iran Diplomacy Sparks Fresh Hopes…</td><td>không</td></tr>
+    <tr><td class="num">0,514</td><td>Stuck in the Suez Canal – the short version (2021)</td><td>không</td></tr>
+    <tr><td class="num">0,548</td><td>Tradition Is Smarter Than You Are (2018)</td><td>không</td></tr>
+    <tr><td class="num">0,564</td><td>Bill Gates Says Trump Is Wrong to Hold Out Against AI Safeguards</td><td>có thể</td></tr>
+    <tr><td class="num">0,605</td><td>Rene-1: Open-weight classifier sets SOTA on Decision Index</td><td>có</td></tr>
+    <tr><td class="num">0,665</td><td>Observability-driven harnesses for building with agents</td><td>có</td></tr>
+    <tr><td class="num">0,758</td><td>LLM Agents Can Easily Tamper with Their Own Traces</td><td>có</td></tr>
+  </tbody>
+</table></div>
+<p>Ranh giới với HN nằm quanh 0,58–0,60. arXiv cho điểm thấp hơn vì văn phong học thuật (trung vị 0,447 so với 0,533 của HN), dù đã lọc sẵn theo thể loại. GitHub là repo bạn tự chọn nên luôn liên quan.</p>
+
+<h2>Gộp: đúng và sai chồng nhau ở 0,8–0,9</h2>
+<div class="tbl"><table>
+  <thead><tr><th class="num">Cosine</th><th>Tài liệu ↔ sự kiện</th><th>Đúng?</th></tr></thead>
+  <tbody>
+    <tr><td class="num">0,818</td><td>DSPy – Program, don't prompt ↔ OpenAI (2015)</td><td>sai</td></tr>
+    <tr><td class="num">0,858</td><td>OpenAI halts training ↔ OpenAI Freezes Development…</td><td>đúng</td></tr>
+    <tr><td class="num">0,863</td><td>Google OpenAI Anthropic forming SAFA ↔ OpenAI (2015)</td><td>sai</td></tr>
+    <tr><td class="num">0,863</td><td>LiveMaply (analytics) ↔ Genug Analytics</td><td>sai</td></tr>
+    <tr><td class="num">0,909</td><td>Trying GPT-6 Sol with AI SDK ↔ Check is your GPT-6-Astra nerfed?</td><td>đáng ngờ</td></tr>
+    <tr><td class="num">0,912–0,922</td><td>3 bài về OpenAI tạm dừng huấn luyện ↔ OpenAI halts training</td><td>đúng</td></tr>
+    <tr><td class="num">0,985</td><td>oven-sh/bun v1.4.2 ↔ v1.4.1</td><td>sai (hai lần phát hành)</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Quyết định</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Tham số</th><th>Tạm</th><th>Mới</th><th>Lý do</th></tr></thead>
+  <tbody>
+    <tr><td>Liên quan (chung, HN)</td><td>0,35</td><td><b>0,58</b></td><td>Ranh giới đọc được từ tiêu đề</td></tr>
+    <tr><td>Liên quan arXiv</td><td>—</td><td><b>0,55</b></td><td><code>sources.config.minRelevance</code></td></tr>
+    <tr><td>Liên quan GitHub</td><td>—</td><td><b>0</b></td><td>Repo do bạn chọn</td></tr>
+    <tr><td>Gộp theo vector</td><td>0,8</td><td><b>0,9</b></td><td>Chỉ gộp khi gần như chắc chắn; vùng 0,8–0,9 để LLM phân xử ở MVP-1</td></tr>
+    <tr><td>GitHub gộp theo vector</td><td>có</td><td><b>tắt</b></td><td><code>sources.config.vectorJoin = false</code>; mỗi release là một sự kiện</td></tr>
+  </tbody>
+</table></div>
+<p>Kết quả sau khi chỉnh: 520 tài liệu liên quan → 512 sự kiện; 5 lượt gộp theo vector và 3 lượt theo cùng URL, 7/8 lượt đúng.</p>
+<div class="note"><b>Giới hạn của cách chỉnh này:</b> dựa trên đọc mẫu, chưa có tập nhãn. Ở MVP-1 cần gán nhãn khoảng 200 cặp để đo precision/recall của việc gộp như thiết kế đã nêu, và dùng 👍/👎 từ digest để chỉnh ngưỡng liên quan.</div>
+</div>
+
+<!-- ============ 06 ============ -->
+<div class="panel" role="tabpanel" id="loi">
+<h2>1. arXiv: thời điểm nộp khác thời điểm công bố</h2>
+<figure>
+<svg viewBox="0 40 900 175" role="img" aria-label="Bài nộp thứ Sáu được công bố thứ Hai, cũ hơn con trỏ">
+  <defs><marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <line x1="40" y1="100" x2="870" y2="100" stroke="#D9E0DD" stroke-width="2"/>
+  <g class="ts"><text x="80" y="125">T5 25/09</text><text x="260" y="125">T6 26/09</text><text x="440" y="125">T7</text><text x="600" y="125">CN</text><text x="760" y="125">T2 28/09</text></g>
+  <circle cx="150" cy="100" r="7" fill="#2a78d6"/><text class="t" x="150" y="80" text-anchor="middle">bài A nộp 25/09</text>
+  <circle cx="330" cy="100" r="7" fill="#eb6834"/><text class="t" x="330" y="80" text-anchor="middle">con trỏ = 26/09</text>
+  <circle cx="800" cy="100" r="7" fill="#1baf7a"/><text class="t" x="800" y="80" text-anchor="middle">bài A mới xuất hiện</text>
+  <path class="ln" d="M160,145 C400,190 600,190 790,145" marker-end="url(#t)"/>
+  <text class="ts" x="475" y="200" text-anchor="middle">công bố trễ 1–3 ngày (cuối tuần không công bố)</text>
+</svg>
+<figcaption><b>Hình 3.</b> Trường <code>published</code> là lúc tác giả <b>nộp</b>. Bài A chỉ xuất hiện trong API sau khi arXiv công bố, lúc con trỏ đã vượt qua 25/09. Con trỏ kiểu "chỉ lấy bài mới hơn lần trước" sẽ bỏ sót A <b>vĩnh viễn</b>.</figcaption>
+</figure>
+<p><b>Phát hiện:</b> lượt chạy đầu trả 0 bài vì bài mới nhất trong API (nộp chiều thứ Sáu) đã cũ hơn mốc "lùi 2 ngày". <b>Sửa:</b> mỗi lượt đọc lại 5 ngày tính lùi từ con trỏ (đo trước: 954 bài, khoảng 15 giây), bài đã có thì khoá duy nhất bỏ đi. Có test mô phỏng đúng tình huống: bài công bố muộn, nộp trước con trỏ, vẫn được đọc.</p>
+<p><b>Lỗi nhỏ đi kèm:</b> so thời điểm bằng chuỗi (<code>…52Z</code> của arXiv so với <code>…52.000Z</code> của <code>toISOString()</code>) có thể sai; đổi sang so theo mốc số.</p>
+
+<h2>2. jsonb bị mã hoá hai lần</h2>
+<div class="grid2">
+  <div class="card"><b class="h">Triệu chứng</b><p>Ngưỡng riêng theo nguồn không có tác dụng: pha A (JavaScript) đọc đúng <code>minRelevance</code>, pha B (SQL) đọc <code>config-&gt;&gt;'minRelevance'</code> ra NULL. Hai test mới thất bại.</p></div>
+  <div class="card"><b class="h">Nguyên nhân</b><p><code>jsonb()</code> của Drizzle <code>JSON.stringify</code> một lần, driver <code>bun-sql</code> stringify thêm lần nữa. Cột chứa <code>"{\"a\":1}"</code> (kiểu string) thay vì <code>{"a": 1}</code>. Drizzle đọc ra thì parse lại, nên code TypeScript chạy đúng và lỗi nằm im <b>từ tuần 1</b>.</p></div>
+</div>
+<pre><code><span class="c">-- trước khi sửa</span>
+select kind, jsonb_typeof(config) from sources;
+ hn     | string     <span class="c">← "{\"backfillHours\":24}"</span>
+ github | array      <span class="c">← lệnh psql `config || '{…}'` của tôi nối chuỗi với object thành mảng</span></code></pre>
+<p><b>Sửa</b> (giống cách <code>seongon-content</code> đã làm): cột jsonb riêng (<code>packages/db/src/schema/json.ts</code>) để driver mã hoá đúng một lần và đọc được cả dữ liệu cũ; dọn byte NUL và surrogate lẻ mà Postgres từ chối; migration <code>0002</code> chuyển dữ liệu cũ về object và ghép lại config GitHub; test quét <b>mọi</b> cột jsonb không cho dòng nào ở kiểu string.</p>
+
+<h2>3. Các lỗi nhỏ khác</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Lỗi</th><th>Nguyên nhân</th><th>Sửa</th></tr></thead>
+  <tbody>
+    <tr><td>Pha A đếm 337 liên quan, pha B chỉ gộp 336</td><td>Điểm sát ngưỡng: số 64-bit ≥ 0,35 nhưng cột <code>real</code> 32-bit lưu thành 0,3499…</td><td><code>Math.fround</code> trước khi so và lưu</td></tr>
+    <tr><td>Lệnh <code>events</code> lỗi</td><td>Trong truy vấn con, <code>"id"</code> không ghi bảng bị hiểu là id của bảng khác</td><td>Ghi rõ <code>events.id</code></td></tr>
+    <tr><td>Test arXiv so URL sai</td><td><code>URLSearchParams</code> mã hoá dấu cách thành <code>+</code>, <code>decodeURIComponent</code> không đổi lại</td><td>Đọc bằng <code>URL.searchParams</code></td></tr>
+    <tr><td>Thử embedding báo lỗi OIDC</td><td>Chạy từ thư mục con nên Bun không đọc <code>.env</code></td><td>Luôn chạy từ gốc repo</td></tr>
+    <tr><td>Lint: độ phức tạp 38 và 22</td><td>CLI là một chuỗi if/else dài; adapter GitHub dồn mọi thứ vào <code>fetch</code></td><td>CLI thành bảng lệnh; tách <code>fetchRepo()</code></td></tr>
+    <tr><td>Tạo nhầm package <code>@radard/ai</code></td><td>Trái thiết kế đã chốt (interface ở core, nhà cung cấp ở adapters)</td><td>Xoá, làm lại đúng chỗ</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Bài học rút ra</h2>
+<ul>
+  <li><b>Đọc dữ liệu thật sớm.</b> Cả lỗi arXiv lẫn ngưỡng quá lỏng đều chỉ lộ ra khi chạy với dữ liệu thật; test với dữ liệu giả không bắt được.</li>
+  <li><b>Kiểm tra bằng SQL, không chỉ bằng code ứng dụng.</b> Lỗi jsonb vô hình với TypeScript vì hai lần mã hoá và hai lần giải mã triệt tiêu nhau.</li>
+  <li><b>Không sửa dữ liệu bằng tay khi chưa hiểu kiểu dữ liệu.</b> Lệnh <code>psql</code> sửa nhanh của tôi đã biến config GitHub thành mảng.</li>
+</ul>
+</div>
+
+<!-- ============ 07 ============ -->
+<div class="panel" role="tabpanel" id="code">
+<h2>File mới và file thay đổi</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Package</th><th>File</th><th>Nội dung</th></tr></thead>
+  <tbody>
+    <tr><td>core</td><td class="mono">ai.ts · vector.ts</td><td>Interface AI, giá, cosine, trung bình cộng dồn</td></tr>
+    <tr><td>core</td><td class="mono">http.ts · source.ts · url.ts</td><td>Giãn request theo host; <code>toText()</code>; thêm tham số theo dõi</td></tr>
+    <tr><td>adapters</td><td class="mono">ai-gateway.ts · ai-fake.ts</td><td>Adapter Vercel AI Gateway (AI SDK 7); embedding giả</td></tr>
+    <tr><td>db</td><td class="mono">schema/layer2.ts · ops.ts · json.ts · usage.ts</td><td>Bảng lớp 2, <code>llm_calls</code>, cột jsonb an toàn, ghi chi phí</td></tr>
+    <tr><td>db</td><td class="mono">drizzle/0001_layer2.sql · 0002_jsonb_fix.sql</td><td>Migration bảng mới; sửa dữ liệu jsonb</td></tr>
+    <tr><td>daemon</td><td class="mono">sources/arxiv.ts · github.ts</td><td>Hai adapter nguồn mới</td></tr>
+    <tr><td>daemon</td><td class="mono">jobs/process.ts</td><td>Lớp 2 (289 dòng)</td></tr>
+    <tr><td>daemon</td><td class="mono">boss.ts · roles/* · runtime.ts · env.ts · cli.ts</td><td>Queue <code>process</code>, lịch 5 phút, chọn embedder, lệnh CLI mới</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Lệnh CLI mới</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Lệnh</th><th>Làm gì</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">profile · profile set "…" · profile seed</td><td>Xem, đặt mô tả lĩnh vực, đặt mô tả mặc định TẠM</td></tr>
+    <tr><td class="mono">process</td><td>Chạy lớp 2 ngay</td></tr>
+    <tr><td class="mono">events [--since=24h]</td><td>Sự kiện gần nhất, nhiều tài liệu trước, kèm nguồn</td></tr>
+    <tr><td class="mono">layer2 recluster</td><td>Gộp lại theo ngưỡng mới, không tốn tiền</td></tr>
+    <tr><td class="mono">layer2 reset</td><td>Xoá toàn bộ lớp 2 để embed lại</td></tr>
+    <tr><td class="mono">costs [--since=24h]</td><td>Chi phí gọi model theo việc</td></tr>
+  </tbody>
+</table></div>
+
+<h2>Test: 42 test trong 11 file</h2>
+<div class="tbl"><table>
+  <thead><tr><th>File</th><th class="num">Test</th><th>Kiểm gì (mới ở tuần 2 in đậm)</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">core/url.test.ts</td><td class="num">8</td><td>Chuẩn hoá URL; <b>tham số quảng cáo và email; không bỏ nhầm tên gần giống; giữ <code>ref</code>; <code>si</code> theo host</b></td></tr>
+    <tr><td class="mono">core/http.test.ts</td><td class="num">1</td><td><b>Giãn request theo luật riêng của host (server cục bộ, đo khoảng cách thật)</b></td></tr>
+    <tr><td class="mono">core/hash.test.ts</td><td class="num">2</td><td>NFC</td></tr>
+    <tr><td class="mono">adapters/object-store-fs.test.ts</td><td class="num">2</td><td>Kho bản thô</td></tr>
+    <tr><td class="mono">daemon/hn.test.ts</td><td class="num">4</td><td>Adapter HN</td></tr>
+    <tr><td class="mono">daemon/arxiv.test.ts</td><td class="num">5</td><td><b>Bỏ hậu tố phiên bản; đọc fixture thật; dừng ở con trỏ; bài công bố muộn vẫn được đọc; con trỏ không tụt</b></td></tr>
+    <tr><td class="mono">daemon/github.test.ts</td><td class="num">5</td><td><b>Fixture thật; ETag và 304; bỏ bản nháp; repo 404 không ảnh hưởng repo khác; lỗi 503 ném ra</b></td></tr>
+    <tr><td class="mono">daemon/fetch.test.ts</td><td class="num">4</td><td>Job fetch idempotent</td></tr>
+    <tr><td class="mono">daemon/scheduler.test.ts</td><td class="num">3</td><td><b>pg-boss thật: cadence sai không chặn nguồn khác; giữ lịch cũ; gỡ lịch khi tắt</b></td></tr>
+    <tr><td class="mono">daemon/process.test.ts</td><td class="num">6</td><td><b>Lọc, gộp URL, gộp vector, mở mới; chạy lại không làm gì; cửa sổ thời gian; tắt gộp vector; ngưỡng riêng của nguồn; thiếu profile</b></td></tr>
+    <tr><td class="mono">daemon/jsonb.test.ts</td><td class="num">2</td><td><b>Không cột jsonb nào chứa chuỗi; SQL đọc được trường bên trong; byte NUL bị dọn</b></td></tr>
+  </tbody>
+</table></div>
+<p>Chạy: <code>bun run check</code> (typecheck TypeScript 7, lint Biome, <code>bun test</code>). Hiện tất cả xanh, không còn cảnh báo.</p>
+
+<h2>Việc tiếp theo</h2>
+<div class="grid2">
+  <div class="card"><b class="h">Cần bạn</b><ul><li>Mô tả lĩnh vực của bạn (tiếng Anh) để thay bản TẠM</li><li>Danh sách repo GitHub thật</li><li>Bot Telegram qua BotFather (tuần 3)</li><li>Đồng ý để commit (repo chưa có commit nào)</li></ul></div>
+  <div class="card"><b class="h">Tuần 3</b><ul><li><code>Notifier</code> + Telegram, digest 07:00 bằng gpt-5.6-luna (11/10: đổi sang claude-haiku-5.5), nút 👍/👎</li><li>Adapter R2</li><li>Dockerfile, deploy Railway</li><li>Nghiệm thu 7 ngày</li></ul></div>
+</div>
+<p class="muted">Ba trang <code>packages.html</code>, <code>daemon.html</code>, <code>pg-boss.html</code> viết ở tuần 1 chưa phản ánh các thay đổi tuần này.</p>
+</div>
+
+<footer>Báo cáo viết từ code và database thật của radard ngày 28/09/2026. Mọi số đo lấy từ lệnh chạy trong phiên (<code>cli sources</code>, <code>cli costs</code>, truy vấn trên <code>doc_text</code> và <code>event_documents</code>). Tài liệu liên quan: <a href="checklist.html">checklist.html</a>, <a href="radard-thiet-ke.html">radard-thiet-ke.html</a>.</footer>
+</div>
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

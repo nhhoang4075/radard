@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Sản phẩm &amp; Stack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9;
+  --bad:#A33A2B; --bad-soft:#F8E3DF; --dot-off:#CBD4D1;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --ground:#101614; --surface:#18201D; --ink:#E6ECEA; --ink-2:#A3B1AC; --line:#2C3834;
+    --accent:#5CC9AE; --accent-soft:#16332B; --warn:#E8B45C; --warn-soft:#352813;
+    --bad:#F08A78; --bad-soft:#3A1E19; --dot-off:#34413D;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1060px;margin:0 auto;padding:48px 20px 80px}
+h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:28px;font-weight:700}
+h3{font-size:21px;font-weight:600}
+h4{font-family:var(--body);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:2px}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2);max-width:70ch;margin-top:14px}
+.muted{color:var(--ink-2)}
+.mono{font-family:var(--mono);font-size:13.5px}
+header{display:grid;gap:8px;padding-bottom:28px;border-bottom:1px solid var(--line)}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{text-decoration:none;font-weight:500}
+nav.toc a:hover{text-decoration:underline}
+section{margin-top:56px;display:grid;gap:20px}
+.part{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);letter-spacing:.04em}
+.prose{max-width:72ch;display:grid;gap:12px}
+ul.clean{margin:0;padding-left:18px;display:grid;gap:5px}
+
+/* idea restatement */
+.pitch{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;display:grid;gap:14px}
+.pitch .big{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.35;max-width:62ch}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:10px 20px;font-size:15px}
+.kv dt{font-weight:600}
+.kv dd{margin:0;color:var(--ink-2)}
+
+/* verdict grid */
+.verdict{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.vcol{display:grid;gap:8px;align-content:start}
+.vcol h4{padding-bottom:6px;border-bottom:2px solid var(--line)}
+.vcol.good h4{border-color:var(--accent);color:var(--accent)}
+.vcol.warn h4{border-color:var(--warn);color:var(--warn)}
+.vcol.bad h4{border-color:var(--bad);color:var(--bad)}
+.vcol ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:15px}
+
+/* tables */
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+table.comp{min-width:760px}
+table.score{min-width:820px}
+table.score td{vertical-align:middle}
+td.name b{display:block}
+td.name span{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+tr.pick td{background:var(--accent-soft)}
+.dots{display:inline-flex;gap:4px;vertical-align:middle}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--dot-off)}
+.dots i.on{background:var(--accent)}
+.dots.cost i.on{background:var(--warn)}
+
+/* pipeline */
+.pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;counter-reset:st}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:6px;align-content:start;position:relative}
+.stage .n{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.stage b{font-size:15.5px}
+.stage p{font-size:13.5px;color:var(--ink-2)}
+.stage .tech{font-family:var(--mono);font-size:12px;color:var(--ink)}
+.stage.llm{border-color:var(--accent)}
+.surfaces{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.surf{border-top:3px solid var(--ink);padding-top:10px;display:grid;gap:6px;font-size:14.5px;align-content:start}
+.surf b{font-family:var(--display);font-size:17px}
+.legend{font-size:13px;color:var(--ink-2)}
+.chip{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;border:1px solid var(--accent);color:var(--accent);vertical-align:1px}
+
+pre{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+
+/* roadmap */
+.phases{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.phase{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:8px;align-content:start}
+.phase .when{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+.phase ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14.5px}
+.phase.cut{background:transparent;border-style:dashed}
+
+/* idea cards */
+.idea{border-top:2px solid var(--ink);padding-top:22px;display:grid;grid-template-columns:200px 1fr;gap:12px 36px}
+.idea-side{display:grid;gap:8px;align-content:start}
+.idea-code{font-family:var(--mono);font-size:13px;color:var(--accent)}
+.idea-side .tag{font-size:14px;color:var(--ink-2)}
+.idea-main{display:grid;gap:14px;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
+.blk{display:grid;gap:6px;align-content:start}
+.blk ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:15px}
+.blk p{font-size:15px}
+.note{background:var(--warn-soft);border-radius:8px;padding:12px 14px;font-size:14.5px}
+.note b{color:var(--warn)}
+.good-note{background:var(--accent-soft);border-radius:8px;padding:12px 14px;font-size:14.5px}
+
+.rec{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:26px;display:grid;gap:14px}
+.rec .big{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.35;max-width:62ch}
+.src{font-size:13.5px;color:var(--ink-2);columns:2 320px;column-gap:28px;margin:0;padding-left:18px}
+.src li{break-inside:avoid;margin-bottom:6px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+
+@media (max-width:860px){
+  .pipe,.surfaces{grid-template-columns:repeat(2,1fr)}
+  .verdict,.phases{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .pipe,.surfaces,.grid2{grid-template-columns:1fr}
+  .idea{grid-template-columns:1fr}
+  .kv{grid-template-columns:1fr;gap:2px 0}
+  .kv dd{margin-bottom:8px}
+  .wrap{padding-top:32px}
+}
+
+/* radard additions */
+.layers{display:grid;gap:10px}
+.layer{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ink);border-radius:10px;padding:16px 18px;display:grid;grid-template-columns:210px 1fr;gap:6px 24px}
+.layer .lname{display:grid;gap:2px;align-content:start}
+.layer .lname b{font-family:var(--display);font-size:18px}
+.layer .lname span{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.layer.l3{border-left-color:var(--accent)}
+.layer.l2{border-left-color:var(--warn)}
+.layer ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14.5px}
+.arrow{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);text-align:center}
+.badge{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.b-known{background:var(--ground);color:var(--ink-2);border:1px solid var(--line)}
+.b-new{background:var(--accent-soft);color:var(--accent)}
+.b-opt{background:var(--warn-soft);color:var(--warn)}
+table.stack{min-width:900px}
+table.stack td:first-child{white-space:nowrap;font-weight:600}
+table.stack td.pick b{display:block;font-family:var(--mono);font-size:13.5px}
+.flow{display:grid;gap:0;border-left:2px solid var(--line);margin-left:8px}
+.fstep{position:relative;padding:0 0 16px 22px;display:grid;gap:3px}
+.fstep::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.fstep .t{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+.fstep p{font-size:14.5px;color:var(--ink-2)}
+.fstep b{font-size:15px}
+.principles{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.pr{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:6px;align-content:start}
+.pr b{font-family:var(--display);font-size:16.5px}
+.pr p{font-size:14.5px;color:var(--ink-2)}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+tr.total td{font-weight:600;background:var(--ground)}
+.procs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.proc{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:6px;align-content:start}
+.proc .role{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.proc b{font-size:15.5px}
+.proc p{font-size:13.5px;color:var(--ink-2)}
+.shared{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.shared .proc{border-style:dashed}
+.learn{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.lc{border-top:2px solid var(--accent);padding-top:12px;display:grid;gap:6px;align-content:start}
+.lc b{font-family:var(--display);font-size:17px}
+.lc .why{font-size:14.5px;color:var(--ink-2)}
+.lc ul{margin:0;padding-left:18px;font-size:14px;display:grid;gap:3px}
+.lc .meta{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+@media (max-width:860px){
+  .procs{grid-template-columns:repeat(2,1fr)}
+  .shared,.principles,.learn{grid-template-columns:1fr}
+  .layer{grid-template-columns:1fr}
+}
+@media (max-width:640px){ .procs{grid-template-columns:1fr} }
+/* diagrams */
+figure.dg{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:12px;overflow-x:auto}
+figure.dg svg{display:block;width:100%;min-width:760px;height:auto;color:var(--ink);font-family:var(--body)}
+figure.dg figcaption{font-size:14px;color:var(--ink-2);max-width:86ch}
+.dg .bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.dg .ex{fill:var(--ground);stroke:var(--ink-2);stroke-width:1;stroke-dasharray:4 3}
+.dg .hub{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.dg .accbox{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.dg .badbox{fill:var(--bad-soft);stroke:var(--bad);stroke-width:1.2;stroke-dasharray:4 3}
+.dg .ch{fill:var(--surface);stroke:var(--line)}
+.dg .hd{fill:var(--ground)}
+.dg .b1{fill:var(--ground);stroke:var(--line)}
+.dg .b2{fill:var(--warn-soft)}
+.dg .b3{fill:var(--accent-soft)}
+.dg .t{fill:currentColor;font-size:13px}
+.dg .tb{fill:currentColor;font-size:14px;font-weight:600}
+.dg .tm{fill:var(--ink-2);font-family:var(--mono);font-size:11.5px}
+.dg .tmb{fill:currentColor;font-family:var(--mono);font-size:12.5px;font-weight:500}
+.dg .ts{fill:var(--ink-2);font-size:11.5px}
+.dg .lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+.dg .lb.acc{fill:var(--accent);font-weight:600}
+.dg .ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.dg .ln.acc{stroke:var(--accent);stroke-width:2}
+.dg .ln.bad{stroke:var(--bad)}
+.dg .ln.dash{stroke-dasharray:5 4}
+.dg .ah{fill:var(--ink-2)}
+.dg .ah.acc{fill:var(--accent)}
+.dg .ah.bad{fill:var(--bad)}
+details.schema summary{cursor:pointer;font-weight:600;font-size:15px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">RADARD · BÁO CÁO SẢN PHẨM &amp; TECH STACK · v0.2 · ĐỀ TÀI ĐÃ DUYỆT · LÀM CÁ NHÂN</div>
+  <h1>radard: daemon quan sát và ghi chép thông tin AI</h1>
+  <p class="lede">Báo cáo này chốt lại sản phẩm sau các vòng bàn trước: từ ý tưởng “bắt sóng tin AI”, qua bản chuẩn hoá “Radar”, đến mô hình daemon 3 lớp. Phần 2 chọn tech stack theo nguyên tắc giữ những gì bạn đã thạo và thêm ở mỗi tầng một công nghệ mới vừa sức, học được trong lúc làm.</p>
+  <nav class="toc">
+    <a href="#pitch">1.1 Định vị</a>
+    <a href="#layers">1.2 Ba lớp</a>
+    <a href="#flow">1.3 Một tin đi qua hệ thống</a>
+    <a href="#features">1.4 Tính năng</a>
+    <a href="#agent">1.5 Agent</a>
+    <a href="#principles">1.6 Nguyên tắc</a>
+    <a href="#scope">1.7 Phạm vi &amp; đo lường</a>
+    <a href="#stack">2.1 Stack</a>
+    <a href="#runtime">2.2 Kiến trúc hệ thống</a>
+    <a href="#data">2.3 Kiến trúc dữ liệu</a>
+    <a href="#optimize">2.4 Tối ưu</a>
+    <a href="#cost">2.5 Chi phí</a>
+    <a href="#notchosen">2.6 Không chọn</a>
+    <a href="#learn">3. Lộ trình học</a>
+    <a href="#roadmap">4. Lộ trình 12 tuần</a>
+    <a href="#risks">5. Rủi ro</a>
+  </nav>
+</header>
+
+<!-- ================= PART 1 ================= -->
+<section id="pitch">
+  <div class="part">PHẦN 1 · SẢN PHẨM</div>
+  <h2>1.1 Định vị</h2>
+  <div class="pitch">
+    <p class="big">radard là một daemon chạy nền, <i>liên tục thu thập và lưu lại</i> thông tin trong lĩnh vực AI, Agent, LLM, ML. Nó gộp thông tin thành sự kiện, cho biết điều gì đáng chú ý với bạn và vì sao, rồi cho phép bạn đặt câu hỏi hoặc giao câu hỏi dài hạn trên toàn bộ kho dữ liệu đã tích luỹ.</p>
+    <dl class="kv">
+      <dt>Tên</dt><dd><b>radar + d</b> (daemon), giống <span class="mono">sshd</span>, <span class="mono">launchd</span>. Tên nói đúng bản chất: một tiến trình chạy liên tục, không phải một app chỉ chạy khi bạn mở. Trên npm tên này còn trống. Trên GitHub có <span class="mono">radrbiz/radard</span>, một daemon P2P không cùng lĩnh vực.</dd>
+      <dt>Người dùng</dt><dd>AI engineer và tech lead cần cập nhật liên tục. Người dùng đầu tiên là bạn.</dd>
+      <dt>Việc chính</dt><dd>“Luôn có người trực thay tôi: ghi lại mọi thứ, chỉ gọi tôi khi có điều quan trọng với <i>tôi</i>, và trả lời được khi tôi hỏi lại chuyện cũ.”</dd>
+      <dt>Đơn vị xử lý</dt><dd><b>Sự kiện</b>, không phải bài viết. 40 bài và thread về cùng một model mới chỉ là 1 sự kiện, kèm danh sách nguồn.</dd>
+      <dt>Khác biệt</dt><dd>
+        (1) <b>Kho dữ liệu riêng tích luỹ theo thời gian</b>, nên trả lời được câu hỏi về lịch sử và xu hướng.
+        (2) <b>Brief sống</b>: câu hỏi dài hạn có bản báo cáo tự cập nhật, và radard chỉ báo khi câu trả lời thay đổi.
+        (3) <b>Agent có harness riêng</b>, dùng được qua chat và qua MCP từ Claude Code hoặc Cursor.
+      </dd>
+    </dl>
+  </div>
+  <div class="good-note"><b>So với các dịch vụ đã khảo sát:</b> newsletter (AINews, AlphaSignal) gửi cùng một bản cho mọi người và không tra cứu lại được. RSS reader (Feedly Leo) dùng cho mọi lĩnh vực nên nông. Deep Research phải hỏi mới trả lời, và trả lời một lần là xong. radard kết hợp <b>quan sát liên tục, kho dữ liệu riêng và câu trả lời tự cập nhật</b>.</div>
+</section>
+
+<section id="layers">
+  <h2>1.2 Mô hình ba lớp</h2>
+  <div class="prose"><p>Lớp 1 chạy độc lập theo lịch, không cần câu hỏi nào. Lớp 2 xử lý ngay khi có dữ liệu mới. Lớp 3 là các cách đọc và khai thác kho. Nếu tắt lớp 3, radard vẫn tiếp tục ghi chép.</p></div>
+  <div class="layers">
+    <div class="layer l3">
+      <div class="lname"><b>Lớp 3 · Khai thác</b><span>đọc kho, không tự thu thập</span></div>
+      <ul>
+        <li><b>Feed &amp; digest:</b> sự kiện đã xếp hạng, bản tóm tắt buổi sáng qua Telegram</li>
+        <li><b>Watch &amp; alert:</b> rule cứng và watch ngữ nghĩa, mỗi alert có câu “vì sao quan trọng với bạn”</li>
+        <li><b>Brief (câu hỏi thường trực):</b> báo cáo sống, có phiên bản, chỉ báo khi nội dung thay đổi</li>
+        <li><b>Dashboard:</b> mỗi biểu đồ trả lời một câu hỏi cụ thể</li>
+        <li><b>Agent chat + MCP server</b></li>
+      </ul>
+    </div>
+    <div class="arrow">▲ đọc sự kiện, thực thể, chủ đề · ▼ đề xuất nguồn mới cho lớp 1 (bạn duyệt)</div>
+    <div class="layer l2">
+      <div class="lname"><b>Lớp 2 · Xử lý</b><span>chạy khi có dữ liệu mới</span></div>
+      <ul>
+        <li>Chuẩn hoá, lấy nội dung chính, khử trùng lặp (URL, hash, SimHash)</li>
+        <li>Embedding và lọc rẻ theo mức liên quan với lĩnh vực</li>
+        <li>Gộp thành sự kiện: tìm ứng viên bằng vector, LLM xác nhận</li>
+        <li>Trích xuất có cấu trúc: loại sự kiện, thực thể, tóm tắt, nhận định</li>
+        <li>Chấm điểm: độ mới, tốc độ lan, độ uy tín nguồn, mức liên quan với hồ sơ của bạn</li>
+      </ul>
+    </div>
+    <div class="arrow">▲ đọc bản thô · xử lý lại được bất cứ lúc nào</div>
+    <div class="layer">
+      <div class="lname"><b>Lớp 1 · Thu thập</b><span>daemon theo lịch, độc lập</span></div>
+      <ul>
+        <li>Mỗi nguồn có lịch riêng, con trỏ riêng, giới hạn tốc độ riêng</li>
+        <li>Conditional GET (<span class="mono">ETag</span>, <span class="mono">If-Modified-Since</span>) để không tải lại thứ chưa đổi</li>
+        <li>Lưu <b>bản gốc không sửa</b> (raw snapshot) vào object storage, metadata vào Postgres</li>
+        <li>Idempotent: chạy lại một lượt không sinh bản trùng; nguồn lỗi thì thử lại sau, không ảnh hưởng nguồn khác</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="flow">
+  <h2>1.3 Một tin đi qua hệ thống</h2>
+  <div class="prose"><p>Ví dụ giả định: một lab phát hành model mới vào buổi sáng.</p></div>
+  <div class="flow">
+    <div class="fstep"><span class="t">08:02 · lớp 1</span><b>Blog của lab có bài mới</b><p>Job <span class="mono">fetch:rss</span> của nguồn này đến lịch. Server trả nội dung mới (không phải 304). Bản HTML gốc được nén và lưu, metadata ghi vào <span class="mono">documents</span>. Job <span class="mono">process:doc</span> được đưa vào hàng đợi.</p></div>
+    <div class="fstep"><span class="t">08:03 · lớp 2</span><b>Chuẩn hoá, embedding, lọc</b><p>Lấy nội dung chính, tính hash và SimHash. Không trùng bài nào. Embedding cho thấy liên quan cao với lĩnh vực nên bài được giữ lại.</p></div>
+    <div class="fstep"><span class="t">08:03 · lớp 2</span><b>Tạo sự kiện mới</b><p>Không có sự kiện gần giống trong 7 ngày qua, nên tạo sự kiện mới. LLM rẻ trích xuất: loại <i>release</i>, thực thể (lab, tên model), tóm tắt ba câu.</p></div>
+    <div class="fstep"><span class="t">08:15 → 11:00 · lớp 1 + 2</span><b>Thread HN, repo GitHub, paper arXiv về cùng model</b><p>Mỗi tài liệu tìm được sự kiện ứng viên bằng vector. LLM xác nhận “cùng một sự kiện”, nên tài liệu được gắn vào sự kiện cũ, không tạo mục mới. Tốc độ lan (số nguồn trong 24 giờ) tăng lên.</p></div>
+    <div class="fstep"><span class="t">09:40 · lớp 3</span><b>Alert</b><p>Điểm sự kiện vượt ngưỡng và khớp watch “model nhỏ cho tác vụ extract”. Telegram gửi 1 tin: tóm tắt, 4 nguồn, và câu “vì sao quan trọng: bạn đang dùng Haiku cho bước enrich; model này công bố giá thấp hơn”. Tin kèm nút 👍/👎.</p></div>
+    <div class="fstep"><span class="t">09:41 · lớp 3</span><b>Brief được cập nhật</b><p>Brief “Có model nào thay được model enrich hiện tại không?” bị đánh dấu cần cập nhật. Agent viết lại đoạn liên quan và so sánh với phiên bản trước. Nhận định mới được thêm kèm trích dẫn, nên brief gửi thông báo <i>thay đổi</i>, không gửi lại toàn bộ.</p></div>
+    <div class="fstep"><span class="t">Tuần sau · lớp 3</span><b>Bạn hỏi lại</b><p>“Tuần trước có những model nào ra mắt, cái nào hợp stack của tôi?” Agent gọi <span class="mono">search_events</span> và <span class="mono">compare</span> trên kho, trả lời có trích dẫn.</p></div>
+  </div>
+</section>
+
+<section id="features">
+  <h2>1.4 Tính năng theo mức ưu tiên</h2>
+  <div class="tbl">
+  <table class="comp">
+    <thead><tr><th>Tính năng</th><th>Làm gì</th><th>Ưu tiên</th></tr></thead>
+    <tbody>
+      <tr><td><b>Quản lý nguồn</b></td><td>Thêm, sửa, tắt nguồn; xem sức khoẻ từng nguồn (lần chạy gần nhất, lỗi, số tài liệu mới)</td><td><span class="badge b-new">MVP</span></td></tr>
+      <tr><td><b>Kho &amp; tìm kiếm</b></td><td>Tìm kết hợp từ khoá và ngữ nghĩa, lọc theo thời gian, nguồn, loại sự kiện</td><td><span class="badge b-new">MVP</span></td></tr>
+      <tr><td><b>Feed sự kiện</b></td><td>Danh sách xếp hạng; mỗi sự kiện ghi rõ gộp từ bao nhiêu nguồn</td><td><span class="badge b-new">MVP</span></td></tr>
+      <tr><td><b>Digest sáng</b></td><td>Telegram, tối đa 7 mục, có link sang web</td><td><span class="badge b-new">MVP</span></td></tr>
+      <tr><td><b>Hồ sơ người dùng</b></td><td>Stack, dự án, chủ đề quan tâm, những thứ không quan tâm; dùng để chấm mức liên quan</td><td><span class="badge b-new">MVP</span></td></tr>
+      <tr><td><b>Watch &amp; alert</b></td><td>Rule cứng và watch ngữ nghĩa; alert có lý do; 👍/👎 điều chỉnh điểm</td><td><span class="badge b-known">Giai đoạn 2</span></td></tr>
+      <tr><td><b>Agent chat</b></td><td>Hỏi đáp có trích dẫn, hiểu thời gian, tạo watch hoặc brief ngay trong lúc chat</td><td><span class="badge b-known">Giai đoạn 2</span></td></tr>
+      <tr><td><b>MCP server</b></td><td>Mở bộ tool của agent cho Claude Code hoặc Cursor</td><td><span class="badge b-known">Giai đoạn 2</span></td></tr>
+      <tr><td><b>Brief sống</b></td><td>Câu hỏi thường trực, báo cáo có phiên bản, nhận định gắn nguồn, báo khi thay đổi</td><td><span class="badge b-known">Giai đoạn 2–3</span></td></tr>
+      <tr><td><b>Đề xuất nguồn</b></td><td>Agent đề xuất truy vấn arXiv, repo hoặc blog mới cho lớp 1; bạn duyệt</td><td><span class="badge b-opt">Giai đoạn 3</span></td></tr>
+      <tr><td><b>Dashboard xu hướng</b></td><td>Chủ đề nóng lên, thực thể hay đi cùng nhau, ai phát hành nhiều</td><td><span class="badge b-opt">Giai đoạn 3</span></td></tr>
+      <tr><td><b>Topic modeling</b></td><td>BERTopic gom chủ đề động theo thời gian</td><td><span class="badge b-opt">Tuỳ chọn</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="agent">
+  <h2>1.5 Agent harness</h2>
+  <div class="prose"><p>Agent chỉ <b>đọc</b> kho qua tool. Mọi con số (xu hướng, số lượng) đến từ SQL, không để LLM tự ước lượng. Hành động có tác dụng phụ (tạo watch, thêm nguồn) cần bạn xác nhận. Cùng một bộ tool dùng cho chat web, cho brief và cho MCP server.</p></div>
+  <div class="grid2">
+    <div class="blk"><h4>Tool đọc</h4><ul>
+      <li><span class="mono">search(query, since?, until?, type?, source?)</span>: tìm kết hợp từ khoá và ngữ nghĩa</li>
+      <li><span class="mono">get_event(id)</span>: sự kiện, các nguồn, thực thể</li>
+      <li><span class="mono">timeline(entity | topic, window)</span></li>
+      <li><span class="mono">trend(topic, window)</span>: số liệu thật từ SQL</li>
+      <li><span class="mono">compare(a, b)</span>: so sánh hai thực thể</li>
+      <li><span class="mono">read_source(document_id)</span>: đọc bản gốc đã lưu, không gọi ra mạng</li>
+    </ul></div>
+    <div class="blk"><h4>Tool ghi (cần xác nhận)</h4><ul>
+      <li><span class="mono">create_watch(description, rule?)</span></li>
+      <li><span class="mono">create_brief(question, cadence)</span></li>
+      <li><span class="mono">propose_source(kind, config, reason)</span>: tạo đề xuất, bạn duyệt thì daemon mới cào</li>
+      <li><span class="mono">remember(preference)</span>: cập nhật hồ sơ người dùng</li>
+    </ul></div>
+    <div class="blk"><h4>Quy tắc</h4><ul>
+      <li>Quy đổi “tuần này”, “tháng trước” thành khoảng ngày cụ thể trước khi gọi tool</li>
+      <li>Câu nào không có nguồn thì phải ghi rõ là suy luận</li>
+      <li>Nội dung tài liệu là <i>dữ liệu</i>, không phải chỉ thị (chống prompt injection từ web; nối được với chủ đề mcp-guard)</li>
+    </ul></div>
+    <div class="blk"><h4>Brief sống hoạt động thế nào</h4><ul>
+      <li>Sự kiện mới đủ gần câu hỏi (vector và thực thể) đánh dấu brief cần cập nhật</li>
+      <li>Job theo lịch chỉ chạy lại các brief đang cần cập nhật</li>
+      <li>Kết quả là danh sách <b>nhận định</b>, mỗi nhận định trỏ đến sự kiện nguồn</li>
+      <li>So sánh theo từng nhận định với phiên bản trước: thêm, bỏ, đổi. Chỉ alert khi thay đổi đủ quan trọng</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="principles">
+  <h2>1.6 Sáu nguyên tắc thiết kế</h2>
+  <div class="principles">
+    <div class="pr"><b>1. Bản thô không bao giờ bị sửa</b><p>Lớp 1 chỉ ghi thêm. Muốn cải tiến prompt gộp sự kiện hay đổi model thì chạy lại lớp 2 trên dữ liệu cũ, không cào lại. Đây cũng là cách so sánh pipeline cũ với pipeline mới trên cùng dữ liệu.</p></div>
+    <div class="pr"><b>2. Mọi job đều idempotent</b><p>Khoá tự nhiên là (nguồn, id bên ngoài) và hash nội dung. Job chạy lại, trùng hay bị kill giữa chừng đều không sinh dữ liệu sai.</p></div>
+    <div class="pr"><b>3. Rẻ trước, đắt sau</b><p>Rule, rồi hash, rồi embedding, rồi model rẻ, rồi mới đến model mạnh. Mỗi tầng loại bớt dữ liệu trước khi chuyển lên tầng đắt hơn.</p></div>
+    <div class="pr"><b>4. Con số đến từ SQL, lời văn đến từ LLM</b><p>Xu hướng và số lượng do truy vấn tính. LLM chỉ diễn giải. Nhận định nào cũng có trích dẫn.</p></div>
+    <div class="pr"><b>5. Báo khi có thay đổi, không báo khi có tin</b><p>Alert có ngưỡng, có lý do, có 👍/👎, có giới hạn số tin mỗi ngày. Báo sai vài lần là người dùng tắt thông báo.</p></div>
+    <div class="pr"><b>6. Ngân sách là giới hạn cứng</b><p>Có trần chi phí LLM mỗi ngày. Chạm trần thì dừng các bước không khẩn và dồn sang batch.</p></div>
+  </div>
+</section>
+
+<section id="scope">
+  <h2>1.7 Phạm vi và đo lường</h2>
+  <div class="grid2">
+    <div class="blk"><h4>Nguồn ban đầu (8 nguồn)</h4>
+      <div class="tbl"><table>
+        <thead><tr><th>Nguồn</th><th>Cách lấy</th><th>Lịch</th></tr></thead>
+        <tbody>
+          <tr><td>Hacker News</td><td>Algolia API</td><td>15 phút</td></tr>
+          <tr><td>arXiv (cs.CL, cs.AI, cs.LG, cs.MA)</td><td>arXiv API</td><td>1 lần/ngày, sau giờ công bố</td></tr>
+          <tr><td>HF Daily Papers</td><td>API của Hugging Face</td><td>2 giờ</td></tr>
+          <tr><td>GitHub releases (repo theo dõi)</td><td>REST API + ETag</td><td>1 giờ</td></tr>
+          <tr><td>GitHub repo mới nổi</td><td>Search API, sắp theo sao</td><td>6 giờ</td></tr>
+          <tr><td>Blog, changelog của lab và công ty</td><td>RSS/Atom, không có thì sitemap</td><td>2–4 giờ</td></tr>
+          <tr><td>Reddit (r/LocalLLaMA, r/MachineLearning)</td><td>RSS, tần suất thấp</td><td>1 giờ</td></tr>
+          <tr><td>AINews / AlphaSignal</td><td>RSS hoặc email, <i>chỉ để đo</i> time-to-signal</td><td>1 lần/ngày</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="blk"><h4>Chỉ số sản phẩm</h4><ul>
+      <li><b>Độ tươi:</b> thời gian từ lúc nguồn đăng đến lúc radard lưu (p50, p95)</li>
+      <li><b>Độ phủ:</b> số nguồn khoẻ và tỉ lệ job lỗi theo nguồn</li>
+      <li><b>Nén thông tin:</b> N tài liệu, M sự kiện, K alert mỗi ngày</li>
+      <li><b>Gộp sự kiện:</b> precision/recall trên khoảng 200 cặp bạn tự gán nhãn</li>
+      <li><b>Precision của alert:</b> tỉ lệ 👍, mục tiêu ≥ 70%</li>
+      <li><b>Time-to-signal:</b> radard báo sớm hay muộn hơn AINews bao nhiêu giờ</li>
+      <li><b>Chi phí:</b> USD mỗi ngày, USD mỗi sự kiện, tỉ lệ dữ liệu bị lọc trước khi đến LLM</li>
+    </ul>
+    <div class="note" style="margin-top:8px"><b>Cắt khỏi v1:</b> X/Twitter (API đắt), Discord, YouTube transcript, nhiều người dùng và billing, app mobile, dự báo xu hướng bằng mô hình thống kê. Schema vẫn có <span class="mono">user_id</span> để mở rộng sau này.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PART 2 ================= -->
+<section id="stack">
+  <div class="part">PHẦN 2 · TECH STACK</div>
+  <h2>2.1 Stack theo từng tầng</h2>
+  <div class="prose">
+    <p>Nguyên tắc chọn: <b>một ngôn ngữ</b> (TypeScript trên Bun) cho gần như toàn bộ hệ thống, <b>một database</b> (Postgres) làm cả kho, hàng đợi, vector và full-text, và mỗi tầng chỉ thêm tối đa một công nghệ mới. Nhờ vậy số thành phần phải vận hành ít, và phần học nằm ở khái niệm (hàng đợi bền, hybrid search, tracing) chứ không nằm ở việc gánh hạ tầng.</p>
+    <p><span class="badge b-known">Đã biết</span> bạn đã dùng trong sản phẩm · <span class="badge b-new">Mới, nên học</span> vừa sức, học được trong 1–3 ngày · <span class="badge b-opt">Tuỳ chọn</span> làm nếu còn thời gian</p>
+  </div>
+  <div class="tbl">
+  <table class="stack">
+    <thead><tr><th>Tầng</th><th>Chọn</th><th>Vì sao</th><th>Đã cân nhắc</th></tr></thead>
+    <tbody>
+      <tr><td>Runtime</td><td class="pick"><b>Bun + TypeScript</b><span class="badge b-known">Đã biết</span></td><td>Sở trường của bạn. Có sẵn <span class="mono">Bun.sql</span> (Postgres), <span class="mono">Bun.s3</span>, <span class="mono">Bun.gzipSync</span>, <span class="mono">bun test</span>, nên cần ít thư viện ngoài. Các API built-in này là <span class="badge b-new">mới</span> với bạn.</td><td>Python cho toàn hệ thống: mạnh về NLP nhưng tách đôi codebase. Chỉ dùng Python cho sidecar topic modeling.</td></tr>
+      <tr><td>Monorepo</td><td class="pick"><b>Bun workspaces</b><span class="badge b-known">Đã biết</span></td><td><span class="mono">apps/daemon</span>, <span class="mono">apps/web</span>, <span class="mono">packages/core</span> (schema, pipeline), <span class="mono">packages/agent</span> (tool, prompt).</td><td>Turborepo: chưa cần khi mới có 2 app.</td></tr>
+      <tr><td>Database</td><td class="pick"><b>Postgres 17 + pgvector + pg_trgm</b><span class="badge b-known">Đã biết</span></td><td>Một chỗ cho quan hệ, vector, full-text, hàng đợi. Phần mới nên học: kiểu <span class="mono">halfvec</span> (vector nửa độ chính xác, giảm một nửa dung lượng), chỉnh index HNSW, <b>hybrid search</b> (<span class="mono">tsvector</span> + vector, gộp bằng RRF), materialized view.</td><td>Vector DB riêng (Qdrant, Weaviate): thêm một hệ phải vận hành, trong khi dữ liệu cỡ vài trăm nghìn vector thì pgvector thừa sức.</td></tr>
+      <tr><td>ORM</td><td class="pick"><b>Drizzle</b><span class="badge b-known">Đã biết</span></td><td>Schema và migration bằng TypeScript. Truy vấn hybrid search viết bằng SQL thuần qua <span class="mono">sql``</span>.</td><td>Prisma: nặng hơn và hỗ trợ pgvector kém hơn.</td></tr>
+      <tr><td>Lịch &amp; hàng đợi</td><td class="pick"><b>pg-boss</b><span class="badge b-new">Mới</span></td><td>Hàng đợi job chạy trên chính Postgres: cron, retry có backoff, <span class="mono">singletonKey</span> chống chạy trùng, throttle và debounce, dead-letter. Đây là trái tim của “daemon” mà không cần thêm Redis.</td><td>BullMQ (cần Redis) · Temporal (mạnh nhưng quá nặng cho đề tài) · Inngest, Trigger.dev (phụ thuộc SaaS) · cron hệ thống (không có retry, không có trạng thái) · DBOS (workflow bền trên Postgres, đáng thử ở bản sau).</td></tr>
+      <tr><td>Thu thập</td><td class="pick"><b>fetch + rss-parser + Readability/linkedom</b><span class="badge b-new">Mới</span></td><td>Conditional GET, giới hạn tốc độ theo host, đọc RSS/Atom, lấy nội dung chính từ HTML. SimHash tự viết khoảng 50 dòng, để học về LSH.</td><td>Playwright: chỉ dùng khi một nguồn bắt buộc phải render JS. v1 bỏ qua các nguồn như vậy.</td></tr>
+      <tr><td>Kho bản thô</td><td class="pick"><b>Cloudflare R2</b> qua <span class="mono">Bun.s3</span><span class="badge b-known">Đã biết</span></td><td>Bạn đã dùng R2 ở personal-site. Bản HTML gốc được nén gzip, key theo hash nội dung. Postgres chỉ giữ metadata nên database gọn.</td><td>Lưu HTML trong Postgres: đơn giản hơn nhưng database phình nhanh. Có thể làm vậy lúc đầu nếu muốn.</td></tr>
+      <tr><td>Gọi LLM</td><td class="pick"><b>Vercel AI SDK + AI Gateway</b><span class="badge b-known">Đã biết</span></td><td>Đổi model bằng một chuỗi. Dùng structured output với schema zod, <span class="mono">embedMany</span>, <span class="mono">streamText</span> cho chat. Bật telemetry để gửi trace.</td><td>LangChain, LangGraph: thêm lớp trừu tượng không cần thiết khi pipeline do code điều khiển.</td></tr>
+      <tr><td>Model</td><td class="pick"><b>Haiku 4.5</b> · <b>Sonnet 5</b> · Jev<span class="badge b-opt">Tuỳ chọn</span></td><td>Haiku 4.5 ($1/$5 mỗi MTok) cho các bước nhiều lượt: xác nhận gộp sự kiện, enrich, lý do alert. Sonnet 5 ($2/$10) cho chat, brief và digest. Jev (nếu vào được early access) cho câu hỏi đóng, với Haiku làm dự phòng.</td><td>Model lớn nhất cho mọi bước: đắt gấp nhiều lần mà các bước phân loại không cần.</td></tr>
+      <tr><td>Batch LLM</td><td class="pick"><b>Anthropic Message Batches</b><span class="badge b-opt">Tuỳ chọn</span></td><td>Bước enrich không cần xong ngay thì gửi batch, rẻ 50%. Gọi qua Anthropic SDK trực tiếp.</td><td>Gọi đồng bộ mọi thứ: đơn giản hơn, tốn gấp đôi ở bước enrich.</td></tr>
+      <tr><td>API</td><td class="pick"><b>Hono</b> trên Bun<span class="badge b-new">Mới</span></td><td>Nhẹ, chuẩn Web Fetch. Có <span class="mono">streamSSE</span>, zod validator, và RPC client <span class="mono">hc</span> để frontend gọi API có type mà không cần sinh code.</td><td>Elysia: chỉ chạy trên Bun · FastAPI: phải dùng Python · Next.js API routes: gắn backend vào frontend.</td></tr>
+      <tr><td>Realtime</td><td class="pick"><b>SSE + Postgres LISTEN/NOTIFY</b><span class="badge b-new">Mới</span></td><td>Worker xử lý xong sự kiện thì gọi <span class="mono">NOTIFY</span>; API <span class="mono">LISTEN</span> rồi đẩy SSE xuống trình duyệt. Không cần polling, không cần WebSocket.</td><td>WebSocket: hai chiều, không cần ở đây · polling: tốn và trễ.</td></tr>
+      <tr><td>Frontend</td><td class="pick"><b>Vite + React + TanStack Router/Query</b><span class="badge b-new">Mới</span> · Tailwind v4, shadcn/ui <span class="badge b-known">Đã biết</span></td><td>Dashboard một người dùng không cần SSR. TanStack Query lo cache và refetch; Router có kiểu cho cả search param (bộ lọc feed). Chat dùng AI SDK UI.</td><td>Next.js: quen, nhưng phần SSR ở đây là thừa · Astro: hợp trang nội dung hơn dashboard tương tác.</td></tr>
+      <tr><td>Biểu đồ</td><td class="pick"><b>Apache ECharts</b><span class="badge b-new">Mới</span></td><td>Có sẵn line, heatmap, graph (đồ thị thực thể), xử lý tốt nhiều điểm dữ liệu.</td><td>Recharts: đơn giản nhưng không có graph · D3: quá thấp tầng.</td></tr>
+      <tr><td>Thông báo</td><td class="pick"><b>Telegram + grammY</b><span class="badge b-new">Mới</span></td><td>Framework bot TypeScript. Nút inline 👍/👎 ghi thẳng vào bảng feedback. Lệnh <span class="mono">/ask</span> để hỏi agent ngay trong Telegram.</td><td>Email: chậm, khó thu phản hồi · Zalo OA: thủ tục phức tạp hơn cho một dự án cá nhân.</td></tr>
+      <tr><td>MCP</td><td class="pick"><b>@modelcontextprotocol/sdk</b><span class="badge b-known">Đã biết</span></td><td>Transport Streamable HTTP gắn vào Hono; dùng lại đúng bộ tool của agent.</td><td>—</td></tr>
+      <tr><td>Quan sát</td><td class="pick"><b>Langfuse</b><span class="badge b-new">Mới</span> + bảng <span class="mono">fetch_runs</span></td><td>Trace từng lời gọi LLM: prompt, token, chi phí, độ trễ, gom theo bước pipeline. Đây là dữ liệu cho mục chi phí trong báo cáo đề tài. Sức khoẻ nguồn lấy từ SQL.</td><td>Chỉ dùng log: không biết tiền đang tốn ở bước nào.</td></tr>
+      <tr><td>Topic modeling</td><td class="pick"><b>Python sidecar: uv + BERTopic</b><span class="badge b-opt">Tuỳ chọn</span></td><td>Job hằng đêm đọc embedding đã có từ Postgres, ghi chủ đề ngược lại. Tách riêng nên không ảnh hưởng daemon.</td><td>Gom cụm bằng TypeScript: thư viện TS cho mảng này yếu.</td></tr>
+      <tr><td>Deploy</td><td class="pick"><b>Railway</b> (daemon, api, Postgres pgvector)<span class="badge b-known">Đã biết</span></td><td>Daemon phải chạy 24/7. MacBook ngủ thì mất dữ liệu, nên chỉ dùng máy để dev. Tách service bằng biến <span class="mono">SERVICE_ROLE</span> như ở agent-platform.</td><td>VPS + Docker Compose: rẻ hơn khi chạy lâu, nhưng phải tự lo vận hành · Cloudflare Workers: không hợp tiến trình chạy dài.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="runtime">
+  <h2>2.2 Kiến trúc hệ thống</h2>
+  <div class="prose"><p>Chỉ có <b>một codebase và một image</b>, với bốn vai trò chọn bằng biến <span class="mono">SERVICE_ROLE</span>. Các vai trò không gọi trực tiếp lẫn nhau mà giao tiếp qua Postgres: hàng đợi pg-boss để giao việc, LISTEN/NOTIFY để báo thay đổi. Khi dev, <span class="mono">bun run dev</span> chạy cả bốn vai trò trong một process.</p></div>
+  <figure class="dg">
+    <svg viewBox="0 0 1130 500" role="img" aria-label="Kiến trúc hệ thống radard: nguồn, worker, scheduler, Postgres, R2, api, bot và client"><defs><marker id="sa-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="sa-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="sa-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah bad" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="ex" x="330" y="16" width="470" height="56" rx="8"/><text class="tb" x="565.0" y="41.0" text-anchor="middle">Vercel AI Gateway</text><text class="ts" x="565.0" y="58.0" text-anchor="middle">Haiku 4.5 · Sonnet 5 · embedding</text><rect class="ex" x="860" y="16" width="250" height="56" rx="8"/><text class="tb" x="985.0" y="41.0" text-anchor="middle">Langfuse</text><text class="ts" x="985.0" y="58.0" text-anchor="middle">trace + chi phí từ worker, api</text><text class="tb" x="85" y="118" text-anchor="middle">Nguồn</text><rect class="ex" x="20" y="130" width="130" height="36" rx="8"/><text class="t" x="85.0" y="153.0" text-anchor="middle">Hacker News</text><rect class="ex" x="20" y="176" width="130" height="36" rx="8"/><text class="t" x="85.0" y="199.0" text-anchor="middle">arXiv</text><rect class="ex" x="20" y="222" width="130" height="36" rx="8"/><text class="t" x="85.0" y="245.0" text-anchor="middle">HF Papers</text><rect class="ex" x="20" y="268" width="130" height="36" rx="8"/><text class="t" x="85.0" y="291.0" text-anchor="middle">GitHub</text><rect class="ex" x="20" y="314" width="130" height="36" rx="8"/><text class="t" x="85.0" y="337.0" text-anchor="middle">RSS blog lab</text><rect class="ex" x="20" y="360" width="130" height="36" rx="8"/><text class="t" x="85.0" y="383.0" text-anchor="middle">Reddit RSS</text><path class="ln " d="M162,148 L162,378"/><path class="ln acc" d="M162,263 L228,263" marker-end="url(#sa-c)"/><text class="lb acc" x="195" y="254" text-anchor="middle">GET</text><text class="lb" x="195" y="282" text-anchor="middle">ETag</text><rect class="bx" x="20" y="430" width="130" height="56" rx="8"/><text class="tb" x="85.0" y="455.0" text-anchor="middle">scheduler</text><text class="ts" x="85.0" y="472.0" text-anchor="middle">cron theo nguồn</text><rect class="bx" x="230" y="130" width="180" height="210" rx="8"/><text class="tb" x="320" y="154" text-anchor="middle">worker</text><text class="tm" x="320" y="172" text-anchor="middle">SERVICE_ROLE=worker</text><text class="tm" x="250" y="200" text-anchor="start">fetch:{nguồn}</text><text class="tm" x="250" y="220" text-anchor="start">process:doc</text><text class="tm" x="250" y="240" text-anchor="start">cluster:doc</text><text class="tm" x="250" y="260" text-anchor="start">enrich:event</text><text class="tm" x="250" y="280" text-anchor="start">score:event</text><text class="tm" x="250" y="300" text-anchor="start">brief:refresh</text><text class="tm" x="250" y="320" text-anchor="start">alert:send</text><rect class="bx" x="230" y="380" width="180" height="56" rx="8"/><text class="tb" x="320.0" y="405.0" text-anchor="middle">Cloudflare R2</text><text class="ts" x="320.0" y="422.0" text-anchor="middle">bản thô · gzip</text><path class="ln " d="M320,340 L320,378" marker-end="url(#sa-a)"/><text class="lb" x="328" y="363" text-anchor="start">ghi bản gốc</text><path class="hub" d="M490,140 V430 A90,14 0 0 0 670,430 V140"/><ellipse class="hub" cx="580" cy="140" rx="90" ry="14"/><text class="tb" x="580" y="180" text-anchor="middle">Postgres 17</text><rect class="ch" x="505" y="196" width="150" height="40" rx="6"/><text class="t" x="580" y="221" text-anchor="middle">bảng lớp 1 · 2 · 3</text><rect class="ch" x="505" y="248" width="150" height="40" rx="6"/><text class="t" x="580" y="273" text-anchor="middle">pg-boss (hàng đợi)</text><rect class="ch" x="505" y="300" width="150" height="40" rx="6"/><text class="t" x="580" y="325" text-anchor="middle">pgvector · tsvector</text><rect class="ch" x="505" y="352" width="150" height="40" rx="6"/><text class="t" x="580" y="377" text-anchor="middle">LISTEN / NOTIFY</text><path class="ln " d="M150,470 L580,470 L580,446" marker-end="url(#sa-a)"/><text class="lb" x="365" y="462" text-anchor="middle">đưa job vào hàng đợi theo cron</text><path class="ln acc" d="M410,200 L488,200" marker-end="url(#sa-c)"/><text class="lb acc" x="449" y="191" text-anchor="middle">ghi kết quả</text><path class="ln " d="M488,240 L412,240" marker-end="url(#sa-a)"/><text class="lb" x="449" y="231" text-anchor="middle">nhận job</text><path class="ln " d="M380,130 L380,74" marker-end="url(#sa-a)"/><text class="lb" x="388" y="104" text-anchor="start">embed · judge · enrich</text><rect class="bx" x="750" y="130" width="170" height="210" rx="8"/><text class="tb" x="835" y="154" text-anchor="middle">api</text><text class="tm" x="835" y="172" text-anchor="middle">Hono</text><text class="tm" x="770" y="200" text-anchor="start">REST / JSON</text><text class="tm" x="770" y="220" text-anchor="start">SSE realtime</text><text class="tm" x="770" y="240" text-anchor="start">chat agent</text><text class="tm" x="770" y="260" text-anchor="start">MCP endpoint</text><text class="tm" x="770" y="280" text-anchor="start">file tĩnh SPA</text><rect class="bx" x="750" y="380" width="170" height="56" rx="8"/><text class="tb" x="835.0" y="405.0" text-anchor="middle">bot</text><text class="tm" x="835.0" y="422.0" text-anchor="middle">grammY</text><path class="ln " d="M790,130 L790,74" marker-end="url(#sa-a)"/><text class="lb" x="798" y="104" text-anchor="start">chat · brief</text><path class="ln " d="M748,200 L672,200" marker-end="url(#sa-a)"/><text class="lb" x="710" y="191" text-anchor="middle">SQL · vector</text><path class="ln acc" d="M672,240 L748,240" marker-end="url(#sa-c)"/><text class="lb acc" x="710" y="231" text-anchor="middle">NOTIFY</text><path class="ln " d="M748,408 L672,408" marker-end="url(#sa-a)" marker-start="url(#sa-a)"/><text class="lb" x="710" y="399" text-anchor="middle">alert · 👍/👎</text><rect class="ex" x="990" y="150" width="120" height="46" rx="8"/><text class="t" x="1050.0" y="178.0" text-anchor="middle">Web (SPA)</text><rect class="ex" x="990" y="230" width="120" height="46" rx="8"/><text class="t" x="1050" y="249" text-anchor="middle">Claude Code,</text><text class="t" x="1050" y="266" text-anchor="middle">Cursor</text><rect class="ex" x="990" y="385" width="120" height="46" rx="8"/><text class="t" x="1050.0" y="413.0" text-anchor="middle">Telegram</text><path class="ln acc" d="M920,173 L988,173" marker-end="url(#sa-c)" marker-start="url(#sa-c)"/><text class="lb acc" x="954" y="164" text-anchor="middle">JSON · SSE</text><path class="ln " d="M920,253 L988,253" marker-end="url(#sa-a)" marker-start="url(#sa-a)"/><text class="lb" x="954" y="244" text-anchor="middle">MCP</text><path class="ln " d="M920,408 L988,408" marker-end="url(#sa-a)" marker-start="url(#sa-a)"/><text class="lb" x="954" y="399" text-anchor="middle">tin · nút</text></svg>
+    <figcaption><b>Hình 1.</b> Các thành phần và luồng dữ liệu. Nét xanh là đường đi của một tin: worker kéo về bằng GET có điều kiện, ghi kết quả vào Postgres, Postgres báo <span class="mono">NOTIFY</span> cho api, api đẩy SSE xuống trình duyệt. Ô nét đứt là dịch vụ bên ngoài. Postgres ở giữa vì mọi vai trò chỉ gặp nhau ở đó.</figcaption>
+  </figure>
+  <figure class="dg">
+    <svg viewBox="0 0 1260 330" role="img" aria-label="Vòng đời job trong daemon radard qua các hàng đợi pg-boss"><defs><marker id="jb-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="jb-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="jb-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah bad" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bx" x="20" y="40" width="110" height="64" rx="8"/><text class="tb" x="75.0" y="69.0" text-anchor="middle">pg-boss cron</text><text class="ts" x="75.0" y="86.0" text-anchor="middle">theo lịch nguồn</text><rect class="bx" x="200" y="40" width="150" height="64" rx="8"/><text class="tmb" x="275.0" y="69.0" text-anchor="middle">fetch:{nguồn}</text><text class="ts" x="275.0" y="86.0" text-anchor="middle">singletonKey = nguồn</text><rect class="bx" x="420" y="40" width="160" height="64" rx="8"/><text class="tmb" x="500.0" y="69.0" text-anchor="middle">process:doc</text><text class="ts" x="500.0" y="86.0" text-anchor="middle">chuẩn hoá · hash · embed</text><rect class="bx" x="650" y="40" width="150" height="64" rx="8"/><text class="tmb" x="725.0" y="69.0" text-anchor="middle">cluster:doc</text><text class="ts" x="725.0" y="86.0" text-anchor="middle">gộp vào sự kiện</text><rect class="bx" x="870" y="40" width="140" height="64" rx="8"/><text class="tmb" x="940.0" y="69.0" text-anchor="middle">enrich:event</text><text class="ts" x="940.0" y="86.0" text-anchor="middle">batch mỗi giờ</text><rect class="bx" x="1080" y="40" width="130" height="64" rx="8"/><text class="tmb" x="1145.0" y="69.0" text-anchor="middle">score:event</text><text class="ts" x="1145.0" y="86.0" text-anchor="middle">điểm · tốc độ lan</text><path class="ln acc" d="M130,72 L198,72" marker-end="url(#jb-c)"/><text class="lb acc" x="165.0" y="62" text-anchor="middle">đến giờ</text><path class="ln acc" d="M350,72 L418,72" marker-end="url(#jb-c)"/><text class="lb acc" x="385.0" y="62" text-anchor="middle">có mới</text><path class="ln acc" d="M580,72 L648,72" marker-end="url(#jb-c)"/><text class="lb acc" x="615.0" y="62" text-anchor="middle">qua lọc</text><path class="ln acc" d="M800,72 L868,72" marker-end="url(#jb-c)"/><text class="lb acc" x="835.0" y="62" text-anchor="middle">có đổi</text><path class="ln acc" d="M1010,72 L1078,72" marker-end="url(#jb-c)"/><text class="lb acc" x="1045.0" y="62" text-anchor="middle">xong</text><path class="ln bad dash" d="M275,104 L275,158" marker-end="url(#jb-b)"/><text class="lb" x="283" y="134" text-anchor="start">lỗi</text><rect class="badbox" x="200" y="160" width="150" height="56" rx="8"/><text class="t" x="275.0" y="185.0" text-anchor="middle">retry ×3 · backoff</text><text class="ts" x="275.0" y="202.0" text-anchor="middle">rồi vào dead-letter</text><path class="ln dash" d="M500,104 L500,158" marker-end="url(#jb-a)"/><text class="lb" x="508" y="134" text-anchor="start">không qua</text><rect class="ex" x="420" y="160" width="160" height="56" rx="8"/><text class="t" x="500.0" y="185.0" text-anchor="middle">dừng sớm</text><text class="ts" x="500.0" y="202.0" text-anchor="middle">trùng / lạc đề (60–80%)</text><path class="ln " d="M1165,104 L1165,158" marker-end="url(#jb-a)"/><text class="lb" x="1173" y="134" text-anchor="start">vượt ngưỡng</text><rect class="bx" x="1080" y="160" width="130" height="56" rx="8"/><text class="tmb" x="1145.0" y="185.0" text-anchor="middle">alert:check</text><text class="ts" x="1145.0" y="202.0" text-anchor="middle">khớp watch?</text><path class="ln " d="M1100,104 L1100,130 L940,130 L940,158" marker-end="url(#jb-a)"/><text class="lb" x="1020" y="124" text-anchor="middle">gần một brief</text><rect class="bx" x="870" y="160" width="140" height="56" rx="8"/><text class="tmb" x="940.0" y="185.0" text-anchor="middle">brief:mark-dirty</text><text class="ts" x="940.0" y="202.0" text-anchor="middle">đặt cờ dirty</text><path class="ln " d="M870,188 L802,188" marker-end="url(#jb-a)"/><rect class="bx" x="650" y="160" width="150" height="56" rx="8"/><text class="tmb" x="725.0" y="185.0" text-anchor="middle">brief:refresh</text><text class="ts" x="725.0" y="202.0" text-anchor="middle">debounce 30 phút</text><path class="ln " d="M1145,216 L1145,248" marker-end="url(#jb-a)"/><text class="lb" x="1153" y="236" text-anchor="start">có</text><rect class="accbox" x="1080" y="250" width="130" height="56" rx="8"/><text class="tmb" x="1145.0" y="275.0" text-anchor="middle">alert:send</text><text class="ts" x="1145.0" y="292.0" text-anchor="middle">Telegram + lý do</text><path class="ln acc" d="M725,216 L725,278 L1078,278" marker-end="url(#jb-c)"/><text class="lb acc" x="900" y="270" text-anchor="middle">brief có thay đổi đáng báo</text><text class="ts" x="20" y="300" text-anchor="start">Mọi job có khoá idempotent; chạy lại không sinh dữ liệu trùng.</text></svg>
+    <figcaption><b>Hình 2.</b> Vòng đời job trong daemon. Mỗi ô là một hàng đợi pg-boss, mỗi mũi tên là một job mới được đưa vào hàng đợi. Nhánh dưới cho thấy hai cách dừng sớm: lỗi mạng thì retry rồi vào dead-letter, còn tài liệu trùng hoặc lạc đề thì dừng trước khi tốn tiền LLM. Alert đến từ hai đường: sự kiện vượt ngưỡng và khớp watch, hoặc brief có thay đổi.</figcaption>
+  </figure>
+  <div class="grid2">
+    <div class="blk"><h4>Vì sao giao tiếp qua Postgres</h4><ul>
+      <li>Không cần message broker riêng: hàng đợi, trạng thái và dữ liệu nằm trong cùng một transaction</li>
+      <li>Restart vai trò nào cũng không mất việc, vì job còn nằm trong bảng</li>
+      <li>Muốn tăng tốc xử lý thì chỉ cần chạy thêm worker</li>
+    </ul></div>
+    <div class="blk"><h4>Giới hạn cần biết</h4><ul>
+      <li>scheduler chỉ chạy <b>một</b> instance (hoặc dùng cơ chế khoá của pg-boss)</li>
+      <li>bot dùng long polling nên cũng chỉ chạy một instance</li>
+      <li>LISTEN cần một kết nối giữ mở riêng, không đi qua connection pool</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="data">
+  <h2>2.3 Kiến trúc dữ liệu</h2>
+  <div class="prose"><p>Dữ liệu chia theo ba lớp, mỗi lớp có quy tắc sống riêng. Lớp 1 chỉ ghi thêm. Lớp 2 xoá và tạo lại được bất cứ lúc nào. Lớp 3 là dữ liệu của bạn (watch, brief, phản hồi), luôn được giữ nguyên.</p></div>
+  <figure class="dg">
+    <svg viewBox="0 0 1100 640" role="img" aria-label="Mô hình dữ liệu radard chia theo ba lớp: thu thập, dẫn xuất, người dùng"><defs><marker id="er-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="er-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="er-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah bad" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="b1" x="10" y="10" width="1080" height="195" rx="10"/><rect class="b2" x="10" y="220" width="1080" height="190" rx="10"/><rect class="b3" x="10" y="425" width="1080" height="205" rx="10"/><text class="tb" x="26" y="196" text-anchor="start">Lớp 1 · Thu thập — chỉ ghi thêm, không sửa</text><text class="tb" x="26" y="400" text-anchor="start">Lớp 2 · Dẫn xuất — xoá và tạo lại được</text><text class="tb" x="26" y="618" text-anchor="start">Lớp 3 · Người dùng — giữ nguyên khi xử lý lại</text><rect class="ex" x="30" y="50" width="100" height="56" rx="6"/><rect class="hd" x="31" y="51" width="98" height="26" rx="5"/><line class="ln" x1="30" y1="77" x2="130" y2="77"/><text class="tmb" x="42" y="69" text-anchor="start">R2</text><text class="tm" x="42" y="96" text-anchor="start">raw/{sha}.gz</text><rect class="bx" x="190" y="40" width="210" height="128" rx="6"/><rect class="hd" x="191" y="41" width="208" height="26" rx="5"/><line class="ln" x1="190" y1="67" x2="400" y2="67"/><text class="tmb" x="202" y="59" text-anchor="start">documents</text><text class="tm" x="202" y="86" text-anchor="start">id · source_id</text><text class="tm" x="202" y="104" text-anchor="start">external_id  UNIQUE</text><text class="tm" x="202" y="122" text-anchor="start">url_canonical · title</text><text class="tm" x="202" y="140" text-anchor="start">content_sha256</text><text class="tm" x="202" y="158" text-anchor="start">raw_key · fetched_at</text><rect class="bx" x="460" y="50" width="170" height="92" rx="6"/><rect class="hd" x="461" y="51" width="168" height="26" rx="5"/><line class="ln" x1="460" y1="77" x2="630" y2="77"/><text class="tmb" x="472" y="69" text-anchor="start">sources</text><text class="tm" x="472" y="96" text-anchor="start">id · kind · name</text><text class="tm" x="472" y="114" text-anchor="start">config jsonb</text><text class="tm" x="472" y="132" text-anchor="start">cadence · enabled</text><rect class="bx" x="690" y="50" width="170" height="92" rx="6"/><rect class="hd" x="691" y="51" width="168" height="26" rx="5"/><line class="ln" x1="690" y1="77" x2="860" y2="77"/><text class="tmb" x="702" y="69" text-anchor="start">source_state</text><text class="tm" x="702" y="96" text-anchor="start">source_id</text><text class="tm" x="702" y="114" text-anchor="start">cursor · etag</text><text class="tm" x="702" y="132" text-anchor="start">last_modified</text><rect class="bx" x="920" y="50" width="160" height="92" rx="6"/><rect class="hd" x="921" y="51" width="158" height="26" rx="5"/><line class="ln" x1="920" y1="77" x2="1080" y2="77"/><text class="tmb" x="932" y="69" text-anchor="start">fetch_runs</text><text class="tm" x="932" y="96" text-anchor="start">source_id · status</text><text class="tm" x="932" y="114" text-anchor="start">http_status</text><text class="tm" x="932" y="132" text-anchor="start">n_new · error</text><path class="ln dash" d="M188,95 L132,95" marker-end="url(#er-a)"/><text class="lb" x="160" y="87" text-anchor="middle">raw_key</text><path class="ln " d="M400,95 L458,95" marker-end="url(#er-a)"/><text class="lb" x="429" y="87" text-anchor="middle">n–1</text><path class="ln " d="M690,95 L632,95" marker-end="url(#er-a)"/><text class="lb" x="661" y="87" text-anchor="middle">1–1</text><path class="ln " d="M1000,150 L1000,172 L545,172 L545,152" marker-end="url(#er-a)"/><text class="lb" x="772" y="166" text-anchor="middle">n–1 · source_id</text><rect class="bx" x="190" y="250" width="210" height="110" rx="6"/><rect class="hd" x="191" y="251" width="208" height="26" rx="5"/><line class="ln" x1="190" y1="277" x2="400" y2="277"/><text class="tmb" x="202" y="269" text-anchor="start">doc_text</text><text class="tm" x="202" y="296" text-anchor="start">document_id</text><text class="tm" x="202" y="314" text-anchor="start">text · simhash</text><text class="tm" x="202" y="332" text-anchor="start">tsv · embedding</text><text class="tm" x="202" y="350" text-anchor="start">pipeline_version</text><rect class="bx" x="460" y="250" width="170" height="92" rx="6"/><rect class="hd" x="461" y="251" width="168" height="26" rx="5"/><line class="ln" x1="460" y1="277" x2="630" y2="277"/><text class="tmb" x="472" y="269" text-anchor="start">event_documents</text><text class="tm" x="472" y="296" text-anchor="start">event_id</text><text class="tm" x="472" y="314" text-anchor="start">document_id</text><text class="tm" x="472" y="332" text-anchor="start">link_confidence</text><rect class="bx" x="690" y="250" width="170" height="110" rx="6"/><rect class="hd" x="691" y="251" width="168" height="26" rx="5"/><line class="ln" x1="690" y1="277" x2="860" y2="277"/><text class="tmb" x="702" y="269" text-anchor="start">events</text><text class="tm" x="702" y="296" text-anchor="start">id · type · title</text><text class="tm" x="702" y="314" text-anchor="start">summary · score</text><text class="tm" x="702" y="332" text-anchor="start">n_sources · velocity</text><text class="tm" x="702" y="350" text-anchor="start">centroid halfvec</text><rect class="bx" x="920" y="250" width="160" height="74" rx="6"/><rect class="hd" x="921" y="251" width="158" height="26" rx="5"/><line class="ln" x1="920" y1="277" x2="1080" y2="277"/><text class="tmb" x="932" y="269" text-anchor="start">entities</text><text class="tm" x="932" y="296" text-anchor="start">id · kind · name</text><text class="tm" x="932" y="314" text-anchor="start">aliases[ ]</text><path class="ln acc" d="M295,170 L295,248" marker-end="url(#er-c)"/><text class="lb acc" x="303" y="225" text-anchor="start">1–1 · xử lý lại</text><path class="ln " d="M400,300 L458,300" marker-end="url(#er-a)"/><text class="lb" x="429" y="292" text-anchor="middle">1–1</text><path class="ln " d="M632,300 L688,300" marker-end="url(#er-a)"/><text class="lb" x="660" y="292" text-anchor="middle">n–1</text><path class="ln " d="M862,300 L918,300" marker-end="url(#er-a)" marker-start="url(#er-a)"/><text class="lb" x="890" y="292" text-anchor="middle">n–n</text><rect class="bx" x="30" y="470" width="150" height="92" rx="6"/><rect class="hd" x="31" y="471" width="148" height="26" rx="5"/><line class="ln" x1="30" y1="497" x2="180" y2="497"/><text class="tmb" x="42" y="489" text-anchor="start">watches</text><text class="tm" x="42" y="516" text-anchor="start">id · description</text><text class="tm" x="42" y="534" text-anchor="start">rule jsonb</text><text class="tm" x="42" y="552" text-anchor="start">embedding</text><rect class="bx" x="230" y="470" width="160" height="92" rx="6"/><rect class="hd" x="231" y="471" width="158" height="26" rx="5"/><line class="ln" x1="230" y1="497" x2="390" y2="497"/><text class="tmb" x="242" y="489" text-anchor="start">alerts</text><text class="tm" x="242" y="516" text-anchor="start">event_id · watch_id</text><text class="tm" x="242" y="534" text-anchor="start">reason</text><text class="tm" x="242" y="552" text-anchor="start">sent_at · channel</text><rect class="bx" x="440" y="470" width="150" height="74" rx="6"/><rect class="hd" x="441" y="471" width="148" height="26" rx="5"/><line class="ln" x1="440" y1="497" x2="590" y2="497"/><text class="tmb" x="452" y="489" text-anchor="start">feedback</text><text class="tm" x="452" y="516" text-anchor="start">alert_id | event_id</text><text class="tm" x="452" y="534" text-anchor="start">value 👍/👎</text><rect class="bx" x="640" y="470" width="150" height="92" rx="6"/><rect class="hd" x="641" y="471" width="148" height="26" rx="5"/><line class="ln" x1="640" y1="497" x2="790" y2="497"/><text class="tmb" x="652" y="489" text-anchor="start">briefs</text><text class="tm" x="652" y="516" text-anchor="start">id · question</text><text class="tm" x="652" y="534" text-anchor="start">cadence · dirty</text><text class="tm" x="652" y="552" text-anchor="start">current_version</text><rect class="bx" x="840" y="470" width="240" height="110" rx="6"/><rect class="hd" x="841" y="471" width="238" height="26" rx="5"/><line class="ln" x1="840" y1="497" x2="1080" y2="497"/><text class="tmb" x="852" y="489" text-anchor="start">brief_claims</text><text class="tm" x="852" y="516" text-anchor="start">brief_id · version</text><text class="tm" x="852" y="534" text-anchor="start">claim</text><text class="tm" x="852" y="552" text-anchor="start">event_ids[ ]</text><text class="tm" x="852" y="570" text-anchor="start">status: added|kept|removed</text><path class="ln " d="M228,515 L182,515" marker-end="url(#er-a)"/><text class="lb" x="205" y="507" text-anchor="middle">n–1</text><path class="ln " d="M440,515 L392,515" marker-end="url(#er-a)"/><text class="lb" x="416" y="507" text-anchor="middle">n–1</text><path class="ln " d="M790,515 L838,515" marker-end="url(#er-a)"/><text class="lb" x="814" y="507" text-anchor="middle">1–n</text><path class="ln " d="M310,468 L310,440 L740,440 L740,362" marker-end="url(#er-a)"/><text class="lb" x="525" y="434" text-anchor="middle">event_id</text><path class="ln " d="M960,468 L960,448 L810,448 L810,362" marker-end="url(#er-a)"/><text class="lb" x="885" y="442" text-anchor="middle">event_ids[ ]</text></svg>
+    <figcaption><b>Hình 3.</b> Các bảng chính theo lớp. Đường xanh <span class="mono">documents → doc_text</span> là ranh giới xử lý lại: mọi thứ bên dưới nó được tạo lại từ bản thô. Lớp 3 chỉ trỏ vào <span class="mono">events</span>, nên khi xử lý lại cần giữ ổn định id của sự kiện (hoặc ánh xạ id cũ sang id mới). Còn thiếu trong hình: <span class="mono">profile</span>, <span class="mono">brief_versions</span> (nội dung và diff mỗi phiên bản), <span class="mono">source_proposals</span>, <span class="mono">event_entities</span> (bảng nối n–n).</figcaption>
+  </figure>
+  <figure class="dg">
+    <svg viewBox="0 0 1210 340" role="img" aria-label="Tầng quyết định khi đưa một tài liệu mới vào sự kiện, rẻ trước đắt sau"><defs><marker id="cl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="cl-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="cl-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah bad" d="M0,0 L10,5 L0,10 z"/></marker></defs><text class="ts" x="20" y="22" text-anchor="start">chi phí:</text><text class="ts" x="240" y="22" text-anchor="middle">≈ 0</text><text class="ts" x="420" y="22" text-anchor="middle">≈ 0</text><text class="ts" x="600" y="22" text-anchor="middle">embedding</text><text class="ts" x="780" y="22" text-anchor="middle">truy vấn vector</text><text class="ts" x="990" y="22" text-anchor="middle">so sánh số</text><rect class="bx" x="20" y="60" width="120" height="50" rx="8"/><text class="tb" x="80.0" y="90.0" text-anchor="middle">tài liệu mới</text><polygon class="bx" points="185,85 240,45 295,85 240,125"/><text class="t" x="240" y="82" text-anchor="middle">URL, hash</text><text class="t" x="240" y="98" text-anchor="middle">trùng?</text><polygon class="bx" points="365,85 420,45 475,85 420,125"/><text class="t" x="420" y="82" text-anchor="middle">SimHash</text><text class="t" x="420" y="98" text-anchor="middle">≤ 3 bit?</text><polygon class="bx" points="545,85 600,45 655,85 600,125"/><text class="t" x="600" y="82" text-anchor="middle">liên quan</text><text class="t" x="600" y="98" text-anchor="middle">lĩnh vực?</text><rect class="bx" x="700" y="60" width="160" height="50" rx="8"/><text class="t" x="780.0" y="82.0" text-anchor="middle">5 sự kiện gần nhất</text><text class="ts" x="780.0" y="99.0" text-anchor="middle">14 ngày · HNSW</text><polygon class="bx" points="935,85 990,45 1045,85 990,125"/><text class="t" x="990" y="82" text-anchor="middle">độ tương</text><text class="t" x="990" y="98" text-anchor="middle">đồng?</text><path class="ln acc" d="M140,85 L183,85" marker-end="url(#cl-c)"/><path class="ln acc" d="M295,85 L363,85" marker-end="url(#cl-c)"/><text class="lb acc" x="329" y="77" text-anchor="middle">không</text><path class="ln acc" d="M475,85 L543,85" marker-end="url(#cl-c)"/><text class="lb acc" x="509" y="77" text-anchor="middle">không</text><path class="ln acc" d="M655,85 L698,85" marker-end="url(#cl-c)"/><text class="lb acc" x="676" y="77" text-anchor="middle">có</text><path class="ln acc" d="M860,85 L933,85" marker-end="url(#cl-c)"/><path class="ln " d="M240,125 L240,188" marker-end="url(#cl-a)"/><text class="lb" x="248" y="160" text-anchor="start">có</text><rect class="ex" x="180" y="190" width="120" height="50" rx="8"/><text class="t" x="240.0" y="212.0" text-anchor="middle">bỏ qua</text><text class="ts" x="240.0" y="229.0" text-anchor="middle">ghi thêm lượt thấy</text><path class="ln " d="M420,125 L420,188" marker-end="url(#cl-a)"/><text class="lb" x="428" y="160" text-anchor="start">có</text><rect class="bx" x="350" y="190" width="140" height="50" rx="8"/><text class="t" x="420.0" y="212.0" text-anchor="middle">gắn vào sự kiện</text><text class="ts" x="420.0" y="229.0" text-anchor="middle">của bản gần trùng</text><path class="ln " d="M600,125 L600,188" marker-end="url(#cl-a)"/><text class="lb" x="608" y="160" text-anchor="start">không</text><rect class="ex" x="540" y="190" width="120" height="50" rx="8"/><text class="t" x="600.0" y="212.0" text-anchor="middle">lưu, dừng</text><text class="ts" x="600.0" y="229.0" text-anchor="middle">không gọi LLM</text><path class="ln " d="M1045,85 L1088,85" marker-end="url(#cl-a)"/><text class="lb" x="1066" y="77" text-anchor="middle">≥ 0,90</text><rect class="bx" x="1090" y="60" width="110" height="50" rx="8"/><text class="t" x="1145.0" y="82.0" text-anchor="middle">gắn vào</text><text class="ts" x="1145.0" y="99.0" text-anchor="middle">sự kiện đó</text><path class="ln acc" d="M990,125 L990,178" marker-end="url(#cl-c)"/><text class="lb acc" x="998" y="156" text-anchor="start">0,75–0,90</text><rect class="accbox" x="920" y="180" width="140" height="50" rx="8"/><text class="t" x="990.0" y="202.0" text-anchor="middle">LLM: cùng</text><text class="ts" x="990.0" y="219.0" text-anchor="middle">sự kiện? (Haiku/Jev)</text><path class="ln " d="M1060,205 L1145,205 L1145,112" marker-end="url(#cl-a)"/><text class="lb" x="1100" y="197" text-anchor="middle">có</text><path class="ln " d="M990,230 L990,268" marker-end="url(#cl-a)"/><text class="lb" x="998" y="254" text-anchor="start">không</text><rect class="bx" x="930" y="270" width="120" height="50" rx="8"/><text class="t" x="990.0" y="300.0" text-anchor="middle">tạo sự kiện mới</text><path class="ln " d="M962,105 L900,105 L900,295 L928,295" marker-end="url(#cl-a)"/><text class="lb" x="892" y="200" text-anchor="end">&lt; 0,75</text><text class="ts" x="20" y="300" text-anchor="start">Ngưỡng 0,75 / 0,90 là giá trị khởi đầu,</text><text class="ts" x="20" y="318" text-anchor="start">hiệu chỉnh bằng tập 200 cặp gán nhãn.</text></svg>
+    <figcaption><b>Hình 4.</b> Tài liệu mới được đưa vào sự kiện qua các tầng từ rẻ đến đắt. Ba tầng đầu gần như miễn phí và loại phần lớn dữ liệu. LLM chỉ được gọi ở <i>vùng xám</i> (độ tương đồng 0,75–0,90), nơi vector không đủ để quyết định.</figcaption>
+  </figure>
+  <figure class="dg">
+      <svg viewBox="0 0 1000 230" role="img" aria-label="Bản thô không đổi nên có thể chạy lại lớp 2 bằng pipeline mới và so sánh với pipeline cũ"><defs><marker id="rp-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="rp-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="rp-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah bad" d="M0,0 L10,5 L0,10 z"/></marker></defs><path class="hub" d="M30,60 V170 A100,14 0 0 0 230,170 V60"/><ellipse class="hub" cx="130" cy="60" rx="100" ry="14"/><text class="tb" x="130" y="108" text-anchor="middle">documents + R2</text><text class="ts" x="130" y="128" text-anchor="middle">bản thô, không bao giờ sửa</text><rect class="bx" x="330" y="40" width="200" height="50" rx="8"/><text class="tmb" x="430.0" y="62.0" text-anchor="middle">pipeline v1</text><text class="ts" x="430.0" y="79.0" text-anchor="middle">prompt A · Haiku 4.5</text><rect class="accbox" x="330" y="140" width="200" height="50" rx="8"/><text class="tmb" x="430.0" y="162.0" text-anchor="middle">pipeline v2</text><text class="ts" x="430.0" y="179.0" text-anchor="middle">prompt B · ngưỡng mới</text><path class="ln " d="M232,95 L280,95 L280,65 L328,65" marker-end="url(#rp-a)"/><text class="lb" x="282" y="55" text-anchor="start">đọc lại</text><path class="ln acc" d="M232,135 L280,135 L280,165 L328,165" marker-end="url(#rp-c)"/><rect class="bx" x="620" y="40" width="210" height="50" rx="8"/><text class="tb" x="725.0" y="62.0" text-anchor="middle">lớp 2</text><text class="tm" x="725.0" y="79.0" text-anchor="middle">pipeline_version = 1</text><rect class="accbox" x="620" y="140" width="210" height="50" rx="8"/><text class="tb" x="725.0" y="162.0" text-anchor="middle">lớp 2</text><text class="tm" x="725.0" y="179.0" text-anchor="middle">pipeline_version = 2</text><path class="ln " d="M530,65 L618,65" marker-end="url(#rp-a)"/><text class="lb" x="574" y="56" text-anchor="middle">ghi</text><path class="ln acc" d="M530,165 L618,165" marker-end="url(#rp-c)"/><text class="lb acc" x="574" y="156" text-anchor="middle">ghi</text><rect class="bx" x="880" y="90" width="110" height="50" rx="8"/><text class="tb" x="935.0" y="112.0" text-anchor="middle">so sánh</text><text class="ts" x="935.0" y="129.0" text-anchor="middle">200 cặp nhãn</text><path class="ln " d="M830,65 L855,65 L855,105 L878,105" marker-end="url(#rp-a)"/><path class="ln acc" d="M830,165 L855,165 L855,125 L878,125" marker-end="url(#rp-c)"/><text class="ts" x="30" y="215" text-anchor="start">Không cào lại nguồn: đổi prompt, model hay ngưỡng chỉ tốn chi phí xử lý.</text></svg>
+      <figcaption><b>Hình 5.</b> Vì bản thô không đổi, mỗi lần cải tiến pipeline chỉ cần chạy lại lớp 2 với <span class="mono">pipeline_version</span> mới, rồi so sánh với phiên bản cũ trên cùng tập nhãn.</figcaption>
+    </figure>
+    <figure class="dg">
+      <svg viewBox="0 0 1100 300" role="img" aria-label="Brief chỉ gửi alert về phần nhận định thay đổi giữa hai phiên bản"><defs><marker id="bd-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="bd-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah acc" d="M0,0 L10,5 L0,10 z"/></marker><marker id="bd-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="ah bad" d="M0,0 L10,5 L0,10 z"/></marker></defs><text class="tb" x="200" y="44" text-anchor="middle">brief v3 · 3 ngày trước</text><text class="tb" x="740" y="44" text-anchor="middle">brief v4 · hôm nay</text><rect class="bx" x="20" y="64" width="360" height="38" rx="6"/><text class="t" x="34" y="88" text-anchor="start">Model A rẻ nhất cho bước extract  [#512]</text><rect class="bx" x="20" y="114" width="360" height="38" rx="6"/><text class="t" x="34" y="138" text-anchor="start">Chưa có model nhỏ đọc tốt tiếng Việt  [#377]</text><rect class="bx" x="20" y="164" width="360" height="38" rx="6"/><text class="t" x="34" y="188" text-anchor="start">Giá embedding ổn định từ tháng 7  [#290]</text><rect class="bx" x="560" y="64" width="380" height="38" rx="6"/><text class="t" x="574" y="88" text-anchor="start">Model A rẻ nhất cho bước extract  [#512]</text><rect class="badbox" x="560" y="114" width="380" height="38" rx="6"/><text class="t" x="574" y="138" text-anchor="start">Chưa có model nhỏ đọc tốt tiếng Việt  [#377]</text><line class="ln bad" x1="572" y1="133" x2="880" y2="133"/><rect class="bx" x="560" y="164" width="380" height="38" rx="6"/><text class="t" x="574" y="188" text-anchor="start">Giá embedding ổn định từ tháng 7  [#290]</text><rect class="accbox" x="560" y="214" width="380" height="38" rx="6"/><text class="t" x="574" y="238" text-anchor="start">Model C (Lab B) đọc tốt tiếng Việt, rẻ hơn A  [#812]</text><path class="ln " d="M380,83 L558,83" marker-end="url(#bd-a)"/><path class="ln bad dash" d="M380,133 L558,133" marker-end="url(#bd-b)"/><path class="ln " d="M380,183 L558,183" marker-end="url(#bd-a)"/><text class="lb" x="469" y="75" text-anchor="middle">giữ</text><text class="lb" x="469" y="125" text-anchor="middle">bỏ: bị #812 bác</text><text class="lb" x="469" y="175" text-anchor="middle">giữ</text><rect class="accbox" x="400" y="225" width="140" height="50" rx="8"/><text class="tb" x="470.0" y="247.0" text-anchor="middle">sự kiện #812</text><text class="ts" x="470.0" y="264.0" text-anchor="middle">Lab B ra Model C</text><path class="ln acc" d="M540,245 L558,233" marker-end="url(#bd-c)"/><rect class="accbox" x="970" y="110" width="125" height="96" rx="8"/><text class="tb" x="1032.5" y="139.0" text-anchor="middle">Alert</text><text class="ts" x="1032.5" y="156.0" text-anchor="middle">+1 nhận định</text><text class="ts" x="1032.5" y="172.0" text-anchor="middle">−1 nhận định</text><text class="ts" x="1032.5" y="188.0" text-anchor="middle">không gửi cả brief</text><path class="ln acc" d="M940,158 L968,158" marker-end="url(#bd-c)"/><text class="ts" x="20" y="290" text-anchor="start">Ví dụ minh hoạ. Mỗi nhận định trỏ tới sự kiện nguồn; so sánh theo nhận định chứ không theo văn bản.</text></svg>
+      <figcaption><b>Hình 6.</b> Brief lưu nhận định theo phiên bản. Sự kiện mới làm một nhận định cũ sai, nên nhận định đó bị bỏ và một nhận định mới được thêm. Alert chỉ nói về hai thay đổi này.</figcaption>
+    </figure>
+  <details class="schema">
+    <summary>Xem schema dạng văn bản</summary>
+<pre>-- Lớp 1: thu thập (chỉ ghi thêm)
+sources        (id, kind, name, config jsonb, cadence, enabled, trust_score)
+source_state   (source_id, cursor, etag, last_modified, last_ok_at, fail_count)
+fetch_runs     (id, source_id, started_at, status, http_status, n_new, error)
+documents      (id, source_id, external_id, url_canonical, title, published_at,
+                fetched_at, content_sha256, raw_key, lang,
+                UNIQUE (source_id, external_id))
+
+-- Lớp 2: dẫn xuất (xoá và tạo lại được từ documents)
+doc_text       (document_id, text, simhash bigint, tsv tsvector, embedding halfvec(1024),
+                relevance real, pipeline_version)
+events         (id, type, title, summary, first_seen_at, last_seen_at,
+                n_sources, velocity_24h, centroid halfvec(1024), score)
+event_documents(event_id, document_id, link_confidence)
+entities       (id, kind, name, aliases text[])
+event_entities (event_id, entity_id)
+
+-- Lớp 3: người dùng (giữ nguyên)
+profile        (user_id, stack jsonb, projects jsonb, interests, dislikes)
+watches        (id, user_id, description, rule jsonb, embedding halfvec(1024), active)
+briefs         (id, user_id, question, cadence, dirty, current_version)
+brief_versions (brief_id, version, created_at, body, diff jsonb)
+brief_claims   (brief_id, version, claim, event_ids bigint[], status)
+alerts         (id, user_id, event_id, watch_id, reason, sent_at, channel)
+feedback       (alert_id | event_id, user_id, value, at)
+source_proposals (id, proposed_by, kind, config, reason, status)</pre>
+  </details>
+</section>
+
+<section id="optimize">
+  <h2>2.4 Các đòn bẩy tối ưu (không hardcore)</h2>
+  <div class="tbl">
+  <table class="comp">
+    <thead><tr><th>Đòn bẩy</th><th>Làm thế nào</th><th>Tiết kiệm gì</th></tr></thead>
+    <tbody>
+      <tr><td><b>Conditional GET</b></td><td>Lưu <span class="mono">ETag</span>/<span class="mono">Last-Modified</span>; nhận 304 thì dừng</td><td>Băng thông và rate limit (304 của GitHub không trừ quota khi có token)</td></tr>
+      <tr><td><b>Khử trùng lặp nhiều tầng</b></td><td>URL chuẩn hoá, rồi sha256, rồi SimHash (khoảng cách Hamming ≤ 3), rồi mới đến vector</td><td>Bài đăng lại, bài copy không tốn embedding hay LLM</td></tr>
+      <tr><td><b>Cache embedding theo hash</b></td><td>Cùng nội dung thì không embed lại</td><td>Tiền embedding khi xử lý lại lớp 2</td></tr>
+      <tr><td><b>Cascade lọc</b></td><td>Rule, rồi độ tương đồng với mô tả lĩnh vực, rồi model rẻ, rồi model mạnh</td><td>Bỏ 60–80% tài liệu trước khi gọi LLM</td></tr>
+      <tr><td><b>Cửa sổ thời gian khi gộp</b></td><td>Chỉ so với sự kiện hoạt động trong 7–14 ngày gần nhất</td><td>Truy vấn vector nhanh và ít cặp phải hỏi LLM</td></tr>
+      <tr><td><b>halfvec + HNSW</b></td><td>Lưu vector 16-bit, index HNSW với tham số mặc định rồi đo lại</td><td>Một nửa dung lượng vector, truy vấn ở mức mili giây</td></tr>
+      <tr><td><b>Batch API</b></td><td>Enrich không khẩn thì gom thành batch mỗi giờ</td><td>50% chi phí bước enrich</td></tr>
+      <tr><td><b>Prompt caching</b></td><td>Để system prompt và định nghĩa tool cố định ở đầu, phần thay đổi ở cuối</td><td>Phần lớn token input của chat và brief lặp lại</td></tr>
+      <tr><td><b>Brief chỉ chạy khi cần cập nhật</b></td><td>Cờ <span class="mono">dirty</span> và debounce bằng pg-boss</td><td>Không chạy lại brief khi không có gì mới</td></tr>
+      <tr><td><b>Materialized view</b></td><td>Số liệu dashboard làm mới mỗi 15 phút</td><td>Không phải tính aggregate mỗi lần mở trang</td></tr>
+      <tr><td><b>LISTEN/NOTIFY</b></td><td>Đẩy thay đổi xuống giao diện</td><td>Không phải polling</td></tr>
+      <tr><td><b>Trần chi phí mỗi ngày</b></td><td>Đếm token từ Langfuse và <span class="mono">usage</span>; chạm trần thì tạm dừng các hàng đợi không khẩn</td><td>Không bị bất ngờ với hoá đơn</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="cost">
+  <h2>2.5 Ước tính chi phí LLM</h2>
+  <div class="prose"><p>Ước tính thô để biết cỡ chi phí, cần đo lại khi chạy thật. Giả định: khoảng 1.000 tài liệu mới mỗi ngày sau khi khử trùng, 30% qua được bước lọc, khoảng 120 sự kiện mới mỗi ngày, 10 brief, 20 lượt chat mỗi ngày. Giá lấy từ bảng giá hiện tại của Anthropic: Haiku 4.5 $1/$5, Sonnet 5 $2/$10 mỗi triệu token input/output.</p></div>
+  <div class="tbl">
+  <table class="comp">
+    <thead><tr><th>Bước</th><th>Model</th><th>Khối lượng mỗi ngày</th><th class="num">Chưa tối ưu</th><th class="num">Đã tối ưu</th></tr></thead>
+    <tbody>
+      <tr><td>Xác nhận gộp sự kiện</td><td>Haiku 4.5 (hoặc Jev)</td><td>150 cặp × ~800 token</td><td class="num">$0,14</td><td class="num">$0,05</td></tr>
+      <tr><td>Enrich sự kiện</td><td>Haiku 4.5</td><td>120 × (3k vào, 400 ra)</td><td class="num">$0,60</td><td class="num">$0,30 <span class="muted">batch</span></td></tr>
+      <tr><td>Lý do alert</td><td>Haiku 4.5</td><td>30 × (2k vào, 150 ra)</td><td class="num">$0,08</td><td class="num">$0,08</td></tr>
+      <tr><td>Cập nhật brief</td><td>Sonnet 5</td><td>20 × (20k vào, 1,5k ra)</td><td class="num">$1,10</td><td class="num">$0,55 <span class="muted">dirty + cache</span></td></tr>
+      <tr><td>Digest sáng</td><td>Sonnet 5</td><td>1 × (30k vào, 2k ra)</td><td class="num">$0,08</td><td class="num">$0,08</td></tr>
+      <tr><td>Chat</td><td>Sonnet 5</td><td>20 lượt × (15k vào, 800 ra)</td><td class="num">$0,76</td><td class="num">$0,45 <span class="muted">cache</span></td></tr>
+      <tr><td>Embedding</td><td>model embedding nhỏ</td><td>~1,5 triệu token</td><td class="num">&lt; $0,05</td><td class="num">&lt; $0,05</td></tr>
+      <tr class="total"><td>Tổng mỗi ngày</td><td></td><td></td><td class="num">≈ $2,8</td><td class="num">≈ $1,5</td></tr>
+      <tr class="total"><td>Tổng mỗi tháng</td><td></td><td></td><td class="num">≈ $85</td><td class="num">≈ $45</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note"><b>Nhận xét:</b> brief và chat chiếm hơn một nửa chi phí, còn pipeline nền khá rẻ. Nếu cần rẻ hơn nữa, có ba cách: giảm số brief hoặc chuyển brief sang Haiku, giới hạn chat, hoặc dùng Jev cho các câu hỏi đóng. Chưa tính hạ tầng: Railway và Postgres tuỳ gói, R2 có free tier. Cần kiểm tra lại bảng giá tại thời điểm triển khai.</div>
+</section>
+
+<section id="notchosen">
+  <h2>2.6 Cố ý không chọn</h2>
+  <div class="prose"><p>Những công nghệ này tốt, nhưng ở quy mô một người dùng và vài nghìn tài liệu mỗi ngày thì chỉ thêm việc vận hành mà không cải thiện kết quả.</p></div>
+  <div class="tbl">
+  <table class="comp">
+    <thead><tr><th>Công nghệ</th><th>Vì sao chưa cần</th><th>Khi nào mới cần</th></tr></thead>
+    <tbody>
+      <tr><td><b>Kafka, Redpanda</b></td><td>Vài nghìn message mỗi ngày; pg-boss thừa sức</td><td>Hàng triệu sự kiện mỗi ngày, nhiều hệ tiêu thụ độc lập</td></tr>
+      <tr><td><b>Temporal</b></td><td>Workflow của radard ngắn và đơn giản</td><td>Workflow kéo dài nhiều ngày, nhiều bước bù trừ</td></tr>
+      <tr><td><b>Kubernetes</b></td><td>4 vai trò, 1 image</td><td>Nhiều team, nhiều service</td></tr>
+      <tr><td><b>Elasticsearch, OpenSearch</b></td><td><span class="mono">tsvector</span> + pg_trgm đủ cho full-text tiếng Anh ở quy mô này</td><td>Hàng chục triệu tài liệu, cần tìm kiếm phức tạp</td></tr>
+      <tr><td><b>Vector DB riêng</b></td><td>pgvector xử lý tốt vài trăm nghìn vector</td><td>Hàng chục triệu vector, cần lọc phức tạp ở tốc độ cao</td></tr>
+      <tr><td><b>ClickHouse, DuckDB</b></td><td>Materialized view đủ cho dashboard</td><td>Phân tích trên lịch sử nhiều năm (DuckDB là lựa chọn nhẹ nếu muốn thử)</td></tr>
+      <tr><td><b>Redis</b></td><td>Hàng đợi, cache và pub/sub đều có trong Postgres</td><td>Rate limit phân tán ở quy mô lớn</td></tr>
+      <tr><td><b>LangChain, LangGraph</b></td><td>Pipeline do code điều khiển; agent loop của AI SDK là đủ</td><td>—</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ================= PART 3 ================= -->
+<section id="learn">
+  <div class="part">PHẦN 3 · HỌC GÌ</div>
+  <h2>3. Những gì bạn sẽ học</h2>
+  <div class="prose"><p>Xếp theo thứ tự sẽ gặp trong lộ trình. Phần đáng học nhất là <b>khái niệm</b>, vì chúng dùng lại được với công cụ khác.</p></div>
+  <div class="learn">
+    <div class="lc"><b>Hàng đợi bền và lập lịch</b><span class="meta">pg-boss · tuần 1–2</span><p class="why">Chính là phần “d” trong radard: job sống sót qua restart, retry, không chạy trùng.</p><ul><li>At-least-once và vì sao job phải idempotent</li><li>Backoff, dead-letter, singleton, debounce</li><li>Concurrency theo từng hàng đợi</li></ul></div>
+    <div class="lc"><b>Crawl có văn hoá</b><span class="meta">fetch · Readability · tuần 1–3</span><p class="why">Crawl lịch sự thì không bị chặn và không lãng phí tài nguyên.</p><ul><li>Conditional GET, 304, ETag</li><li>Rate limit theo host (token bucket)</li><li>Chuẩn hoá URL, robots.txt, điều khoản dùng nguồn</li></ul></div>
+    <div class="lc"><b>Khử trùng lặp gần đúng</b><span class="meta">SimHash tự viết · tuần 3</span><p class="why">Một thuật toán cổ điển, ngắn, rất đáng tự tay viết một lần.</p><ul><li>Shingling, SimHash, khoảng cách Hamming</li><li>Khi nào dùng hash, khi nào dùng embedding, khi nào cần LLM</li></ul></div>
+    <div class="lc"><b>Postgres cho tìm kiếm</b><span class="meta">pgvector · tsvector · tuần 3–7</span><p class="why">Một database làm được cả phần việc của Elasticsearch lẫn vector DB ở quy mô vừa.</p><ul><li><span class="mono">halfvec</span>, HNSW (<span class="mono">m</span>, <span class="mono">ef_search</span>), đọc <span class="mono">EXPLAIN ANALYZE</span></li><li>Hybrid search và Reciprocal Rank Fusion</li><li>Materialized view, LISTEN/NOTIFY</li></ul></div>
+    <div class="lc"><b>Hono và API có type đầu cuối</b><span class="meta">Hono RPC · tuần 3–4</span><p class="why">Frontend gọi API có type mà không cần OpenAPI hay sinh code.</p><ul><li>Middleware, zod validator, <span class="mono">hc</span> client</li><li><span class="mono">streamSSE</span> cho realtime</li></ul></div>
+    <div class="lc"><b>Quan sát hệ LLM</b><span class="meta">Langfuse · tuần 5</span><p class="why">Không đo được thì không tối ưu được. Đây cũng là số liệu cho báo cáo đề tài.</p><ul><li>Trace, span, chi phí theo bước</li><li>So sánh prompt và phiên bản pipeline</li></ul></div>
+    <div class="lc"><b>Bot Telegram</b><span class="meta">grammY · tuần 5–6</span><p class="why">Kênh thông báo và thu phản hồi rẻ nhất.</p><ul><li>Inline keyboard, callback query</li><li>Command, session</li></ul></div>
+    <div class="lc"><b>Frontend dữ liệu</b><span class="meta">TanStack · ECharts · tuần 8–11</span><p class="why">Cách hiện đại để làm dashboard SPA nhiều bộ lọc.</p><ul><li>Server state và client state; cache, invalidate</li><li>Search param có type làm bộ lọc</li><li>Biểu đồ thời gian, heatmap, đồ thị thực thể</li></ul></div>
+  </div>
+</section>
+
+<!-- ================= PART 4 ================= -->
+<section id="roadmap">
+  <div class="part">PHẦN 4 · LỘ TRÌNH</div>
+  <h2>4. Lộ trình 12 tuần</h2>
+  <div class="phases">
+    <div class="phase"><span class="when">TUẦN 1–4 · NỀN CHẠY ĐƯỢC</span><b>Daemon ghi chép</b><ul>
+      <li>Monorepo, schema Drizzle, pg-boss scheduler và worker</li>
+      <li>3 nguồn đầu: HN, arXiv, GitHub releases; lưu bản thô vào R2</li>
+      <li>Chuẩn hoá, SimHash, embedding, lọc</li>
+      <li>Hono API và feed tài liệu đơn giản</li>
+      <li>Deploy Railway sớm để daemon bắt đầu tích luỹ dữ liệu</li>
+    </ul><p class="legend">Học: pg-boss, conditional GET, SimHash, halfvec, Hono</p></div>
+    <div class="phase"><span class="when">TUẦN 5–8 · THÔNG MINH HƠN</span><b>Sự kiện, alert, agent</b><ul>
+      <li>Gộp sự kiện và enrich; gán nhãn 200 cặp để đo</li>
+      <li>Langfuse; digest sáng qua Telegram</li>
+      <li>Hồ sơ người dùng, watch, alert có lý do, 👍/👎</li>
+      <li>Agent chat với bộ tool, hybrid search</li>
+      <li>MCP server; thêm 5 nguồn còn lại</li>
+    </ul><p class="legend">Học: structured output, Langfuse, grammY, RRF, MCP</p></div>
+    <div class="phase"><span class="when">TUẦN 9–12 · HOÀN THIỆN</span><b>Brief, dashboard, đo lường</b><ul>
+      <li>Brief sống: nhận định, phiên bản, diff, alert khi thay đổi</li>
+      <li>Đề xuất nguồn từ agent</li>
+      <li>Dashboard: materialized view, ECharts, SSE realtime</li>
+      <li>Batch API và trần chi phí</li>
+      <li>Đo các chỉ số ở mục 1.7, viết báo cáo, demo</li>
+    </ul><p class="legend">Học: LISTEN/NOTIFY, TanStack, ECharts; BERTopic nếu còn thời gian</p></div>
+  </div>
+  <div class="good-note"><b>Vì sao deploy từ tuần 4:</b> giá trị của radard tăng theo lượng dữ liệu tích luỹ. Daemon chạy càng sớm thì đến tuần 12 càng có đủ lịch sử để làm dashboard xu hướng, đo time-to-signal và demo các câu hỏi như “tháng trước có gì”.</div>
+</section>
+
+<section id="risks">
+  <div class="part">PHẦN 5</div>
+  <h2>5. Rủi ro và kỷ luật phạm vi khi làm một mình</h2>
+  <div class="verdict">
+    <div class="vcol bad"><h4>Rủi ro</h4><ul>
+      <li><b>Gộp sự kiện sai:</b> gộp nhầm hai sự kiện hoặc tách một sự kiện thành hai. Cần đo sớm bằng tập nhãn</li>
+      <li><b>Nguồn đổi định dạng hoặc chặn:</b> theo dõi sức khoẻ từng nguồn, cảnh báo khi một nguồn im lặng quá lâu</li>
+      <li><b>Chi phí brief và chat:</b> có trần chi phí và cờ dirty</li>
+      <li><b>Prompt injection từ nội dung web:</b> agent chỉ đọc; tool ghi cần xác nhận</li>
+      <li><b>Một người, nhiều mảng:</b> backend, pipeline, agent, frontend, vận hành đều do bạn làm</li>
+    </ul></div>
+    <div class="vcol warn"><h4>Nếu chậm tiến độ, cắt theo thứ tự</h4><ul>
+      <li>1. Topic modeling (BERTopic)</li>
+      <li>2. Đồ thị thực thể trên dashboard</li>
+      <li>3. Đề xuất nguồn từ agent</li>
+      <li>4. Batch API (vẫn gọi đồng bộ được)</li>
+      <li>5. Web chat; giữ MCP và lệnh <span class="mono">/ask</span> trên Telegram</li>
+      <li><b>Không cắt:</b> daemon lớp 1, gộp sự kiện, alert có lý do, brief, đo lường</li>
+    </ul></div>
+    <div class="vcol good"><h4>Việc tiếp theo</h4><ul>
+      <li>Viết hồ sơ người dùng của chính bạn (stack, dự án, chủ đề quan tâm)</li>
+      <li>Chốt 3 nguồn đầu tiên và 3 brief đầu tiên</li>
+      <li>Khởi tạo repo <span class="mono">~/Personal/radard</span>: schema, pg-boss, nguồn HN</li>
+      <li>Mỗi tuần dành một buổi xem Langfuse và sức khoẻ nguồn</li>
+    </ul></div>
+  </div>
+</section>
+
+<footer>
+  radard · báo cáo sản phẩm và tech stack v0.2 · 09/2026. Giá model lấy từ bảng giá Anthropic hiện tại; ước tính chi phí là ước tính thô dựa trên giả định ở mục 2.5. Tài liệu liên quan trong <span class="mono">~/Personal</span>: de-tai-san-pham.html (bản Radar gốc), de-tai-agent.html, de-tai-A-mcp-guard.md, bao-cao-jev.html, bao-cao-jev-ecosystem.html.
+</footer>
+
+</div>
+</body>
+</html>

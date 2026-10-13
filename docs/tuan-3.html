@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Tuần 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+
+.dec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:760px){.dec{grid-template-columns:1fr}}
+.tg{max-width:520px;margin:16px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#DCE8DF}
+.tg-head{display:flex;gap:10px;align-items:center;background:#fff;padding:10px 14px;border-bottom:1px solid var(--line)}
+.tg-head small{display:block;color:var(--ink-3);font-size:12px}
+.tg-av{width:34px;height:34px;border-radius:50%;background:#2BB3A0;color:#fff;display:grid;place-items:center;font-weight:700}
+.tg-body{padding:14px;display:grid;gap:10px}
+.tg-msg{background:#fff;border-radius:12px 12px 12px 4px;padding:9px 12px;font-size:14.5px;line-height:1.5;max-width:92%;box-shadow:0 1px 1px rgba(0,0,0,.06)}
+.tg-msg b{display:block;margin-bottom:2px}
+.tg-msg a{font-size:13px;word-break:break-all}
+.tg-msg .tg-time{display:block;text-align:right;font-size:11px;color:var(--ink-3);margin-top:2px}
+.tg-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:-6px;max-width:92%}
+.tg-btns span{background:rgba(255,255,255,.7);border-radius:8px;text-align:center;padding:6px;font-size:14px;color:#2A7A6E;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="eyebrow">RADARD · KẾ HOẠCH TUẦN 3 · MVP-0 · 11/10/2026</div>
+<h1>Tuần 3: digest buổi sáng trên Telegram</h1>
+<p class="lede">Mục tiêu tuần 3: mỗi sáng 07:00, bạn nhận trên điện thoại tối đa 7 sự kiện đáng đọc nhất trong 24 giờ, mỗi sự kiện có nút 👍/👎; rồi đưa radard lên server và chạy 7 ngày để nghiệm thu. Tài liệu này giải thích từng phần, đặc biệt là ba bảng mới, bằng một digest mẫu làm từ dữ liệu thật.</p>
+
+<nav class="tabs" aria-label="Các phần">
+  <div class="tablist" role="tablist">
+    <button class="tab" role="tab" aria-controls="tong-quan"><span class="n">01</span>Tổng quan</button>
+    <button class="tab" role="tab" aria-controls="luong"><span class="n">02</span>Luồng digest</button>
+    <button class="tab" role="tab" aria-controls="bang"><span class="n">03</span>Ba bảng mới</button>
+    <button class="tab" role="tab" aria-controls="mot-ngay"><span class="n">04</span>Một ngày dữ liệu</button>
+    <button class="tab" role="tab" aria-controls="chon"><span class="n">05</span>Chọn sự kiện &amp; LLM</button>
+    <button class="tab" role="tab" aria-controls="telegram"><span class="n">06</span>Telegram</button>
+    <button class="tab" role="tab" aria-controls="deploy"><span class="n">07</span>Deploy &amp; nghiệm thu</button>
+  </div>
+</nav>
+
+<!-- 01 -->
+<div class="panel" role="tabpanel" id="tong-quan">
+<div class="tiles">
+  <div class="tile"><b>381</b><span>sự kiện ứng viên trong một ngày thật (05/10 → 06/10)</span></div>
+  <div class="tile"><b>7</b><span>được chọn vào digest</span></div>
+  <div class="tile"><b>$0,0012</b><span>một digest với claude-haiku-5.5 (đo thật)</span></div>
+  <div class="tile"><b>10 giây</b><span>model viết xong cả 7 tóm tắt</span></div>
+</div>
+
+<h2>Việc trong tuần</h2>
+<div class="tbl"><table>
+<thead><tr><th>Việc</th><th>Kết quả</th><th>Trạng thái</th></tr></thead>
+<tbody>
+<tr><td>Bot Telegram</td><td>@radard_bot, gửi thử được</td><td><span class="pill">Xong</span></td></tr>
+<tr><td>Schema gửi tin và phản hồi</td><td>3 bảng <code>digests</code>, <code>deliveries</code>, <code>feedback</code> (tab 03)</td><td><span class="pill">Xong</span></td></tr>
+<tr><td>Model LLM</td><td>Mặc định <code>anthropic/claude-haiku-5.5</code>, đổi được qua <code>LLM_MODEL</code>; chi phí ghi theo số Gateway báo (tab 05)</td><td><span class="pill">Xong</span></td></tr>
+<tr><td>Notifier + adapter Telegram</td><td>Gửi tin, nút 👍/👎, ghi bảng</td><td>Chưa làm</td></tr>
+<tr><td>Job digest 07:00</td><td>Chọn sự kiện, gọi LLM, gửi</td><td>Chưa làm</td></tr>
+<tr><td>ObjectStore R2, Dockerfile, Railway</td><td>Chạy trên server</td><td>Chưa làm, cần bạn tạo tài khoản</td></tr>
+<tr><td>Nghiệm thu 7 ngày</td><td>Bốn tiêu chí (tab 07)</td><td>Chưa làm</td></tr>
+</tbody></table></div>
+
+<h2>Thứ tự đề xuất</h2>
+<div class="steps">
+  <div class="step"><b>Notifier + Telegram trên máy local</b><p>Gửi được tin có nút, bấm nút ghi được vào <code>feedback</code>.</p></div>
+  <div class="step"><b>Job digest</b><p>Chạy tay bằng CLI trước (<code>bun run cli digest --dry-run</code> in ra mà không gửi), rồi gắn lịch 07:00.</p></div>
+  <div class="step"><b>Bạn nhận digest thật vài sáng trên máy local</b><p>Chỉnh cách chọn sự kiện và giọng văn theo phản hồi của bạn.</p></div>
+  <div class="step"><b>R2, Docker, Railway</b><p>Chỉ deploy khi bạn đồng ý. Sau đó chạy 7 ngày để nghiệm thu.</p></div>
+</div>
+
+<div class="note"><b>Còn chờ bạn:</b> mô tả lĩnh vực thật (digest đang lọc bằng mô tả TẠM); có commit tuần 1–2 không; tài khoản Railway và bucket R2 (trước bước 4).</div>
+</div>
+
+<!-- 02 -->
+<div class="panel" role="tabpanel" id="luong">
+<h2>Từ 07:00 tới khi bạn bấm 👍</h2>
+<figure>
+<svg viewBox="0 0 760 330" role="img" aria-label="Lịch 07:00 tạo job digest; job chọn sự kiện, gọi LLM, gửi Telegram, ghi digests và deliveries; bạn bấm nút, bot ghi feedback">
+  <defs><marker id="f2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bx" x="20" y="20" width="150" height="48" rx="8"/><text class="t" x="95" y="40" text-anchor="middle">pg-boss: lịch</text><text class="tm" x="95" y="57" text-anchor="middle">0 7 * * * (giờ VN)</text>
+  <rect class="bc" x="210" y="20" width="150" height="48" rx="8"/><text class="tb" x="285" y="49" text-anchor="middle">job digest</text>
+  <rect class="ba" x="400" y="20" width="160" height="48" rx="8"/><text class="t" x="480" y="40" text-anchor="middle">1. Chọn ≤ 7 sự kiện</text><text class="ts" x="480" y="57" text-anchor="middle">events, doc_text (24 giờ)</text>
+  <rect class="ba" x="590" y="20" width="150" height="48" rx="8"/><text class="t" x="665" y="40" text-anchor="middle">2. Một lời gọi LLM</text><text class="ts" x="665" y="57" text-anchor="middle">tóm tắt tiếng Việt</text>
+  <rect class="bd" x="590" y="110" width="150" height="48" rx="8"/><text class="t" x="665" y="130" text-anchor="middle">3. Gửi Telegram</text><text class="ts" x="665" y="147" text-anchor="middle">1 tin mở đầu + 7 tin</text>
+  <rect class="bp" x="360" y="110" width="190" height="48" rx="8"/><text class="t" x="455" y="130" text-anchor="middle">4. Ghi digests,</text><text class="t" x="455" y="147" text-anchor="middle">deliveries (mỗi tin 1 dòng)</text>
+  <rect class="bx" x="590" y="210" width="150" height="48" rx="8"/><text class="t" x="665" y="230" text-anchor="middle">Bạn bấm 👍</text><text class="ts" x="665" y="247" text-anchor="middle">trên điện thoại</text>
+  <rect class="bc" x="360" y="210" width="190" height="48" rx="8"/><text class="t" x="455" y="230" text-anchor="middle">bot nhận callback,</text><text class="t" x="455" y="247" text-anchor="middle">tìm delivery theo message_id</text>
+  <rect class="bp" x="130" y="210" width="190" height="48" rx="8"/><text class="t" x="225" y="230" text-anchor="middle">5. Ghi feedback</text><text class="ts" x="225" y="247" text-anchor="middle">+ trả lời "Đã ghi nhận 👍"</text>
+  <g class="ln" marker-end="url(#f2)"><path d="M170,44 L208,44"/><path d="M360,44 L398,44"/><path d="M560,44 L588,44"/><path d="M665,68 L665,108"/><path d="M590,134 L552,134"/><path d="M665,158 L665,208"/><path d="M590,234 L552,234"/><path d="M360,234 L322,234"/></g>
+  <text class="ts" x="20" y="300">Job digest chạy lại (lỗi mạng, retry) không gửi trùng: digests có khoá duy nhất (kênh, người nhận, cuối khoảng thời gian).</text>
+  <text class="ts" x="20" y="318">Bot nhận nút bằng long polling (hỏi Telegram liên tục) khi dev; trên server cũng vậy, không cần mở cổng web.</text>
+</svg>
+<figcaption><b>Hình 1.</b> Bước 1–4 chạy mỗi sáng một lần; bước 5 chạy mỗi khi bạn bấm.</figcaption>
+</figure>
+
+<h2>Vì sao "mỗi sự kiện một tin"</h2>
+<p>Telegram gắn nút vào <b>từng tin</b>. Gộp 7 sự kiện vào một tin thì nút 👍 không biết đang nói sự kiện nào (trừ khi làm 14 nút đánh số). Tách ra thì mỗi tin có đúng 2 nút của nó, và sau này nếu bật nhận xét, bạn reply vào đúng tin là radard biết ngay sự kiện. Đổi lại: mỗi sáng 8 tin thay vì 1.</p>
+
+<h2>Nhận xét bằng chữ: chưa làm, nhưng đã sẵn chỗ</h2>
+<p>Theo quyết định của bạn, tuần 3 chỉ có 👍/👎. Bảng <code>feedback</code> đã có <code>kind = 'comment'</code> và cột <code>text</code>; bật tính năng sau này không cần đổi schema.</p>
+</div>
+
+<!-- 03 -->
+<div class="panel" role="tabpanel" id="bang">
+<h2>Ba bảng và quan hệ với dữ liệu cũ</h2>
+<figure>
+<svg viewBox="0 0 760 360" role="img" aria-label="digests một-nhiều deliveries một-nhiều feedback; deliveries chụp document_ids trỏ về documents; event_id trỏ events chỉ để tham khảo, không có khoá ngoại">
+  <defs><marker id="f3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bp" x="20" y="30" width="200" height="120" rx="8"/><text class="tb" x="120" y="54" text-anchor="middle">digests</text>
+  <g class="tm"><text x="34" y="78">id</text><text x="34" y="96">channel, recipient</text><text x="34" y="114">period_start, period_end</text><text x="34" y="132">status, lang, sent_at</text></g>
+  <rect class="bp" x="280" y="30" width="210" height="160" rx="8"/><text class="tb" x="385" y="54" text-anchor="middle">deliveries</text>
+  <g class="tm"><text x="294" y="78">id, digest_id</text><text x="294" y="96">message_id (Telegram)</text><text x="294" y="114">kind: header | event</text><text x="294" y="132">position 1…7</text><text x="294" y="150">document_ids[] ← bền</text><text x="294" y="168">event_id ← tham khảo</text><text x="294" y="186">title, body (đã gửi)</text></g>
+  <rect class="bp" x="550" y="30" width="190" height="140" rx="8"/><text class="tb" x="645" y="54" text-anchor="middle">feedback</text>
+  <g class="tm"><text x="564" y="78">id, delivery_id</text><text x="564" y="96">kind: like | dislike |</text><text x="564" y="114">      comment</text><text x="564" y="132">text (nhận xét)</text><text x="564" y="150">created_at</text></g>
+  <rect class="bc" x="280" y="260" width="210" height="60" rx="8"/><text class="tb" x="385" y="284" text-anchor="middle">documents (lớp 1)</text><text class="ts" x="385" y="303" text-anchor="middle">id không bao giờ đổi</text>
+  <rect class="ex" x="550" y="260" width="190" height="60" rx="8"/><text class="tb" x="645" y="284" text-anchor="middle">events (lớp 2)</text><text class="ts" x="645" y="303" text-anchor="middle">xoá, dựng lại được</text>
+  <g class="ln" marker-end="url(#f3)"><path d="M220,90 L278,90"/><path d="M490,90 L548,90"/><path d="M385,190 L385,258"/></g>
+  <path d="M470,170 L590,258" fill="none" stroke="#9A5B00" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <g class="lb"><text x="249" y="82" text-anchor="middle">1 → nhiều</text><text x="519" y="82" text-anchor="middle">1 → nhiều</text><text x="395" y="228">khoá ngoại thật</text><text x="560" y="222" style="fill:#9A5B00">chỉ tham khảo, không khoá</text></g>
+</svg>
+<figcaption><b>Hình 2.</b> Màu cam: dữ liệu của bạn, không tạo lại được. Xanh: lớp 1, bền. Viền đứt: lớp 2, dẫn xuất. Phản hồi bám vào tài liệu (bền), không bám vào sự kiện (có thể bị dựng lại).</figcaption>
+</figure>
+
+<h2>Vì sao không trỏ thẳng vào events</h2>
+<p>Hãy hình dung: hôm nay bạn 👍 sự kiện số 1234 "OpenAI halts training". Tuần sau ta chỉnh ngưỡng gộp và chạy <code>layer2 recluster</code>: bảng <code>events</code> bị xoá sạch, dựng lại, và cùng chuyện đó giờ có id 905. Nếu <code>feedback</code> lưu "event 1234":</p>
+<div class="grid2">
+  <div class="card"><b class="h">Có khoá ngoại vào events</b><p>Xoá <code>events</code> thì Postgres buộc xoá luôn phản hồi (cascade), hoặc chặn không cho recluster. Mất dữ liệu của bạn, hoặc kẹt.</p></div>
+  <div class="card"><b class="h">Lưu id mà không khoá ngoại</b><p>Không mất dòng, nhưng 1234 giờ không trỏ vào đâu, hoặc tệ hơn trỏ nhầm sang một sự kiện khác vừa được cấp đúng id đó.</p></div>
+</div>
+<p>Cách đã chọn: lúc gửi, chụp lại <b>danh sách tài liệu</b> của sự kiện (<code>document_ids = {2311, 2318, 2402}</code>). Tài liệu ở lớp 1 không bao giờ bị xoá hay đổi id. Sau recluster, tìm lại sự kiện mới chứa các tài liệu đó bằng một truy vấn. <code>event_id</code> vẫn lưu để tra nhanh khi chưa recluster.</p>
+
+<h2>Bảng digests: một lượt gửi</h2>
+<div class="tbl"><table>
+<thead><tr><th>Cột</th><th>Nghĩa</th><th>Ví dụ</th></tr></thead>
+<tbody>
+<tr><td class="mono">channel</td><td>Kênh gửi. Để sẵn cho Discord, Web Push</td><td class="mono">telegram</td></tr>
+<tr><td class="mono">recipient</td><td>Người nhận trong kênh đó (Telegram: chat id)</td><td class="mono">100000001</td></tr>
+<tr><td class="mono">period_start, period_end</td><td>Digest bao phủ khoảng thời gian nào</td><td class="mono">11/10 07:00 → 12/10 07:00</td></tr>
+<tr><td class="mono">status</td><td><code>sending</code> lúc bắt đầu, <code>sent</code> khi gửi xong, <code>failed</code> nếu lỗi (kèm <code>error</code>)</td><td class="mono">sent</td></tr>
+<tr><td class="mono">lang</td><td>Ngôn ngữ của phần tóm tắt (dữ liệu gốc vẫn tiếng Anh)</td><td class="mono">vi</td></tr>
+</tbody></table></div>
+<p><b>Khoá duy nhất</b> (channel, recipient, period_end): job digest bị chạy lại (pg-boss retry, bạn chạy tay) thì lần thứ hai không tạo được dòng mới, nên không gửi trùng.</p>
+
+<h2>Bảng deliveries: mỗi tin đã gửi</h2>
+<div class="tbl"><table>
+<thead><tr><th>Cột</th><th>Nghĩa</th><th>Ví dụ</th></tr></thead>
+<tbody>
+<tr><td class="mono">digest_id</td><td>Thuộc lượt digest nào</td><td class="mono">12</td></tr>
+<tr><td class="mono">message_id</td><td>Id tin Telegram trả về khi gửi. Khi bạn bấm nút, Telegram gửi lại đúng id này, nên đây là cách tìm ra tin</td><td class="mono">58</td></tr>
+<tr><td class="mono">kind</td><td><code>header</code> (tin mở đầu) hoặc <code>event</code> (tin của một sự kiện)</td><td class="mono">event</td></tr>
+<tr><td class="mono">position</td><td>Thứ tự trong digest. Sau này đo được "tin đầu có được bấm nhiều hơn không"</td><td class="mono">1</td></tr>
+<tr><td class="mono">document_ids</td><td>Ảnh chụp các tài liệu của sự kiện lúc gửi: <b>mối nối bền</b></td><td class="mono">{2311, 2318, 2402}</td></tr>
+<tr><td class="mono">event_id</td><td>Sự kiện lúc gửi, chỉ để tham khảo</td><td class="mono">1234</td></tr>
+<tr><td class="mono">title, body</td><td><b>Đúng nội dung đã gửi</b>. Sau này đổi prompt hay model, vẫn biết bạn đã đọc gì khi bấm 👍</td><td>"Anthropic mời cộng đồng…"</td></tr>
+</tbody></table></div>
+
+<h2>Bảng feedback: phản hồi của bạn</h2>
+<div class="tbl"><table>
+<thead><tr><th>Cột</th><th>Nghĩa</th><th>Ví dụ</th></tr></thead>
+<tbody>
+<tr><td class="mono">delivery_id</td><td>Phản hồi cho tin nào. Trống = góp ý chung (nhắn thường, không gắn tin)</td><td class="mono">87</td></tr>
+<tr><td class="mono">kind</td><td><code>like</code>, <code>dislike</code>, hoặc <code>comment</code> (để sau)</td><td class="mono">like</td></tr>
+<tr><td class="mono">text</td><td>Chỉ có với comment. DB bắt buộc: comment phải có chữ, like/dislike không được có chữ</td><td class="mono">null</td></tr>
+<tr><td class="mono">source_message_id</td><td>Id tin của bạn (với comment), để Telegram gửi lại cùng update cũng không ghi trùng</td><td class="mono">null</td></tr>
+</tbody></table></div>
+<p><b>Chỉ ghi thêm:</b> bấm 👍 rồi đổi ý bấm 👎 là hai dòng; ý kiến hiện tại là dòng mới nhất, và vẫn biết bạn đã đổi ý. Không sửa, không xoá dòng cũ.</p>
+</div>
+
+<!-- 04 -->
+<div class="panel" role="tabpanel" id="mot-ngay">
+<h2>Theo dõi các bảng qua một buổi sáng</h2>
+<p>Ví dụ rút gọn (2 sự kiện thay vì 7). Mỗi bước là những dòng mới xuất hiện.</p>
+<div class="steps">
+  <div class="step"><b>07:00:00 · job digest bắt đầu</b><p>Tạo dòng digest trước khi gửi gì, để chặn chạy trùng.</p>
+<pre><code>digests     id=12  telegram  100000001  11/10 07:00 → 12/10 07:00  status=sending  lang=vi</code></pre></div>
+  <div class="step"><b>07:00:01 · chọn sự kiện, gọi LLM</b><p>Đọc <code>events</code>, <code>doc_text</code>; gọi model một lần. Ghi chi phí.</p>
+<pre><code>llm_calls   task=digest  model=anthropic/claude-haiku-5.5  in=1518  out=2157  $0,00123  cost_source=gateway</code></pre></div>
+  <div class="step"><b>07:00:11 · gửi tin mở đầu, rồi từng sự kiện</b><p>Mỗi lần Telegram trả về message_id thì ghi ngay một dòng.</p>
+<pre><code>deliveries  id=86  digest=12  msg=57  header  pos=–  docs={}                "Sáng 12/10: 7 sự kiện…"
+deliveries  id=87  digest=12  msg=58  event   pos=1  docs={2311,2318,2402}  event=1234  "Anthropic mời…"
+deliveries  id=88  digest=12  msg=59  event   pos=2  docs={2290,2297}       event=1240  "Tự host bộ phát hiện…"</code></pre></div>
+  <div class="step"><b>07:00:13 · gửi xong</b>
+<pre><code>digests     id=12  status=sent  sent_at=07:00:13</code></pre></div>
+  <div class="step"><b>08:15 · bạn bấm 👍 ở tin "Anthropic mời…", 08:16 đổi ý bấm 👎</b><p>Telegram báo "người dùng bấm nút <code>fb:87:like</code> trên tin 58". Bot ghi, trả lời ngắn.</p>
+<pre><code>feedback    id=301  delivery=87  like     08:15
+feedback    id=302  delivery=87  dislike  08:16      ← ý kiến hiện tại</code></pre></div>
+  <div class="step"><b>Tuần sau · chạy layer2 recluster</b><p><code>events</code> bị xoá và dựng lại; sự kiện 1234 không còn. <code>deliveries</code> và <code>feedback</code> không bị chạm. Tìm sự kiện mới chứa các tài liệu cũ:</p>
+<pre><code>SELECT ed.event_id FROM event_documents ed
+WHERE ed.document_id = ANY ('{2311,2318,2402}')     -- document_ids của delivery 87
+GROUP BY ed.event_id ORDER BY count(*) DESC LIMIT 1; → 905 (id mới của cùng chuyện đó)</code></pre></div>
+</div>
+<div class="note"><b>Đã kiểm bằng test</b> (apps/daemon/test/delivery.test.ts): xoá lớp 2 thì phản hồi và document_ids vẫn còn; comment không có chữ bị DB từ chối; ghi trùng cùng tin của bạn bị từ chối; một khoảng thời gian chỉ một digest.</div>
+</div>
+
+<!-- 05 -->
+<div class="panel" role="tabpanel" id="chon">
+<h2>Chọn ≤ 7 sự kiện từ hàng trăm</h2>
+<p>Ứng viên: sự kiện có hoạt động trong 24 giờ qua (mọi sự kiện đều đã qua lọc liên quan ở lớp 2). Điểm đề xuất ban đầu:</p>
+<pre><code>điểm = mức liên quan cao nhất trong các tài liệu của sự kiện + 0,04 × ln(số tài liệu)</code></pre>
+<p>Thử trên một ngày thật (05/10 02:00 → 06/10 02:00 UTC, 381 ứng viên):</p>
+<div class="tbl"><table>
+<thead><tr><th class="num">#</th><th>Sự kiện</th><th class="num">Liên quan</th><th class="num">Tài liệu</th><th class="num">Điểm</th></tr></thead>
+<tbody>
+<tr><td class="num">1</td><td>Anthropic wants your thoughts on AI</td><td class="num">0,832</td><td class="num">5</td><td class="num">0,897</td></tr>
+<tr><td class="num">2</td><td>Self-host your own AI text detector on CPU</td><td class="num">0,815</td><td class="num">3</td><td class="num">0,859</td></tr>
+<tr><td class="num">3</td><td>Three AI models, same prompt, before and after a testing tool</td><td class="num">0,846</td><td class="num">1</td><td class="num">0,846</td></tr>
+<tr><td class="num">4</td><td>TypeSafe AI's Jev vs. Perplexity's Decisions API</td><td class="num">0,834</td><td class="num">1</td><td class="num">0,834</td></tr>
+<tr><td class="num">5</td><td>How (and Why) to Build an AI Agent from Scratch in Python</td><td class="num">0,795</td><td class="num">2</td><td class="num">0,823</td></tr>
+<tr><td class="num">6</td><td><b>OpenAI "rogue" agent activities found on Wikimedia projects</b></td><td class="num">0,793</td><td class="num">2</td><td class="num">0,821</td></tr>
+<tr><td class="num">7</td><td>ReviewBench: An open benchmark for AI code review</td><td class="num">0,769</td><td class="num">3</td><td class="num">0,813</td></tr>
+</tbody></table></div>
+<div class="note"><b>Điểm cần chỉnh:</b> sự kiện lớn nhất ngày (Wikimedia, <b>258 điểm, 178 bình luận</b> trên HN) chỉ đứng thứ 6, trong khi bài số 4 có 1 điểm, 0 bình luận. Chính model khi viết lời mở đầu cũng coi tin Wikimedia là nổi bật nhất. Công thức chưa tính <b>độ nổi</b> (điểm và bình luận HN, sao GitHub). Đề xuất thêm một thành phần như <code>0,03 × ln(1 + điểm HN)</code> và chỉnh tiếp bằng 👍/👎 của bạn trong tuần đầu.</div>
+
+<h2>Một lời gọi LLM cho cả digest</h2>
+<p>Gửi 7 sự kiện (tiêu đề + tối đa 4 tài liệu mỗi sự kiện: tiêu đề, link, điểm, bình luận) trong một lời gọi, yêu cầu trả JSON:</p>
+<pre><code><span class="c">// system prompt (rút gọn)</span>
+You write a short morning digest for one reader: an AI software engineer who builds LLM agents
+with TypeScript (Bun) and Python. Write in Vietnamese. Return ONLY JSON:
+{"intro": string, "items": [{"n", "title" (≤ 12 words), "summary" (2 sentences: what happened
+and why it matters for this reader)}]}. Use only the facts in the input; do not invent numbers.</code></pre>
+
+<h3>Kết quả thật (claude-haiku-5.5, 11/10/2026)</h3>
+<div class="tbl"><table>
+<thead><tr><th>Lần</th><th class="num">Token vào</th><th class="num">Token ra</th><th class="num">Trong đó suy nghĩ</th><th class="num">Thời gian</th><th class="num">Chi phí</th><th>Kết quả</th></tr></thead>
+<tbody>
+<tr><td>1 (trần 2.000 token ra)</td><td class="num">1.518</td><td class="num">2.000</td><td class="num">879</td><td class="num">9,4 s</td><td class="num">$0,00115</td><td><b>Hỏng:</b> chạm trần giữa chừng, JSON bị cắt</td></tr>
+<tr><td>2 (trần 4.000)</td><td class="num">1.518</td><td class="num">2.157</td><td class="num">810</td><td class="num">10,1 s</td><td class="num">$0,00123</td><td>Đủ 7 mục, JSON hợp lệ</td></tr>
+</tbody></table></div>
+<p><b>Bài học:</b> model này tự suy nghĩ trước khi trả lời, và token suy nghĩ tính vào trần <code>maxOutputTokens</code>. Job digest sẽ đặt trần rộng, kiểm JSON (thiếu mục thì thử lại một lần), và ghi lỗi rõ ràng nếu vẫn hỏng. Chi phí: ~$0,0012 mỗi ngày, ~$0,04 mỗi tháng.</p>
+
+<h2>So sánh model</h2>
+<p>Model nằm ở biến <code>LLM_MODEL</code>; mặc định <code>anthropic/claude-haiku-5.5</code>. Đổi sang <code>openai/gpt-6-luna</code> chỉ cần sửa <code>.env</code>. Chi phí ghi vào <code>llm_calls</code> là <b>số Gateway báo cho từng lời gọi</b> (<code>cost_source = gateway</code>), đã tính:</p>
+<div class="tbl"><table>
+<thead><tr><th>Yếu tố</th><th>claude-haiku-5.5</th><th>gpt-6-luna</th></tr></thead>
+<tbody>
+<tr><td>Giá cơ bản (vào / ra, mỗi MTok)</td><td>$0,10 / $0,50</td><td>$0,10 / $0,50</td></tr>
+<tr><td>Bậc giá khi prompt dài</td><td>từ 100 nghìn token: <b>gấp 5</b> ($0,50 / $2,50)</td><td>từ 272 nghìn token: gấp 2 / 1,5</td></tr>
+<tr><td>Cache đọc / ghi</td><td>$0,01 / $0,125</td><td>$0,01 / $0,125</td></tr>
+<tr><td>Service tier rẻ hơn (flex)</td><td>không thấy trong bảng giá</td><td>có: $0,05 / $0,25</td></tr>
+</tbody></table></div>
+<p><b>Khi Gateway không báo số tiền</b> (dự phòng): radard ước tính từ <b>bảng giá có bậc</b> đọc từ <code>ai-gateway.vercel.sh/v1/models</code> (giữ trong ngày), chọn bậc theo số token đầu vào, áp cùng bậc cho đầu ra và cache, ghi <code>cost_source = estimate</code>. Không cấu hình giá tay nữa: đổi model là giá tự đúng. Đã so với số Gateway báo cho cả claude-haiku-5.5 và gpt-6-luna: lệch 0,00%. Không có cả bảng giá thì ghi <code>unknown</code>.</p>
+<p>Digest dùng ~1.500 token vào, xa các bậc giá cao. Để so: <code>bun run cli costs --since=7d</code> tách theo model. Chất lượng thì so bằng 👍/👎: job digest sẽ ghi model đã viết từng tin vào <code>deliveries.meta</code>, nên tính được tỉ lệ 👍 theo model.</p>
+</div>
+
+<!-- 06 -->
+<div class="panel" role="tabpanel" id="telegram">
+<h2>Digest mẫu trông thế nào</h2>
+<p>Nội dung dưới đây do claude-haiku-5.5 viết thật từ dữ liệu ngày 05/10 (hiển thị 4/7 tin).</p>
+<div class="tg">
+  <div class="tg-head"><span class="tg-av">R</span><div><b>radard</b><small>bot</small></div></div>
+  <div class="tg-body" id="tg-body"></div>
+</div>
+
+<h2>Các khái niệm Telegram Bot API</h2>
+<div class="tbl"><table>
+<thead><tr><th>Khái niệm</th><th>Là gì</th><th>radard dùng để</th></tr></thead>
+<tbody>
+<tr><td class="mono">sendMessage</td><td>Gửi một tin; trả về <code>message_id</code></td><td>Gửi tin mở đầu và từng sự kiện; ghi message_id vào <code>deliveries</code></td></tr>
+<tr><td class="mono">inline_keyboard</td><td>Các nút gắn dưới tin, mỗi nút mang một chuỗi <code>callback_data</code> (≤ 64 byte)</td><td>Hai nút 👍 <code>fb:87:like</code>, 👎 <code>fb:87:dislike</code> (87 là delivery id)</td></tr>
+<tr><td class="mono">callback_query</td><td>Telegram báo cho bot: ai bấm nút nào trên tin nào</td><td>Đọc <code>fb:87:like</code> → ghi <code>feedback</code></td></tr>
+<tr><td class="mono">answerCallbackQuery</td><td>Bot xác nhận đã nhận, hiện thông báo nhỏ "Đã ghi nhận 👍"</td><td>Không gọi thì nút cứ quay vòng trên điện thoại</td></tr>
+<tr><td class="mono">getUpdates (long polling)</td><td>Bot hỏi Telegram "có gì mới không?", Telegram giữ kết nối tới khi có tin mới hoặc hết thời gian chờ (ví dụ 50 giây)</td><td>Nhận lượt bấm. Không cần mở cổng web, chạy được cả trên máy lẫn Railway</td></tr>
+<tr><td class="mono">webhook</td><td>Ngược lại: Telegram tự gọi tới URL của bạn</td><td>Chưa cần. Đổi sau nếu muốn, không ảnh hưởng bảng</td></tr>
+</tbody></table></div>
+<p>Giới hạn cần nhớ: Telegram cho bot gửi khoảng 1 tin/giây vào một chat; 8 tin mỗi sáng thì giãn 1 giây là đủ. Tin dài tối đa 4.096 ký tự.</p>
+</div>
+
+<!-- 07 -->
+<div class="panel" role="tabpanel" id="deploy">
+<h2>Đưa lên server</h2>
+<div class="grid3">
+  <div class="card"><b class="h">ObjectStore R2</b><p>Bản thô hiện nằm ở <code>./data</code> trên máy. Trên server dùng Cloudflare R2 qua <code>Bun.s3</code>, cùng key <code>raw/ab/&lt;sha&gt;.gz</code>. Cần bạn: tạo bucket và khoá truy cập.</p></div>
+  <div class="card"><b class="h">Dockerfile</b><p>Một image cho mọi vai trò; chọn bằng <code>SERVICE_ROLE</code> (scheduler, worker, bot hoặc all).</p></div>
+  <div class="card"><b class="h">Railway</b><p>Postgres có pgvector + dịch vụ radard. Biến bí mật đặt trong Variables của Railway. <b>Chỉ deploy khi bạn đồng ý.</b> Cần bạn: tạo project.</p></div>
+</div>
+
+<h2>Nghiệm thu 7 ngày</h2>
+<div class="tbl"><table>
+<thead><tr><th>Tiêu chí</th><th>Đo bằng</th></tr></thead>
+<tbody>
+<tr><td>≥ 95% lượt fetch thành công</td><td><code>fetch_runs.status</code></td></tr>
+<tr><td>Digest đến mỗi sáng</td><td><code>digests.status = sent</code> đủ 7 ngày</td></tr>
+<tr><td>≥ 50 lượt 👍/👎</td><td><code>feedback</code> (khoảng 1 lượt mỗi tin là đạt)</td></tr>
+<tr><td>Chi phí LLM &lt; $0,1/ngày</td><td><code>llm_calls.cost_usd</code> (dự kiến ~$0,0012 cho digest + ~$0,002 embedding cho ~1.500 tài liệu mới)</td></tr>
+</tbody></table></div>
+
+<h2>Các điểm cần bạn quyết</h2>
+<div class="dec">
+  <div class="card"><b class="h">Giờ gửi</b><p>07:00 giờ Việt Nam (00:00 UTC). pg-boss đặt được múi giờ cho lịch.</p></div>
+  <div class="card"><b class="h">Số sự kiện</b><p>Tối đa 7. Ngày ít tin thì gửi ít hơn, ngày không có gì thì gửi một tin "hôm nay yên ắng" hay không gửi?</p></div>
+  <div class="card"><b class="h">Độ nổi trong điểm xếp hạng</b><p>Thêm điểm HN/sao GitHub vào công thức (tab 05)? Đề xuất: có.</p></div>
+  <div class="card"><b class="h">Mỗi sự kiện một tin</b><p>8 tin mỗi sáng, hay 1 tin với nút đánh số? Đề xuất: mỗi sự kiện một tin.</p></div>
+</div>
+</div>
+
+<footer>radard · docs/tuan-3.html · Digest mẫu: dữ liệu radard ngày 05/10/2026, viết bởi anthropic/claude-haiku-5.5 qua Vercel AI Gateway ngày 11/10/2026 (2 lời gọi, $0,0024). Giá model lấy từ ai-gateway.vercel.sh/v1/models cùng ngày.</footer>
+
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+<script>window.T3_SAMPLE={"intro": "Hôm nay có một tin nổi bật về hành vi của agent OpenAI trên các dự án Wikimedia, cùng nhiều công cụ liên quan đến AI agent và AI code review.", "items": [{"n": 1, "title": "Anthropic mời cộng đồng chia sẻ ý kiến về AI", "summary": "Anthropic đăng một bài nghiên cứu hỏi người dùng muốn gì từ AI, bài đạt 27 điểm và 63 bình luận trên Hacker News. Với bạn, đây là tín hiệu về kỳ vọng người dùng, nhưng chưa có kỹ thuật cụ thể để áp dụng ngay.", "url": "https://anthropic.com/research/your-thoughts-on-ai", "nDocs": 4}, {"n": 2, "title": "Tự host bộ phát hiện văn bản AI trên CPU", "summary": "SlopTotal là công cụ self-hosted chạy 23 open model để phát hiện văn bản do AI tạo ra, chạy được trên CPU. Nếu bạn xây pipeline xử lý nội dung đầu vào, đây là lựa chọn để lọc nội dung kém chất lượng mà không phụ thuộc API bên ngoài.", "url": "https://github.com/pablocaeg/sloptotal", "nDocs": 3}, {"n": 3, "title": "So sánh ba model AI trước và sau khi dùng công cụ test", "summary": "Buoy đăng bài so sánh đầu ra của ba model AI với cùng một prompt, trước và sau khi áp dụng công cụ testing của họ. Bài có ít tương tác, nhưng ý tưởng đánh giá đầu ra model trước và sau thay đổi phù hợp với việc kiểm thử LLM agent.", "url": "https://buoy.gg/blog/ai-models-before-and-after-buoy", "nDocs": 1}, {"n": 4, "title": "So sánh Jev của TypeSafe AI với Decisions API của Perplexity", "summary": "Một bài trên Vercel so sánh Jev của TypeSafe AI với Decisions API của Perplexity, hiện chỉ có 1 điểm và chưa có bình luận. Đầu vào không cung cấp chi tiết kỹ thuật, nên bạn cần đọc trực tiếp bài viết nếu muốn đánh giá các API này cho hệ thống agent.", "url": "https://vercel.com/i/jev-vs-perplexity", "nDocs": 1}]};</script>
+<script>(function(){
+var D=window.T3_SAMPLE,body=document.getElementById('tg-body');if(!body) return;
+function msg(html){var m=document.createElement('div');m.className='tg-msg';m.innerHTML=html;body.appendChild(m);return m;}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+msg('<b>☀️ Sáng 06/10 · 7 sự kiện</b>'+esc(D.intro)+'<span class="tg-time">07:00</span>');
+D.items.forEach(function(it){
+  msg('<b>'+it.n+'. '+esc(it.title)+'</b>'+esc(it.summary)+'<br><a>'+esc(it.url)+'</a>'+(it.nDocs>1?' · '+it.nDocs+' nguồn':'')+'<span class="tg-time">07:00</span>');
+  var b=document.createElement('div');b.className='tg-btns';b.innerHTML='<span>👍</span><span>👎</span>';body.appendChild(b);
+});
+})();</script>
+</body>
+</html>

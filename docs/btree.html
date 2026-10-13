@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · B-tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="eyebrow">RADARD · GIẢI THÍCH · 06/10/2026</div>
+<h1>B-tree: mục lục của cơ sở dữ liệu</h1>
+<p class="lede">B-tree là loại index mặc định của Postgres, và là thứ đang làm các truy vấn của radard nhanh (kể cả truy vấn tìm sự kiện gần nhất). Tài liệu này giải thích cấu trúc, cách tìm và cách thêm, có mô phỏng chạy được và số đo thật trên máy bạn.</p>
+
+<nav class="tabs" aria-label="Các phần">
+  <div class="tablist" role="tablist">
+    <button class="tab" role="tab" aria-controls="bai-toan"><span class="n">01</span>Bài toán</button>
+    <button class="tab" role="tab" aria-controls="cau-truc"><span class="n">02</span>Cấu trúc</button>
+    <button class="tab" role="tab" aria-controls="tim"><span class="n">03</span>Tìm kiếm</button>
+    <button class="tab" role="tab" aria-controls="mo-phong"><span class="n">04</span>Mô phỏng</button>
+    <button class="tab" role="tab" aria-controls="them"><span class="n">05</span>Thêm &amp; tách trang</button>
+    <button class="tab" role="tab" aria-controls="postgres"><span class="n">06</span>Trong Postgres</button>
+    <button class="tab" role="tab" aria-controls="radard"><span class="n">07</span>Trong radard</button>
+  </div>
+</nav>
+
+<!-- ============================ 01 ============================ -->
+<div class="panel" role="tabpanel" id="bai-toan">
+<div class="tiles">
+  <div class="tile"><b>95,8 ms</b><span>tìm 1 dòng trong 10 triệu, không có index</span></div>
+  <div class="tile"><b>0,03 ms</b><span>cùng truy vấn, có B-tree</span></div>
+  <div class="tile"><b>4 trang</b><span>phải đọc (so với 54.080 trang)</span></div>
+  <div class="tile"><b>3 tầng</b><span>chiều cao cây cho 10 triệu dòng</span></div>
+</div>
+<p class="muted" style="font-size:14px">Đo trên MacBook Air M3, Postgres 17.9, bảng 10 triệu dòng một cột <code>timestamptz</code> (DB tạm, đã xoá). Chi tiết ở tab 03 và 05.</p>
+
+<h2>Không có index thì sao</h2>
+<p>Bảng trong Postgres là một dãy <b>trang</b> (page) 8 KB, các dòng nằm trong trang theo thứ tự được ghi vào, <b>không theo thứ tự nào của dữ liệu</b>. Hỏi <code>WHERE ts = '2026-02-28 00:53'</code> thì Postgres không biết dòng đó ở trang nào, nên phải đọc <b>mọi trang</b> và kiểm từng dòng. Đó là <code>Seq Scan</code>. Bảng 10 triệu dòng có 54.080 trang (423 MB): đọc hết mất ~96 ms, dù chỉ cần một dòng.</p>
+
+<h2>Ý tưởng: giữ một bản sao đã sắp xếp</h2>
+<p>Index là một cấu trúc riêng, nằm cạnh bảng, chứa giá trị của cột được đánh index <b>đã sắp xếp</b>, mỗi giá trị kèm <b>địa chỉ của dòng</b> trong bảng. Giống mục lục cuối sách: các từ khoá xếp theo vần, mỗi từ kèm số trang. Tìm "HNSW" thì lật tới vần H, không đọc sách từ trang 1.</p>
+<p>Nhưng một danh sách sắp xếp dài 10 triệu phần tử lại khó cập nhật: chèn một giá trị vào giữa thì phải dời một nửa danh sách. <b>B-tree</b> giải quyết bằng cách chia danh sách thành các trang nhỏ và xếp chúng thành một cây thấp, rộng. Tìm nhanh, chèn cũng nhanh.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Ký hiệu</th><th>Nghĩa trong tài liệu này</th></tr></thead>
+<tbody>
+<tr><td><b>Khoá</b></td><td>Giá trị của cột được đánh index (ví dụ <code>last_seen_at</code> của một sự kiện).</td></tr>
+<tr><td><b>Trang</b> (page)</td><td>Khối 8 KB, đơn vị đọc ghi của Postgres. Mỗi nút của B-tree là một trang.</td></tr>
+<tr><td><b>TID</b></td><td>Địa chỉ của một dòng trong bảng: (số trang, số ô). Lá của B-tree trỏ tới dòng bằng TID.</td></tr>
+<tr><td><b>Fan-out</b></td><td>Số nhánh con của một nút trong. B-tree của Postgres có fan-out vài trăm.</td></tr>
+<tr><td><b>Planner</b></td><td>Phần của Postgres quyết định <b>cách</b> chạy một truy vấn (quét cả bảng hay dùng index nào), dựa trên ước lượng chi phí từ thống kê của bảng.</td></tr>
+<tr><td><b>Seq Scan, Index Scan…</b></td><td>Tên các cách đọc dữ liệu mà planner chọn. Giải thích ở tab 03.</td></tr>
+</tbody></table></div>
+<p>Các thuật ngữ khác (fillfactor, HOT, collation, GIN…) được giải thích ngay chỗ chúng xuất hiện, và gom lại ở bảng cuối tab 06.</p>
+</div>
+
+<!-- ============================ 02 ============================ -->
+<div class="panel" role="tabpanel" id="cau-truc">
+<h2>Gốc, nút trong, lá</h2>
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="B-tree ba tầng: gốc chỉ đường tới nút trong, nút trong chỉ đường tới lá, lá nối nhau theo thứ tự và trỏ tới dòng trong bảng">
+  <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <g class="ts"><text x="14" y="44">gốc</text><text x="14" y="124">nút trong</text><text x="14" y="204">lá</text><text x="14" y="276">bảng</text></g>
+  <rect class="bc" x="300" y="22" width="160" height="34" rx="6"/><text class="tmb" x="380" y="44" text-anchor="middle">20 │ 40</text>
+  <rect class="ba" x="110" y="102" width="120" height="34" rx="6"/><text class="tmb" x="170" y="124" text-anchor="middle">8 │ 14</text>
+  <rect class="ba" x="320" y="102" width="120" height="34" rx="6"/><text class="tmb" x="380" y="124" text-anchor="middle">27 │ 33</text>
+  <rect class="ba" x="530" y="102" width="120" height="34" rx="6"/><text class="tmb" x="590" y="124" text-anchor="middle">47 │ 55</text>
+  <g class="ln" marker-end="url(#a2)"><path d="M320,56 L190,100"/><path d="M380,56 L380,100"/><path d="M440,56 L570,100"/></g>
+  <g class="lb"><text x="236" y="76">&lt; 20</text><text x="386" y="84">20–39</text><text x="512" y="76">≥ 40</text></g>
+  <g>
+    <rect class="bd" x="80" y="182" width="62" height="34" rx="6"/><text class="tm" x="111" y="204" text-anchor="middle">3 5</text>
+    <rect class="bd" x="150" y="182" width="62" height="34" rx="6"/><text class="tm" x="181" y="204" text-anchor="middle">8 11</text>
+    <rect class="bd" x="220" y="182" width="62" height="34" rx="6"/><text class="tm" x="251" y="204" text-anchor="middle">14 17</text>
+    <rect class="bd" x="296" y="182" width="62" height="34" rx="6"/><text class="tm" x="327" y="204" text-anchor="middle">20 24</text>
+    <rect class="bd" x="366" y="182" width="62" height="34" rx="6"/><text class="tm" x="397" y="204" text-anchor="middle">27 30</text>
+    <rect class="bd" x="436" y="182" width="62" height="34" rx="6"/><text class="tm" x="467" y="204" text-anchor="middle">33 36</text>
+    <rect class="bd" x="512" y="182" width="62" height="34" rx="6"/><text class="tm" x="543" y="204" text-anchor="middle">40 44</text>
+    <rect class="bd" x="582" y="182" width="62" height="34" rx="6"/><text class="tm" x="613" y="204" text-anchor="middle">47 51</text>
+    <rect class="bd" x="652" y="182" width="62" height="34" rx="6"/><text class="tm" x="683" y="204" text-anchor="middle">55 60</text>
+  </g>
+  <g class="ln" marker-end="url(#a2)"><path d="M130,136 L111,180"/><path d="M170,136 L181,180"/><path d="M210,136 L251,180"/>
+    <path d="M340,136 L327,180"/><path d="M380,136 L397,180"/><path d="M420,136 L467,180"/>
+    <path d="M550,136 L543,180"/><path d="M590,136 L613,180"/><path d="M630,136 L683,180"/></g>
+  <g stroke="#5B45A8" stroke-width="1.4" marker-end="url(#a2)"><path d="M142,199 L148,199"/><path d="M212,199 L218,199"/><path d="M282,199 L294,199"/><path d="M358,199 L364,199"/><path d="M428,199 L434,199"/><path d="M498,199 L510,199"/><path d="M574,199 L580,199"/><path d="M644,199 L650,199"/></g>
+  <rect class="ex" x="80" y="256" width="634" height="30" rx="6"/>
+  <g class="ts"><text x="397" y="276" text-anchor="middle">các trang của bảng, dòng nằm theo thứ tự ghi vào</text></g>
+  <g stroke="#9FB3AC" stroke-dasharray="3 3"><line x1="384" y1="216" x2="300" y2="256"/><line x1="410" y1="216" x2="520" y2="256"/></g>
+  <text class="lb" x="460" y="242">TID: (trang, ô)</text>
+</svg>
+<figcaption><b>Hình 1.</b> Mỗi hộp là một trang. Nút gốc và nút trong chỉ chứa khoá chỉ đường. Lá chứa mọi khoá theo thứ tự, mỗi khoá kèm TID trỏ về dòng trong bảng, và mỗi lá nối sang lá kế bên (mũi tên tím). Thật ra mỗi trang chứa vài trăm khoá chứ không phải 2.</figcaption>
+</figure>
+
+<div class="grid3">
+  <div class="card"><b class="h">Gốc và nút trong</b><p>Chỉ để <b>chỉ đường</b>: mỗi khoá phân chia hai nhánh con. "Nhỏ hơn 20 đi trái, từ 20 tới dưới 40 đi giữa, từ 40 đi phải."</p></div>
+  <div class="card"><b class="h">Lá</b><p>Chứa <b>mọi khoá đã sắp xếp</b>, mỗi khoá kèm TID của dòng. Các lá nối nhau thành một chuỗi theo thứ tự, đi được cả hai chiều.</p></div>
+  <div class="card"><b class="h">Cân bằng</b><p><b>Mọi lá cùng độ sâu</b>. Tìm khoá nào cũng đi đúng bằng chiều cao cây. Chữ B thường được hiểu là <i>balanced</i>.</p></div>
+</div>
+<p>Postgres dùng biến thể <b>B+tree</b> của Lehman &amp; Yao (1981): khoá đầy đủ chỉ nằm ở lá, nút trong chỉ giữ khoá chỉ đường, các trang cùng tầng nối nhau. Phần nối ngang còn giúp nhiều tiến trình đọc ghi cùng lúc mà không phải khoá cả cây.</p>
+
+<h2>Vì sao cây rất thấp: đo thật</h2>
+<p>Một trang 8 KB chứa được rất nhiều khoá nhỏ. Đo bằng extension <code>pageinspect</code> trên index của cột <code>timestamptz</code> (khoá 8 byte + TID 6 byte + đầu mục ≈ 16 byte mỗi mục):</p>
+<div class="grid3">
+  <div class="card"><b class="h">367 khoá / lá</b><p>Index dựng một lần chừa 10% chỗ trống (fillfactor 90) cho các lần chèn sau: còn trống 808 byte.</p></div>
+  <div class="card"><b class="h">285 nhánh / nút trong</b><p>Mỗi nút trong chỉ tới 285 trang con. Đó là fan-out.</p></div>
+  <div class="card"><b class="h">97 nhánh ở gốc</b><p>Gốc của bảng 10 triệu dòng chỉ cần 97 nhánh: 97 × 285 × 367 ≈ 10,1 triệu.</p></div>
+</div>
+<div class="tbl"><table>
+<thead><tr><th class="num">Số dòng</th><th class="num">Số tầng</th><th class="num">Số trang index</th><th class="num">Cỡ index</th></tr></thead>
+<tbody>
+<tr><td class="num">1.000</td><td class="num">2</td><td class="num">5</td><td class="num">40 KB</td></tr>
+<tr><td class="num">100.000</td><td class="num">2</td><td class="num">276</td><td class="num">2,2 MB</td></tr>
+<tr><td class="num">1.000.000</td><td class="num">3</td><td class="num">2.745</td><td class="num">21 MB</td></tr>
+<tr><td class="num">10.000.000</td><td class="num">3</td><td class="num">27.422</td><td class="num">214 MB</td></tr>
+</tbody></table></div>
+<p>Số tầng = <code>level</code> + 1 trong <code>bt_metap</code>; số trang tính cả 1 trang metadata. Gấp 10.000 lần dữ liệu (1 nghìn lên 10 triệu) mà cây chỉ cao thêm <b>một tầng</b>. Với fan-out ~300, mỗi tầng nhân sức chứa lên ~300 lần: 4 tầng đã chứa vài tỷ dòng. Gốc và các nút trong (vài trăm trang) hầu như luôn nằm sẵn trong RAM, nên tìm một khoá thực tế chỉ đọc đĩa vài trang.</p>
+<pre><code><span class="c">-- tự kiểm trên index bất kỳ</span>
+CREATE EXTENSION pageinspect;
+SELECT level FROM bt_metap('events_last_seen_idx');                 <span class="c">-- số tầng - 1</span>
+SELECT live_items, free_size FROM bt_page_stats('events_last_seen_idx', 1);</code></pre>
+</div>
+
+<!-- ============================ 03 ============================ -->
+<div class="panel" role="tabpanel" id="tim">
+<h2>Tìm một khoá: đi từ gốc xuống lá</h2>
+<div class="steps">
+  <div class="step"><b>Ở mỗi nút, tìm vị trí của khoá trong danh sách khoá chỉ đường</b><p>Danh sách đã sắp xếp nên dùng tìm nhị phân: ~8 phép so sánh cho 285 khoá.</p></div>
+  <div class="step"><b>Đi xuống nhánh tương ứng</b><p>Khoá chỉ đường thứ i phân chia nhánh i và nhánh i+1.</p></div>
+  <div class="step"><b>Tới lá: lấy TID, đọc dòng trong bảng</b><p>Chiều cao 3 thì đọc 3 trang index + 1 trang bảng.</p></div>
+</div>
+<div class="card" style="margin-top:14px"><b class="h">Cách đọc kết quả EXPLAIN</b>
+<p><code>EXPLAIN</code> in ra kế hoạch planner đã chọn. Thêm <code>ANALYZE</code> thì Postgres chạy thật và in số đo; thêm <code>BUFFERS</code> thì in số trang đã đọc.</p>
+<ul>
+<li><code>Index Scan using t10m_ts</code>: cách đọc (ở đây: dùng index tên <code>t10m_ts</code>). Dòng thụt vào trong là bước con, chạy trước.</li>
+<li><code>actual time=0.010..0.011 rows=1</code>: thời gian (ms) tới dòng đầu..dòng cuối, và số dòng bước này trả ra.</li>
+<li><code>Buffers: shared hit=4 read=0</code>: số trang 8 KB đã đọc. <b>hit</b> là có sẵn trong bộ nhớ đệm của Postgres, <b>read</b> là phải lấy từ đĩa (hoặc cache của hệ điều hành). Đây là con số đáng tin nhất để so hai cách.</li>
+<li><code>Parallel Seq Scan</code>, <code>Gather</code>: Postgres chia việc cho nhiều tiến trình chạy song song rồi gom kết quả.</li>
+<li><code>Sort Method: top-N heapsort</code>: sắp xếp nhưng chỉ giữ N dòng đầu (khi có <code>LIMIT</code>), rẻ hơn sắp xếp toàn bộ.</li>
+<li><code>Rows Removed by Filter</code>: số dòng đã đọc rồi bỏ vì không thoả điều kiện. Số này lớn là dấu hiệu đang đọc thừa.</li>
+</ul></div>
+<pre><code>EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM t10m WHERE ts = '2026-02-28 00:53:16.866654+07';
+
+Index Scan using t10m_ts on t10m  (actual time=0.010..0.011 rows=1)
+  Index Cond: (ts = '2026-02-28 00:53:16.866654+07')
+  Buffers: shared hit=<b>4</b>                     <span class="c">← gốc + nút trong + lá + 1 trang bảng</span>
+Execution Time: <b>0.030 ms</b>
+
+<span class="c">-- so với cột id không có index (cùng bảng):</span>
+Parallel Seq Scan on t10m   Rows Removed by Filter: 3333333 (×3 tiến trình)
+  Buffers: shared hit=2622 read=<b>51458</b>
+Execution Time: <b>95.787 ms</b></code></pre>
+<p>Đọc 4 trang thay vì 54.080 trang, nhanh hơn ~3.000 lần.</p>
+
+<h2>Tìm theo khoảng: thế mạnh lớn nhất</h2>
+<p>Vì lá đã sắp xếp và nối nhau, <code>WHERE ts BETWEEN a AND b</code> chỉ cần: đi từ gốc xuống lá chứa <code>a</code>, rồi <b>đọc sang phải theo chuỗi lá</b> tới khi gặp khoá lớn hơn <code>b</code>. Không phải quay lại gốc. Kết quả ra sẵn theo thứ tự.</p>
+<figure>
+<svg viewBox="0 0 760 130" role="img" aria-label="Tìm khoảng 24 tới 44: xuống lá chứa 24 rồi đi ngang qua các lá tới 44">
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#0E6E5C"/></marker></defs>
+  <text class="tb" x="20" y="22">BETWEEN 24 AND 44</text>
+  <g>
+    <rect class="bx" x="20" y="60" width="74" height="34" rx="6"/><text class="tm" x="57" y="82" text-anchor="middle">14 17</text>
+    <rect class="bc" x="108" y="60" width="74" height="34" rx="6"/><text class="tmb" x="145" y="82" text-anchor="middle">20 <tspan fill="#0E6E5C">24</tspan></text>
+    <rect class="bc" x="196" y="60" width="74" height="34" rx="6"/><text class="tmb" x="233" y="82" text-anchor="middle" fill="#0E6E5C">27 30</text>
+    <rect class="bc" x="284" y="60" width="74" height="34" rx="6"/><text class="tmb" x="321" y="82" text-anchor="middle" fill="#0E6E5C">33 36</text>
+    <rect class="bc" x="372" y="60" width="74" height="34" rx="6"/><text class="tmb" x="409" y="82" text-anchor="middle"><tspan fill="#0E6E5C">40 44</tspan></text>
+    <rect class="bc" x="460" y="60" width="74" height="34" rx="6"/><text class="tmb" x="497" y="82" text-anchor="middle">47 ✕</text>
+    <rect class="bx" x="548" y="60" width="74" height="34" rx="6"/><text class="tm" x="585" y="82" text-anchor="middle">55 60</text>
+  </g>
+  <g stroke="#0E6E5C" stroke-width="2.4" fill="none" marker-end="url(#a3)"><path d="M182,77 L194,77"/><path d="M270,77 L282,77"/><path d="M358,77 L370,77"/><path d="M446,77 L458,77"/></g>
+  <path d="M145,30 L145,58" stroke="#0E6E5C" stroke-width="2.4" marker-end="url(#a3)"/>
+  <text class="lb" x="155" y="44">xuống từ gốc tới lá chứa 24</text>
+  <text class="ts" x="497" y="114" text-anchor="middle">gặp 47 &gt; 44: dừng</text>
+</svg>
+<figcaption><b>Hình 2.</b> Một lần đi xuống (chiều cao cây), rồi đi ngang qua đúng các lá chứa kết quả.</figcaption>
+</figure>
+
+<h3>ORDER BY … LIMIT: không phải sắp xếp</h3>
+<pre><code>SELECT * FROM t10m ORDER BY ts DESC LIMIT 20;
+  Index Scan Backward using t10m_ts    Buffers: shared hit=17     Execution Time: <b>0.013 ms</b>
+
+SELECT * FROM t10m ORDER BY id DESC LIMIT 20;        <span class="c">-- id không có index</span>
+  Parallel Seq Scan → Sort (top-N heapsort)  Buffers: ~54.000   Execution Time: <b>195 ms</b></code></pre>
+<p>Có index thì chỉ cần đọc 20 khoá cuối chuỗi lá (đi ngược). Không có index thì đọc cả 10 triệu dòng để chọn ra 20.</p>
+
+<h2>Ba cách Postgres dùng B-tree</h2>
+<div class="tbl"><table>
+<thead><tr><th>Cách</th><th>Làm gì</th><th>Khi nào planner chọn</th><th class="num">Ví dụ đo (10 triệu dòng)</th></tr></thead>
+<tbody>
+<tr><td><b>Index Scan</b></td><td>Đi theo lá, với mỗi khoá đọc ngay dòng trong bảng</td><td>Ít dòng khớp, hoặc cần thứ tự</td><td class="num">1 giờ dữ liệu, 3.685 dòng: 1,7 ms</td></tr>
+<tr><td><b>Index Only Scan</b></td><td>Chỉ đọc index, không chạm bảng (khi mọi cột cần lấy đều nằm trong index, và Postgres biết chắc mọi dòng trên trang bảng đó đều "nhìn thấy được" với mọi giao dịch. Nó ghi điều này trong <b>visibility map</b>, một bản đồ 2 bit mỗi trang do VACUUM cập nhật; trang chưa chắc chắn thì vẫn phải đọc bảng; xem mục "Visibility map" ngay dưới)</td><td>Câu hỏi chỉ cần cột trong index</td><td class="num">cùng 3.685 dòng, chỉ lấy <code>ts</code>: <b>0,14 ms</b></td></tr>
+<tr><td><b>Bitmap Index Scan</b> + Bitmap Heap Scan</td><td>Quét index, gom TID thành bản đồ theo trang, rồi đọc các trang bảng theo thứ tự trang (mỗi trang một lần)</td><td>Khớp nhiều dòng nằm rải rác trong bảng</td><td class="num">xem tab 06, index 2 cột</td></tr>
+<tr><td><b>Seq Scan</b> (không dùng index)</td><td>Đọc hết bảng</td><td>Khớp phần lớn bảng: nhảy qua index rồi đọc từng dòng còn đắt hơn</td><td class="num">50% dữ liệu: 320 ms (planner tự bỏ index)</td></tr>
+</tbody></table></div>
+<div class="note"><b>Tương quan vật lý:</b> trong bảng đo, dòng được ghi theo thứ tự thời gian, nên các dòng có <code>ts</code> gần nhau nằm cùng trang. Index Scan cho 5% dữ liệu (500.000 dòng) vẫn chỉ mất 34 ms. Nếu dòng nằm rải rác, mỗi khoá phải đọc một trang khác, và planner sẽ chuyển sang Bitmap hoặc Seq Scan sớm hơn nhiều. Postgres lưu độ tương quan này (từ −1 tới 1, 1 là thứ tự trong bảng trùng thứ tự trong index) trong view thống kê <code>pg_stats.correlation</code>, và planner dùng nó để ước lượng chi phí.</div>
+
+<h2>Visibility map: vì sao "Index Only Scan" có lúc vẫn đọc bảng</h2>
+<h3>Gốc rễ: Postgres giữ nhiều phiên bản của một dòng (MVCC)</h3>
+<p><code>UPDATE</code> không sửa dòng tại chỗ: Postgres ghi một <b>phiên bản mới</b> và giữ phiên bản cũ. <code>DELETE</code> chỉ đánh dấu dòng đã xoá. Mỗi phiên bản ghi kèm giao dịch nào tạo ra nó, giao dịch nào xoá nó. Nhờ vậy nhiều giao dịch chạy cùng lúc mà không chặn nhau: giao dịch A đang đọc vẫn thấy phiên bản cũ trong khi B sửa, giao dịch mở sau khi B commit thì thấy bản mới. Cơ chế này gọi là <b>MVCC</b> (multi-version concurrency control).</p>
+<p>Hệ quả: gặp một phiên bản dòng chưa chắc nó "có thật" với bạn (có thể đã bị xoá, đã bị thay, hoặc do giao dịch chưa commit tạo ra). Muốn biết phải xem thông tin giao dịch <b>ghi trên chính dòng đó, trong trang bảng</b>. Index B-tree không lưu thông tin này, chỉ lưu khoá và TID. Nên kể cả khi mọi cột cần lấy đều có trong index, Postgres vẫn phải mở trang bảng để kiểm.</p>
+
+<h3>Visibility map: 2 bit cho mỗi trang bảng</h3>
+<p>Mỗi bảng có thêm một file nhỏ (đuôi <code>_vm</code>) với 2 bit cho mỗi trang 8 KB:</p>
+<div class="tbl"><table>
+<thead><tr><th>Bit</th><th>Nghĩa</th></tr></thead>
+<tbody>
+<tr><td><b>all-visible</b></td><td>Mọi dòng trên trang đã commit, không còn phiên bản chết: mọi giao dịch đều thấy chúng.</td></tr>
+<tr><td><b>all-frozen</b></td><td>Mạnh hơn: các dòng đã "đóng băng", không bao giờ cần kiểm lại thông tin giao dịch (phục vụ bảo trì dài hạn, chống xoay vòng số giao dịch).</td></tr>
+</tbody></table></div>
+<figure>
+<svg viewBox="0 0 760 150" role="img" aria-label="Index Only Scan: với mỗi khoá, nếu trang bảng all-visible thì dùng giá trị trong index, không thì đọc trang bảng và tính một heap fetch">
+  <defs><marker id="v3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bd" x="20" y="55" width="150" height="40" rx="8"/><text class="t" x="95" y="80" text-anchor="middle">khoá + TID từ index</text>
+  <rect class="bx" x="230" y="50" width="220" height="50" rx="8"/><text class="t" x="340" y="71" text-anchor="middle">trang bảng của TID có bit</text><text class="t" x="340" y="88" text-anchor="middle">all-visible trong _vm?</text>
+  <rect class="bc" x="520" y="12" width="220" height="40" rx="8"/><text class="t" x="630" y="37" text-anchor="middle">dùng luôn giá trị trong index</text>
+  <rect class="bp" x="520" y="98" width="220" height="40" rx="8"/><text class="t" x="630" y="123" text-anchor="middle">đọc trang bảng (+1 Heap Fetch)</text>
+  <g class="ln" marker-end="url(#v3)"><path d="M170,75 L228,75"/><path d="M450,64 L518,34"/><path d="M450,88 L518,116"/></g>
+  <g class="lb"><text x="478" y="40">có</text><text x="452" y="134">chưa chắc</text></g>
+</svg>
+<figcaption><b>Hình 3.</b> Index Only Scan hỏi visibility map trước khi quyết định có phải đọc bảng hay không. <code>Heap Fetches</code> trong EXPLAIN đếm số lần phải đọc bảng.</figcaption>
+</figure>
+<div class="grid2">
+  <div class="card"><b class="h">Ai bật bit</b><p><code>VACUUM</code> (và autovacuum): sau khi dọn sạch phiên bản chết trên một trang, nó đánh dấu trang all-visible.</p></div>
+  <div class="card"><b class="h">Ai tắt bit</b><p>Mọi <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> chạm vào trang: trang vừa có phiên bản mới hoặc phiên bản chết.</p></div>
+</div>
+
+<h3>Đo thật</h3>
+<p>Bảng 1 triệu dòng (5.406 trang, 43 MB), index trên <code>ts</code>, autovacuum tắt để quan sát. Truy vấn <code>SELECT ts … WHERE ts</code> trong một ngày (86.401 dòng), luôn là Index Only Scan. Đếm trang all-visible bằng extension <code>pg_visibility</code>:</p>
+<div class="tbl"><table>
+<thead><tr><th>Trạng thái</th><th class="num">Trang all-visible</th><th class="num">Heap Fetches</th><th class="num">Trang đã đọc</th><th class="num">ms</th></tr></thead>
+<tbody>
+<tr><td>1. Vừa chèn xong, chưa VACUUM</td><td class="num">0 / 5.406</td><td class="num" style="color:var(--warn);font-weight:600">86.401</td><td class="num">707</td><td class="num">10,3</td></tr>
+<tr><td>2. Sau <code>VACUUM</code></td><td class="num">5.406 / 5.406</td><td class="num" style="color:var(--accent);font-weight:600">0</td><td class="num">240</td><td class="num">4,4</td></tr>
+<tr><td>3. Sau <code>UPDATE</code> 21.600 dòng trong ngày đó, chưa VACUUM lại</td><td class="num">5.288 / 5.523</td><td class="num" style="color:var(--warn);font-weight:600">43.227</td><td class="num">43.503</td><td class="num">13,4</td></tr>
+</tbody></table></div>
+<ul>
+<li><b>Bước 1:</b> chưa trang nào được xác nhận, nên "Index Only Scan" vẫn kiểm bảng cho từng dòng.</li>
+<li><b>Bước 2:</b> VACUUM xác nhận mọi trang: chỉ đọc index, số trang đọc từ 707 xuống 240, nhanh hơn 2,3 lần.</li>
+<li><b>Bước 3:</b> UPDATE ghi phiên bản mới vào 117 trang mới và tắt bit các trang cũ có dòng bị sửa (235 trang mất bit). Truy vấn chạm đúng vùng đó nên lại phải kiểm bảng, chậm hơn cả lúc chưa VACUUM, cho tới khi VACUUM chạy lại.</li>
+</ul>
+<p>Bản đồ rất nhỏ: 2 bit mỗi trang, bảng 43 MB chỉ cần một trang 8 KB cho file <code>_vm</code>. <code>VACUUM</code> cũng dùng nó để <b>bỏ qua các trang đã all-visible</b>, nên VACUUM trên bảng lớn ít thay đổi chạy rất nhanh.</p>
+<div class="note"><b>Trong radard:</b> <code>documents</code>, <code>doc_text</code> chủ yếu ghi thêm, ít sửa: autovacuum giữ bản đồ gần như kín, Index Only Scan hiệu quả. <code>events</code> bị UPDATE mỗi lần gộp (<code>centroid</code>, <code>n_docs</code>, <code>last_seen_at</code>) nên các trang liên tục mất bit, truy vấn trên nó hầu như luôn đọc bảng; với vài trăm dòng thì không đáng kể.</div>
+</div>
+
+<!-- ============================ 04 ============================ -->
+<div class="panel" role="tabpanel" id="mo-phong">
+<h2>Tự tay thử</h2>
+<p>B+tree thật (cùng cách tìm, chèn và tách trang như Postgres), nhưng mỗi trang chỉ chứa <b>tối đa 3 khoá</b> để thấy được. Chèn khoá để xem trang đầy thì tách, cây cao lên từ gốc. Tìm một khoá hoặc một khoảng để xem đường đi.</p>
+<div class="card sim">
+  <div class="sim-ctl">
+    <label>Khoá <input type="number" id="k" value="25" min="1" max="999" style="width:72px"></label>
+    <button id="bIns" type="button">Chèn</button>
+    <button id="bNext" type="button">Chèn khoá kế tiếp trong dãy mẫu</button>
+    <button id="bRand" type="button">Chèn 5 khoá ngẫu nhiên</button>
+    <button id="bReset" type="button">Cây trống</button>
+  </div>
+  <div class="sim-ctl">
+    <button id="bFind" type="button">Tìm khoá</button>
+    <label>Khoảng từ <input type="number" id="ra" value="20" style="width:64px"></label>
+    <label>tới <input type="number" id="rb" value="45" style="width:64px"></label>
+    <button id="bRange" type="button">Tìm khoảng</button>
+  </div>
+  <svg id="tree" viewBox="0 0 900 300" role="img" aria-label="Mô phỏng B+tree, mỗi trang tối đa 3 khoá"></svg>
+  <div class="sim-stats" id="tstats"></div>
+  <ul class="st-notes" id="tlog"></ul>
+  <div class="lg sim-lg">
+    <span><i style="background:#E3ECF8;border:1px solid #2F5DA8"></i>nút trong (khoá chỉ đường)</span>
+    <span><i style="background:#ECE7F7;border:1px solid #5B45A8"></i>lá</span>
+    <span><i style="background:#fff;border:3px solid #0E6E5C"></i>trang đã đọc</span>
+    <span><i style="background:#FBEFD9;border:2px solid #9A5B00"></i>vừa tách / vừa tạo</span>
+    <span><i style="background:#0E6E5C"></i>khoá tìm thấy</span>
+  </div>
+</div>
+<h3>Nên thử</h3>
+<div class="steps">
+  <div class="step"><b>Bấm "Cây trống", rồi bấm "Chèn khoá kế tiếp" nhiều lần</b><p>Dãy mẫu 10, 20, 30, 40… Khoá thứ 4 làm lá đầy (quá 3 khoá): lá tách đôi, một khoá được <b>chép lên</b> làm khoá chỉ đường, và cây có gốc mới. Đọc dòng giải thích dưới hình ở mỗi bước.</p></div>
+  <div class="step"><b>Chèn tiếp tới khi gốc cũng đầy</b><p>Gốc tách đôi, một khoá được <b>đẩy lên</b> làm gốc mới: cây cao thêm một tầng, <b>từ trên đỉnh</b>. Mọi lá vẫn cùng độ sâu.</p></div>
+  <div class="step"><b>Tìm khoảng 20 tới 45</b><p>Một đường đi xuống, rồi đi ngang theo chuỗi lá. Đếm số trang đã đọc so với tổng số trang.</p></div>
+</div>
+<div class="note"><b>Khác với thật:</b> ở đây mỗi trang 3 khoá, tách khi có khoá thứ 4. Postgres: mỗi trang vài trăm khoá, tách khi trang 8 KB hết chỗ; khoá trùng nhau được phép (radard có nhiều tài liệu cùng thời điểm), và từ Postgres 13 các khoá trùng được gộp (deduplication) để tiết kiệm chỗ.</div>
+</div>
+
+<!-- ============================ 05 ============================ -->
+<div class="panel" role="tabpanel" id="them">
+<h2>Thêm một khoá</h2>
+<div class="steps">
+  <div class="step"><b>Tìm lá đúng chỗ</b><p>Giống tìm kiếm: đi từ gốc xuống.</p></div>
+  <div class="step"><b>Lá còn chỗ: chèn vào, giữ thứ tự</b><p>Phần lớn các lần chèn dừng ở đây: chỉ sửa đúng một trang.</p></div>
+  <div class="step"><b>Lá đầy: tách đôi (page split)</b><p>Một nửa số khoá sang trang mới, trang mới nối vào chuỗi lá. Nút cha nhận thêm một khoá chỉ đường trỏ tới trang mới.</p></div>
+  <div class="step"><b>Cha cũng đầy: tách tiếp lên trên</b><p>Có thể lan tới gốc. Gốc tách thì tạo gốc mới phía trên: <b>cây chỉ cao lên ở đỉnh</b>, nên mọi lá luôn cùng độ sâu.</p></div>
+</div>
+<p>Khác với cây nhị phân thường (chèn sai thứ tự có thể làm cây lệch thành một danh sách dài), B-tree <b>tự cân bằng</b> chỉ nhờ quy tắc "tách và đẩy lên". Không bao giờ phải xoay cây hay dựng lại.</p>
+
+<h2>Cái giá khi ghi: đo thật</h2>
+<p>Mỗi index là một cây phải sửa ở mỗi lần INSERT (và mỗi UPDATE chạm cột được đánh index). Chèn 1 triệu dòng <code>(id, ts, src)</code>, thời gian ngẫu nhiên:</p>
+<div class="bars" role="img" aria-label="Chèn 1 triệu dòng: không index 1,5 giây; 1 index 3,7 giây; 3 index 7,4 giây">
+  <div class="bar"><span class="bl">Không có index</span><span class="bt"><i style="width:20.5%"></i></span><span class="bv">1,5 s</span></div>
+  <div class="bar"><span class="bl">1 index (ts)</span><span class="bt"><i class="a" style="width:50.4%"></i></span><span class="bv">3,7 s</span></div>
+  <div class="bar"><span class="bl">3 index (khoá chính, ts, (src, ts))</span><span class="bt"><i class="a" style="width:100%"></i></span><span class="bv">7,4 s</span></div>
+</div>
+<div class="grid2">
+  <div class="card"><b class="h">Ghi chậm dần theo số index</b><p>1 index đã làm chèn chậm 2,5 lần; 3 index chậm 5 lần. Bảng ghi nhiều (như <code>documents</code>, bảng job của pg-boss) không nên có index "phòng khi cần".</p></div>
+  <div class="card"><b class="h">Index tốn chỗ</b><p>Bảng 50 MB; mỗi index ~30 MB; 3 index 90 MB, lớn hơn cả bảng.</p></div>
+</div>
+
+<h3>Tách trang làm index thưa đi</h3>
+<div class="tbl"><table>
+<thead><tr><th>Index 1 triệu khoá</th><th class="num">Khoá trung bình / lá</th><th class="num">Số lá</th></tr></thead>
+<tbody>
+<tr><td>Dựng một lần trên dữ liệu có sẵn (<code>CREATE INDEX</code>)</td><td class="num">367</td><td class="num">2.733</td></tr>
+<tr><td>Chèn dần, thứ tự ngẫu nhiên</td><td class="num">259</td><td class="num">3.871 (+42%)</td></tr>
+</tbody></table></div>
+<p>Khi dựng một lần, Postgres sắp xếp hết rồi xếp kín từng trang (chừa 10%). Khi chèn ngẫu nhiên, mỗi lần tách để lại hai trang đầy một nửa, trung bình các trang chỉ đầy ~70%. Chèn theo thứ tự tăng dần (như <code>id</code> tự tăng, hay <code>fetched_at</code>) thì Postgres tối ưu: tách lệch về cuối, trang cũ giữ gần kín.</p>
+
+<h3>Xoá và cập nhật</h3>
+<div class="grid3">
+  <div class="card"><b class="h">DELETE</b><p>Khoá trong index không bị gỡ ngay, chỉ trỏ tới dòng đã chết. <code>VACUUM</code> (autovacuum tự chạy) mới dọn, và gỡ hẳn trang rỗng.</p></div>
+  <div class="card"><b class="h">UPDATE</b><p>Postgres ghi phiên bản dòng mới. Nếu cột được đánh index không đổi và trang còn chỗ, nó dùng <b>HOT update</b>: không phải sửa index. Đổi cột có index thì mọi index đều nhận khoá mới.</p></div>
+  <div class="card"><b class="h">REINDEX</b><p>Index phình (bloat) sau nhiều lần xoá, sửa thì <code>REINDEX CONCURRENTLY</code> dựng lại cho kín, không khoá bảng.</p></div>
+</div>
+</div>
+
+<!-- ============================ 06 ============================ -->
+<div class="panel" role="tabpanel" id="postgres">
+<h2>B-tree trả lời được những câu hỏi nào</h2>
+<div class="tbl"><table>
+<thead><tr><th>Câu hỏi</th><th>Dùng được B-tree?</th><th>Ghi chú</th></tr></thead>
+<tbody>
+<tr><td class="mono">= &lt; &lt;= &gt; &gt;= BETWEEN IN</td><td>Có</td><td>Mọi kiểu có thứ tự: số, thời gian, chuỗi, uuid…</td></tr>
+<tr><td class="mono">ORDER BY col [DESC] LIMIT n</td><td>Có</td><td>Đi theo chuỗi lá, không sắp xếp</td></tr>
+<tr><td class="mono">IS NULL / IS NOT NULL</td><td>Có</td><td>NULL được xếp ở cuối (mặc định)</td></tr>
+<tr><td class="mono">LIKE 'abc%'</td><td>Có điều kiện</td><td>Chỉ với tiền tố cố định, và cần collation <code>C</code> hoặc <code>text_pattern_ops</code></td></tr>
+<tr><td class="mono">LIKE '%abc%'</td><td>Không</td><td>Không biết bắt đầu từ đâu trong thứ tự. Dùng GIN + <code>pg_trgm</code> (radard đã bật extension này)</td></tr>
+<tr><td class="mono">ORDER BY centroid &lt;=&gt; q</td><td>Không</td><td>Vector không có thứ tự một chiều sao cho vector gần nhau nằm cạnh nhau: cần HNSW</td></tr>
+<tr><td class="mono">jsonb @&gt; '{...}'</td><td>Không</td><td>Dùng GIN</td></tr>
+</tbody></table></div>
+
+<h2>Index nhiều cột: thứ tự cột quyết định</h2>
+<p>Index <code>(src, ts)</code> sắp xếp theo <code>src</code> trước, trong cùng <code>src</code> mới theo <code>ts</code>. Giống danh bạ xếp theo họ rồi tới tên: tìm "Nguyễn Huy" nhanh, tìm mọi người tên "Huy" thì phải lật cả danh bạ.</p>
+<pre><code>(src, ts):   (0, 01-01) (0, 01-05) (0, 02-11) … (1, 01-02) (1, 01-09) … (2, 01-01) …
+              └──── src = 0, ts tăng dần ────┘   └── src = 1 ──┘</code></pre>
+<p>Đo trên bảng 1 triệu dòng, <code>src</code> có 10 giá trị, lọc 1 ngày dữ liệu:</p>
+<div class="tbl"><table>
+<thead><tr><th>Truy vấn</th><th>Index được dùng</th><th class="num">Trang index đọc</th><th class="num">ms</th></tr></thead>
+<tbody>
+<tr><td><code>src = 3 AND ts BETWEEN …</code></td><td><code>(src, ts)</code>: cột đầu khớp bằng, cột sau là khoảng</td><td class="num">4</td><td class="num">0,73</td></tr>
+<tr><td><code>ts BETWEEN …</code> (không có src), có index riêng <code>(ts)</code></td><td><code>(ts)</code></td><td class="num">12</td><td class="num">4,9</td></tr>
+<tr><td><code>ts BETWEEN …</code>, bỏ index <code>(ts)</code>, chỉ còn <code>(src, ts)</code></td><td><b>không dùng</b>: Seq Scan</td><td class="num">—</td><td class="num">29,4</td></tr>
+</tbody></table></div>
+<p>Thiếu cột đầu thì khoá của <code>ts</code> nằm rải rác trong 10 đoạn <code>src</code>, nên index gần như vô dụng. (Postgres 18 thêm <i>skip scan</i> nhảy qua từng giá trị của cột đầu; máy bạn đang chạy Postgres 17.9.) Quy tắc: <b>cột lọc bằng (=) đặt trước, cột lọc khoảng hoặc sắp xếp đặt sau</b>.</p>
+<p>Ở bảng nhỏ thì khác: trong radard, <code>WHERE external_id = '…'</code> (thiếu <code>source_id</code>) vẫn dùng index <code>(source_id, external_id)</code>, nhưng phải đọc 21 trang thay vì 3 (2,5 ms thay vì 0,33 ms): index chỉ có 2.569 khoá nên đọc hết index vẫn rẻ hơn đọc bảng.</p>
+
+<h2>Các loại index B-tree đặc biệt</h2>
+<div class="grid2">
+  <div class="card"><b class="h">UNIQUE</b><p>Cùng cây B-tree, thêm kiểm tra: trước khi chèn, tìm xem khoá đã có chưa. Khoá chính luôn có index UNIQUE. radard chặn tài liệu trùng bằng <code>UNIQUE (source_id, external_id)</code>.</p></div>
+  <div class="card"><b class="h">Partial (một phần)</b><p><code>CREATE INDEX … WHERE state = 'created'</code>: chỉ đánh index các dòng thoả điều kiện, cây nhỏ hơn. pg-boss dùng partial unique index cho <code>singletonKey</code> (xem pg-boss.html).</p></div>
+  <div class="card"><b class="h">Biểu thức</b><p><code>CREATE INDEX ON documents (lower(title))</code>: index trên kết quả của hàm, dùng được khi truy vấn viết đúng biểu thức đó.</p></div>
+  <div class="card"><b class="h">INCLUDE (covering)</b><p><code>CREATE INDEX ON events (last_seen_at) INCLUDE (n_docs)</code>: thêm cột vào lá (không dùng để sắp xếp) để Index Only Scan không phải đọc bảng.</p></div>
+</div>
+
+<h2>Thuật ngữ đã gặp</h2>
+<div class="tbl"><table>
+<thead><tr><th>Thuật ngữ</th><th>Nghĩa</th></tr></thead>
+<tbody>
+<tr><td><b>B+tree</b>, Lehman &amp; Yao</td><td>Biến thể B-tree mà khoá đầy đủ chỉ nằm ở lá, nút trong chỉ giữ khoá chỉ đường, các trang cùng tầng nối ngang. Lehman &amp; Yao (1981) thêm liên kết ngang để nhiều tiến trình đọc ghi cùng lúc mà không khoá cả cây. Postgres dùng biến thể này.</td></tr>
+<tr><td><b>Page split</b> (tách trang)</td><td>Trang đầy khi chèn thêm: chia đôi sang một trang mới, thêm khoá chỉ đường vào trang cha (tab 05).</td></tr>
+<tr><td><b>Fillfactor</b></td><td>Tỷ lệ lấp đầy mỗi trang khi dựng index; mặc định 90%, chừa 10% cho các lần chèn sau đỡ phải tách trang.</td></tr>
+<tr><td><b>Deduplication</b></td><td>Từ Postgres 13: nhiều dòng cùng một khoá được lưu một lần khoá kèm danh sách TID, thay vì lặp khoá.</td></tr>
+<tr><td><b>HOT update</b> (Heap-Only Tuple)</td><td>UPDATE mà không cột nào có index bị đổi và trang còn chỗ: phiên bản dòng mới nằm cùng trang, các index không phải sửa.</td></tr>
+<tr><td><b>Bloat</b></td><td>Index hoặc bảng phình to vì chứa nhiều chỗ trống sau xoá, sửa. Sửa bằng VACUUM (tái dùng chỗ) hoặc REINDEX (dựng lại kín).</td></tr>
+<tr><td><b>VACUUM</b>, autovacuum</td><td>Việc dọn dẹp của Postgres: gỡ các phiên bản dòng đã chết, dọn index, cập nhật visibility map. Autovacuum là tiến trình nền tự chạy VACUUM khi bảng thay đổi đủ nhiều.</td></tr>
+<tr><td><b>Collation</b></td><td>Quy tắc so sánh và sắp xếp chuỗi theo ngôn ngữ (ví dụ "a" và "á" xếp thế nào). Collation <code>C</code> so theo byte, đơn giản nhất.</td></tr>
+<tr><td><b>text_pattern_ops</b></td><td>Một operator class (cách index so sánh giá trị) cho chuỗi, so theo byte, để <code>LIKE 'abc%'</code> dùng được B-tree khi DB dùng collation theo ngôn ngữ.</td></tr>
+<tr><td><b>GIN</b>, <b>pg_trgm</b></td><td>GIN là loại index khác của Postgres cho giá trị "chứa nhiều phần" (mảng, jsonb, từ trong văn bản). <code>pg_trgm</code> là extension cắt chuỗi thành các cụm 3 ký tự để GIN tìm được <code>LIKE '%abc%'</code>.</td></tr>
+<tr><td><b>Skip scan</b></td><td>Từ Postgres 18: dùng index nhiều cột dù truy vấn không lọc cột đầu, bằng cách nhảy qua từng giá trị của cột đầu.</td></tr>
+<tr><td><b>Visibility map</b></td><td>Bản đồ 2 bit mỗi trang bảng: trang này mọi dòng đều nhìn thấy được chưa, đã đóng băng chưa. Index Only Scan cần nó để khỏi đọc bảng (tab 03).</td></tr>
+<tr><td><b>MVCC</b></td><td>Multi-version concurrency control: Postgres giữ nhiều phiên bản của một dòng để các giao dịch đọc ghi cùng lúc không chặn nhau (tab 03).</td></tr>
+<tr><td><b>pageinspect</b></td><td>Extension đi kèm Postgres để xem nội dung thô của trang (dùng để đo chiều cao cây ở tab 02).</td></tr>
+<tr><td><b>pg_stat_user_indexes</b></td><td>View thống kê: mỗi index đã được dùng bao nhiêu lần (<code>idx_scan</code>). Dùng ở tab 07.</td></tr>
+</tbody></table></div>
+
+<h2>B-tree và HNSW</h2>
+<div class="tbl"><table>
+<thead><tr><th></th><th>B-tree</th><th>HNSW</th></tr></thead>
+<tbody>
+<tr><td>Dữ liệu</td><td>Có thứ tự trên một trục</td><td>Vector, chỉ có "gần hay xa"</td></tr>
+<tr><td>Cấu trúc</td><td>Cây cân bằng, mỗi khoá đúng một chỗ</td><td>Đồ thị nhiều tầng, đi tham lam</td></tr>
+<tr><td>Kết quả</td><td><b>Chính xác 100%</b></td><td>Gần đúng (recall ~99%)</td></tr>
+<tr><td>Chi phí tìm</td><td>Chiều cao cây (3–4 trang)</td><td>Vài trăm phép tính khoảng cách</td></tr>
+<tr><td>Kết hợp với bộ lọc</td><td>Lọc là chính việc của nó</td><td>Tìm trước, lọc sau: có thể trả thiếu (xem hnsw.html tab 06)</td></tr>
+</tbody></table></div>
+<p>Chúng bổ sung cho nhau: btree thu hẹp tập ứng viên bằng điều kiện có thứ tự (thời gian), rồi tính khoảng cách chính xác trên tập nhỏ đó. Đó đúng là cách truy vấn tìm sự kiện của radard đang chạy (tab 07).</p>
+</div>
+
+<!-- ============================ 07 ============================ -->
+<div class="panel" role="tabpanel" id="radard">
+<h2>Các index B-tree của radard và ai dùng chúng</h2>
+<p>Số lần được dùng lấy từ <code>pg_stat_user_indexes.idx_scan</code> trên DB <code>radard</code> local (cộng dồn từ khi tạo DB tới 06/10; hai index của <code>events</code> được đặt lại trước một lượt <code>process</code> đầy đủ).</p>
+<div class="tbl"><table>
+<thead><tr><th>Index</th><th>Cột</th><th class="num">idx_scan</th><th>Phục vụ</th></tr></thead>
+<tbody>
+<tr><td class="mono">documents_pkey</td><td>id</td><td class="num">13.239</td><td>Join từ <code>doc_text</code>, <code>event_documents</code> về tài liệu</td></tr>
+<tr><td class="mono">doc_text_pkey</td><td>document_id</td><td class="num">10.379</td><td>Pha A tìm tài liệu chưa có <code>doc_text</code> (left join … is null)</td></tr>
+<tr><td class="mono">event_documents_document_id_pk</td><td>document_id</td><td class="num">7.795</td><td>Pha B: tài liệu đã thuộc sự kiện nào chưa</td></tr>
+<tr><td class="mono">documents_url_idx</td><td>url_canonical</td><td class="num">4.960</td><td>Gộp theo cùng URL (bước 1 của pha B)</td></tr>
+<tr><td class="mono">documents_source_external_uq</td><td>(source_id, external_id) UNIQUE</td><td class="num">2.589</td><td>Job fetch: chặn tài liệu trùng (<code>ON CONFLICT DO NOTHING</code>)</td></tr>
+<tr><td class="mono">events_last_seen_idx</td><td>last_seen_at</td><td class="num">422 / lượt</td><td><b>nearestEvent</b>: lọc sự kiện trong cửa sổ thời gian</td></tr>
+<tr><td class="mono">events_centroid_hnsw</td><td>centroid (HNSW)</td><td class="num">0 / lượt</td><td>Chưa được dùng với code hiện tại (xem hnsw.html tab 07)</td></tr>
+<tr><td class="mono">event_documents_event_idx</td><td>event_id</td><td class="num">12</td><td>CLI <code>events</code>: liệt kê nguồn của sự kiện</td></tr>
+<tr><td class="mono">doc_text_relevance_idx</td><td>relevance</td><td class="num">6</td><td>Ít khi: pha B lọc relevance theo ngưỡng riêng từng nguồn (<code>coalesce</code>), planner thường không dùng</td></tr>
+<tr><td class="mono">documents_fetched_idx</td><td>fetched_at</td><td class="num">3</td><td>CLI <code>docs --since</code></td></tr>
+<tr><td class="mono">llm_calls_at_idx</td><td>at</td><td class="num">2</td><td>CLI <code>costs --since</code></td></tr>
+<tr><td class="mono">fetch_runs_source_started_idx</td><td>(source_id, started_at)</td><td class="num">0</td><td>Chưa có truy vấn nào lọc theo nguồn; CLI <code>runs</code> sắp theo id</td></tr>
+<tr><td class="mono">documents_sha_idx</td><td>content_sha256</td><td class="num">0</td><td>Chưa dùng; dự định cho chống trùng theo nội dung</td></tr>
+</tbody></table></div>
+
+<h2>Truy vấn quan trọng nhất: tìm sự kiện gần nhất</h2>
+<pre><code>WHERE last_seen_at  &gt;= $2            <span class="c">-- doc.at − 7 ngày   ← btree events_last_seen_idx</span>
+  AND first_seen_at &lt;= $3            <span class="c">-- doc.at + 7 ngày   ← lọc sau (không có index)</span>
+  AND embedding_model = $4
+ORDER BY centroid &lt;=&gt; $1 LIMIT 1;    <span class="c">-- tính cosine chính xác cho tập đã lọc</span>
+
+Index Scan using events_last_seen_idx (rows=424) → Sort (top-N heapsort) → Limit
+Execution Time: 7.18 ms</code></pre>
+<p>Btree làm phần nó giỏi (lọc theo thời gian, chính xác), phép tính vector chỉ chạy trên vài trăm sự kiện còn lại. Đã thử 4 kịch bản planner có thể đổi ý (ngay sau TRUNCATE khi chưa có thống kê, prepared statement dùng kế hoạch chung sau 5 lần chạy, tài liệu ở nhiều thời điểm khác nhau, bảng 2.048 sự kiện): đều là btree hoặc Seq Scan, không có HNSW.</p>
+
+<h2>Gợi ý (chưa làm, cần bạn quyết)</h2>
+<div class="steps">
+  <div class="step"><b>Cân nhắc bỏ <code>documents_sha_idx</code> và <code>fetch_runs_source_started_idx</code></b><p>0 lần dùng; mỗi tài liệu mới vẫn phải ghi vào chúng. Hoặc giữ nếu sắp có tính năng chống trùng theo nội dung. Nên đợi chạy thật 7 ngày rồi xem lại <code>idx_scan</code>.</p></div>
+  <div class="step"><b>Khi số sự kiện lớn: index <code>(embedding_model, last_seen_at)</code></b><p>Cột lọc bằng đặt trước, cột khoảng đặt sau (tab 06). Hiện chỉ có một model nên chưa cần.</p></div>
+  <div class="step"><b>Xem <code>idx_scan</code> định kỳ</b><p><code>SELECT indexrelname, idx_scan FROM pg_stat_user_indexes ORDER BY idx_scan;</code> là cách rẻ nhất để biết index nào thừa.</p></div>
+</div>
+</div>
+
+<footer>radard · docs/btree.html · Số đo: DB tạm <code>radard_btree</code> và <code>vm_demo</code> (Postgres 17.9, đã xoá sau khi đo) và DB <code>radard</code> local, 06/10/2026. Tham khảo: Bayer &amp; McCreight (1972), Lehman &amp; Yao (1981), tài liệu Postgres "B-Tree Indexes" và <code>src/backend/access/nbtree/README</code>.</footer>
+
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+<script>/* ---------- Mô phỏng B+tree (tab 04) ---------- */
+(function(){
+  var svg=document.getElementById('tree');if(!svg) return;
+  var NS='http://www.w3.org/2000/svg',MAX=3;
+  var SAMPLE=[10,20,30,40,50,25,35,5,15,45,55,60,27,33,65,70,12,38];
+  var root,nextIdx,pages,hl;
+  function leaf(){return {leaf:true,keys:[],next:null,id:++pages};}
+  function inner(){return {leaf:false,keys:[],kids:[],id:++pages};}
+  function reset(){pages=0;root=leaf();nextIdx=0;hl={read:{},fresh:{},found:{}};}
+
+  // Số nhánh con: số khoá chỉ đường <= k (khoá chỉ đường = khoá nhỏ nhất của nhánh phải).
+  function slot(n,k){var i=0;while(i<n.keys.length&&n.keys[i]<=k) i++;return i;}
+  function descend(k,log){
+    var n=root,path=[n];
+    while(!n.leaf){
+      var i=slot(n,k);
+      if(log) log.push('Trang '+n.id+' ['+n.keys.join(', ')+']: '+(i===0?k+' < '+n.keys[0]:(i===n.keys.length?k+' ≥ '+n.keys[i-1]:n.keys[i-1]+' ≤ '+k+' < '+n.keys[i]))+' → nhánh '+(i+1)+' (trong '+n.kids.length+' nhánh).');
+      n=n.kids[i];path.push(n);
+    }
+    return path;
+  }
+  function insert(k){
+    var log=[];hl={read:{},fresh:{},found:{}};
+    var path=descend(k,log),lf=path[path.length-1];
+    path.forEach(function(p){hl.read[p.id]=1;});
+    if(lf.keys.indexOf(k)>=0){log.push('Lá '+lf.id+' đã có '+k+'. Mô phỏng này không cho khoá trùng (Postgres thì cho).');return log;}
+    lf.keys.push(k);lf.keys.sort(function(a,b){return a-b;});
+    if(lf.keys.length<=MAX){log.push('Lá '+lf.id+' còn chỗ: chèn '+k+' → ['+lf.keys.join(', ')+']. Chỉ sửa một trang.');hl.found[k]=1;return log;}
+    // tách lá
+    var right=leaf(),half=Math.ceil(lf.keys.length/2);
+    right.keys=lf.keys.slice(half);lf.keys=lf.keys.slice(0,half);
+    right.next=lf.next;lf.next=right;
+    var sep=right.keys[0];hl.fresh[lf.id]=1;hl.fresh[right.id]=1;hl.found[k]=1;
+    log.push('Lá '+lf.id+' có '+(MAX+1)+' khoá, quá '+MAX+' → TÁCH: ['+lf.keys.join(', ')+'] và lá mới '+right.id+' ['+right.keys.join(', ')+']. Nối lá mới vào chuỗi lá.');
+    log.push('CHÉP khoá '+sep+' (khoá nhỏ nhất của lá mới) lên trang cha làm khoá chỉ đường.');
+    var child=lf,newNode=right,depth=path.length-2;
+    while(true){
+      if(depth<0){
+        var r=inner();r.keys=[sep];r.kids=[child,newNode];root=r;hl.fresh[r.id]=1;
+        log.push('Không có trang cha (vừa tách gốc) → tạo GỐC MỚI '+r.id+' ['+sep+']. Cây cao thêm một tầng, từ trên đỉnh.');
+        break;
+      }
+      var parent=path[depth],pos=parent.kids.indexOf(child);
+      parent.keys.splice(pos,0,sep);parent.kids.splice(pos+1,0,newNode);
+      if(parent.keys.length<=MAX){log.push('Trang cha '+parent.id+' còn chỗ → ['+parent.keys.join(', ')+'].');break;}
+      var mid=Math.floor(parent.keys.length/2),up=parent.keys[mid],nr=inner();
+      nr.keys=parent.keys.slice(mid+1);nr.kids=parent.kids.slice(mid+1);
+      parent.keys=parent.keys.slice(0,mid);parent.kids=parent.kids.slice(0,mid+1);
+      hl.fresh[parent.id]=1;hl.fresh[nr.id]=1;
+      log.push('Trang cha '+parent.id+' cũng quá '+MAX+' khoá → TÁCH: ['+parent.keys.join(', ')+'] và trang mới '+nr.id+' ['+nr.keys.join(', ')+']; ĐẨY khoá '+up+' lên trên (nút trong không giữ lại khoá đẩy lên).');
+      sep=up;child=parent;newNode=nr;depth--;
+    }
+    return log;
+  }
+  function find(k){
+    var log=[];hl={read:{},fresh:{},found:{}};
+    var path=descend(k,log),lf=path[path.length-1];
+    path.forEach(function(p){hl.read[p.id]=1;});
+    if(lf.keys.indexOf(k)>=0){hl.found[k]=1;log.push('Lá '+lf.id+' ['+lf.keys.join(', ')+'] có '+k+': lấy TID, đọc dòng trong bảng.');}
+    else log.push('Lá '+lf.id+' ['+lf.keys.join(', ')+'] không có '+k+': khoá không tồn tại. Không cần xem lá nào khác.');
+    log.push('Đã đọc '+path.length+' trang (bằng chiều cao cây) trên tổng '+countPages()+' trang.');
+    return log;
+  }
+  function range(a,b){
+    var log=[];hl={read:{},fresh:{},found:{}};
+    if(a>b){var t=a;a=b;b=t;}
+    var path=descend(a,log),n=path[path.length-1],got=[],nRead=path.length;
+    path.forEach(function(p){hl.read[p.id]=1;});
+    log.push('Tới lá '+n.id+', lá có thể chứa '+a+'. Từ đây đi ngang theo chuỗi lá:');
+    outer: while(n){
+      for(var i=0;i<n.keys.length;i++){
+        if(n.keys[i]>b){log.push('Lá '+n.id+': gặp '+n.keys[i]+' > '+b+' → dừng.');break outer;}
+        if(n.keys[i]>=a){got.push(n.keys[i]);hl.found[n.keys[i]]=1;}
+      }
+      n=n.next;if(n){hl.read[n.id]=1;nRead++;}
+    }
+    if(!n) log.push('Hết chuỗi lá.');
+    log.push('Kết quả ['+got.join(', ')+'], đã sắp xếp sẵn. Đọc '+nRead+' trang trên tổng '+countPages()+'.');
+    return log;
+  }
+  function countPages(){var c=0;(function w(n){c++;if(!n.leaf) n.kids.forEach(w);})(root);return c;}
+  function height(){var h=1,n=root;while(!n.leaf){n=n.kids[0];h++;}return h;}
+  function nKeys(){var c=0,n=root;while(!n.leaf) n=n.kids[0];while(n){c+=n.keys.length;n=n.next;}return c;}
+
+  function el(n,a,p){var e=document.createElementNS(NS,n);for(var k in a) e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e;}
+  var KW=30,PAD=6,GAP=14,LH=78;
+  function draw(log){
+    svg.textContent='';
+    var levels=[],q=[[root,0]];
+    while(q.length){var x=q.shift();(levels[x[1]]=levels[x[1]]||[]).push(x[0]);if(!x[0].leaf) x[0].kids.forEach(function(c){q.push([c,x[1]+1]);});}
+    var H=levels.length,w=function(n){return Math.max(1,n.keys.length)*KW+PAD*2;};
+    var leaves=levels[H-1],tot=leaves.reduce(function(s,n){return s+w(n);},0)+GAP*(leaves.length-1);
+    var W=Math.max(900,tot+40),pos={},x0=(W-tot)/2;
+    leaves.forEach(function(n){pos[n.id]={x:x0,y:20+(H-1)*LH};x0+=w(n)+GAP;});
+    for(var l=H-2;l>=0;l--) levels[l].forEach(function(n){
+      var a=pos[n.kids[0].id],b=pos[n.kids[n.kids.length-1].id];
+      var cx=(a.x+b.x+w(n.kids[n.kids.length-1]))/2;pos[n.id]={x:cx-w(n)/2,y:20+l*LH};
+    });
+    svg.setAttribute('viewBox','0 0 '+W+' '+(H*LH+10));
+    // cạnh cha → con
+    levels.forEach(function(lv){lv.forEach(function(n){if(n.leaf) return;var p=pos[n.id];
+      n.kids.forEach(function(c,i){var cp=pos[c.id];var on=hl.read[n.id]&&hl.read[c.id];
+        el('line',{x1:p.x+PAD+i*KW,y1:p.y+30,x2:cp.x+w(c)/2,y2:cp.y,stroke:on?'#0E6E5C':'#B8C3BF','stroke-width':on?2.4:1.2});});});});
+    // chuỗi lá
+    leaves.forEach(function(n){if(!n.next) return;var a=pos[n.id],b=pos[n.next.id];var on=hl.read[n.id]&&hl.read[n.next.id];
+      el('line',{x1:a.x+w(n),y1:a.y+15,x2:b.x,y2:b.y+15,stroke:on?'#0E6E5C':'#5B45A8','stroke-width':on?2.4:1.2});});
+    // trang
+    levels.forEach(function(lv){lv.forEach(function(n){
+      var p=pos[n.id],ww=w(n),fresh=hl.fresh[n.id],read=hl.read[n.id];
+      el('rect',{x:p.x,y:p.y,width:ww,height:30,rx:5,fill:fresh?'#FBEFD9':(n.leaf?'#ECE7F7':'#E3ECF8'),stroke:read?'#0E6E5C':(fresh?'#9A5B00':(n.leaf?'#5B45A8':'#2F5DA8')),'stroke-width':read?3:(fresh?2:1.2)});
+      if(!n.keys.length){var t0=el('text',{x:p.x+ww/2,y:p.y+19,'text-anchor':'middle','font-size':11,fill:'#6B7773'});t0.textContent='trống';}
+      n.keys.forEach(function(k,i){
+        var cx=p.x+PAD+i*KW+KW/2,f=n.leaf&&hl.found[k];
+        if(f) el('rect',{x:cx-KW/2+2,y:p.y+4,width:KW-4,height:22,rx:4,fill:'#0E6E5C'});
+        if(i>0) el('line',{x1:p.x+PAD+i*KW,y1:p.y+6,x2:p.x+PAD+i*KW,y2:p.y+24,stroke:'#C9D2CE'});
+        var t=el('text',{x:cx,y:p.y+19,'text-anchor':'middle','font-size':12.5,'font-family':'IBM Plex Mono,monospace','font-weight':f?600:400,fill:f?'#fff':'#16201D'});t.textContent=k;
+      });
+      var lb=el('text',{x:p.x,y:p.y-4,'font-size':9.5,fill:'#6B7773'});lb.textContent='trang '+n.id;
+    });});
+    var st=document.getElementById('tstats');st.textContent='';
+    [['Chiều cao',height()],['Số trang',countPages()],['Số khoá',nKeys()]].forEach(function(x){
+      var s=document.createElement('span');var b=document.createElement('b');b.textContent=x[1];s.appendChild(document.createTextNode(x[0]+': '));s.appendChild(b);st.appendChild(s);});
+    var ul=document.getElementById('tlog');ul.textContent='';
+    (log||[]).forEach(function(m){var li=document.createElement('li');li.textContent=m;ul.appendChild(li);});
+  }
+  var $=function(id){return document.getElementById(id);};
+  $('bIns').addEventListener('click',function(){var k=parseInt($('k').value,10);if(isNaN(k)) return;draw(['Chèn '+k+':'].concat(insert(k)));});
+  $('bNext').addEventListener('click',function(){
+    if(nextIdx>=SAMPLE.length){draw(['Đã chèn hết dãy mẫu ('+SAMPLE.join(', ')+'). Thử chèn khoá tuỳ ý hoặc khoá ngẫu nhiên.']);return;}
+    var k=SAMPLE[nextIdx++];$('k').value=k;draw(['Chèn '+k+' (khoá thứ '+nextIdx+' của dãy mẫu):'].concat(insert(k)));});
+  $('bRand').addEventListener('click',function(){var all=[];for(var i=0;i<5;i++){var k=1+Math.floor(Math.random()*99),l=insert(k);all.push('Chèn '+k+': '+l[l.length-1]);}hl={read:{},fresh:{},found:{}};draw(all);});
+  $('bReset').addEventListener('click',function(){reset();draw(['Cây trống: một trang lá, cũng là gốc.']);});
+  $('bFind').addEventListener('click',function(){var k=parseInt($('k').value,10);if(isNaN(k)) return;draw(['Tìm '+k+':'].concat(find(k)));});
+  $('bRange').addEventListener('click',function(){var a=parseInt($('ra').value,10),b=parseInt($('rb').value,10);if(isNaN(a)||isNaN(b)) return;draw(['Tìm khoảng '+a+' tới '+b+':'].concat(range(a,b)));});
+  // Mở đầu: chèn sẵn 12 khoá mẫu để có cây 3 tầng.
+  reset();for(var i=0;i<12;i++) insert(SAMPLE[nextIdx++]);hl={read:{},fresh:{},found:{}};
+  draw(['Đã chèn sẵn 12 khoá đầu của dãy mẫu: '+SAMPLE.slice(0,12).join(', ')+'. Bấm "Cây trống" để xem cây lớn lên từ đầu.']);
+})();
+</script>
+</body>
+</html>

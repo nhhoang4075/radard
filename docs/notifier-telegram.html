@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Notifier và Telegram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7; --red:#A83A2F; --red-soft:#F8E4E1;
+  --tg:#2AABEE; --tg-bg:#DCE8D2; --tg-bubble:#FFFFFF;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px);margin-top:8px}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h2 .n{font-family:var(--mono);font-size:14px;color:var(--ink-3);font-weight:500;margin-right:10px;vertical-align:middle}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+ul,ol{max-width:76ch;padding-left:22px}
+li{margin:4px 0}
+a{color:var(--accent)}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;color:var(--ink-3)}
+.lede{font-size:17.5px;color:var(--ink-2);max-width:72ch}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+pre .c{color:var(--ink-3)}
+pre .k{color:var(--violet)}
+pre .s{color:var(--accent)}
+pre .h{background:var(--warn-soft)}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{text-decoration:none;font-weight:500}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:700px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tablewrap{overflow-x:auto;margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+.callout{margin-top:16px;padding:14px 16px;border-radius:10px;border-left:4px solid var(--accent);background:var(--accent-soft);max-width:86ch}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+.callout.blue{border-color:var(--blue);background:var(--blue-soft)}
+.callout.red{border-color:var(--red);background:var(--red-soft)}
+.callout p:first-child{margin-top:0}
+.callout b.t{display:block;font-family:var(--display);font-size:16px;margin-bottom:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h3{margin-top:0}
+.pill{display:inline-block;font-family:var(--mono);font-size:12px;padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.pill.v{background:var(--violet-soft);color:var(--violet)}
+.pill.b{background:var(--blue-soft);color:var(--blue)}
+.pill.w{background:var(--warn-soft);color:var(--warn)}
+
+/* demo escape */
+.demo{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.demo label{font-size:13px;color:var(--ink-2);display:block;margin-top:10px}
+.demo input,.demo textarea{width:100%;font-family:var(--mono);font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink)}
+.demo-out{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-top:14px}
+.demo-out pre{margin:0;white-space:pre-wrap;word-break:break-word}
+.lbl{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--ink-3);text-transform:uppercase;margin-bottom:6px}
+
+/* phone */
+.phone{background:var(--tg-bg);border-radius:18px;padding:12px;border:6px solid #1d2422;min-height:120px;display:flex;flex-direction:column;gap:8px}
+.phone .top{font-size:13px;font-weight:600;color:#1d2422;display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1px solid rgba(0,0,0,.08)}
+.phone .ava{width:24px;height:24px;border-radius:50%;background:var(--tg);color:#fff;display:grid;place-items:center;font-size:12px}
+.bubble{background:var(--tg-bubble);border-radius:12px 12px 12px 4px;padding:8px 10px;font-size:14px;line-height:1.45;color:#111;max-width:100%;word-break:break-word}
+.bubble a{color:#1a73c9}
+.bubble .meta{font-size:11px;color:#8a938f;text-align:right;margin-top:2px}
+.kb{display:flex;gap:4px;margin-top:4px}
+.kb button{flex:1;border:0;border-radius:8px;padding:7px 4px;background:rgba(255,255,255,.65);font:inherit;font-size:14px;cursor:pointer;color:#111}
+.kb button:hover{background:#fff}
+.kb button.on{background:#fff;font-weight:600;box-shadow:inset 0 0 0 2px var(--tg)}
+.toast{position:relative;align-self:center;background:rgba(20,28,26,.85);color:#fff;font-size:13px;padding:6px 12px;border-radius:8px;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+
+/* simulator */
+.sim{display:grid;grid-template-columns:300px 1fr;gap:16px;margin-top:16px}
+.sim .side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.log{background:#141c1a;color:#d8e2de;border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.55;height:250px;overflow:auto}
+.log .t{color:#8fd3c0}
+.log .x{color:#f0b46a}
+.log .d{color:#8a9893}
+.log .r{color:#f08f84}
+.mini{font-size:13px}
+.mini td,.mini th{padding:5px 8px}
+.mini tr.new td{background:var(--accent-soft)}
+.mini tr.dup td{background:var(--red-soft);text-decoration:line-through;color:var(--ink-3)}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+
+details{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+details summary{cursor:pointer;font-weight:600}
+details[open] summary{margin-bottom:6px}
+footer{margin-top:64px;font-size:13px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:14px}
+
+/* tabs */
+nav.tabs{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;margin:22px -16px 0;padding:10px 16px;background:var(--ground);border-bottom:1px solid var(--line);scrollbar-width:thin}
+nav.tabs a{flex:none;text-decoration:none;color:var(--ink-2);font-size:14px;font-weight:500;padding:6px 12px;border-radius:8px;border:1px solid transparent;white-space:nowrap}
+nav.tabs a span{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+nav.tabs a:hover{background:var(--surface);border-color:var(--line)}
+nav.tabs a.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+nav.tabs a.active span{color:#B9C6C1}
+section.tab{display:none}
+section.tab.active{display:block}
+section.tab h2{margin-top:28px}
+.pager{display:flex;justify-content:space-between;gap:12px;margin-top:40px;padding-top:16px;border-top:1px solid var(--line)}
+.pager a{text-decoration:none;font-weight:500;font-size:14.5px;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.pager a:hover{border-color:var(--accent)}
+
+@media (max-width:760px){
+  .grid2,.demo-out,.sim{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · GIẢI THÍCH KỸ THUẬT · TUẦN 3 · BƯỚC 4</div>
+<h1>Notifier, adapter Telegram và Telegram Bot API</h1>
+<p class="lede">Trang này giải thích phần “gửi tin có nút 👍/👎 và nhận lượt bấm” trong kế hoạch <code>tuan-3-thuc-thi.html</code>: Notifier là gì, adapter Telegram làm gì, Telegram Bot API thực chất hoạt động ra sao, và vì sao kế hoạch chọn từng chi tiết như vậy. Có hai bản chạy thử ngay trên trang: thử escape HTML (tab 03) và thử bấm nút (tab 05).</p>
+
+<nav class="tabs" id="tabs">
+  <a href="#s1"><span>01</span>Bức tranh lớn</a>
+  <a href="#s2"><span>02</span>Bot API</a>
+  <a href="#s3"><span>03</span>Gửi một tin</a>
+  <a href="#s4"><span>04</span>Nút và callback</a>
+  <a href="#s5"><span>05</span>Thử bấm nút</a>
+  <a href="#s6"><span>06</span>Long polling</a>
+  <a href="#s7"><span>07</span>Giới hạn và lỗi</a>
+  <a href="#s8"><span>08</span>Bảo mật</a>
+  <a href="#s9"><span>09</span>grammY</a>
+  <a href="#s10"><span>10</span>Phác thảo code</a>
+  <a href="#s11"><span>11</span>Khi review</a>
+</nav>
+
+<section class="tab" id="s1">
+<h2><span class="n">01</span>Bức tranh lớn: ổ cắm và phích cắm</h2>
+<p>radard dùng kiến trúc <b>ports &amp; adapters</b>. Hãy hình dung ổ cắm điện trên tường: nó quy định hình dạng (hai chân tròn, 220V). Mọi thiết bị muốn dùng điện đều phải có phích cắm khớp hình dạng đó. Ổ cắm không cần biết bạn cắm quạt hay sạc điện thoại.</p>
+<ul>
+  <li><b>Notifier</b> là cái ổ cắm. Nó là một <code>interface</code> TypeScript trong <code>packages/core</code>. Nó chỉ nói: “đưa tôi một tin ở dạng trung lập, tôi gửi đi và trả về id của tin”.</li>
+  <li><b>Adapter Telegram</b> (<code>packages/adapters/src/telegram.ts</code>) là một phích cắm. Nó biết mọi chi tiết riêng của Telegram: URL, HTML, nút bấm, giới hạn tốc độ.</li>
+  <li><b>Adapter giả</b> (<code>notify-fake.ts</code>) là phích cắm thứ hai. Nó không gửi gì cả, chỉ ghi tin vào một mảng trong bộ nhớ. Test dùng nó để kiểm job digest mà không gọi mạng.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 900 330" role="img" aria-label="Sơ đồ ports and adapters của Notifier">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5753"/></marker>
+  </defs>
+  <!-- core -->
+  <rect x="20" y="20" width="390" height="290" rx="14" fill="#DDEEE9" stroke="#0E6E5C"/>
+  <text x="40" y="48" font-size="13" fill="#0E6E5C" font-weight="600" letter-spacing="1">LÕI · packages/core + jobs</text>
+  <rect x="45" y="70" width="160" height="70" rx="10" fill="#fff" stroke="#D9E0DD"/>
+  <text x="125" y="98" font-size="15" text-anchor="middle" font-weight="600">job digest</text>
+  <text x="125" y="120" font-size="12" text-anchor="middle" fill="#4A5753">chọn 7 tin, gọi LLM</text>
+  <rect x="45" y="190" width="160" height="90" rx="10" fill="#fff" stroke="#D9E0DD"/>
+  <text x="125" y="215" font-size="13" text-anchor="middle" font-weight="600">Message (trung lập)</text>
+  <text x="125" y="237" font-size="11.5" text-anchor="middle" fill="#4A5753" font-family="IBM Plex Mono">title · lines[]</text>
+  <text x="125" y="254" font-size="11.5" text-anchor="middle" fill="#4A5753" font-family="IBM Plex Mono">url · actions[]</text>
+  <text x="125" y="271" font-size="11" text-anchor="middle" fill="#6B7773">không có HTML</text>
+  <path d="M125 140 L125 188" stroke="#4A5753" stroke-width="1.5" marker-end="url(#ar)"/>
+  <!-- port -->
+  <rect x="250" y="120" width="140" height="80" rx="10" fill="#fff" stroke="#0E6E5C" stroke-width="2"/>
+  <text x="320" y="150" font-size="15" text-anchor="middle" font-weight="700" fill="#0E6E5C">Notifier</text>
+  <text x="320" y="170" font-size="11.5" text-anchor="middle" font-family="IBM Plex Mono">send(to, msg)</text>
+  <text x="320" y="187" font-size="11.5" text-anchor="middle" font-family="IBM Plex Mono">→ { providerMsgId }</text>
+  <path d="M205 235 Q240 235 260 202" stroke="#4A5753" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+  <!-- port socket marks -->
+  <rect x="396" y="140" width="22" height="12" rx="3" fill="#0E6E5C"/>
+  <rect x="396" y="168" width="22" height="12" rx="3" fill="#0E6E5C"/>
+  <!-- adapters -->
+  <text x="450" y="48" font-size="13" fill="#5B45A8" font-weight="600" letter-spacing="1">ADAPTER · packages/adapters</text>
+  <rect x="450" y="65" width="200" height="66" rx="10" fill="#ECE7F7" stroke="#5B45A8"/>
+  <text x="550" y="92" font-size="14" text-anchor="middle" font-weight="600">telegram.ts</text>
+  <text x="550" y="113" font-size="11.5" text-anchor="middle" fill="#4A5753">HTML, nút, giãn nhịp, 429</text>
+  <rect x="450" y="145" width="200" height="66" rx="10" fill="#ECE7F7" stroke="#5B45A8"/>
+  <text x="550" y="172" font-size="14" text-anchor="middle" font-weight="600">notify-fake.ts</text>
+  <text x="550" y="193" font-size="11.5" text-anchor="middle" fill="#4A5753">ghi vào mảng, cho test</text>
+  <rect x="450" y="225" width="200" height="66" rx="10" fill="#fff" stroke="#5B45A8" stroke-dasharray="5 4"/>
+  <text x="550" y="252" font-size="14" text-anchor="middle" font-weight="600" fill="#6B7773">discord.ts · webpush.ts</text>
+  <text x="550" y="273" font-size="11.5" text-anchor="middle" fill="#6B7773">để sau, không sửa lõi</text>
+  <path d="M418 160 L448 98" stroke="#5B45A8" stroke-width="1.5" fill="none"/>
+  <path d="M418 160 L448 178" stroke="#5B45A8" stroke-width="1.5" fill="none"/>
+  <path d="M418 160 L448 258" stroke="#5B45A8" stroke-width="1.5" fill="none" stroke-dasharray="4 4"/>
+  <!-- external -->
+  <rect x="700" y="55" width="180" height="86" rx="10" fill="#fff" stroke="#2AABEE" stroke-dasharray="6 4"/>
+  <text x="790" y="85" font-size="14" text-anchor="middle" font-weight="600">api.telegram.org</text>
+  <text x="790" y="106" font-size="11.5" text-anchor="middle" fill="#4A5753">HTTPS + JSON</text>
+  <text x="790" y="124" font-size="11.5" text-anchor="middle" fill="#4A5753">dịch vụ bên ngoài</text>
+  <path d="M650 98 L698 98" stroke="#4A5753" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="740" y="170" width="100" height="130" rx="16" fill="#1d2422"/>
+  <rect x="748" y="182" width="84" height="106" rx="8" fill="#DCE8D2"/>
+  <rect x="756" y="194" width="68" height="30" rx="6" fill="#fff"/>
+  <rect x="756" y="228" width="32" height="14" rx="4" fill="#fff" opacity=".7"/>
+  <rect x="792" y="228" width="32" height="14" rx="4" fill="#fff" opacity=".7"/>
+  <text x="772" y="239" font-size="10">👍</text><text x="802" y="239" font-size="10">👎</text>
+  <text x="790" y="268" font-size="11" text-anchor="middle" fill="#1d2422">điện thoại</text>
+  <path d="M790 141 L790 168" stroke="#4A5753" stroke-width="1.5" marker-end="url(#ar)"/>
+</svg>
+<figcaption>Hình 1. Lõi chỉ biết <code>Notifier</code>. Đổi Telegram sang Discord là thêm một adapter mới và đổi cấu hình; job digest không đổi dòng nào. Quy tắc 1 trong thiết kế: chỉ <code>packages/adapters</code> được biết Telegram tồn tại.</figcaption>
+</figure>
+
+<h3>Hai chiều, hai thành phần</h3>
+<p>Telegram ở radard là kênh <b>hai chiều</b>, nên có hai phần tách biệt. Đây là chỗ dễ lẫn nhất:</p>
+<div class="grid2">
+  <div class="card">
+    <span class="pill">Chiều đi</span>
+    <h3 style="margin-top:8px">Notifier.send()</h3>
+    <p>radard → Telegram → điện thoại. Job digest gọi lúc 07:00. Mỗi tin gửi xong trả về <code>message_id</code>, job ghi ngay một dòng <code>deliveries</code>.</p>
+    <p class="mini" style="color:var(--ink-2)">Ai gọi: <code>jobs/digest.ts</code>, CLI <code>notify test</code>.</p>
+  </div>
+  <div class="card">
+    <span class="pill v">Chiều về</span>
+    <h3 style="margin-top:8px">Vai trò bot</h3>
+    <p>Điện thoại → Telegram → radard. Bạn bấm 👍, Telegram giữ sự kiện đó lại; vai trò <code>bot</code> hỏi lấy về (long polling), tìm <code>deliveries</code> theo <code>message_id</code>, ghi <code>feedback</code>.</p>
+    <p class="mini" style="color:var(--ink-2)">Ai chạy: <code>apps/daemon/src/roles/bot.ts</code>, chạy liên tục.</p>
+  </div>
+</div>
+<div class="callout blue"><p>Thiết kế gốc gọi chiều về là <code>ChatChannel</code> (một interface khác, quy mọi kênh về cùng một lệnh nội bộ như <code>feedback</code>). Kế hoạch tuần 3 chưa tách interface này; bot đọc Telegram trực tiếp. Không sai, chỉ là bản tối giản. Khi thêm Discord sẽ cần tách.</p></div>
+<div class="pager"><span></span><a class="pn" href="#s2">02 Bot API →</a></div>
+</section>
+<section class="tab" id="s2">
+<h2><span class="n">02</span>Telegram Bot API thực chất là gì</h2>
+<p>Không có gì bí ẩn: Bot API là <b>một bộ URL HTTPS nhận và trả JSON</b>. Không cần SDK, không cần WebSocket. Mọi lệnh đều có dạng:</p>
+<pre><code>POST https://api.telegram.org/bot<span class="h">&lt;TOKEN&gt;</span>/<span class="k">&lt;tênPhươngThức&gt;</span>
+Content-Type: application/json
+
+{ ...tham số... }</code></pre>
+<p>Và mọi câu trả lời đều theo một trong hai hình:</p>
+<div class="grid2">
+<pre><code><span class="c">// thành công</span>
+{
+  "ok": true,
+  "result": { ... }
+}</code></pre>
+<pre><code><span class="c">// thất bại</span>
+{
+  "ok": false,
+  "error_code": 429,
+  "description": "Too Many Requests: retry after 3",
+  "parameters": { "retry_after": 3 }
+}</code></pre>
+</div>
+<p>Vì vậy adapter có thể viết bằng <code>fetch</code> thuần của Bun, khoảng 100–150 dòng. Thiết kế gốc có nhắc thư viện <b>grammY</b> (xem <a href="#s9">tab 09</a>); kế hoạch tuần 3 không nói rõ dùng gì. Với 5 phương thức như dưới đây, <code>fetch</code> thuần đủ dùng và ít phụ thuộc hơn; grammY đáng giá hơn khi có nhiều lệnh, hội thoại nhiều bước (như luồng “➕ Tự thêm” chủ đề ở bước 5).</p>
+
+<h3>Năm phương thức radard cần</h3>
+<div class="tablewrap"><table>
+<tr><th>Phương thức</th><th>Làm gì</th><th>radard dùng ở đâu</th></tr>
+<tr><td><code>sendMessage</code></td><td>Gửi một tin. Trả về đối tượng <code>Message</code>, trong đó có <code>message_id</code></td><td>Tin mở đầu và 7 tin sự kiện. <code>message_id</code> ghi vào <code>deliveries.message_id</code></td></tr>
+<tr><td><code>getUpdates</code></td><td>Hỏi “có gì mới cho bot không?” (bấm nút, tin nhắn, lệnh)</td><td>Vòng lặp của vai trò bot (tab 06)</td></tr>
+<tr><td><code>answerCallbackQuery</code></td><td>Xác nhận đã nhận một lượt bấm; hiện thông báo nhỏ trên điện thoại</td><td>“Đã ghi nhận 👍”. Không gọi thì nút cứ quay vòng</td></tr>
+<tr><td><code>editMessageReplyMarkup</code></td><td>Thay bộ nút của một tin đã gửi</td><td>Đổi nút thành “👍 ✓” để bạn thấy mình đã bấm gì</td></tr>
+<tr><td><code>setMyCommands</code></td><td>Đặt menu lệnh hiện khi gõ <code>/</code></td><td><code>/start</code>, <code>/topics</code> (bước 5)</td></tr>
+</table></div>
+
+<h3>Ba khái niệm nền</h3>
+<div class="tablewrap"><table>
+<tr><th>Khái niệm</th><th>Nghĩa</th><th>Ví dụ</th></tr>
+<tr><td><b>Bot token</b></td><td>Chìa khoá duy nhất của bot, @BotFather cấp. Ai có token là điều khiển được bot hoàn toàn</td><td><code>123456:ABC-xyz…</code> (nằm trong <code>.env</code>)</td></tr>
+<tr><td><b>chat_id</b></td><td>Định danh cuộc trò chuyện. Với chat riêng giữa bạn và bot, nó bằng user id của bạn. Bot <b>không thể nhắn trước</b> cho ai chưa bấm /start</td><td><code>100000001</code> (số giả). Lưu ở <code>digests.recipient</code></td></tr>
+<tr><td><b>Update</b></td><td>Một sự kiện Telegram giữ cho bot: tin nhắn mới, lượt bấm nút… Mỗi update có <code>update_id</code> tăng dần</td><td><code>{ update_id: 9001, callback_query: {...} }</code></td></tr>
+</table></div>
+<div class="pager"><a class="pn" href="#s1">← 01 Bức tranh lớn</a><a class="pn" href="#s3">03 Gửi một tin →</a></div>
+</section>
+<section class="tab" id="s3">
+<h2><span class="n">03</span>Gửi một tin: từ Message trung lập tới HTML Telegram</h2>
+<p>Lõi đưa cho adapter một <code>Message</code> chỉ có văn bản thuần. Adapter làm ba việc: <b>escape</b> ký tự đặc biệt, <b>ghép</b> thành HTML mà Telegram hiểu, và <b>gắn nút</b>.</p>
+
+<h3>Vì sao phải escape</h3>
+<p>radard gửi với <code>parse_mode: "HTML"</code> để có chữ đậm và link. Khi đó Telegram đọc mọi dấu <code>&lt;</code> như mở đầu một thẻ. Một tiêu đề bài HN như <code>Why x &lt; y in Rust &amp; C++</code> nếu gửi thẳng thì Telegram trả lỗi <code>400 Bad Request: can't parse entities</code> và <b>cả tin không được gửi</b>. Chỉ cần thay ba ký tự:</p>
+<div class="tablewrap"><table>
+<tr><th>Ký tự</th><th>Thay bằng</th><th>Ghi chú</th></tr>
+<tr><td><code>&amp;</code></td><td><code>&amp;amp;</code></td><td>Phải thay <b>đầu tiên</b>, nếu không sẽ thay hỏng kết quả của hai dòng dưới</td></tr>
+<tr><td><code>&lt;</code></td><td><code>&amp;lt;</code></td><td></td></tr>
+<tr><td><code>&gt;</code></td><td><code>&amp;gt;</code></td><td></td></tr>
+<tr><td><code>"</code></td><td><code>&amp;quot;</code></td><td>Chỉ cần trong giá trị thuộc tính, ví dụ URL trong <code>&lt;a href="…"&gt;</code></td></tr>
+</table></div>
+<p>Telegram chỉ hỗ trợ một tập thẻ nhỏ: <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;u&gt;</code>, <code>&lt;s&gt;</code>, <code>&lt;a href&gt;</code>, <code>&lt;code&gt;</code>, <code>&lt;pre&gt;</code>, <code>&lt;blockquote&gt;</code>, <code>&lt;tg-spoiler&gt;</code>. Không có <code>&lt;br&gt;</code>, <code>&lt;p&gt;</code>; xuống dòng dùng <code>\n</code>.</p>
+
+<div class="demo" id="escDemo">
+  <div class="lbl">Thử ngay: gõ tiêu đề và tóm tắt, xem adapter sẽ gửi gì</div>
+  <label for="inTitle">title</label>
+  <input id="inTitle" value="Why x < y in Rust & C++ matters">
+  <label for="inLine">lines[0]</label>
+  <input id="inLine" value="Bài phân tích so sánh <T> generic giữa hai ngôn ngữ.">
+  <label for="inUrl">url</label>
+  <input id="inUrl" value="https://example.com/a?x=1&y=2">
+  <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:var(--ink)"><input type="checkbox" id="noEsc" style="width:auto"> Tắt escape (xem chuyện gì xảy ra)</label>
+  <div class="demo-out">
+    <div>
+      <div class="lbl">Body gửi tới sendMessage</div>
+      <pre id="outJson"></pre>
+    </div>
+    <div>
+      <div class="lbl">Trên điện thoại</div>
+      <div class="phone">
+        <div class="top"><span class="ava">R</span>radard bot</div>
+        <div id="outPhone"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>Ba tham số đáng chú ý của sendMessage</h3>
+<ul>
+  <li><code>link_preview_options: { "is_disabled": true }</code>: tắt khung xem trước link. Không tắt thì 7 tin mỗi sáng sẽ có 7 ảnh to, rất dài. (Tham số cũ <code>disable_web_page_preview</code> đã bị thay bằng tham số này.)</li>
+  <li><code>reply_markup.inline_keyboard</code>: mảng các <b>hàng</b>, mỗi hàng là mảng các nút. <code>[[👍, 👎]]</code> là một hàng hai nút; <code>[[👍], [👎]]</code> là hai hàng.</li>
+  <li>Mỗi nút có <code>text</code> (chữ hiện ra) và <code>callback_data</code> (chuỗi bí mật gửi về bot khi bấm, <b>tối đa 64 byte</b>). Nút link thì dùng <code>url</code> thay cho <code>callback_data</code>.</li>
+</ul>
+<div class="pager"><a class="pn" href="#s2">← 02 Bot API</a><a class="pn" href="#s4">04 Nút và callback →</a></div>
+</section>
+<section class="tab" id="s4">
+<h2><span class="n">04</span>Nút bấm và callback: từ 👍 trên điện thoại tới một dòng feedback</h2>
+
+<figure>
+<svg viewBox="0 0 900 520" role="img" aria-label="Sơ đồ tuần tự gửi tin và bấm nút">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16201D"/></marker>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5B45A8"/></marker>
+  </defs>
+  <g font-size="13" font-weight="600" text-anchor="middle">
+    <rect x="30" y="10" width="130" height="34" rx="8" fill="#DDEEE9" stroke="#0E6E5C"/><text x="95" y="32">job digest</text>
+    <rect x="230" y="10" width="130" height="34" rx="8" fill="#fff" stroke="#16201D"/><text x="295" y="32">Postgres</text>
+    <rect x="430" y="10" width="150" height="34" rx="8" fill="#fff" stroke="#2AABEE"/><text x="505" y="32">api.telegram.org</text>
+    <rect x="640" y="10" width="110" height="34" rx="8" fill="#fff" stroke="#16201D"/><text x="695" y="32">điện thoại</text>
+    <rect x="780" y="10" width="100" height="34" rx="8" fill="#ECE7F7" stroke="#5B45A8"/><text x="830" y="32">vai trò bot</text>
+  </g>
+  <g stroke="#D9E0DD" stroke-dasharray="4 4"><line x1="95" y1="44" x2="95" y2="510"/><line x1="295" y1="44" x2="295" y2="510"/><line x1="505" y1="44" x2="505" y2="510"/><line x1="695" y1="44" x2="695" y2="510"/><line x1="830" y1="44" x2="830" y2="510"/></g>
+  <g font-size="12">
+    <line x1="95" y1="75" x2="503" y2="75" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="110" y="68">① sendMessage  nút: fb:like / fb:dislike</text>
+    <line x1="505" y1="95" x2="693" y2="95" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="520" y="90" fill="#4A5753">tin hiện ra</text>
+    <line x1="505" y1="120" x2="97" y2="120" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="250" y="114">② { ok: true, result: { message_id: 58 } }</text>
+    <line x1="95" y1="150" x2="293" y2="150" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="105" y="144">③ INSERT deliveries</text>
+    <text x="105" y="166" fill="#4A5753" font-family="IBM Plex Mono" font-size="11">id=87, message_id=58</text>
+
+    <rect x="560" y="190" width="270" height="26" rx="6" fill="#FBEFD9"/>
+    <text x="695" y="208" text-anchor="middle" fill="#9A5B00">… 08:15, bạn bấm 👍 …</text>
+
+    <line x1="695" y1="235" x2="507" y2="235" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="520" y="229" fill="#4A5753">④ bấm</text>
+    <line x1="828" y1="265" x2="507" y2="265" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="545" y="259" fill="#5B45A8">⑤ getUpdates (đang chờ sẵn)</text>
+    <line x1="505" y1="290" x2="828" y2="290" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="520" y="284" fill="#5B45A8">⑥ callback_query: data="fb:like", message_id=58</text>
+    <line x1="830" y1="320" x2="297" y2="320" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="380" y="314" fill="#5B45A8">⑦ tìm delivery theo (telegram, chat, 58) → 87</text>
+    <line x1="830" y1="350" x2="297" y2="350" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="380" y="344" fill="#5B45A8">⑧ INSERT feedback (87, like, "cb:…")</text>
+    <line x1="828" y1="385" x2="507" y2="385" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="545" y="379" fill="#5B45A8">⑨ answerCallbackQuery "Đã ghi nhận 👍"</text>
+    <line x1="505" y1="405" x2="693" y2="405" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="520" y="400" fill="#4A5753">toast hiện</text>
+    <line x1="828" y1="440" x2="507" y2="440" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="545" y="434" fill="#5B45A8">⑩ editMessageReplyMarkup "👍 ✓"</text>
+    <line x1="505" y1="460" x2="693" y2="460" stroke="#16201D" marker-end="url(#ar2)"/>
+    <text x="520" y="455" fill="#4A5753">nút đổi</text>
+    <line x1="828" y1="490" x2="507" y2="490" stroke="#5B45A8" marker-end="url(#ar3)"/>
+    <text x="545" y="484" fill="#5B45A8">⑪ getUpdates offset=9002 (xác nhận, chờ tiếp)</text>
+  </g>
+</svg>
+<figcaption>Hình 2. Bước ①–③ chạy lúc 07:00, một lần cho mỗi tin. Bước ④–⑪ chạy mỗi khi bạn bấm. Telegram không gọi tới radard; chính bot đi hỏi (⑤). Đó là long polling, tab 06.</figcaption>
+</figure>
+
+<h3>Một callback_query trông thế nào</h3>
+<p>Đây là update Telegram trả về ở bước ⑥ (rút gọn). Phần tô vàng là ba thứ bot cần:</p>
+<pre><code>{
+  "update_id": 9001,
+  "callback_query": {
+    "id": <span class="h">"4382917450193746"</span>,        <span class="c">← id lượt bấm. Dùng cho answerCallbackQuery và chống ghi trùng</span>
+    "from": { "id": 100000001, "first_name": "Hoang" },
+    "message": {
+      "message_id": <span class="h">58</span>,                <span class="c">← tin nào được bấm → tìm deliveries</span>
+      "chat": { "id": <span class="h">100000001</span>, "type": "private" },  <span class="c">← ai bấm → lọc người lạ</span>
+      "text": "Anthropic mời cộng đồng…"
+    },
+    "data": "fb:like"                 <span class="c">← callback_data của nút</span>
+  }
+}</code></pre>
+
+<h3>Vì sao nút không mang id delivery</h3>
+<div class="callout warn">
+<b class="t">Bài toán con gà và quả trứng</b>
+<p>Bản 11/10 định gắn nút <code>fb:87:like</code>, với 87 là id dòng <code>deliveries</code>. Nhưng theo thứ tự thời gian:</p>
+<ol>
+  <li>Muốn có id 87 thì phải INSERT dòng <code>deliveries</code>.</li>
+  <li>Dòng đó cần <code>message_id</code> (cột NOT NULL).</li>
+  <li><code>message_id</code> chỉ có <b>sau khi</b> gửi tin.</li>
+  <li>Mà nút phải được gắn <b>lúc</b> gửi tin.</li>
+</ol>
+<p>Không thể có 87 trước khi gửi. Cách sửa trong bản 12/10: nút chỉ mang <code>fb:like</code>. Callback luôn kèm <code>message.message_id</code> và <code>chat.id</code>, nên bot tìm delivery bằng khoá duy nhất <code>(channel, recipient, message_id)</code> đã có sẵn trong schema (<code>deliveries_message_uq</code>). Không phải đổi schema, và khoá duy nhất đó cũng chính là index giúp tra nhanh.</p>
+</div>
+<p class="mini" style="color:var(--ink-2)">Một cách khác (không dùng) là gửi tin trước, rồi gọi <code>editMessageReplyMarkup</code> để gắn nút có id. Tốn gấp đôi request và có lúc tin hiện ra mà chưa có nút.</p>
+
+<h3>Chống ghi trùng không cần lưu offset</h3>
+<p>Telegram có thể giao lại cùng một update (ví dụ bot khởi động lại trước khi kịp xác nhận). Kế hoạch lưu <code>"cb:" + callback_query.id</code> vào <code>feedback.source_message_id</code>. Khoá duy nhất <code>feedback_source_message_uq (channel, recipient, source_message_id)</code> sẽ chặn dòng thứ hai. Đây là kiểu <b>idempotent</b>: làm một lần hay mười lần, kết quả như nhau.</p>
+<p>Lưu ý chữ “bấm hai lần”: <b>hai lượt bấm thật</b> (👍 rồi 👎) có hai <code>callback_query.id</code> khác nhau, nên ra hai dòng, đúng ý “chỉ ghi thêm, dòng mới nhất là ý kiến hiện tại”. Chỉ <b>cùng một update bị giao lại</b> mới bị chặn. Bản thử ở tab 05 cho thấy hai trường hợp này.</p>
+<div class="pager"><a class="pn" href="#s3">← 03 Gửi một tin</a><a class="pn" href="#s5">05 Thử bấm nút →</a></div>
+</section>
+<section class="tab" id="s5">
+<h2><span class="n">05</span>Thử bấm nút</h2>
+<p>Bản mô phỏng dưới đây chạy đúng logic kế hoạch mô tả, trên dữ liệu mẫu trong <code>tuan-3.html</code>. Bấm 👍/👎 trên “điện thoại”, rồi thử hai nút phía dưới để xem bot xử lý trường hợp xấu.</p>
+
+<div class="sim">
+  <div class="side">
+    <div class="phone" id="simPhone">
+      <div class="top"><span class="ava">R</span>radard bot</div>
+      <div class="bubble"><b>Sáng 12/10: 2 sự kiện đáng chú ý</b><div class="meta">07:00 · msg 57</div></div>
+      <div>
+        <div class="bubble"><b>1. Anthropic mời cộng đồng góp ý về AI</b><br>Anthropic mở khảo sát công khai… <a href="#s5" onclick="return false">Đọc</a><div class="meta">07:00 · msg 58</div></div>
+        <div class="kb" data-msg="58"><button data-v="like">👍</button><button data-v="dislike">👎</button></div>
+      </div>
+      <div>
+        <div class="bubble"><b>2. Tự host bộ phát hiện văn bản AI trên CPU</b><br>Một công cụ mã nguồn mở… <a href="#s5" onclick="return false">Đọc</a><div class="meta">07:00 · msg 59</div></div>
+        <div class="kb" data-msg="59"><button data-v="like">👍</button><button data-v="dislike">👎</button></div>
+      </div>
+      <div class="toast" id="toast">Đã ghi nhận 👍</div>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="btnReplay">↻ Telegram giao lại update cuối</button>
+      <button class="btn" id="btnStranger">👤 Người lạ bấm nút</button>
+      <button class="btn" id="btnReset">Xoá làm lại</button>
+    </div>
+  </div>
+  <div class="side">
+    <div>
+      <div class="lbl">Nhật ký vai trò bot</div>
+      <div class="log" id="log"></div>
+    </div>
+    <div>
+      <div class="lbl">deliveries (đã có từ 07:00)</div>
+      <div class="tablewrap" style="margin-top:0"><table class="mini">
+        <tr><th>id</th><th>message_id</th><th>kind</th><th>pos</th><th>document_ids</th></tr>
+        <tr><td>86</td><td>57</td><td>header</td><td>–</td><td>{}</td></tr>
+        <tr><td>87</td><td>58</td><td>event</td><td>1</td><td>{2311,2318,2402}</td></tr>
+        <tr><td>88</td><td>59</td><td>event</td><td>2</td><td>{2290,2297}</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <div class="lbl">feedback</div>
+      <div class="tablewrap" style="margin-top:0"><table class="mini" id="fbTable">
+        <tr><th>id</th><th>delivery_id</th><th>kind</th><th>source_message_id</th></tr>
+      </table></div>
+    </div>
+  </div>
+</div>
+<div class="pager"><a class="pn" href="#s4">← 04 Nút và callback</a><a class="pn" href="#s6">06 Long polling →</a></div>
+</section>
+<section class="tab" id="s6">
+<h2><span class="n">06</span>Long polling: bot đi hỏi, Telegram giữ máy</h2>
+<p>Có hai cách để bot biết bạn vừa bấm nút:</p>
+<div class="grid2">
+  <div class="card">
+    <span class="pill v">Tuần 3 dùng</span>
+    <h3 style="margin-top:8px">Long polling · getUpdates</h3>
+    <p>Bot gọi <code>getUpdates?timeout=50</code>. Nếu chưa có gì mới, Telegram <b>giữ kết nối mở</b> tới 50 giây. Có lượt bấm thì trả về ngay. Hết 50 giây không có gì thì trả mảng rỗng, bot hỏi lại.</p>
+    <p>Giống gọi điện cho tổng đài và nói “có tin gì thì báo, tôi giữ máy”.</p>
+    <p class="mini"><b>Ưu:</b> không cần URL công khai, không mở cổng. Chạy trên MacBook lẫn Railway như nhau.</p>
+  </div>
+  <div class="card">
+    <span class="pill b">Thiết kế gốc, để sau</span>
+    <h3 style="margin-top:8px">Webhook · setWebhook</h3>
+    <p>Bạn đăng ký một URL HTTPS. Mỗi khi có update, Telegram tự POST tới URL đó.</p>
+    <p>Giống để lại địa chỉ, có thư thì bưu điện mang tới.</p>
+    <p class="mini"><b>Ưu:</b> không cần process giữ kết nối. <b>Nhược:</b> cần domain HTTPS công khai và kiểm <code>X-Telegram-Bot-Api-Secret-Token</code>. Hợp khi có vai trò <code>api</code> (Hono) trên server.</p>
+  </div>
+</div>
+<div class="callout blue"><p><b>Hai tài liệu nói hơi khác nhau.</b> <code>radard-thiet-ke.html</code> ghi: prod dùng webhook vào vai trò <code>api</code>, long polling chỉ khi dev. <code>tuan-3.html</code> và bản thực thi ghi: tuần 3 dùng long polling cả trên server, vì chưa có vai trò <code>api</code>. Hai cách không mâu thuẫn: bảng dữ liệu y hệt, chỉ khác đường update đi vào. Đổi sang webhook sau này là việc của rìa, không chạm lõi.</p></div>
+
+<h3>Offset: cách bot nói “tôi đã nhận rồi”</h3>
+<p>Telegram giữ các update chưa xác nhận tối đa <b>24 giờ</b>. Bot xác nhận bằng cách gọi lần sau với <code>offset = update_id lớn nhất + 1</code>. Vòng lặp trông như sau:</p>
+<pre><code><span class="k">let</span> offset = 0;                          <span class="c">// chỉ giữ trong bộ nhớ</span>
+<span class="k">while</span> (!stopped) {
+  <span class="k">const</span> updates = <span class="k">await</span> tg(<span class="s">"getUpdates"</span>, {
+    offset, timeout: 50,
+    allowed_updates: [<span class="s">"callback_query"</span>, <span class="s">"message"</span>],
+  });
+  <span class="k">for</span> (<span class="k">const</span> u <span class="k">of</span> updates) {
+    <span class="k">await</span> handle(u);                      <span class="c">// ghi feedback TRƯỚC</span>
+    offset = u.update_id + 1;              <span class="c">// rồi mới xác nhận</span>
+  }
+}</code></pre>
+<ul>
+  <li><b>Xử lý trước, xác nhận sau.</b> Bot chết giữa chừng thì lần sau Telegram giao lại update đó. Nhờ khoá <code>"cb:" + id</code>, giao lại không sinh dòng trùng. Đây gọi là giao “ít nhất một lần” cộng xử lý idempotent, cho kết quả như “đúng một lần”.</li>
+  <li><b>Vì sao không cần lưu offset vào DB:</b> offset trong bộ nhớ đủ cho lúc bot chạy. Khi khởi động lại, offset về 0, Telegram giao lại những update chưa xác nhận (trong 24 giờ), và khoá duy nhất lọc trùng.</li>
+  <li><b>Chỉ một bot được hỏi.</b> Hai process cùng gọi <code>getUpdates</code> với một token thì Telegram trả <code>409 Conflict</code> cho một bên. Đây là lý do bước 8 phải tắt daemon trên máy trước khi bật trên Railway. Đã đặt webhook thì <code>getUpdates</code> cũng bị 409.</li>
+  <li>Vòng lặp cần <code>timeout</code> phía client (của <code>fetch</code>) dài hơn 50 giây, ví dụ 60 giây, nếu không sẽ tự cắt trước khi Telegram kịp trả lời.</li>
+</ul>
+<div class="pager"><a class="pn" href="#s5">← 05 Thử bấm nút</a><a class="pn" href="#s7">07 Giới hạn và lỗi →</a></div>
+</section>
+<section class="tab" id="s7">
+<h2><span class="n">07</span>Giới hạn và lỗi cần xử lý</h2>
+<div class="tablewrap"><table>
+<tr><th>Giới hạn / lỗi</th><th>Con số</th><th>radard xử lý</th></tr>
+<tr><td>Tốc độ gửi vào một chat</td><td>khoảng 1 tin/giây</td><td>Giãn 1 giây giữa các tin. 8 tin mỗi sáng mất ~8 giây</td></tr>
+<tr><td>Tốc độ gửi toàn bot</td><td>khoảng 30 tin/giây</td><td>Một người nhận, không chạm tới</td></tr>
+<tr><td><code>429 Too Many Requests</code></td><td><code>parameters.retry_after</code> giây</td><td>Chờ đúng số giây đó rồi gửi lại. Không đoán, không thử dồn dập</td></tr>
+<tr><td>Độ dài tin</td><td>4.096 ký tự (sau khi bỏ thẻ HTML)</td><td>Tóm tắt 2 câu, xa giới hạn. Nên cắt an toàn phòng LLM viết dài</td></tr>
+<tr><td><code>callback_data</code></td><td>1–64 <b>byte</b> (không phải ký tự)</td><td><code>fb:dislike</code> = 10 byte. Emoji hay tiếng Việt có dấu tốn nhiều byte hơn, nên giữ ASCII</td></tr>
+<tr><td><code>400 can't parse entities</code></td><td></td><td>Quên escape. Test escape (tab 03) chặn lỗi này</td></tr>
+<tr><td><code>400 message is not modified</code></td><td></td><td>Gọi <code>editMessageReplyMarkup</code> với bộ nút y hệt (bấm 👍 hai lần). Nên bỏ qua lỗi này, không coi là hỏng</td></tr>
+<tr><td><code>403 Forbidden: bot was blocked by the user</code></td><td></td><td>Bạn chặn bot. Không thử lại; ghi <code>digests.status = failed</code> kèm lỗi</td></tr>
+<tr><td><code>409 Conflict</code></td><td></td><td>Hai bot cùng long polling, hoặc đang có webhook. Xem tab 06</td></tr>
+<tr><td>Lỗi mạng, <code>5xx</code></td><td></td><td>Job digest ném lỗi, pg-boss thử lại; plan trong <code>digests.meta</code> giúp gửi tiếp từ tin còn thiếu</td></tr>
+</table></div>
+<div class="callout"><p><b>Quy tắc chung:</b> lỗi <code>4xx</code> (trừ 429) là lỗi của ta, thử lại không giúp gì. Lỗi <code>429</code> và <code>5xx</code> là tạm thời, nên thử lại.</p></div>
+<div class="pager"><a class="pn" href="#s6">← 06 Long polling</a><a class="pn" href="#s8">08 Bảo mật →</a></div>
+</section>
+<section class="tab" id="s8">
+<h2><span class="n">08</span>Bảo mật: bot của bạn là bot công khai</h2>
+<ul>
+  <li><b>Ai cũng tìm và nhắn được cho @radard_bot.</b> Không lọc thì người lạ bấm 👍 làm bẩn dữ liệu, hoặc gõ <code>/topics</code> để bot gọi LLM tốn tiền của bạn. Kế hoạch: bot bỏ qua mọi update có <code>chat.id</code> khác <code>TELEGRAM_CHAT_ID</code>, có test riêng. Lưu ý kiểm cả <code>callback_query.message.chat.id</code> lẫn <code>message.chat.id</code>, vì hai loại update để chat id ở hai chỗ khác nhau.</li>
+  <li><b>Token nằm ngay trong URL.</b> <code>https://api.telegram.org/bot<b>TOKEN</b>/sendMessage</code>. Nếu adapter log URL request hay để lỗi <code>fetch</code> in nguyên URL, token sẽ lọt vào log. Khi log, chỉ ghi tên phương thức.</li>
+  <li><b>chat_id là thông tin cá nhân.</b> Tài liệu và test dùng số giả <code>100000001</code>; số thật chỉ nằm trong <code>.env</code>.</li>
+  <li><b>Khi đổi sang webhook:</b> đặt <code>secret_token</code> trong <code>setWebhook</code>, rồi từ chối mọi request thiếu header <code>X-Telegram-Bot-Api-Secret-Token</code> khớp. Không có bước này thì ai biết URL cũng giả được lượt bấm.</li>
+  <li><b>Lộ token?</b> Vào @BotFather, <code>/revoke</code> để cấp token mới; token cũ chết ngay.</li>
+</ul>
+<div class="pager"><a class="pn" href="#s7">← 07 Giới hạn và lỗi</a><a class="pn" href="#s9">09 grammY →</a></div>
+</section>
+<section class="tab" id="s9">
+<h2><span class="n">09</span>grammY: “Hono của Telegram”</h2>
+<p><b>grammY</b> (đọc là “gram-y”, tên ghép từ tele<b>gram</b>) là một thư viện TypeScript để viết bot Telegram. Nó chạy trên Bun, Node, Deno và cả Cloudflare Workers. Nó <b>không</b> phải dịch vụ hay máy chủ trung gian: bên dưới, grammY vẫn gọi đúng các URL <code>api.telegram.org/bot…/sendMessage</code> mà tab 02 mô tả. Nó chỉ làm sẵn những phần mà ta sẽ phải tự viết.</p>
+
+<div class="callout"><b class="t">So sánh dễ nhớ</b>
+<p>Bạn đã biết <b>Hono</b> trong radard: thay vì tự đọc <code>Request</code>, tự so URL, tự viết <code>if (path === "/api/feed")</code>, ta khai báo <code>app.get("/api/feed", handler)</code>. grammY làm đúng việc đó, chỉ khác là thứ đi vào không phải HTTP request mà là <b>update của Telegram</b>: thay vì tự viết <code>if (u.callback_query?.data === "fb:like")</code>, ta khai báo <code>bot.callbackQuery("fb:like", handler)</code>.</p></div>
+
+<h3>grammY cho ta ba thứ</h3>
+<div class="tablewrap"><table>
+<tr><th>Phần</th><th>Thay cho việc tự làm</th><th>Ví dụ</th></tr>
+<tr><td><b>1. Gọi API có kiểu</b><br><code>bot.api</code> hoặc <code>new Api(token)</code></td><td>Hàm <code>call(method, body)</code> tự viết với <code>fetch</code>, tự đoán kiểu JSON trả về</td><td><code>await bot.api.sendMessage(chatId, text, { parse_mode: "HTML" })</code> trả về <code>Message</code> có kiểu đầy đủ; gõ sai tên tham số là TypeScript báo ngay</td></tr>
+<tr><td><b>2. Định tuyến update</b><br><code>bot.on</code>, <code>bot.callbackQuery</code>, <code>bot.command</code></td><td>Một chuỗi <code>if</code> lớn đọc từng loại update</td><td><code>bot.command("topics", …)</code>, <code>bot.callbackQuery(/^fb:(like|dislike)$/, …)</code></td></tr>
+<tr><td><b>3. Nhận update</b><br><code>bot.start()</code> hoặc <code>webhookCallback</code></td><td>Vòng lặp <code>getUpdates</code> tự viết, tự quản <code>offset</code> (tab 06)</td><td><code>bot.start()</code> chạy long polling. Sau này đổi sang webhook: <code>app.post("/api/telegram/webhook", webhookCallback(bot, "hono"))</code></td></tr>
+</table></div>
+
+<h3>Middleware và <code>ctx</code></h3>
+<p>Mỗi update đi qua một chuỗi hàm, giống middleware của Hono. Mỗi hàm nhận <code>ctx</code> (context): trong đó có update gốc, và các phím tắt gọi API gắn sẵn với chat hiện tại. Hàm nào không gọi <code>next()</code> thì update dừng ở đó.</p>
+<figure>
+<svg viewBox="0 0 900 190" role="img" aria-label="Chuỗi middleware grammY">
+  <defs><marker id="ar9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5753"/></marker></defs>
+  <rect x="10" y="60" width="130" height="64" rx="10" fill="#fff" stroke="#2AABEE" stroke-dasharray="5 4"/>
+  <text x="75" y="88" font-size="13" text-anchor="middle" font-weight="600">update</text>
+  <text x="75" y="107" font-size="11" text-anchor="middle" fill="#4A5753" font-family="IBM Plex Mono">fb:like · msg 58</text>
+  <path d="M140 92 L180 92" stroke="#4A5753" stroke-width="1.5" marker-end="url(#ar9)"/>
+  <rect x="182" y="50" width="190" height="84" rx="10" fill="#FBEFD9" stroke="#9A5B00"/>
+  <text x="277" y="76" font-size="13" text-anchor="middle" font-weight="600">bot.use(chỉChatCủaBạn)</text>
+  <text x="277" y="97" font-size="11.5" text-anchor="middle" fill="#4A5753">chat lạ → không gọi next()</text>
+  <text x="277" y="115" font-size="11.5" text-anchor="middle" fill="#4A5753">chat đúng → await next()</text>
+  <path d="M372 92 L412 92" stroke="#4A5753" stroke-width="1.5" marker-end="url(#ar9)"/>
+  <rect x="414" y="50" width="220" height="84" rx="10" fill="#ECE7F7" stroke="#5B45A8"/>
+  <text x="524" y="76" font-size="13" text-anchor="middle" font-weight="600">bot.callbackQuery(/^fb:/)</text>
+  <text x="524" y="97" font-size="11.5" text-anchor="middle" fill="#4A5753">tìm delivery, ghi feedback</text>
+  <text x="524" y="115" font-size="11.5" text-anchor="middle" fill="#4A5753">ctx.answerCallbackQuery(…)</text>
+  <path d="M634 92 L674 92" stroke="#4A5753" stroke-width="1.5" marker-end="url(#ar9)" stroke-dasharray="4 4"/>
+  <rect x="676" y="50" width="200" height="84" rx="10" fill="#fff" stroke="#D9E0DD"/>
+  <text x="776" y="76" font-size="13" text-anchor="middle" font-weight="600" fill="#6B7773">bot.command("topics")</text>
+  <text x="776" y="97" font-size="11.5" text-anchor="middle" fill="#6B7773">không khớp nên bỏ qua</text>
+  <text x="776" y="115" font-size="11.5" text-anchor="middle" fill="#6B7773">(update đã được xử lý)</text>
+  <text x="277" y="165" font-size="12" text-anchor="middle" fill="#9A5B00">lọc người lạ một lần, cho mọi loại update</text>
+</svg>
+<figcaption>Hình 3. Bộ lọc chat id đặt ở đầu chuỗi là chặn được người lạ cho cả nút bấm, lệnh <code>/topics</code> lẫn tin nhắn. Tự viết thì phải nhớ kiểm ở từng chỗ, và chat id nằm ở chỗ khác nhau tuỳ loại update; <code>ctx.chat</code> của grammY gom về một chỗ.</figcaption>
+</figure>
+
+<h3>Cùng một việc, hai cách viết</h3>
+<p>Xử lý lượt bấm 👍/👎 (giống phác thảo ở tab 10):</p>
+<div class="grid2">
+<div>
+<div class="lbl">fetch thuần</div>
+<pre><code><span class="c">// tự viết vòng lặp, tự quản offset</span>
+<span class="k">let</span> offset = 0;
+<span class="k">while</span> (!stopped) {
+  <span class="k">const</span> ups = <span class="k">await</span> tg(<span class="s">"getUpdates"</span>,
+    { offset, timeout: 50 });
+  <span class="k">for</span> (<span class="k">const</span> u <span class="k">of</span> ups) {
+    <span class="k">const</span> cq = u.callback_query;
+    <span class="k">const</span> chat = cq?.message?.chat.id
+      ?? u.message?.chat.id;
+    <span class="k">if</span> (String(chat) === ME &amp;&amp; cq &amp;&amp;
+        /^fb:/.test(cq.data ?? <span class="s">""</span>)) {
+      <span class="k">await</span> saveFeedback(cq);
+      <span class="k">await</span> tg(<span class="s">"answerCallbackQuery"</span>, {
+        callback_query_id: cq.id,
+        text: <span class="s">"Đã ghi nhận"</span>,
+      });
+    }
+    offset = u.update_id + 1;
+  }
+}</code></pre>
+</div>
+<div>
+<div class="lbl">grammY</div>
+<pre><code><span class="k">import</span> { Bot } <span class="k">from</span> <span class="s">"grammy"</span>;
+<span class="k">import</span> { autoRetry } <span class="k">from</span> <span class="s">"@grammyjs/auto-retry"</span>;
+
+<span class="k">const</span> bot = <span class="k">new</span> Bot(token);
+bot.api.config.use(autoRetry()); <span class="c">// 429, 5xx</span>
+
+bot.use(<span class="k">async</span> (ctx, next) =&gt; {
+  <span class="k">if</span> (String(ctx.chat?.id) === ME) <span class="k">await</span> next();
+});
+
+bot.callbackQuery(/^fb:(like|dislike)$/,
+  <span class="k">async</span> (ctx) =&gt; {
+    <span class="k">await</span> saveFeedback(ctx.callbackQuery);
+    <span class="k">await</span> ctx.answerCallbackQuery(<span class="s">"Đã ghi nhận"</span>);
+  });
+
+bot.catch((err) =&gt; log.error(err.error));
+bot.start(); <span class="c">// long polling, tự quản offset</span></code></pre>
+</div>
+</div>
+<p>Phần <code>saveFeedback</code> (tìm delivery theo <code>message_id</code>, INSERT với <code>"cb:" + id</code>, <code>onConflictDoNothing</code>) <b>giống hệt</b> ở hai cách. grammY không làm thay phần nghiệp vụ hay chống ghi trùng; nó chỉ lo phần giao tiếp với Telegram.</p>
+
+<h3>Bảng đối chiếu</h3>
+<div class="tablewrap"><table>
+<tr><th>Bot API (tab 02–07)</th><th>grammY</th></tr>
+<tr><td><code>sendMessage</code></td><td><code>bot.api.sendMessage(chatId, text, opts)</code> hoặc <code>ctx.reply(text)</code> trong handler</td></tr>
+<tr><td><code>reply_markup.inline_keyboard</code></td><td><code>new InlineKeyboard().text("👍", "fb:like").text("👎", "fb:dislike")</code></td></tr>
+<tr><td><code>getUpdates</code> + <code>offset</code></td><td><code>bot.start()</code>; <code>bot.stop()</code> xác nhận offset cuối trước khi dừng</td></tr>
+<tr><td><code>setWebhook</code> + secret token</td><td><code>webhookCallback(bot, "hono", { secretToken })</code></td></tr>
+<tr><td><code>answerCallbackQuery</code></td><td><code>ctx.answerCallbackQuery("Đã ghi nhận 👍")</code></td></tr>
+<tr><td><code>editMessageReplyMarkup</code></td><td><code>ctx.editMessageReplyMarkup({ reply_markup })</code></td></tr>
+<tr><td><code>setMyCommands</code></td><td><code>bot.api.setMyCommands([{ command: "topics", description: "Chọn chủ đề" }])</code></td></tr>
+<tr><td>Lỗi <code>{ ok: false, error_code }</code></td><td>Ném <code>GrammyError</code> (Telegram từ chối) hoặc <code>HttpError</code> (không tới được Telegram)</td></tr>
+<tr><td>429 + <code>retry_after</code></td><td>Plugin <code>@grammyjs/auto-retry</code> tự chờ đúng <code>retry_after</code> rồi gửi lại</td></tr>
+</table></div>
+
+<h3>Plugin đáng biết cho radard</h3>
+<div class="tablewrap"><table>
+<tr><th>Plugin</th><th>Làm gì</th><th>Khi nào radard cần</th></tr>
+<tr><td><code>@grammyjs/auto-retry</code></td><td>Tự thử lại khi gặp 429 (chờ <code>retry_after</code>) và lỗi 5xx</td><td>Bước 4. Thay cho vòng <code>for(;;)</code> tự viết</td></tr>
+<tr><td><code>@grammyjs/menu</code></td><td>Menu nút có trạng thái: bấm nút thì tin tự vẽ lại</td><td>Bước 5: danh sách chủ đề bật tắt có ✅</td></tr>
+<tr><td><code>@grammyjs/conversations</code></td><td>Viết hội thoại nhiều bước như code tuần tự: hỏi, chờ trả lời, hỏi tiếp</td><td>Bước 5: “➕ Tự thêm” → hỏi tên → hỏi mô tả → [Lưu] [Huỷ]</td></tr>
+<tr><td><code>@grammyjs/transformer-throttler</code></td><td>Giới hạn tốc độ gửi chung cho cả bot</td><td>Chưa cần: một người nhận, giãn 1 giây là đủ</td></tr>
+<tr><td><code>@grammyjs/runner</code></td><td>Xử lý nhiều update song song</td><td>Không cần: <code>bot.start()</code> xử lý lần lượt từng update, hợp với một người dùng</td></tr>
+</table></div>
+
+<h3>grammY nằm ở đâu trong ports &amp; adapters</h3>
+<p>Quy tắc 1 của thiết kế: chỉ <code>packages/adapters</code> được import <code>grammy</code>. Lõi và job digest vẫn chỉ thấy <code>Notifier</code>. Cụ thể:</p>
+<ul>
+  <li><code>adapters/src/telegram.ts</code> dùng <code>new Api(token)</code> của grammY để gửi. Chỉ cần phần gọi API, không cần <code>Bot</code>; job digest không phải chạy long polling chỉ để gửi tin.</li>
+  <li>Vai trò <code>bot</code> dùng <code>new Bot(token)</code> để nhận update. Hàm <code>render()</code> và escape HTML vẫn là của ta, viết như tab 03.</li>
+  <li>Adapter giả <code>notify-fake.ts</code> không đổi gì: nó không liên quan tới grammY.</li>
+  <li>Test handler không cần mạng: grammY cho phép chèn một “transformer” vào <code>bot.api.config.use(…)</code> để chặn mọi lời gọi API và trả kết quả giả, rồi đưa update giả vào bằng <code>bot.handleUpdate(update)</code>. Tạo <code>Bot</code> với <code>botInfo</code> có sẵn để nó không gọi <code>getMe</code>.</li>
+</ul>
+
+<h3>Ba cái bẫy khi dùng grammY</h3>
+<div class="callout red">
+<ol style="margin:0">
+  <li><b>Quên <code>bot.catch</code>.</b> Handler mặc định của grammY sẽ <b>dừng bot</b> khi một handler ném lỗi (ví dụ DB rớt mạng một giây). Bot dừng thì không ai nhận lượt bấm nữa. Luôn cài <code>bot.catch</code> để ghi log và chạy tiếp.</li>
+  <li><b>Dùng <code>drop_pending_updates</code>.</b> Nhiều ví dụ trên mạng gọi <code>bot.start({ drop_pending_updates: true })</code> cho “sạch”. Với radard, việc này xoá luôn các lượt 👍 bạn bấm trong lúc bot tắt. Không dùng; khoá <code>"cb:" + id</code> đã lo phần trùng.</li>
+  <li><b><code>await bot.start()</code> không bao giờ trả về</b> cho tới khi bot dừng. Nếu <code>bun run dev</code> chạy nhiều vai trò trong một process, đừng <code>await</code> nó trước khi khởi động scheduler và worker. Khi tắt daemon, gọi <code>bot.stop()</code> để nó xác nhận offset và đóng kết nối gọn.</li>
+</ol>
+</div>
+
+<h3>Vậy có nên dùng không?</h3>
+<div class="grid2">
+  <div class="card">
+    <span class="pill">fetch thuần</span>
+    <h3 style="margin-top:8px">Hợp nếu chỉ có bước 4</h3>
+    <ul class="mini">
+      <li>Không thêm thư viện; dễ đọc từng request</li>
+      <li>Khoảng 100–150 dòng cho gửi tin, nút, 429, vòng long polling</li>
+      <li>Hợp với cách radard làm adapter đến giờ (<code>ai-gateway.ts</code> gọi thẳng)</li>
+      <li>Nhược: bước 5 phải tự viết máy trạng thái cho hội thoại “➕ Tự thêm”</li>
+    </ul>
+  </div>
+  <div class="card">
+    <span class="pill v">grammY</span>
+    <h3 style="margin-top:8px">Hợp nếu tính cả bước 5 trở đi</h3>
+    <ul class="mini">
+      <li>Kiểu đầy đủ cho mọi phương thức và update</li>
+      <li>Có sẵn auto-retry, menu, conversations, webhook cho Hono</li>
+      <li>Thiết kế gốc đã chọn grammY (bảng công nghệ, tuần 7)</li>
+      <li>Nhược: thêm một phụ thuộc và một lớp trừu tượng phải học; lỗi có thể bị bọc khó đọc hơn</li>
+    </ul>
+  </div>
+</div>
+<p>Ý kiến của tôi: bot của radard sẽ lớn dần (<code>/topics</code>, “➕ Tự thêm”, sau này <code>/ask</code> cho agent), nên dùng grammY từ bước 4 sẽ đỡ viết lại về sau. Đây là quyết định của bạn và phiên đang làm tuần 3. Nếu chọn grammY thì cài bằng <code>bun add grammy @grammyjs/auto-retry</code> trong <code>packages/adapters</code>.</p>
+<div class="pager"><a class="pn" href="#s8">← 08 Bảo mật</a><a class="pn" href="#s10">10 Phác thảo code →</a></div>
+</section>
+<section class="tab" id="s10">
+<h2><span class="n">10</span>Phác thảo code</h2>
+<div class="callout warn"><p>Đây là phác thảo của tôi để minh hoạ cách các mảnh khớp nhau, <b>không phải</b> code phiên kia đang viết. Tên và chữ ký có thể khác. Thiết kế gốc dùng <code>actions: { id: 'up' | 'down' | 'open' }</code>; kế hoạch tuần 3 dùng <code>fb:like</code>/<code>fb:dislike</code> cho khớp cột <code>feedback.kind</code>.</p></div>
+
+<h3>Interface trong lõi · <code>packages/core/src/notify.ts</code></h3>
+<pre><code><span class="c">/** Tin ở dạng trung lập: văn bản thuần, mỗi adapter tự render. */</span>
+<span class="k">export interface</span> Message {
+  kind: <span class="s">"digest"</span> | <span class="s">"alert"</span> | <span class="s">"system"</span>;
+  title: string;
+  lines: string[];
+  url?: string;
+  actions?: { id: <span class="s">"like"</span> | <span class="s">"dislike"</span>; label: string }[];
+}
+
+<span class="k">export interface</span> Notifier {
+  <span class="k">readonly</span> channel: <span class="s">"telegram"</span> | <span class="s">"discord"</span> | <span class="s">"webpush"</span> | <span class="s">"fake"</span>;
+  <span class="c">/** Trả về id tin phía kênh; job ghi nó vào deliveries.message_id. */</span>
+  send(recipient: string, msg: Message): Promise&lt;{ messageId: string }&gt;;
+}</code></pre>
+
+<h3>Adapter · <code>packages/adapters/src/telegram.ts</code></h3>
+<pre><code><span class="k">const</span> esc = (s: string) =&gt;
+  s.replaceAll(<span class="s">"&amp;"</span>, <span class="s">"&amp;amp;"</span>).replaceAll(<span class="s">"&lt;"</span>, <span class="s">"&amp;lt;"</span>).replaceAll(<span class="s">"&gt;"</span>, <span class="s">"&amp;gt;"</span>);
+
+<span class="k">export function</span> render(msg: Message): string {
+  <span class="k">const</span> parts = [<span class="s">`&lt;b&gt;${esc(msg.title)}&lt;/b&gt;`</span>, ...msg.lines.map(esc)];
+  <span class="k">if</span> (msg.url) parts.push(<span class="s">`&lt;a href="${esc(msg.url).replaceAll('"', "&amp;quot;")}"&gt;Đọc&lt;/a&gt;`</span>);
+  <span class="k">return</span> parts.join(<span class="s">"\n"</span>);
+}
+
+<span class="k">export function</span> telegramNotifier(token: string): Notifier {
+  <span class="k">let</span> lastSentAt = 0;
+  <span class="k">async function</span> call(method: string, body: unknown) {
+    <span class="k">for</span> (;;) {
+      <span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">`https://api.telegram.org/bot${token}/${method}`</span>, {
+        method: <span class="s">"POST"</span>, headers: { <span class="s">"content-type"</span>: <span class="s">"application/json"</span> },
+        body: JSON.stringify(body),
+      });
+      <span class="k">const</span> json = <span class="k">await</span> res.json();
+      <span class="k">if</span> (json.ok) <span class="k">return</span> json.result;
+      <span class="k">if</span> (json.error_code === 429) {                       <span class="c">// chờ đúng retry_after</span>
+        <span class="k">await</span> Bun.sleep((json.parameters?.retry_after ?? 1) * 1000);
+        <span class="k">continue</span>;
+      }
+      <span class="k">throw new</span> Error(<span class="s">`telegram ${method}: ${json.description}`</span>); <span class="c">// không in URL (có token)</span>
+    }
+  }
+  <span class="k">return</span> {
+    channel: <span class="s">"telegram"</span>,
+    <span class="k">async</span> send(chatId, msg) {
+      <span class="k">await</span> Bun.sleep(Math.max(0, lastSentAt + 1000 - Date.now())); <span class="c">// giãn 1 giây</span>
+      <span class="k">const</span> result = <span class="k">await</span> call(<span class="s">"sendMessage"</span>, {
+        chat_id: chatId,
+        text: render(msg),
+        parse_mode: <span class="s">"HTML"</span>,
+        link_preview_options: { is_disabled: <span class="k">true</span> },
+        reply_markup: msg.actions?.length
+          ? { inline_keyboard: [msg.actions.map((a) =&gt; ({ text: a.label, callback_data: <span class="s">`fb:${a.id}`</span> }))] }
+          : <span class="k">undefined</span>,
+      });
+      lastSentAt = Date.now();
+      <span class="k">return</span> { messageId: String(result.message_id) };
+    },
+  };
+}</code></pre>
+
+<h3>Adapter giả · <code>notify-fake.ts</code></h3>
+<pre><code><span class="k">export function</span> fakeNotifier(opts: { failAfter?: number } = {}) {
+  <span class="k">const</span> sent: { recipient: string; msg: Message; messageId: string }[] = [];
+  <span class="k">return</span> {
+    channel: <span class="s">"fake"</span> <span class="k">as const</span>,
+    sent,                                   <span class="c">// test đọc mảng này để kiểm</span>
+    <span class="k">async</span> send(recipient: string, msg: Message) {
+      <span class="k">if</span> (opts.failAfter !== <span class="k">undefined</span> &amp;&amp; sent.length &gt;= opts.failAfter) <span class="k">throw new</span> Error(<span class="s">"fake: mạng rớt"</span>);
+      <span class="k">const</span> messageId = String(sent.length + 1);
+      sent.push({ recipient, msg, messageId });
+      <span class="k">return</span> { messageId };
+    },
+  };
+}</code></pre>
+<p>Tham số <code>failAfter</code> chính là cách test tình huống “chết sau tin thứ 3 rồi chạy lại thì gửi tiếp từ tin 4” ở bước 6, không cần mạng thật.</p>
+
+<details>
+<summary>Phác thảo xử lý một callback trong vai trò bot</summary>
+<pre><code><span class="k">async function</span> onCallback(cq: CallbackQuery) {
+  <span class="k">const</span> chatId = String(cq.message?.chat.id);
+  <span class="k">if</span> (chatId !== env.TELEGRAM_CHAT_ID) <span class="k">return</span>;          <span class="c">// người lạ: bỏ qua, im lặng</span>
+  <span class="k">const</span> kind = cq.data === <span class="s">"fb:like"</span> ? <span class="s">"like"</span> : cq.data === <span class="s">"fb:dislike"</span> ? <span class="s">"dislike"</span> : <span class="k">null</span>;
+  <span class="k">if</span> (!kind) <span class="k">return</span> answer(cq.id);
+
+  <span class="k">const</span> [d] = <span class="k">await</span> db.select({ id: deliveries.id }).from(deliveries).where(and(
+    eq(deliveries.channel, <span class="s">"telegram"</span>),
+    eq(deliveries.recipient, chatId),
+    eq(deliveries.messageId, String(cq.message.message_id)),
+  ));
+
+  <span class="k">await</span> db.insert(feedback).values({
+    deliveryId: d?.id ?? <span class="k">null</span>, channel: <span class="s">"telegram"</span>, recipient: chatId,
+    kind, sourceMessageId: <span class="s">`cb:${cq.id}`</span>,
+  }).onConflictDoNothing();                               <span class="c">// update giao lại → không ghi trùng</span>
+
+  <span class="k">await</span> answer(cq.id, kind === <span class="s">"like"</span> ? <span class="s">"Đã ghi nhận 👍"</span> : <span class="s">"Đã ghi nhận 👎"</span>);
+  <span class="k">await</span> markButtons(chatId, cq.message.message_id, kind)  <span class="c">// "👍 ✓"</span>
+    .catch(ignoreNotModified);
+}</code></pre>
+</details>
+<div class="pager"><a class="pn" href="#s9">← 09 grammY</a><a class="pn" href="#s11">11 Khi review →</a></div>
+</section>
+<section class="tab" id="s11">
+<h2><span class="n">11</span>Những chỗ đáng hỏi khi review code của phiên kia</h2>
+<p>Khi phiên kia báo xong bước 4, đây là danh sách để bạn tự kiểm hoặc hỏi lại:</p>
+<div class="tablewrap"><table>
+<tr><th>Hỏi</th><th>Câu trả lời đúng trông thế nào</th></tr>
+<tr><td>Lõi có import gì của Telegram không?</td><td>Không. <code>packages/core</code> và <code>jobs/digest.ts</code> chỉ thấy <code>Notifier</code> và <code>Message</code></td></tr>
+<tr><td>Escape có thay <code>&amp;</code> trước không? URL có escape không?</td><td>Có, và có test với tiêu đề chứa <code>&lt;</code> và <code>&amp;</code></td></tr>
+<tr><td>Nút mang gì?</td><td><code>fb:like</code> / <code>fb:dislike</code>, không có id delivery</td></tr>
+<tr><td>Delivery được ghi lúc nào?</td><td>Ngay sau mỗi <code>sendMessage</code> thành công, từng tin một, không đợi gửi xong cả 8</td></tr>
+<tr><td>Bot có <code>answerCallbackQuery</code> cả khi bỏ qua hay lỗi không?</td><td>Nên có (trừ người lạ), để nút trên điện thoại không quay vòng mãi</td></tr>
+<tr><td>Chống trùng dựa vào đâu?</td><td><code>"cb:" + callback_query.id</code> + <code>onConflictDoNothing</code>. Test: cùng update hai lần → một dòng</td></tr>
+<tr><td>Người lạ bị chặn ở đâu?</td><td>Đầu hàm xử lý update, trước mọi truy vấn DB hay lời gọi LLM. Có test</td></tr>
+<tr><td>Log có in token không?</td><td>Không. Lỗi chỉ ghi tên phương thức và <code>description</code></td></tr>
+<tr><td>429 xử lý ra sao?</td><td>Chờ đúng <code>retry_after</code>, không phải số cố định</td></tr>
+<tr><td>Long polling có timeout phía client &gt; 50 giây và dừng sạch khi tắt daemon?</td><td>Có, vòng lặp nhận tín hiệu dừng (<code>AbortController</code>) để không treo khi <code>bun run dev</code> tắt</td></tr>
+<tr><td>Nếu dùng grammY: có <code>bot.catch</code>, không có <code>drop_pending_updates</code>, và <code>grammy</code> chỉ được import trong <code>packages/adapters</code> hay vai trò bot?</td><td>Có đủ cả ba (tab 09)</td></tr>
+<tr><td>Delivery không tìm thấy (tin quá cũ, hay tin không do digest gửi)?</td><td>Không ném lỗi. Hoặc bỏ qua, hoặc ghi <code>delivery_id = null</code>; nên thống nhất một cách</td></tr>
+</table></div>
+
+<h3>Tự kiểm tra mức hiểu</h3>
+<details><summary>1. Vì sao không gộp 7 sự kiện vào một tin cho gọn?</summary><p>Nút gắn vào từng tin. Một tin có 7 sự kiện thì nút 👍 không biết nói về sự kiện nào, trừ khi làm 14 nút đánh số. Tách ra thì <code>message_id</code> của tin chính là “sự kiện nào”.</p></details>
+<details><summary>2. Bot khởi động lại, offset về 0. Có ghi trùng không?</summary><p>Không. Telegram giao lại các update chưa xác nhận, nhưng mỗi update mang <code>callback_query.id</code> cũ, nên <code>"cb:…"</code> đụng khoá duy nhất và bị bỏ qua.</p></details>
+<details><summary>3. Bạn bấm 👍 rồi 👎. Bảng feedback có mấy dòng?</summary><p>Hai. Hai lượt bấm là hai <code>callback_query.id</code> khác nhau. Ý kiến hiện tại là dòng có <code>id</code> lớn nhất.</p></details>
+<details><summary>4. Daemon trên MacBook quên tắt khi Railway đã chạy. Chuyện gì xảy ra?</summary><p>Hai bên cùng gọi <code>getUpdates</code> nên một bên bị <code>409 Conflict</code> và lượt bấm có thể rơi vào DB của máy. Tệ hơn, mỗi bên có DB riêng, nên khoá duy nhất của <code>digests</code> không chặn được: bạn nhận hai digest mỗi sáng.</p></details>
+<details><summary>5. Muốn thêm Discord thì sửa những file nào?</summary><p>Thêm <code>adapters/src/discord.ts</code> triển khai <code>Notifier</code>, thêm cấu hình chọn kênh. Job digest không đổi. Phần nhận nút của Discord thì cần tách interface chiều về (<code>ChatChannel</code>) vì vai trò bot hiện đọc Telegram trực tiếp.</p></details>
+<div class="pager"><a class="pn" href="#s10">← 10 Phác thảo code</a><span></span></div>
+</section>
+
+<footer>radard · docs/notifier-telegram.html · Viết ngày 12/10/2026 để giải thích bước 4 của <code>tuan-3-thuc-thi.html</code>, dựa trên <code>radard-thiet-ke.html</code>, <code>tuan-3.html</code>, <code>packages/db/src/schema/delivery.ts</code>. Phần code ở tab 10 là phác thảo minh hoạ, không phải code thật của radard.</footer>
+</div>
+
+<script>
+
+// ---------- tabs ----------
+(function(){
+  const tabs = [...document.querySelectorAll("section.tab")];
+  const links = [...document.querySelectorAll("#tabs a")];
+  function show(){
+    const id = (location.hash || "#s1").slice(1);
+    const target = tabs.find(t => t.id === id) ? id : "s1";
+    tabs.forEach(t => t.classList.toggle("active", t.id === target));
+    links.forEach(a => {
+      const on = a.getAttribute("href") === "#" + target;
+      a.classList.toggle("active", on);
+      if (on) a.scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+    const nav = document.getElementById("tabs");
+    if (window.scrollY > nav.offsetTop) window.scrollTo({ top: nav.offsetTop });
+  }
+  window.addEventListener("hashchange", show);
+  show();
+})();
+// ---------- demo escape ----------
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  const escAttr = (s) => esc(s).replaceAll('"',"&quot;");
+  // hiển thị chuỗi như văn bản trong trang (escape để in ra, không liên quan Telegram)
+  const show = (s) => s.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  const ALLOWED = /^(b|i|u|s|a|code|pre|blockquote|tg-spoiler)$/;
+
+  // kiểm tra như Telegram: mọi '<' phải mở một thẻ được hỗ trợ, '&' phải là entity hợp lệ
+  function parseError(html){
+    const tagRe = /<\/?([a-zA-Z-]+)(\s[^<>]*)?>/g;
+    let stripped = html.replace(tagRe, (m, name) => ALLOWED.test(name.toLowerCase()) ? "" : "\u0000BAD:" + name);
+    const bad = stripped.match(/\u0000BAD:([a-zA-Z-]+)/);
+    if (bad) return `Unsupported start tag "${bad[1]}"`;
+    if (stripped.includes("<")) return "Unexpected end of name token / unclosed tag";
+    const amp = stripped.match(/&(?!(amp|lt|gt|quot);)/);
+    if (amp) return "Character entity expected";
+    return null;
+  }
+  function render(){
+    const noEsc = $("noEsc").checked;
+    const t = $("inTitle").value, l = $("inLine").value, u = $("inUrl").value;
+    const e = noEsc ? (s)=>s : esc, ea = noEsc ? (s)=>s : escAttr;
+    const text = `<b>${e(t)}</b>\n${e(l)}\n<a href="${ea(u)}">Đọc</a>`;
+    const body = {
+      chat_id: "100000001",
+      text,
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      reply_markup: { inline_keyboard: [[
+        { text: "👍", callback_data: "fb:like" },
+        { text: "👎", callback_data: "fb:dislike" }
+      ]]}
+    };
+    $("outJson").innerHTML = show(JSON.stringify(body, null, 2));
+    const err = parseError(text);
+    if (err){
+      $("outPhone").innerHTML = `<div class="bubble" style="background:#F8E4E1;color:#A83A2F"><b>Không gửi được</b><br>Telegram trả về:<br><code style="font-size:12px">400 Bad Request: can't parse entities: ${show(err)}</code></div>`;
+      return;
+    }
+    // render an toàn: dựng DOM thật từ bản đã escape, chỉ cho phép b và a
+    const decode = (s) => s.replaceAll("&lt;","<").replaceAll("&gt;",">").replaceAll("&quot;",'"').replaceAll("&amp;","&");
+    const bubble = document.createElement("div"); bubble.className = "bubble";
+    const b = document.createElement("b"); b.textContent = decode(e(t)); bubble.append(b, document.createElement("br"));
+    bubble.append(document.createTextNode(decode(e(l))), document.createElement("br"));
+    const a = document.createElement("a"); a.textContent = "Đọc"; a.href = "javascript:void(0)"; a.title = u; bubble.append(a);
+    const kb = document.createElement("div"); kb.className = "kb";
+    kb.innerHTML = "<button tabindex='-1'>👍</button><button tabindex='-1'>👎</button>";
+    $("outPhone").replaceChildren(bubble, kb);
+  }
+  ["inTitle","inLine","inUrl","noEsc"].forEach(id => $(id).addEventListener("input", render));
+  render();
+})();
+
+// ---------- simulator ----------
+(function(){
+  const deliveriesByMsg = { "58": 87, "59": 88 };
+  const ME = "100000001";
+  let updateId = 9000, cbSeq = 4382917450193746n, fbId = 300, offset = 0;
+  const seen = new Set();
+  let lastUpdate = null;
+  const log = document.getElementById("log");
+  const tbl = document.getElementById("fbTable");
+  const toast = document.getElementById("toast");
+  const line = (cls, text) => { const d = document.createElement("div"); d.className = cls; d.textContent = text; log.append(d); log.scrollTop = log.scrollHeight; };
+
+  function showToast(t){ toast.textContent = t; toast.classList.add("show"); clearTimeout(showToast.h); showToast.h = setTimeout(()=>toast.classList.remove("show"), 1400); }
+
+  function addRow(cells, cls){
+    const tr = document.createElement("tr"); if (cls) tr.className = cls;
+    cells.forEach(c => { const td = document.createElement("td"); td.textContent = c; tr.append(td); });
+    tbl.querySelectorAll("tr.new").forEach(r => r.classList.remove("new"));
+    tbl.append(tr);
+  }
+
+  function handle(u, replay){
+    const cq = u.callback_query;
+    line("t", `getUpdates → update_id=${u.update_id}${replay ? " (giao lại)" : ""}`);
+    line("d", `  data="${cq.data}" message_id=${cq.message.message_id} chat=${cq.message.chat.id}`);
+    if (cq.message.chat.id !== ME){
+      line("r", "  chat lạ → bỏ qua, không đụng DB, không trả lời");
+      offset = u.update_id + 1; line("d", `  offset=${offset}`);
+      return;
+    }
+    const kind = cq.data === "fb:like" ? "like" : "dislike";
+    const did = deliveriesByMsg[String(cq.message.message_id)];
+    line("d", `  SELECT deliveries WHERE (telegram, ${ME}, '${cq.message.message_id}') → id=${did}`);
+    const key = "cb:" + cq.id;
+    if (seen.has(key)){
+      line("x", `  INSERT feedback … source_message_id='${key}'`);
+      line("r", "  ON CONFLICT (feedback_source_message_uq) → bỏ qua, không thêm dòng");
+      addRow(["–", did, kind, key], "dup");
+    } else {
+      seen.add(key); fbId++;
+      line("x", `  INSERT feedback id=${fbId} delivery=${did} ${kind} '${key}'`);
+      addRow([fbId, did, kind, key], "new");
+    }
+    line("d", `  answerCallbackQuery("${kind === "like" ? "Đã ghi nhận 👍" : "Đã ghi nhận 👎"}")`);
+    if (!replay){
+      showToast(kind === "like" ? "Đã ghi nhận 👍" : "Đã ghi nhận 👎");
+      const kb = document.querySelector(`#simPhone .kb[data-msg="${cq.message.message_id}"]`);
+      const btns = kb.querySelectorAll("button");
+      const already = kb.dataset.state === kind;
+      if (already) line("d", "  editMessageReplyMarkup → 400 message is not modified (bỏ qua)");
+      else line("d", `  editMessageReplyMarkup → "${kind === "like" ? "👍 ✓" : "👎 ✓"}"`);
+      kb.dataset.state = kind;
+      btns[0].textContent = kind === "like" ? "👍 ✓" : "👍"; btns[0].classList.toggle("on", kind === "like");
+      btns[1].textContent = kind === "dislike" ? "👎 ✓" : "👎"; btns[1].classList.toggle("on", kind === "dislike");
+    }
+    offset = u.update_id + 1; line("d", `  offset=${offset} (xác nhận)`);
+  }
+
+  function makeUpdate(msgId, v, chat){
+    cbSeq += 7919n;
+    return { update_id: ++updateId, callback_query: { id: cbSeq.toString(), data: "fb:" + v, message: { message_id: Number(msgId), chat: { id: chat } } } };
+  }
+
+  document.querySelectorAll("#simPhone .kb button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const msg = btn.parentElement.dataset.msg;
+      const u = makeUpdate(msg, btn.dataset.v, ME);
+      lastUpdate = u; handle(u, false);
+    });
+  });
+  document.getElementById("btnReplay").addEventListener("click", () => {
+    if (!lastUpdate){ line("d", "Chưa có lượt bấm nào để giao lại. Bấm 👍 hoặc 👎 trước."); return; }
+    line("r", "— bot khởi động lại, offset=0; Telegram giao lại update chưa xác nhận —");
+    handle(lastUpdate, true);
+  });
+  document.getElementById("btnStranger").addEventListener("click", () => {
+    handle(makeUpdate("58", "dislike", "777000123"), true);
+  });
+  document.getElementById("btnReset").addEventListener("click", () => {
+    seen.clear(); fbId = 300; lastUpdate = null; log.textContent = "";
+    tbl.querySelectorAll("tr:not(:first-child)").forEach(r => r.remove());
+    document.querySelectorAll("#simPhone .kb").forEach(kb => { delete kb.dataset.state; const b = kb.querySelectorAll("button"); b[0].textContent = "👍"; b[1].textContent = "👎"; b.forEach(x => x.classList.remove("on")); });
+    line("d", "Bot đang chờ getUpdates?timeout=50 …");
+  });
+  line("d", "Bot đang chờ getUpdates?timeout=50 …");
+})();
+</script>
+</body>
+</html>

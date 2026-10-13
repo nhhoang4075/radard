@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Tuần 3 thực thi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+
+.dec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:760px){.dec{grid-template-columns:1fr}}
+.tg{max-width:520px;margin:16px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#DCE8DF}
+.tg-head{display:flex;gap:10px;align-items:center;background:#fff;padding:10px 14px;border-bottom:1px solid var(--line)}
+.tg-head small{display:block;color:var(--ink-3);font-size:12px}
+.tg-av{width:34px;height:34px;border-radius:50%;background:#2BB3A0;color:#fff;display:grid;place-items:center;font-weight:700}
+.tg-body{padding:14px;display:grid;gap:10px}
+.tg-msg{background:#fff;border-radius:12px 12px 12px 4px;padding:9px 12px;font-size:14.5px;line-height:1.5;max-width:92%;box-shadow:0 1px 1px rgba(0,0,0,.06)}
+.tg-msg b{display:block;margin-bottom:2px}
+.tg-msg a{font-size:13px;word-break:break-all}
+.tg-msg .tg-time{display:block;text-align:right;font-size:11px;color:var(--ink-3);margin-top:2px}
+.tg-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:-6px;max-width:92%}
+.tg-btns span{background:rgba(255,255,255,.7);border-radius:8px;text-align:center;padding:6px;font-size:14px;color:#2A7A6E;font-weight:600}
+</style>
+</head>
+<body>
+<style>
+.stp{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:16px}
+.stp h3{margin:0;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.stp h3 .k{font-family:var(--mono);font-size:13px;background:var(--accent);color:#fff;border-radius:6px;padding:1px 8px}
+.stp h3 .d{font-family:var(--body);font-size:13px;font-weight:500;color:var(--ink-3)}
+.stp dl{display:grid;grid-template-columns:110px 1fr;gap:6px 14px;margin:12px 0 0;font-size:14.5px}
+.stp dt{font-weight:600;color:var(--ink-2)}
+.stp dd{margin:0}
+.stp dd ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.stp .you{color:var(--warn);font-weight:600}
+@media (max-width:640px){.stp dl{grid-template-columns:1fr}.stp dt{margin-top:6px}}
+.tag{display:inline-block;font-size:11.5px;font-weight:600;border-radius:99px;padding:1px 8px;white-space:nowrap}
+.t-new{background:var(--blue-soft);color:var(--blue)}
+.t-fix{background:var(--warn-soft);color:var(--warn)}
+.t-keep{background:var(--accent-soft);color:var(--accent)}
+.t-you{background:var(--warn-soft);color:var(--warn)}
+.find{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:12px 16px;margin-top:14px}
+.find b.h{display:block;font-size:15.5px}
+.find p{font-size:14.5px;color:var(--ink-2);margin-top:4px}
+.qd{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-top:14px}
+.qd b.h{font-family:var(--display);font-size:17px}
+.qd ol{margin:8px 0 0;padding-left:20px;display:grid;gap:4px;font-size:14.5px}
+.qd .rec{font-weight:600;color:var(--accent)}
+.qd p{font-size:14.5px;color:var(--ink-2)}
+.qd.done{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)) left/4px 100% no-repeat,var(--surface)}
+.qd .ok{font-family:var(--body);font-size:12px;font-weight:600;background:var(--accent);color:#fff;border-radius:99px;padding:1px 9px;margin-left:8px;vertical-align:2px}
+.qd del{color:var(--ink-3)}
+</style>
+<div class="wrap">
+<div class="eyebrow">RADARD · KẾ HOẠCH THỰC THI TUẦN 3 · MVP-0 · 12/10/2026</div>
+<h1>Tuần 3, thiết kế lại để làm được</h1>
+<p class="lede">Bản 11/10 (<a href="tuan-3.html">tuan-3.html</a>) lên kế hoạch trước khi có công thức xếp hạng và chủ đề. Bản này xếp lại việc theo thiết kế mới trong <a href="xep-hang.html">xep-hang.html</a>. Mỗi việc ghi rõ: làm gì, file nào, thế nào là xong, việc nào cần bạn. Tôi cũng ghi lại 9 chỗ còn hở mà tôi tìm ra khi rà lại thiết kế.</p>
+
+<nav class="tabs" aria-label="Các phần">
+  <div class="tablist" role="tablist">
+    <button class="tab" role="tab" aria-controls="tong-quan"><span class="n">01</span>Tổng quan</button>
+    <button class="tab" role="tab" aria-controls="thu-tu"><span class="n">02</span>Thứ tự</button>
+    <button class="tab" role="tab" aria-controls="du-lieu"><span class="n">03</span>Dữ liệu &amp; điểm</button>
+    <button class="tab" role="tab" aria-controls="digest"><span class="n">04</span>Telegram &amp; digest</button>
+    <button class="tab" role="tab" aria-controls="deploy"><span class="n">05</span>Deploy &amp; nghiệm thu</button>
+    <button class="tab" role="tab" aria-controls="phat-hien"><span class="n">06</span>Chỗ hở đã tìm</button>
+    <button class="tab" role="tab" aria-controls="quyet"><span class="n">07</span>Cần bạn quyết</button>
+  </div>
+</nav>
+
+<!-- 01 -->
+<div class="panel" role="tabpanel" id="tong-quan">
+<div class="tiles">
+  <div class="tile"><b>10</b><span>bước, từ bật lại daemon tới nghiệm thu</span></div>
+  <div class="tile"><b>6 ngày</b><span>dữ liệu đang thiếu (daemon tắt từ 06/10)</span></div>
+  <div class="tile"><b>9</b><span>chỗ hở tìm thấy khi rà thiết kế (tab 06)</span></div>
+  <div class="tile"><b>6 / 8</b><span>điểm còn chờ bạn quyết; D3, D4 đã chốt 12/10 (tab 07)</span></div>
+</div>
+
+<h2>Mục tiêu không đổi</h2>
+<p>Mỗi sáng 07:00 giờ Việt Nam, bạn nhận trên Telegram tối đa 7 sự kiện đáng đọc nhất trong 24 giờ, mỗi sự kiện một tin có nút 👍/👎. Sau đó radard lên Railway và chạy 7 ngày liền không cần can thiệp tay để nghiệm thu.</p>
+
+<h2>Khác gì kế hoạch 11/10</h2>
+<div class="tbl"><table>
+<thead><tr><th>Phần</th><th>Bản 11/10</th><th>Bản này</th></tr></thead>
+<tbody>
+<tr><td>Lọc liên quan</td><td>Một mô tả TẠM, ngưỡng 0,58</td><td><span class="tag t-new">mới</span> Bạn chọn chủ đề từ thư viện hoặc tự thêm. Mỗi tài liệu được chấm với từng chủ đề rồi chuẩn hoá theo mặt bằng (bước 1–2)</td></tr>
+<tr><td>Gộp sự kiện</td><td>Chỉ gộp tài liệu có relevance ≥ 0,58 (arXiv 0,55, GitHub 0): lọc theo hồ sơ ngay ở bước xử lý</td><td><span class="tag t-fix">sửa</span> Gộp <b>mọi</b> tài liệu. Hồ sơ chỉ dùng ở digest, nên toàn pipeline chỉ còn một quyết định "có liên quan tới bạn không" (tab 02, D4)</td></tr>
+<tr><td>Chọn tin</td><td>Liên quan cao nhất + 0,04 × ln(số tài liệu)</td><td><span class="tag t-new">mới</span> Công thức S gồm 6 thành phần, chọn theo MMR, giữ chỗ và hạn mức theo nguồn, có sàn điểm (bước 3)</td></tr>
+<tr><td>Độ nổi (điểm HN)</td><td>Chưa có</td><td><span class="tag t-new">mới</span> Lấy lại điểm HN ngay trước khi xếp hạng và lưu vào bảng mới <code>doc_signals</code>. Bảng này thiết kế cũ còn thiếu (tab 06, mục 2)</td></tr>
+<tr><td>Nút 👍/👎</td><td>Nhét id delivery vào nút</td><td><span class="tag t-fix">sửa</span> Nút không mang id. Bấm nút thì tìm tin theo <code>message_id</code>, vì lúc gửi tin chưa có id delivery (tab 06, mục 1)</td></tr>
+<tr><td>Job digest lỗi giữa chừng</td><td>Khoá duy nhất chặn gửi trùng</td><td><span class="tag t-fix">sửa</span> Lưu danh sách tin đã chọn trước khi gửi. Chạy lại thì gửi tiếp phần còn thiếu, không bỏ dở (tab 06, mục 3)</td></tr>
+<tr><td>Tiêu chí ≥ 50 phản hồi</td><td>Giữ nguyên</td><td><span class="tag t-fix">sửa</span> Không thể đạt: 7 ngày × 7 tin chỉ có tối đa 49 tin. Đề xuất đổi tiêu chí (tab 07)</td></tr>
+<tr><td>Thông báo, R2, Docker, Railway</td><td>Như thiết kế</td><td><span class="tag t-keep">giữ</span> Giữ nguyên, nhưng làm sau digest chạy thật trên máy</td></tr>
+</tbody></table></div>
+
+<h2>Lịch dự kiến</h2>
+<p>Ngày ghi dưới đây là mục tiêu, chưa phải cam kết. Chỗ dễ trễ nhất là bước 8, vì cần bạn tạo tài khoản Railway và R2.</p>
+<div class="tbl"><table>
+<thead><tr><th>Ngày</th><th>Bước</th><th>Kết quả nhìn thấy được</th></tr></thead>
+<tbody>
+<tr><td class="mono">T2 12/10</td><td>0 · 1</td><td>Daemon chạy lại, lấy bù 6 ngày. Có thư viện chủ đề, đã thử trên dữ liệu thật</td></tr>
+<tr><td class="mono">T3 13/10</td><td>2</td><td>Mỗi tài liệu có điểm theo từng chủ đề, có mặt bằng, có điểm HN mới</td></tr>
+<tr><td class="mono">T4 14/10</td><td>3</td><td><code>cli rank</code> in bảng 7 tin kèm R, P, C, A, F, N cho một ngày bất kỳ</td></tr>
+<tr><td class="mono">T5 15/10</td><td>4</td><td>Bot gửi tin có nút; bấm nút thì ghi vào <code>feedback</code></td></tr>
+<tr><td class="mono">T6 16/10</td><td>5 · 6</td><td>Chọn chủ đề trên Telegram; <code>cli digest --dry-run</code>; lịch 07:00</td></tr>
+<tr><td class="mono">T7–CN 17–18/10</td><td>7</td><td>Hai digest thật trên máy; chỉnh theo phản hồi của bạn</td></tr>
+<tr><td class="mono">18–19/10</td><td>8</td><td>radard chạy trên Railway, bản thô lưu trên R2</td></tr>
+<tr><td class="mono">20–26/10</td><td>9</td><td>7 digest liên tiếp. <code>cli report</code> chấm theo các tiêu chí nghiệm thu</td></tr>
+</tbody></table></div>
+
+<div class="note"><b>Cách làm giữ như cũ.</b> Tôi không commit, push hay deploy khi bạn chưa đồng ý. Tôi không đọc hay in khoá API, token, chat id. Tôi chỉ đánh dấu một việc là xong khi đã chạy thật và test xanh. Sau mỗi bước, tôi cập nhật <a href="checklist.html">checklist.html</a> khi bạn đã duyệt kế hoạch này.</div>
+</div>
+
+<!-- 02 -->
+<div class="panel" role="tabpanel" id="thu-tu">
+<h2>Bước nào cần bước nào</h2>
+<figure>
+<svg viewBox="0 0 1100 300" role="img" aria-label="Sơ đồ phụ thuộc: dữ liệu và chủ đề đi vào chấm điểm, rồi xếp hạng, rồi job digest; Telegram chạy song song và cũng đi vào job digest; sau đó digest thật trên máy, deploy, nghiệm thu.">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ah"/></marker></defs>
+<!-- boxes -->
+<rect class="bx" x="10" y="20" width="130" height="56" rx="8"/><text class="tb" x="22" y="43">0 · Bật daemon</text><text class="ts" x="22" y="62">lấy bù 06–12/10</text>
+<rect class="bx" x="10" y="110" width="130" height="56" rx="8"/><text class="tb" x="22" y="133">1 · Chủ đề</text><text class="ts" x="22" y="152">thư viện + tự thêm</text>
+<rect class="bx" x="10" y="210" width="130" height="56" rx="8"/><text class="tb" x="22" y="233">4 · Telegram</text><text class="ts" x="22" y="252">Notifier, bot, 👍/👎</text>
+<rect class="bx" x="180" y="65" width="140" height="56" rx="8"/><text class="tb" x="192" y="88">2 · Chấm điểm</text><text class="ts" x="192" y="107">điểm chủ đề, mặt bằng</text>
+<rect class="bx" x="180" y="210" width="140" height="56" rx="8"/><text class="tb" x="192" y="233">5 · Chọn chủ đề</text><text class="ts" x="192" y="252">trên Telegram</text>
+<rect class="bx" x="360" y="65" width="130" height="56" rx="8"/><text class="tb" x="372" y="88">3 · Xếp hạng</text><text class="ts" x="372" y="107">S, MMR, cli rank</text>
+<rect class="bc" x="530" y="135" width="130" height="56" rx="8"/><text class="tb" x="542" y="158">6 · Job digest</text><text class="ts" x="542" y="177">07:00, chạy lại an toàn</text>
+<rect class="bx" x="700" y="135" width="120" height="56" rx="8"/><text class="tb" x="712" y="158">7 · Chạy thật</text><text class="ts" x="712" y="177">2 sáng trên máy</text>
+<rect class="bx" x="860" y="135" width="105" height="56" rx="8"/><text class="tb" x="872" y="158">8 · Deploy</text><text class="ts" x="872" y="177">R2 · Docker</text>
+<rect class="bx" x="985" y="135" width="105" height="56" rx="8"/><text class="tb" x="995" y="158">9 · Nghiệm thu</text><text class="ts" x="995" y="177">7 ngày</text>
+<rect class="bp" x="840" y="230" width="145" height="44" rx="8"/><text class="t" x="852" y="250">Cần bạn: tài khoản</text><text class="ts" x="852" y="266">Railway, bucket R2</text>
+<!-- arrows -->
+<path class="ln" d="M140,48 C160,48 160,85 178,85" marker-end="url(#ar)"/>
+<path class="ln" d="M140,138 C160,138 160,102 178,102" marker-end="url(#ar)"/>
+<path class="ln" d="M140,238 L178,238" marker-end="url(#ar)"/>
+<path class="ln" d="M75,166 L75,186 C75,200 250,192 250,208" marker-end="url(#ar)"/>
+<path class="ln" d="M320,93 L358,93" marker-end="url(#ar)"/>
+<path class="ln" d="M490,93 C515,93 505,150 528,150" marker-end="url(#ar)"/>
+<path class="ln" d="M320,238 C440,238 470,178 528,178" marker-end="url(#ar)" stroke-dasharray="5 4"/>
+<path class="ln" d="M140,226 C300,200 420,170 528,165" marker-end="url(#ar)"/>
+<path class="ln" d="M660,163 L698,163" marker-end="url(#ar)"/>
+<path class="ln" d="M820,163 L858,163" marker-end="url(#ar)"/>
+<path class="ln" d="M965,163 L983,163" marker-end="url(#ar)"/>
+<path class="ln" d="M912,230 L912,193" marker-end="url(#ar)"/>
+<text class="lb" x="330" y="84">R theo chủ đề</text>
+<text class="lb" x="500" y="122">7 tin + điểm</text>
+<text class="lb" x="395" y="224">gửi tin, nhận nút</text>
+<text class="lb" x="400" y="258">tuỳ chọn</text>
+</svg>
+<figcaption>Hình 1. Bước 4 (Telegram) không cần chủ đề hay điểm, nên làm song song được với bước 1–3. Mũi tên đứt: digest vẫn chạy được khi chưa có bước 5, vì chủ đề có thể chọn bằng CLI. Bước 8 chỉ bắt đầu khi bạn đã tạo tài khoản.</figcaption>
+</figure>
+
+<h2>Hồ sơ chỉ dùng ở một chỗ</h2>
+<p>Chốt 12/10 (D4). Bước xử lý mô tả thế giới và không biết bạn là ai. Hồ sơ của bạn (các chủ đề) chỉ được dùng để <b>chấm điểm</b> ở bước xử lý, không dùng để <b>loại</b> bài nào. Quyết định "có liên quan tới bạn không" chỉ xảy ra một lần, ở digest.</p>
+<figure>
+<svg viewBox="0 0 980 300" role="img" aria-label="Ba tầng: thu thập lấy về và lưu; xử lý embed, gộp mọi tài liệu và chấm điểm theo chủ đề mà không loại bài nào; digest là nơi duy nhất dùng hồ sơ để quyết định liên quan, bằng cổng R ≥ 0,6.">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" class="ah"/></marker></defs>
+<rect class="ba" x="10" y="30" width="220" height="200" rx="10"/>
+<text class="tb" x="26" y="58">Thu thập</text>
+<text class="ts" x="26" y="78">"có gì mới?"</text>
+<text class="t" x="26" y="112">lấy theo cửa sổ thời gian</text>
+<text class="t" x="26" y="134">lưu bản thô, không sửa</text>
+<text class="t" x="26" y="156">documents</text>
+<text class="ts" x="26" y="206">không đọc hồ sơ</text>
+<rect class="bd" x="270" y="30" width="330" height="200" rx="10"/>
+<text class="tb" x="286" y="58">Xử lý</text>
+<text class="ts" x="286" y="78">"chuyện gì đang xảy ra?"</text>
+<text class="t" x="286" y="112">embed mọi tài liệu</text>
+<text class="t" x="286" y="134">gộp MỌI tài liệu: cùng chuyện khi giống ≥ 0,9</text>
+<text class="t" x="286" y="156">chấm cosine với từng chủ đề → doc_topic_scores</text>
+<text class="t" x="286" y="178">mặt bằng mỗi ngày → baselines</text>
+<text class="ts" x="286" y="206">dùng chủ đề để tính số, không loại bài nào</text>
+<rect class="bc" x="640" y="30" width="330" height="200" rx="10"/>
+<text class="tb" x="656" y="58">Digest · 07:00</text>
+<text class="ts" x="656" y="78">"chuyện nào đáng để BẠN đọc?"</text>
+<text class="t" x="656" y="112">1. R ≥ 0,6: có thuộc chủ đề của bạn không</text>
+<text class="t" x="656" y="134">2. lấy lại điểm HN (chỉ cho tin qua bước 1)</text>
+<text class="t" x="656" y="156">3. S ≥ sàn: có đủ đáng đọc không</text>
+<text class="t" x="656" y="178">4. chọn 7, phạt trùng từ 0,85</text>
+<text class="ts" x="656" y="206">nơi DUY NHẤT quyết định liên quan</text>
+<path class="ln" d="M230,130 L268,130" marker-end="url(#ar2)"/>
+<path class="ln" d="M600,130 L638,130" marker-end="url(#ar2)"/>
+<rect class="bp" x="560" y="252" width="160" height="40" rx="8"/>
+<text class="t" x="574" y="277">Hồ sơ: chủ đề của bạn</text>
+<path class="ln" d="M600,252 L560,232" marker-end="url(#ar2)" stroke-dasharray="5 4"/>
+<path class="ln" d="M690,252 L730,232" marker-end="url(#ar2)"/>
+<text class="lb" x="455" y="250">chấm điểm</text>
+<text class="lb" x="745" y="250">quyết định</text>
+</svg>
+<figcaption>Hình 2. Mũi tên đứt: ở bước xử lý, chủ đề chỉ dùng để tính điểm. Mũi tên liền: ở digest, điểm đó quyết định tin nào vào. Trước 12/10, bước xử lý cũng loại bài theo hồ sơ (ngưỡng 0,58), nên có hai cổng liên quan rời nhau.</figcaption>
+</figure>
+
+<h3>Mỗi ngưỡng còn lại trả lời một câu hỏi khác</h3>
+<div class="tbl"><table>
+<thead><tr><th>Câu hỏi</th><th>Ngưỡng</th><th>Ở đâu</th></tr></thead><tbody>
+<tr><td>Hai bài có cùng một chuyện không?</td><td class="mono">giống ≥ 0,9 thì gộp</td><td>Xử lý</td></tr>
+<tr><td>Chuyện này có thuộc chủ đề của bạn không?</td><td class="mono">R ≥ 0,6</td><td>Digest</td></tr>
+<tr><td>Chuyện này có đủ đáng đọc không?</td><td class="mono">S ≥ sàn 0,59</td><td>Digest</td></tr>
+<tr><td>Hai tin đã chọn có thể là cùng chuyện không?</td><td class="mono">phạt từ giống 0,85</td><td>Digest</td></tr>
+</tbody></table></div>
+<p>Ngưỡng 0,85 và 0,9 nối với nhau có chủ ý. Bước xử lý chỉ gộp khi chắc chắn là cùng chuyện (≥ 0,9). Vùng 0,85–0,9 nghĩa là "có thể cùng chuyện", nên digest xử lý bằng cách trừ điểm thay vì gộp. Hai sự kiện Nvidia giống nhau 0,901 là ví dụ thật cho vùng này.</p>
+
+<h3>Đổi lại thì tốn gì</h3>
+<div class="tbl"><table>
+<thead><tr><th></th><th>Trước (lọc rồi mới gộp)</th><th>Gộp mọi tài liệu</th></tr></thead><tbody>
+<tr><td>Tài liệu được gộp</td><td class="num">4.034 (24%)</td><td class="num">16.637 (100%)</td></tr>
+<tr><td>Tìm tâm gần nhất, mỗi tài liệu</td><td>vài ms</td><td>85 ms. Đo thật ngày 12/10: quét 15.542 vector trong cửa sổ 14 ngày đông nhất</td></tr>
+<tr><td>Mỗi ngày (~1.500 tài liệu)</td><td></td><td>khoảng 2 phút, chạy nền</td></tr>
+<tr><td>Gộp lại toàn bộ một lần</td><td></td><td>khoảng 25 phút, không gọi model</td></tr>
+<tr><td>Sửa hay thêm chủ đề</td><td>phải gộp lại</td><td>chỉ tính lại điểm, bằng SQL</td></tr>
+<tr><td>Độ phủ C, độ nổi P</td><td>mất các bài đăng lại có tiêu đề sơ sài</td><td>đủ mọi bài của chuyện</td></tr>
+</tbody></table></div>
+<p>Số sự kiện tăng khoảng 4 lần, nhưng digest không chậm thêm. Cổng R chạy trước, tính trên điểm đã có sẵn. Chỉ những sự kiện qua cổng mới cần lấy lại điểm HN. Khi số sự kiện lên hàng chục nghìn thì bật <code>hnsw.iterative_scan</code>; việc này đã ghi trong mục "Để sau" của checklist.</p>
+
+<h2>Vì sao xếp như vậy</h2>
+<div class="grid2">
+  <div class="card"><b class="h">Bật daemon trước tiên</b><p>Mặt bằng (median và mốc 0,1% của mỗi nguồn × chủ đề) tính trên 30 ngày gần nhất. Hiện DB chỉ có dữ liệu tới 06/10. Bật lại sớm thì tới lúc làm bước 2–3 đã có lại dữ liệu những ngày gần đây, và digest thử được trên ngày mới.</p></div>
+  <div class="card"><b class="h">Xếp hạng không phụ thuộc Telegram</b><p>Bước 3 là các hàm thuần (nhận số, trả số), viết trong <code>packages/core</code>, test bằng chính các ví dụ trong xep-hang.html. Kiểm được đúng sai mà không cần gửi tin nào.</p></div>
+  <div class="card"><b class="h">Chạy thật trên máy trước khi deploy</b><p>Hai sáng nhận digest thật cho thấy những lỗi test không bắt được: giọng văn, tin trùng, giờ gửi. Sửa trên máy nhanh hơn sửa trên Railway.</p></div>
+  <div class="card"><b class="h">Nghiệm thu chỉ tính trên server</b><p>Tiêu chí là "7 ngày liên tục không can thiệp tay". Máy MacBook ngủ thì daemon dừng, nên 7 ngày tính từ lúc radard chạy trên Railway.</p></div>
+</div>
+</div>
+
+<!-- 03 -->
+<div class="panel" role="tabpanel" id="du-lieu">
+<h2>Bước 0–3: dữ liệu, chủ đề, điểm</h2>
+<p class="muted">Các thuật ngữ dùng dưới đây:</p>
+<ul class="muted">
+<li><b>chủ đề</b> (topic) là một mối quan tâm, có một câu mô tả tiếng Anh dùng để embed.</li>
+<li><b>mặt bằng</b> (baseline) là median và mốc 0,1% cao nhất của một nguồn × chủ đề, tính trên 30 ngày.</li>
+<li><b>z</b> là điểm đã chuẩn hoá theo mặt bằng: <code>clamp((x − median) / (mốc 0,1% − median), 0, 1)</code>. z = 0 nghĩa là bình thường như mọi bài; z = 1 nghĩa là hiếm có.</li>
+</ul>
+<p class="muted">Chi tiết từng công thức ở <a href="xep-hang.html">xep-hang.html</a>.</p>
+
+<div class="stp"><h3><span class="k">0</span>Bật lại daemon, lấy bù dữ liệu<span class="d">~30 phút · cần bạn đồng ý</span></h3>
+<dl>
+<dt>Làm</dt><dd><code>bun run dev</code> (vai trò <code>all</code>). Lịch đã lưu trong Postgres. HN và arXiv đi theo cửa sổ thời gian (<code>walkWindows</code>) từ con trỏ cũ, nên lấy bù được cả khoảng 06/10 → nay. Job process sẽ embed khoảng 3–6 nghìn tài liệu mới.</dd>
+<dt>Xong khi</dt><dd><ul><li><code>cli runs</code> cho thấy HN và arXiv về <code>ok</code>, không còn <code>behind</code>.</li><li>Số tài liệu mỗi ngày từ 06/10 tới 12/10 ngang các ngày trước (khoảng 1.000–2.000 mỗi ngày).</li><li><code>doc_text</code> có đủ embedding cho mọi tài liệu.</li></ul></dd>
+<dt>Chi phí</dt><dd>Embedding khoảng $0,002–0,004 (tính theo $0,0192 cho 12.273 tài liệu ngày 06/10).</dd>
+<dt class="you">Cần bạn</dt><dd>Đồng ý bật lại. Máy cần thức trong lúc lấy bù.</dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">1</span>Thư viện chủ đề và chủ đề của bạn<span class="d">~1 buổi</span></h3>
+<dl>
+<dt>Bảng</dt><dd>Migration 0007:
+<pre>topics            thư viện chủ đề, radard soạn sẵn
+  id, key, group_vi, label_vi, description_en, active
+
+profile_topics    chủ đề của bạn: chọn từ thư viện, hoặc tự thêm
+  id, topic_id (trống nếu tự thêm), label
+  description_user   lời của bạn (trống nếu chọn từ thư viện)
+  description_en     câu dùng để embed
+  origin             library | custom
+  kind               include | exclude
+  embedding, embedding_model, active, created_at</pre>
+<code>profile.description</code> đổi vai thành <b>bối cảnh</b>: chỉ đưa vào prompt digest để viết câu "vì sao đáng chú ý với bạn", không dùng để lọc.</dd>
+<dt>Thư viện</dt><dd>Khoảng 15 chủ đề, chia nhóm, tên tiếng Việt. Câu mô tả tiếng Anh viết theo kiểu đã thử ngày 12/10 (câu có ví dụ cụ thể, không phải một chữ). Mỗi chủ đề được thử trên 16 nghìn tài liệu thật: xem 10 bài khớp nhất và 10 bài sát mặt bằng. Chủ đề nào kéo nhầm bài lạc đề thì sửa câu mô tả. Kết quả thử ghi thành bảng trong tài liệu, để bạn duyệt.</dd>
+<dt>Tự thêm</dt><dd>Bạn nhập tên và mô tả bằng lời của mình. Một lời gọi LLM (<code>task = topic_describe</code>) chuyển nó thành câu tiếng Anh dạng giống thư viện, rồi hiện lại cho bạn duyệt. Bảng lưu cả hai: lời gốc và bản tiếng Anh.</dd>
+<dt>Code</dt><dd><code>packages/db/src/schema/profile.ts</code> · <code>packages/db/seed/topics.ts</code> · <code>apps/daemon/src/jobs/topics.ts</code> · CLI <code>topics list | pick | add | off</code></dd>
+<dt>Xong khi</dt><dd><ul><li>Test: chọn chủ đề, tự thêm (dùng LLM giả), tắt rồi bật lại, chọn trùng thì bị chặn.</li><li>Bạn đã duyệt thư viện. Hồ sơ thật của bạn có các chủ đề đã chọn và đã embed.</li></ul></dd>
+<dt class="you">Cần bạn</dt><dd>Duyệt thư viện. Chọn chủ đề cho hồ sơ. Chủ đề "không quan tâm": tuần 3 chỉ có cột <code>kind</code> trong schema, chưa tính điểm (D3, đã chốt).</dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">2</span>Điểm theo chủ đề, tín hiệu, mặt bằng<span class="d">~1 ngày</span></h3>
+<dl>
+<dt>Bảng</dt><dd>Migration 0008:
+<pre>doc_topic_scores  document_id, profile_topic_id, score (cosine)   PK (document_id, profile_topic_id)
+doc_signals       document_id, metric, value, observed_at          PK (document_id, metric)
+                  metric = hn_points | hn_comments …   (giá trị mới nhất)
+baselines         source_id, profile_topic_id (trống = tín hiệu), metric,
+                  median, p999, n, computed_at</pre></dd>
+<dt>Điểm chủ đề</dt><dd><ul><li>Job process tính cosine giữa mỗi tài liệu mới và mọi chủ đề đang bật, ngay sau khi embed.</li><li>Tài liệu cũ được backfill bằng một câu SQL dùng pgvector (<code>1 − (embedding &lt;=&gt; topic)</code>). Phần này không gọi model, nên không tốn tiền.</li><li>Thêm một chủ đề thì chỉ tính lại cột của chủ đề đó.</li></ul></dd>
+<dt>Tín hiệu HN</dt><dd><ul><li><code>refresh(docs)</code> hỏi Algolia điểm và số bình luận mới nhất, 50 bài mỗi request.</li><li>Chạy một lần để backfill cả 30 ngày, khoảng 200 request.</li><li>Sau đó chạy trước mỗi digest cho các tài liệu ứng viên.</li></ul></dd>
+<dt>Mặt bằng</dt><dd><ul><li>Job <code>baselines</code> chạy lúc 06:30 giờ Việt Nam, trước digest.</li><li>Dùng <code>percentile_cont(0.5)</code> và <code>percentile_cont(0.999)</code> trên 30 ngày, theo cặp (nguồn × chủ đề) và (nguồn × tín hiệu); thêm một dòng mặt bằng chung cho mỗi chủ đề.</li><li>Lúc tra thì trộn hai mặt bằng theo <code>w = n / (n + 1000)</code>.</li><li>Mặt bằng của độ nổi chỉ tính trên bài đã đăng hơn 24 giờ, vì điểm HN còn tăng trong ngày đầu.</li></ul></dd>
+<dt>Gộp mọi tài liệu</dt><dd><ul><li>Bỏ ngưỡng relevance 0,58 trong <code>Thresholds</code>.</li><li>Bỏ <code>sources.config.minRelevance</code> (arXiv 0,55, GitHub 0).</li><li>Bỏ cột <code>doc_text.relevance</code> và embedding của <code>profile</code> (migration 0008). <code>doc_topic_scores</code> thay cho nó.</li><li>Pha B của job process gộp mọi tài liệu chưa thuộc sự kiện nào. Ngưỡng gộp 0,9 và cửa sổ ±7 ngày giữ nguyên.</li><li>Chạy <code>events rebuild</code> một lần, khoảng 25 phút.</li><li>Release GitHub vẫn không gộp theo vector, như cũ.</li></ul></dd>
+<dt>Code</dt><dd><code>jobs/process.ts</code> (thêm pha chấm chủ đề, bỏ cổng liên quan) · <code>jobs/baselines.ts</code> · <code>sources/hn.ts</code> (<code>refresh</code>, <code>engagement</code>) · <code>core/src/source.ts</code> (thêm 2 hàm tuỳ chọn vào <code>SourceAdapter</code>)</dd>
+<dt>Xong khi</dt><dd><ul><li>Test <code>percentile_cont</code> trên bộ số biết trước đáp án. Test phép trộn: n = 0 thì dùng hẳn mặt bằng chung.</li><li>Test <code>refresh</code> với Algolia giả.</li><li>Test job process: tài liệu không khớp chủ đề nào vẫn được gộp. Sửa chủ đề thì không đổi bảng <code>events</code>.</li><li>Sau recluster: mọi tài liệu thuộc đúng một sự kiện; thời gian mỗi tài liệu được ghi vào log.</li><li>Trên DB thật, mặt bằng HN của độ nổi gần với số đã đo ngày 11/10 (median ≈ 1,10, mốc 0,1% ≈ 7,04).</li></ul></dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">3</span>Xếp hạng và chọn 7 tin<span class="d">~1 ngày</span></h3>
+<dl>
+<dt>Làm</dt><dd>Hàm thuần trong <code>packages/core/src/ranking.ts</code>:
+<pre>normalize(x, baseline)            → z
+components(event, docs, signals)  → { R, P, C, A, F, N, topic }   // topic = chủ đề cho R cao nhất
+score(c, weights)                 → S = N × (0,40R + 0,25P + 0,15C + 0,10A + 0,10F)
+select(candidates, opts)          → ≤ 7 tin: cổng R ≥ 0,6, sàn 0,59, giữ chỗ mỗi nguồn,
+                                    tối đa 3 tin/nguồn, phạt trùng 0,3 × clamp((giống − 0,85)/0,10)</pre>
+Trọng số và hằng số nằm trong một object cấu hình. Mỗi digest lưu lại cấu hình đã dùng, để sau này giải thích được vì sao tin đó được chọn.</dd>
+<dt>Ứng viên</dt><dd>Một câu SQL lấy các sự kiện có tài liệu mới trong 24 giờ, kèm tài liệu, điểm chủ đề, tín hiệu và nguồn. N tính từ <code>deliveries.document_ids</code> của 7 ngày gần nhất.</dd>
+<dt>CLI</dt><dd><code>cli rank --at 2026-10-06T00:00Z</code> in 7 tin đã chọn, các thành phần điểm, chủ đề khớp và lý do mỗi tin bị loại.</dd>
+<dt>Xong khi</dt><dd><ul><li>Test lại đúng các ví dụ trong xep-hang.html: phạt cặp Nvidia 0,15; thứ tự chọn A, C, D, B; ví dụ hạn mức 9 ứng viên ra 5 tin.</li><li>Trên ngày 05/10, tin Wikimedia đứng đầu.</li><li>Một ngày trong 06–12/10 cho ra danh sách mà bạn đọc thấy hợp lý.</li></ul></dd>
+</dl></div>
+</div>
+
+<!-- 04 -->
+<div class="panel" role="tabpanel" id="digest">
+<h2>Bước 4–7: Telegram và digest</h2>
+<p class="muted">Các khái niệm của Telegram Bot API dùng dưới đây:</p>
+<ul class="muted">
+<li><b>long polling</b> (<code>getUpdates</code>): bot hỏi Telegram liên tục "có gì mới không".</li>
+<li><b>callback_query</b>: Telegram báo rằng ai đó đã bấm một nút.</li>
+<li><b>callback_data</b>: chuỗi tối đa 64 byte gắn vào nút.</li>
+</ul>
+<p class="muted">Giải thích kỹ hơn ở <a href="tuan-3.html#telegram">tuan-3.html, tab 06</a>.</p>
+
+<div class="stp"><h3><span class="k">4</span>Notifier và bot Telegram<span class="d">~1 ngày · làm song song với 1–3 được</span></h3>
+<dl>
+<dt>Làm</dt><dd><ul>
+<li>Interface <code>Notifier</code> trong core, nhận tin ở dạng trung lập (<code>title</code>, <code>lines</code>, <code>url</code>, <code>actions</code>) như trong thiết kế. Có thêm adapter giả chạy trong bộ nhớ để test.</li>
+<li>Adapter <code>telegram.ts</code>:<ul><li>Render tin thành HTML của Telegram, có escape ký tự.</li><li>Gắn nút <code>fb:like</code> và <code>fb:dislike</code>.</li><li>Giãn nhịp 1 giây giữa các tin.</li><li>Chạm giới hạn (HTTP 429) thì chờ đúng <code>retry_after</code>.</li></ul></li>
+<li>Vai trò <code>bot</code> chạy long polling:<ul><li>Khi có người bấm nút, tìm delivery theo (kênh, chat, <code>message_id</code>) và ghi <code>feedback</code>.</li><li>Gọi <code>answerCallbackQuery</code> để hiện chữ "Đã ghi nhận 👍".</li><li>Sửa nút thành "👍 ✓" để bạn thấy mình đã bấm gì.</li></ul></li>
+<li>Bot bỏ qua mọi tin không đến từ chat của bạn (tab 06, mục 7).</li></ul></dd>
+<dt>Không ghi trùng</dt><dd>Lưu <code>"cb:" + callback_query.id</code> vào <code>feedback.source_message_id</code>. Khoá duy nhất có sẵn sẽ chặn bản ghi trùng khi Telegram gửi lại cùng một update, ví dụ lúc bot khởi động lại. Nhờ vậy không cần lưu offset của <code>getUpdates</code>.</dd>
+<dt>Code</dt><dd><code>core/src/notify.ts</code> · <code>adapters/src/telegram.ts</code> · <code>adapters/src/notify-fake.ts</code> · <code>apps/daemon/src/roles/bot.ts</code> · CLI <code>notify test</code></dd>
+<dt>Xong khi</dt><dd><ul><li>Test parse callback.</li><li>Test escape HTML, gồm tiêu đề có <code>&lt;</code> và <code>&amp;</code>.</li><li>Test bấm hai lần cùng một update thì chỉ có một dòng feedback.</li><li>Test chat lạ bị bỏ qua.</li><li>Trên điện thoại: bạn bấm 👍 rồi 👎 ở tin thử, bảng có 2 dòng.</li></ul></dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">5</span>Chọn chủ đề trên Telegram<span class="d">~nửa ngày · tuỳ quyết định D2</span></h3>
+<dl>
+<dt>Luồng</dt><dd><code>/topics</code> (hoặc lần đầu <code>/start</code>) → một tin liệt kê thư viện thành nút bật tắt, chủ đề đã chọn có dấu ✅ → nút "➕ Tự thêm" → bot hỏi tên và mô tả → LLM viết câu tiếng Anh → bot hiện câu đó kèm nút [Lưu] [Huỷ]. Lưu thì embed chủ đề mới (1 lời gọi), tính điểm của chủ đề đó cho mọi tài liệu (SQL), rồi tính lại mặt bằng.</dd>
+<dt>Lệnh</dt><dd>Tên lệnh bằng tiếng Anh (chốt 12/10); phần mô tả trong menu lệnh của Telegram (<code>setMyCommands</code>) và nội dung tin vẫn bằng tiếng Việt, theo <code>profile.display_lang</code>. Tuần 3 có <code>/start</code> và <code>/topics</code>. Telegram chỉ nhận tên lệnh gồm chữ thường, số và dấu gạch dưới, tối đa 32 ký tự.</dd>
+<dt>Không làm</dt><dd>Theo quyết định 12/10, các phần sau để sau: xem trước tin mẫu, 👎 có lý do, đề xuất hằng tuần, <code>/add</code>, <code>/remove</code>, chế độ nâng cao.</dd>
+<dt>Xong khi</dt><dd>Test luồng bằng adapter giả. Bạn chọn được chủ đề và tự thêm được một chủ đề trên điện thoại.</dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">6</span>Job digest<span class="d">~1 ngày</span></h3>
+<dl>
+<dt>Luồng</dt><dd><pre>07:00 giờ VN (pg-boss cron "0 7 * * *", tz Asia/Ho_Chi_Minh)
+1. Tạo dòng digests (channel, recipient, period_end), nếu đã có thì đọc lại
+   sent → dừng · sending/failed → làm tiếp từ bước còn thiếu
+2. Chưa có danh sách tin trong digests.meta.plan:
+     ứng viên → refresh HN → chấm điểm → select (bước 3)
+     → 1 lời gọi LLM viết lời mở đầu + tóm tắt (JSON, kiểm cấu trúc, thiếu thì thử lại 1 lần)
+     → lưu plan: tin đã chọn, điểm, chủ đề khớp, cấu hình, mặt bằng, model
+3. Gửi tin mở đầu và từng tin theo position. Gửi được tin nào thì ghi delivery ngay.
+   Chạy lại thì bỏ qua các position đã có delivery.
+4. status = sent</pre></dd>
+<dt>Khi lỗi</dt><dd><ul><li>LLM hỏng hai lần thì vẫn gửi: tiêu đề gốc và link, không có tóm tắt, kèm ghi chú "bản không tóm tắt".</li><li>Không có tin nào vượt sàn thì làm theo quyết định D5.</li><li>Lỗi Telegram thì pg-boss thử lại. Bước 1 bảo đảm không gửi trùng.</li></ul></dd>
+<dt>Prompt</dt><dd><ul><li>Đọc bối cảnh và ngôn ngữ hiển thị từ <code>profile</code>, không viết cứng câu "builds LLM agents…" như bản thử.</li><li>Mỗi tin ghi kèm chủ đề khớp, để hiện dòng "vì sao chọn".</li><li>Đặt trần <code>maxOutputTokens</code> 8.000, vì token suy nghĩ cũng tính vào trần này (13/10: một lần gọi chạm trần 4.000, JSON bị cắt).</li></ul></dd>
+<dt>Bảng</dt><dd>Migration 0009 thêm cột <code>digests.meta jsonb</code>. Hiện <code>digests</code> chưa có chỗ lưu plan.</dd>
+<dt>Code</dt><dd><code>jobs/digest.ts</code> · <code>boss.ts</code> (queue <code>digest</code>, <code>baselines</code>) · <code>roles/scheduler.ts</code> · CLI <code>digest --dry-run | --now</code></dd>
+<dt>Xong khi</dt><dd><ul><li>Test với Notifier giả và LLM giả:<ul><li>chạy 2 lần chỉ gửi 1 lần;</li><li>"chết" sau tin thứ 3 rồi chạy lại thì gửi tiếp từ tin 4;</li><li>LLM trả JSON hỏng thì dùng bản không tóm tắt;</li><li>ngày không có tin thì xử lý theo D5.</li></ul></li><li><code>--dry-run</code> in đúng digest sẽ gửi, không gửi gì.</li></ul></dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">7</span>Hai sáng digest thật trên máy<span class="d">17–18/10</span></h3>
+<dl>
+<dt>Làm</dt><dd>Để daemon chạy qua đêm, máy cắm sạc và tắt chế độ ngủ (<code>caffeinate</code>). Sáng nhận digest. Bạn bấm 👍/👎 và nói chỗ nào chưa ổn. Tôi chỉnh prompt hoặc hằng số. Mỗi lần đổi đều ghi lại trong tài liệu, không âm thầm sửa.</dd>
+<dt>Xong khi</dt><dd>Hai digest <code>sent</code> đúng giờ, không có tin trùng chuyện, và bạn thấy đọc được.</dd>
+<dt class="you">Cần bạn</dt><dd>Đọc và bấm nút ở cả hai sáng. Góp ý thêm bằng lời trong phiên làm việc.</dd>
+</dl></div>
+</div>
+
+<!-- 05 -->
+<div class="panel" role="tabpanel" id="deploy">
+<h2>Bước 8–9: lên server và nghiệm thu</h2>
+
+<div class="stp"><h3><span class="k">8</span>R2, Docker, Railway<span class="d">~1 ngày · cần bạn</span></h3>
+<dl>
+<dt>R2</dt><dd><code>adapters/src/object-store-r2.ts</code> dùng <code>Bun.s3</code>, với cùng key <code>raw/ab/&lt;sha&gt;.gz</code> như bản ghi đĩa. Một bộ contract test chung chạy cho cả adapter đĩa lẫn adapter R2, theo quy tắc 5 trong thiết kế. Chọn adapter bằng biến <code>OBJECT_STORE</code>.</dd>
+<dt>Docker</dt><dd>Một image <code>oven/bun</code> chạy được mọi vai trò, chọn bằng <code>SERVICE_ROLE</code>. Railway chạy một service với <code>SERVICE_ROLE=all</code> (gồm scheduler, worker, bot). Kiểm tra trước trên máy bằng <code>docker build</code> và <code>docker run</code>.</dd>
+<dt>Railway</dt><dd><ul><li>Postgres có pgvector.</li><li>Biến bí mật đặt trong Variables: <code>AI_GATEWAY_API_KEY</code>, <code>TELEGRAM_*</code>, <code>GITHUB_TOKEN</code>, khoá R2. Bạn tự nhập; tôi không nhập thay.</li><li>Chuyển dữ liệu từ máy lên theo quyết định D7.</li><li>Tắt daemon trên máy trước khi bật trên server. Nếu hai bot cùng chạy long polling, Telegram báo lỗi 409 và hai bên tranh nhau lượt bấm.</li></ul></dd>
+<dt>Xong khi</dt><dd>Trên Railway: một lượt fetch HN <code>ok</code>, một lượt process, <code>cli notify test</code> tới được điện thoại, bấm nút ghi được vào DB trên server.</dd>
+<dt class="you">Cần bạn</dt><dd>Tạo project Railway và bucket R2 (kèm khoá truy cập), đặt biến bí mật. Đồng ý cho deploy.</dd>
+</dl></div>
+
+<div class="stp"><h3><span class="k">9</span>Nghiệm thu 7 ngày<span class="d">20–26/10</span></h3>
+<dl>
+<dt>Làm</dt><dd><code>cli report --since 7d</code> chấm từng tiêu chí, đọc thẳng từ các bảng. Mỗi ngày tôi chỉ xem số liệu, không sửa code. Nếu phải sửa thì đếm lại 7 ngày từ đầu.</dd>
+<dt>Tiêu chí</dt><dd><div class="tbl"><table>
+<thead><tr><th>Tiêu chí</th><th>Đo bằng</th></tr></thead><tbody>
+<tr><td>≥ 95% lượt fetch thành công (ok, not_modified, behind)</td><td><code>fetch_runs.status</code></td></tr>
+<tr><td>7/7 digest đến đúng giờ (lệch &lt; 10 phút)</td><td><code>digests.status = sent</code>, <code>sent_at</code></td></tr>
+<tr><td>Phản hồi: đề xuất ≥ 70% tin sự kiện có ít nhất một 👍/👎, thay cho "≥ 50 lượt" (D6)</td><td><code>feedback</code> nối <code>deliveries</code></td></tr>
+<tr><td>Chi phí model &lt; $0,1/ngày</td><td><code>llm_calls.cost_usd</code> theo ngày</td></tr>
+<tr><td>Có số liệu đầu tiên: tài liệu/ngày, tỉ lệ lọc, số sự kiện, tỉ lệ 👍</td><td>in trong report</td></tr>
+</tbody></table></div></dd>
+</dl></div>
+
+<h2>Sau tuần 3 (không làm trong tuần này)</h2>
+<p>Các việc sau giữ nguyên thứ tự đã chốt 11/10, làm ngay sau khi digest chạy ổn: repo GitHub đang nổi (Trending, repo mới, lọc rác, <code>repo_stats</code>) và các mục "Để sau" trong checklist. Riêng danh sách repo cho nguồn releases thì nên có trước bước 8, để những ngày nghiệm thu chạy với repo thật.</p>
+</div>
+
+<!-- 06 -->
+<div class="panel" role="tabpanel" id="phat-hien">
+<h2>Chỗ hở tìm thấy khi rà thiết kế</h2>
+<p>Tôi rà lại tuan-3.html, xep-hang.html, pipeline.html và code hiện tại, với từng bước phải chạy được. Dưới đây là những chỗ thiết kế cũ còn sai hoặc còn thiếu, kèm cách sửa đã đưa vào các bước ở tab 03–05.</p>
+
+<div class="find"><b class="h">1. Nút 👍 không thể mang id delivery</b><p>tuan-3.html ghi nút là <code>fb:87:like</code>, với 87 là id delivery. Nhưng dòng delivery cần <code>message_id</code> (cột NOT NULL), mà <code>message_id</code> chỉ có sau khi gửi tin. Trước khi gửi thì chưa có id 87. <b>Sửa:</b> nút chỉ mang <code>fb:like</code>. Callback của Telegram có kèm <code>message.message_id</code>, nên bot tìm delivery bằng khoá duy nhất <code>(channel, recipient, message_id)</code> đã có sẵn. Không phải sửa schema.</p></div>
+
+<div class="find"><b class="h">2. Không có chỗ lưu điểm HN lấy lại</b><p>Công thức P cần điểm HN mới, và mặt bằng của P cần điểm HN của 30 ngày. Điểm lưu lúc lấy bài thì vô dụng (trung bình 1,6). Bốn bảng đã thiết kế không bảng nào chứa điểm lấy lại. <b>Sửa:</b> thêm bảng <code>doc_signals</code> và backfill một lần, khoảng 200 request Algolia (bước 2).</p></div>
+
+<div class="find"><b class="h">3. Job digest chết giữa chừng thì gửi dở rồi thôi</b><p>Khoá duy nhất trên <code>digests</code> chặn gửi trùng, nhưng cũng chặn luôn lần chạy lại. Gửi được 3/7 tin rồi lỗi mạng thì 4 tin còn lại mất. Ngoài ra, chọn tin lại lần nữa có thể ra danh sách khác, vì điểm HN đã đổi. <b>Sửa:</b> lưu plan vào <code>digests.meta</code> trước khi gửi. Chạy lại thì đọc plan và gửi tiếp các position chưa có delivery (bước 6, migration 0009).</p></div>
+
+<div class="find"><b class="h">4. Tiêu chí "≥ 50 phản hồi" không đạt được</b><p>Tối đa 7 tin × 7 ngày = 49 tin sự kiện. Ngày yên ắng có sàn điểm thì còn ít hơn. Muốn đủ 50 thì phải bấm đổi ý để tạo dòng thứ hai. Con số này không đo điều mình muốn biết. <b>Đề xuất:</b> đổi thành tỉ lệ (D6).</p></div>
+
+<div class="find"><b class="h">5. Cổng gộp sự kiện vẫn dựa vào mô tả TẠM</b><p>Job process chỉ gộp tài liệu có relevance ≥ 0,58 (arXiv 0,55). Relevance lại là cosine với mô tả TẠM, thứ sắp bị thay bằng các chủ đề. Hiện mới 4.034/16.637 tài liệu (24%) được gộp. Nếu không đổi, chủ đề mới (ví dụ ML research, có median 0,348) gần như không có sự kiện nào để chọn. <b>Đã chốt 12/10 (D4):</b> bước xử lý gộp mọi tài liệu, hồ sơ chỉ dùng ở digest. Toàn pipeline chỉ còn một cổng liên quan (tab 02).</p></div>
+
+<div class="find"><b class="h">6. Chat id thật nằm trong tài liệu và test</b><p>tuan-3.html và <code>apps/daemon/test/delivery.test.ts</code> có đúng chat id của bạn. Tôi kiểm bằng cách so sánh với biến môi trường; lệnh chỉ in ra đúng/sai. <b>Đã sửa hôm nay:</b> thay bằng số giả <code>100000001</code> ở cả hai file. Repo chưa commit lần nào, nên git chưa lưu bản có chat id.</p></div>
+
+<div class="find"><b class="h">7. Ai cũng nhắn được cho bot</b><p>@radard_bot là bot công khai. Thiết kế chưa ghi rằng bot phải bỏ qua người lạ. Không có bước kiểm này, người khác có thể bấm 👍 làm bẩn dữ liệu, hoặc dùng <code>/topics</code> khiến bot gọi LLM và tốn tiền. <b>Sửa:</b> bot chỉ xử lý update từ <code>TELEGRAM_CHAT_ID</code>, có test riêng (bước 4).</p></div>
+
+<div class="find"><b class="h">8. Hai daemon cùng chạy khi chuyển lên Railway</b><p>Nếu daemon trên máy và trên server cùng chạy long polling, Telegram trả lỗi 409 cho một bên. Hai bên cũng có thể cùng gửi digest, vì mỗi bên có DB riêng nên khoá duy nhất không chặn được. <b>Sửa:</b> trong các bước deploy, tắt daemon trên máy trước khi bật trên server (bước 8).</p></div>
+
+<div class="find"><b class="h">9. Mặt bằng cần dữ liệu đều, mà đang hở 6 ngày</b><p>Từ 07/10 tới 11/10 mỗi ngày chỉ có 1–10 tài liệu (chỉ GitHub releases), vì daemon tắt. Mặt bằng 30 ngày tính trên dữ liệu thủng như vậy sẽ lệch về phía các ngày cũ. <b>Sửa:</b> bật daemon ngay (bước 0). walkWindows lấy bù được cả khoảng này.</p></div>
+</div>
+
+<!-- 07 -->
+<div class="panel" role="tabpanel" id="quyet">
+<h2>Cần bạn quyết</h2>
+<p>Mỗi mục có một phương án tôi đề xuất (in đậm màu xanh). Bạn chỉ cần trả lời theo mã, ví dụ "D2 theo đề xuất, D4 chọn b".</p>
+
+<div class="qd"><b class="h">D1 · Bật lại daemon ngay hôm nay?</b>
+<ol><li class="rec">Có. Cần cho bước 2–3 và để lấp khoảng hở dữ liệu. Chi phí khoảng $0,004.</li><li>Đợi tới khi xong bước 1.</li></ol></div>
+
+<div class="qd"><b class="h">D2 · Chọn chủ đề ở đâu trong tuần 3?</b>
+<ol><li class="rec">Trên Telegram bằng <code>/topics</code>, gồm nút bật tắt và "➕ Tự thêm" (bước 5). CLI vẫn có để dev.</li><li>Chỉ CLI trong tuần 3; phần Telegram để sau.</li></ol>
+<p>Nghiêng về a vì bạn muốn thiết kế "xuất phát từ UX". Bot đằng nào cũng phải chạy để nhận nút, nên làm thêm luồng này tốn khoảng nửa ngày.</p></div>
+
+<div class="qd done"><b class="h">D3 · Chủ đề "không quan tâm" (exclude)<span class="ok">đã chốt a · 12/10</span></b>
+<ol><li class="rec">Schema có sẵn cột <code>kind</code>, nhưng phần tính điểm để sau. Cách trừ điểm chưa có công thức kiểm chứng.</li><li><del>Làm ngay với quy tắc đơn giản: một tài liệu có z với chủ đề exclude ≥ 0,6 và lớn hơn R thì không tính vào R.</del></li></ol>
+<p>Khi bạn có chủ đề muốn loại thì bật phần tính điểm, không phải đổi schema. Quy tắc b là điểm khởi đầu khi đó.</p></div>
+
+<div class="qd done"><b class="h">D4 · Bước xử lý gộp những tài liệu nào<span class="ok">đã chốt · 12/10</span></b>
+<p><b>Gộp mọi tài liệu. Hồ sơ chỉ dùng ở digest.</b> Bản đầu của tài liệu này đề xuất thêm một "cổng lỏng" z ≥ 0,3 ở bước xử lý. Bạn chỉ ra rằng như vậy pipeline bị phân mảnh: cổng gộp và cổng digest trông như hai thứ không liên quan tới nhau. Sau khi đo (85 ms mỗi tài liệu), gộp hết có chi phí chấp nhận được. Toàn pipeline giờ chỉ còn một cổng liên quan, R ≥ 0,6 ở digest. Chi tiết ở tab 02, "Hồ sơ chỉ dùng ở một chỗ".</p>
+<ol><li><del>Cổng lỏng z ≥ 0,3 ở bước xử lý</del></li><li class="rec">Gộp mọi tài liệu</li></ol></div>
+
+<div class="qd"><b class="h">D5 · Ngày không có tin nào vượt sàn</b>
+<ol><li class="rec">Gửi một tin ngắn: "Hôm nay yên ắng, không có tin vượt ngưỡng", kèm số ứng viên. Bạn biết radard vẫn sống, và tiêu chí "digest đến mỗi sáng" vẫn đo được.</li><li>Không gửi gì.</li></ol></div>
+
+<div class="qd"><b class="h">D6 · Tiêu chí phản hồi khi nghiệm thu</b>
+<ol><li class="rec">≥ 70% tin sự kiện có ít nhất một 👍 hoặc 👎.</li><li>Giữ một con số tuyệt đối, hạ xuống ≥ 30 lượt.</li></ol></div>
+
+<div class="qd"><b class="h">D7 · Dữ liệu lên Railway</b>
+<ol><li class="rec">Chuyển toàn bộ: <code>pg_dump</code> từ máy rồi <code>pg_restore</code> lên Railway, và đẩy <code>./data</code> lên R2. Giữ được 30 ngày cho mặt bằng và giữ phản hồi 2 ngày thử.</li><li>Bắt đầu lại từ DB trống trên server. Mặt bằng sẽ thiếu dữ liệu trong những ngày đầu nghiệm thu.</li></ol></div>
+
+<div class="qd"><b class="h">D8 · Trọng số và hằng số khởi đầu</b>
+<ol><li class="rec">Dùng đúng bộ trong xep-hang.html:<ul><li>trọng số R, P, C, A, F lần lượt 0,40 / 0,25 / 0,15 / 0,10 / 0,10;</li><li>cổng R 0,6, sàn 0,59, tối đa 3 tin mỗi nguồn, mốc phạt trùng 0,85, P trung tính 0,3.</li></ul>Chỉnh lại sau tuần đầu theo phản hồi.</li><li>Bạn chỉnh trước, có thể thử bằng thanh trượt ở xep-hang.html tab 05.</li></ol></div>
+
+<h2>Việc chỉ bạn làm được</h2>
+<div class="tbl"><table>
+<thead><tr><th>Việc</th><th>Cần trước</th></tr></thead><tbody>
+<tr><td>Đồng ý bật lại daemon (D1)</td><td>Bước 0, hôm nay</td></tr>
+<tr><td>Duyệt thư viện chủ đề, chọn chủ đề cho hồ sơ, viết vài dòng bối cảnh</td><td>Bước 3 (14/10)</td></tr>
+<tr><td>Danh sách repo thật cho nguồn releases</td><td>Bước 8</td></tr>
+<tr><td>Tạo project Railway (có Postgres pgvector), bucket R2 và khoá truy cập</td><td>Bước 8 (17/10)</td></tr>
+<tr><td>Đồng ý commit (radard chưa commit lần nào; lab-notebook có bản capture 12/10)</td><td>Nên làm trước bước 8. Deploy từ một commit rõ ràng thì lỗi trên server biết ngay ứng với code nào</td></tr>
+<tr><td>Đồng ý deploy</td><td>Bước 8</td></tr>
+</tbody></table></div>
+</div>
+
+<footer>radard · docs/tuan-3-thuc-thi.html · Kế hoạch lập ngày 12/10/2026, dựa trên radard-thiet-ke.html v0.7, tuan-3.html, xep-hang.html, pipeline.html, checklist.html và code hiện tại (69/69 test). Số liệu DB: radard local, 12/10/2026.</footer>
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

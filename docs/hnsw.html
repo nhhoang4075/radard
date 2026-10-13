@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · HNSW</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="eyebrow">RADARD · GIẢI THÍCH · 29/09/2026</div>
+<h1>HNSW: tìm vector gần nhất mà không phải so với tất cả</h1>
+<p class="lede">HNSW là loại index giúp Postgres (qua pgvector) tìm nhanh các vector gần một vector cho trước. Tài liệu này giải thích nó từ con số không, có mô phỏng chạy được, số đo thật trên máy bạn, và cách radard đang (và chưa) dùng nó.</p>
+
+<nav class="tabs" aria-label="Các phần">
+  <div class="tablist" role="tablist">
+    <button class="tab" role="tab" aria-controls="bai-toan"><span class="n">01</span>Bài toán</button>
+    <button class="tab" role="tab" aria-controls="do-thi"><span class="n">02</span>Đồ thị thế giới nhỏ</button>
+    <button class="tab" role="tab" aria-controls="tang"><span class="n">03</span>Nhiều tầng</button>
+    <button class="tab" role="tab" aria-controls="mo-phong"><span class="n">04</span>Mô phỏng</button>
+    <button class="tab" role="tab" aria-controls="tham-so"><span class="n">05</span>Tham số &amp; số đo</button>
+    <button class="tab" role="tab" aria-controls="pgvector"><span class="n">06</span>Trong pgvector</button>
+    <button class="tab" role="tab" aria-controls="radard"><span class="n">07</span>Trong radard</button>
+  </div>
+</nav>
+
+<!-- ============================ 01 ============================ -->
+<div class="panel" role="tabpanel" id="bai-toan">
+<div class="tiles">
+  <div class="tile"><b>120 ms</b><span>quét hết 50.000 vector</span></div>
+  <div class="tile"><b>1,2 ms</b><span>dùng HNSW, cùng dữ liệu</span></div>
+  <div class="tile"><b>99%</b><span>lần HNSW trả đúng vector gần nhất</span></div>
+  <div class="tile"><b>~100×</b><span>nhanh hơn, đổi lấy 1% sai</span></div>
+</div>
+<p class="muted" style="font-size:14px">Số đo trên MacBook Air M3, Postgres 17 + pgvector 0.8.5, 50.000 vector 1024 chiều kiểu <code>halfvec</code>, 100 truy vấn. Chi tiết ở tab 05.</p>
+
+<h2>Tìm hàng xóm gần nhất</h2>
+<p>Mỗi tài liệu và mỗi sự kiện trong radard là một vector 1024 chiều. Hai vector càng cùng hướng thì hai văn bản càng cùng nghĩa. Rất nhiều việc quy về một câu hỏi:</p>
+<div class="tldr"><b>Cho vector q, trong N vector đã lưu, vector nào gần q nhất?</b> (nearest neighbor search)</div>
+<div class="tbl"><table>
+<thead><tr><th>Ký hiệu</th><th>Nghĩa trong tài liệu này</th></tr></thead>
+<tbody>
+<tr><td><b>q</b></td><td><b>Vector câu hỏi</b> (query): vector ta muốn tìm hàng xóm gần nhất cho nó. Trong radard: embedding của tài liệu mới, câu hỏi là "sự kiện nào có tâm gần nó nhất". Trong các hình, q là ngôi sao cam.</td></tr>
+<tr><td><b>X</b></td><td>Điểm đang được <b>thêm vào</b> index. Khi thêm, HNSW tìm hàng xóm cho X, nên lúc đó X đóng vai q.</td></tr>
+<tr><td><b>N</b></td><td>Số vector đang lưu trong index.</td></tr>
+<tr><td><b>Hàng xóm</b></td><td>Các điểm mà một điểm được nối cạnh tới trong đồ thị HNSW.</td></tr>
+</tbody></table></div>
+<p>Trong radard: "tài liệu mới này gần sự kiện nào nhất?" (pha B gộp sự kiện). Sau này: "tìm các bài nói về <i>agent memory</i>" (tìm kiếm ngữ nghĩa cho MCP và UI).</p>
+
+<h3>Cách chắc chắn đúng: so với tất cả</h3>
+<p>Tính khoảng cách từ q tới từng vector, lấy cái nhỏ nhất. Mỗi lần so là 1024 phép nhân. Với N vector là N × 1024 phép tính, và <b>tăng tuyến tính theo N</b>: gấp 10 lần dữ liệu thì chậm gấp 10 lần. Postgres gọi cách này là <code>Seq Scan</code> + <code>Sort</code>.</p>
+
+<h3>Cách nhanh: chấp nhận gần đúng</h3>
+<p>Không có cách nào vừa chính xác tuyệt đối vừa nhanh hơn nhiều trong không gian hàng trăm chiều (các cây chia không gian như k-d tree mất tác dụng khi số chiều lớn). Vì vậy ngành chọn <b>approximate nearest neighbor (ANN)</b>: trả về vector "gần như chắc chắn" gần nhất, nhanh hơn hàng trăm lần. Tỷ lệ trả đúng gọi là <b>recall</b>.</p>
+
+<div class="grid3">
+  <div class="card"><b class="h">IVFFlat</b><p>Chia vector thành các cụm, chỉ tìm trong vài cụm gần q. Phải "huấn luyện" trên dữ liệu có sẵn; dữ liệu đổi nhiều thì phải dựng lại.</p></div>
+  <div class="card" style="border-color:var(--accent)"><b class="h">HNSW</b><p>Nối các vector thành đồ thị, đi theo cạnh để tới gần q. Thêm dữ liệu dần được, không cần huấn luyện. Recall cao. <b>Là thứ radard dùng.</b></p></div>
+  <div class="card"><b class="h">Quét hết</b><p>Chính xác 100%. Đủ nhanh khi N nhỏ (vài nghìn), hoặc khi bộ lọc khác đã thu hẹp còn ít dòng.</p></div>
+</div>
+
+<h2>Đọc tiếp theo thứ tự</h2>
+<div class="steps">
+  <div class="step"><b>Đồ thị thế giới nhỏ (tab 02)</b><p>Ý tưởng lõi: đi tham lam trên đồ thị hàng xóm.</p></div>
+  <div class="step"><b>Nhiều tầng (tab 03)</b><p>Chữ "Hierarchical": thêm tầng "đường cao tốc" để đi xa nhanh.</p></div>
+  <div class="step"><b>Mô phỏng (tab 04)</b><p>Bấm vào mặt phẳng, xem HNSW tìm từng bước và so với đáp án đúng.</p></div>
+  <div class="step"><b>Tham số, pgvector, radard (tab 05–07)</b><p>Số đo thật, cái bẫy khi có bộ lọc, và radard nên làm gì.</p></div>
+</div>
+</div>
+
+<!-- ============================ 02 ============================ -->
+<div class="panel" role="tabpanel" id="do-thi">
+<h2>Ý tưởng: đi dần về phía đích</h2>
+<p>Nối mỗi vector với vài vector gần nó nhất (gọi là <b>hàng xóm</b>). Muốn tìm vector gần q: bắt đầu ở một điểm bất kỳ, nhìn các hàng xóm, <b>nhảy sang hàng xóm nào gần q hơn</b>. Lặp lại tới khi không hàng xóm nào gần q hơn điểm đang đứng. Đó là <b>tìm kiếm tham lam</b> (greedy search).</p>
+
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="Tìm kiếm tham lam: từ A nhảy qua cạnh dài tới G, rồi I, rồi J là điểm gần q nhất">
+  <defs><marker id="g2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#0E6E5C"/></marker></defs>
+  <g stroke="#C9D2CE" stroke-width="1.3">
+    <line x1="60" y1="150" x2="150" y2="80"/><line x1="60" y1="150" x2="170" y2="220"/><line x1="150" y1="80" x2="260" y2="140"/><line x1="170" y1="220" x2="260" y2="140"/>
+    <line x1="150" y1="80" x2="330" y2="60"/><line x1="260" y1="140" x2="330" y2="60"/><line x1="170" y1="220" x2="350" y2="230"/><line x1="260" y1="140" x2="350" y2="230"/>
+    <line x1="260" y1="140" x2="430" y2="150"/><line x1="330" y1="60" x2="430" y2="150"/><line x1="350" y1="230" x2="430" y2="150"/><line x1="330" y1="60" x2="520" y2="90"/>
+    <line x1="430" y1="150" x2="520" y2="90"/><line x1="430" y1="150" x2="540" y2="220"/><line x1="350" y1="230" x2="540" y2="220"/><line x1="520" y1="90" x2="620" y2="150"/>
+    <line x1="540" y1="220" x2="620" y2="150"/><line x1="520" y1="90" x2="700" y2="80"/><line x1="620" y1="150" x2="700" y2="80"/><line x1="620" y1="150" x2="690" y2="240"/><line x1="540" y1="220" x2="690" y2="240"/>
+  </g>
+  <path d="M60,150 C160,40 330,110 430,150" fill="none" stroke="#9A5B00" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text class="lb" x="240" y="86" text-anchor="middle" style="fill:#9A5B00">cạnh dài A–G</text>
+  <g stroke="#0E6E5C" stroke-width="2.6" fill="none" marker-end="url(#g2)">
+    <path d="M66,144 C160,50 330,112 420,147"/><line x1="438" y1="156" x2="530" y2="214"/><line x1="549" y1="214" x2="610" y2="159"/>
+  </g>
+  <g class="t" text-anchor="middle">
+    <g fill="#FFFFFF" stroke="#4A5753" stroke-width="1.3">
+      <circle cx="150" cy="80" r="9"/><circle cx="170" cy="220" r="9"/><circle cx="260" cy="140" r="9"/><circle cx="330" cy="60" r="9"/><circle cx="350" cy="230" r="9"/>
+      <circle cx="520" cy="90" r="9"/><circle cx="700" cy="80" r="9"/><circle cx="690" cy="240" r="9"/>
+    </g>
+    <circle cx="60" cy="150" r="11" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="2"/>
+    <circle cx="430" cy="150" r="11" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="2"/>
+    <circle cx="540" cy="220" r="11" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="2"/>
+    <circle cx="620" cy="150" r="12" fill="#0E6E5C"/>
+    <text x="60" y="180">A · bắt đầu</text><text x="150" y="66">B</text><text x="170" y="250">C</text><text x="260" y="126">D</text><text x="330" y="46">E</text><text x="350" y="258">F</text>
+    <text x="430" y="182">G</text><text x="520" y="76">H</text><text x="540" y="252">I</text><text x="610" y="130">J · gần nhất</text><text x="700" y="66">K</text><text x="690" y="268">L</text>
+    <path d="M650,166 l4,9 10,1 -8,6 3,10 -9,-5 -9,5 3,-10 -8,-6 10,-1z" fill="#eb6834"/>
+    <text x="668" y="206" style="fill:#eb6834;font-weight:600">q</text>
+  </g>
+</svg>
+<figcaption><b>Hình 1.</b> Tìm điểm gần q (ngôi sao). Từ A, trong các hàng xóm B, C, G thì G gần q nhất, nhảy sang G. Từ G, hàng xóm I gần nhất. Từ I sang J. Hàng xóm của J (H, I, K, L) đều xa q hơn J, nên dừng: J là kết quả. Chỉ đi 3 bước, tính khoảng cách tới khoảng một nửa số điểm.</figcaption>
+</figure>
+
+<h2>"Thế giới nhỏ" là gì</h2>
+<p>Tên lấy từ hiện tượng "sáu bước cách biệt": hai người bất kỳ trên Trái Đất thường chỉ cách nhau vài người quen trung gian. Lý do: đa số quan hệ là gần (hàng xóm, đồng nghiệp), nhưng có một ít <b>quan hệ xa</b> (người bạn ở nước khác) đóng vai đường tắt.</p>
+<p>Đồ thị trong Hình 1 cũng vậy. Hầu hết cạnh nối điểm gần nhau, nhưng cạnh dài A–G cho phép vượt nửa bản đồ trong một bước. Đồ thị có cả cạnh gần lẫn cạnh xa như thế gọi là <b>navigable small world (NSW)</b>: đi tham lam là tới đích trong ít bước.</p>
+
+<h3>Hai vấn đề của đồ thị một tầng</h3>
+<div class="grid2">
+  <div class="card"><b class="h">Kẹt ở điểm tối ưu cục bộ</b><p>Có thể dừng ở một điểm mà mọi hàng xóm đều xa q hơn, trong khi điểm gần nhất thật nằm ở vùng khác, không nối trực tiếp. Giống leo núi trong sương mù: lên tới một đỉnh nhỏ tưởng là đỉnh cao nhất.</p></div>
+  <div class="card"><b class="h">Cạnh dài ít và ngẫu nhiên</b><p>Với hàng triệu điểm, nếu điểm bắt đầu ở xa và không gặp cạnh dài phù hợp, phải đi rất nhiều bước ngắn. Số bước tăng nhanh theo N.</p></div>
+</div>
+<p>HNSW giải quyết cả hai: vấn đề thứ nhất bằng cách giữ một <b>danh sách ứng viên</b> thay vì chỉ một điểm (tham số <code>ef</code>, tab 05), vấn đề thứ hai bằng <b>nhiều tầng</b> (tab 03).</p>
+</div>
+
+<!-- ============================ 03 ============================ -->
+<div class="panel" role="tabpanel" id="tang">
+<h2>Tầng trên thưa, tầng dưới dày</h2>
+<p>HNSW (Malkov &amp; Yashunin, 2016) xếp các điểm thành nhiều tầng. <b>Tầng 0 chứa mọi điểm</b>. Mỗi tầng phía trên chỉ chứa một phần nhỏ của tầng dưới. Ở tầng thưa, hai điểm nối nhau thường cách xa nhau: đó là các "cạnh dài" được tổ chức có chủ đích thay vì dựa vào may mắn.</p>
+
+<figure>
+<svg viewBox="0 0 760 395" role="img" aria-label="Ba tầng: tìm ở tầng 2 tới điểm 500, xuống tầng 1 tới 640, xuống tầng 0 tới 600 là gần q nhất">
+  <defs><marker id="g3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#0E6E5C"/></marker></defs>
+  <g class="ts"><text x="14" y="64">Tầng 2</text><text x="14" y="184">Tầng 1</text><text x="14" y="314">Tầng 0</text></g>
+  <g class="ts" style="fill:#6B7773"><text x="14" y="80">2 điểm</text><text x="14" y="200">5 điểm</text><text x="14" y="330">14 điểm</text></g>
+  <rect x="80" y="36" width="660" height="50" rx="8" fill="#ECE7F7" opacity=".5"/>
+  <rect x="80" y="156" width="660" height="50" rx="8" fill="#E3ECF8" opacity=".6"/>
+  <rect x="80" y="286" width="660" height="50" rx="8" fill="#DDEEE9" opacity=".6"/>
+  <g stroke="#B8C3BF" stroke-dasharray="2 4">
+    <line x1="120" y1="61" x2="120" y2="311"/><line x1="500" y1="61" x2="500" y2="311"/><line x1="250" y1="181" x2="250" y2="311"/><line x1="400" y1="181" x2="400" y2="311"/><line x1="640" y1="181" x2="640" y2="311"/>
+  </g>
+  <line x1="585" y1="30" x2="585" y2="345" stroke="#eb6834" stroke-dasharray="4 4" stroke-width="1.2"/>
+  <g stroke="#5B45A8" stroke-width="1.4"><line x1="120" y1="61" x2="500" y2="61"/></g>
+  <g stroke="#2F5DA8" stroke-width="1.4"><line x1="120" y1="181" x2="250" y2="181"/><line x1="250" y1="181" x2="400" y2="181"/><line x1="400" y1="181" x2="500" y2="181"/><line x1="500" y1="181" x2="640" y2="181"/></g>
+  <g stroke="#7FB5A8" stroke-width="1.3"><line x1="95" y1="311" x2="700" y2="311"/></g>
+  <g fill="#FFFFFF" stroke="#5B45A8" stroke-width="1.6"><circle cx="120" cy="61" r="8"/><circle cx="500" cy="61" r="8"/></g>
+  <g fill="#FFFFFF" stroke="#2F5DA8" stroke-width="1.6"><circle cx="120" cy="181" r="8"/><circle cx="250" cy="181" r="8"/><circle cx="400" cy="181" r="8"/><circle cx="500" cy="181" r="8"/><circle cx="640" cy="181" r="8"/></g>
+  <g fill="#FFFFFF" stroke="#0E6E5C" stroke-width="1.4">
+    <circle cx="95" cy="311" r="7"/><circle cx="120" cy="311" r="7"/><circle cx="160" cy="311" r="7"/><circle cx="205" cy="311" r="7"/><circle cx="250" cy="311" r="7"/><circle cx="300" cy="311" r="7"/><circle cx="350" cy="311" r="7"/>
+    <circle cx="400" cy="311" r="7"/><circle cx="450" cy="311" r="7"/><circle cx="500" cy="311" r="7"/><circle cx="550" cy="311" r="7"/><circle cx="640" cy="311" r="7"/><circle cx="700" cy="311" r="7"/>
+  </g>
+  <circle cx="600" cy="311" r="9" fill="#0E6E5C"/>
+  <g stroke="#0E6E5C" stroke-width="2.6" fill="none" marker-end="url(#g3)">
+    <path d="M128,52 Q310,20 490,52"/><line x1="500" y1="71" x2="500" y2="170"/>
+    <path d="M508,172 Q570,150 630,172"/><line x1="640" y1="191" x2="640" y2="300"/>
+    <path d="M638,321 Q620,346 604,322"/>
+  </g>
+  <g class="lb" text-anchor="middle">
+    <text x="120" y="26">điểm vào</text><text x="310" y="22">bước 1</text><text x="455" y="125">xuống tầng</text><text x="548" y="146">bước 2</text><text x="684" y="250">xuống tầng</text>
+  </g>
+  <g class="ts" text-anchor="middle"><text x="560" y="362" style="fill:#0E6E5C;font-weight:600">kết quả</text><text x="585" y="382" style="fill:#eb6834">vị trí của q</text></g>
+</svg>
+<figcaption><b>Hình 2.</b> Minh hoạ trên một trục cho dễ nhìn (thật ra là 1024 chiều). Bắt đầu ở <b>điểm vào</b> trên tầng cao nhất. Tầng 2: nhảy xa tới 500. Xuống tầng 1 (cùng điểm 500), đi tiếp tới 640. Xuống tầng 0, đi một bước ngắn tới 600: gần q nhất. Tầng trên đưa tới đúng khu vực, tầng dưới tìm chính xác trong khu vực đó.</figcaption>
+</figure>
+
+<h2>Giống cách chỉ đường</h2>
+<div class="tbl"><table>
+<thead><tr><th>Tầng</th><th>Giống</th><th>Việc</th></tr></thead>
+<tbody>
+<tr><td>Cao nhất</td><td>Đường cao tốc</td><td>Tới đúng tỉnh trong vài bước</td></tr>
+<tr><td>Giữa</td><td>Quốc lộ</td><td>Tới đúng huyện</td></tr>
+<tr><td>Tầng 0</td><td>Đường làng</td><td>Tới đúng nhà. Ở tầng này HNSW tìm kỹ hơn, giữ nhiều ứng viên (tab 05)</td></tr>
+</tbody></table></div>
+<p>Cấu trúc này cũng giống <b>skip list</b> (danh sách nhảy cóc) trong môn cấu trúc dữ liệu: danh sách liên kết có các tầng "nhảy xa" phía trên, tìm kiếm O(log N) thay vì O(N). HNSW là skip list mang sang không gian vector.</p>
+
+<h2>Thêm một điểm: quyết định tầng trước, nối sau</h2>
+<p>Chỗ dễ vướng: khi thêm điểm X, HNSW "chọn tầng cao nhất L" cho X, trong khi X còn chưa nằm trong đồ thị. <b>L không phải thứ có sẵn trong X để đo ra, mà là quyết định HNSW đưa ra cho X</b>, ngay ở bước đầu tiên: "X sẽ có mặt ở các tầng 0, 1, …, L".</p>
+
+<div class="steps">
+  <div class="step"><b>Quyết định: X sẽ sống ở tầng 0..L</b><p>Tung đồng xu (xem dưới). Lúc này X <b>chưa</b> nằm trong đồ thị.</p></div>
+  <div class="step"><b>Từ điểm vào, tìm tham lam xuống dần tới tầng L</b><p>Chỉ để tới khu vực gần X, chưa nối gì. Các tầng cao hơn L không liên quan tới X.</p></div>
+  <div class="step"><b>Ở tầng L, L−1, …, 0: tìm các điểm gần X nhất rồi nối</b><p>Tìm với danh sách <code>ef_construction</code> ứng viên, chọn <code>m</code> điểm gần nhất làm hàng xóm, nối hai chiều. <b>Đến đây X mới thật sự được thêm vào</b>, ở đủ L+1 tầng.</p></div>
+  <div class="step"><b>Hàng xóm nào vượt quá số cạnh cho phép thì tỉa bớt</b><p>Tối đa <code>m</code> cạnh ở tầng trên, <code>2m</code> ở tầng 0. Chọn giữ cạnh nào quan trọng hơn ta tưởng: xem mục "Chọn hàng xóm" ngay dưới.</p></div>
+  <div class="step"><b>Nếu L cao hơn tầng cao nhất hiện có, X thành điểm vào</b><p>Mọi lần tìm kiếm sau bắt đầu từ X.</p></div>
+</div>
+<p>Giống một nhân viên mới vào công ty: <b>quyết định chức vụ trước</b>, rồi mới xếp chỗ ngồi và giới thiệu với đồng nghiệp cùng cấp. Quyết định chức vụ không cần nhân viên đã ngồi vào bàn.</p>
+<div class="tbl"><table>
+<thead><tr><th>Điểm thêm vào</th><th class="num">Tung ra L</th><th>Có mặt ở tầng</th><th>Việc ở bước 3</th></tr></thead>
+<tbody>
+<tr><td>X₁</td><td class="num">0</td><td>chỉ tầng 0</td><td>Nối với hàng xóm ở tầng 0</td></tr>
+<tr><td>X₂</td><td class="num">0</td><td>chỉ tầng 0</td><td>Như trên</td></tr>
+<tr><td>X₃</td><td class="num">1</td><td>tầng 0 và 1</td><td>Nối với các điểm tầng 1 gần nó, rồi nối ở tầng 0</td></tr>
+<tr><td>X₄</td><td class="num">0</td><td>chỉ tầng 0</td><td>Như X₁</td></tr>
+</tbody></table></div>
+<p>Chữ "cao nhất" vì điểm có mặt ở tầng L thì cũng có mặt ở mọi tầng dưới. Tầng 0 luôn chứa tất cả.</p>
+
+<h3>"Đồng xu" cụ thể là gì</h3>
+<p>Công thức trong bài báo và trong pgvector:</p>
+<pre><code>L = floor(−ln(random()) × mL)      với mL = 1 / ln(m),  m = 16 (mặc định pgvector)</code></pre>
+<p>Nhìn đáng sợ, nhưng nó tương đương với trò chơi này:</p>
+<pre><code>L = 0
+lặp:  tung một đồng xu lệch, xác suất "ngửa" = 1/m  (= 1/16)
+      ngửa → L = L + 1, tung tiếp
+      sấp  → dừng</code></pre>
+<p>15/16 số điểm ra sấp ngay lần đầu, nên chỉ ở tầng 0. 1/16 ngửa một lần, lên tới tầng 1. 1/256 ngửa hai lần liền, lên tới tầng 2. Công thức logarit chỉ tính gọn kết quả của cả chuỗi tung bằng một lần gọi <code>random()</code>. Kết quả với 50.000 điểm:</p>
+<div class="tbl"><table>
+<thead><tr><th>Tầng</th><th class="num">Xác suất một điểm có mặt</th><th class="num">Số điểm (kỳ vọng)</th></tr></thead>
+<tbody>
+<tr><td>0</td><td class="num">1</td><td class="num">50.000</td></tr>
+<tr><td>1</td><td class="num">1/16</td><td class="num">~3.125</td></tr>
+<tr><td>2</td><td class="num">1/256</td><td class="num">~195</td></tr>
+<tr><td>3</td><td class="num">1/4.096</td><td class="num">~12</td></tr>
+<tr><td>4</td><td class="num">1/65.536</td><td class="num">~0–1</td></tr>
+</tbody></table></div>
+<p>Số tầng tăng theo log N: gấp 16 lần dữ liệu mới thêm khoảng một tầng. Đó là lý do tìm kiếm gần như O(log N).</p>
+
+<h3>Tại sao ngẫu nhiên, không chọn "điểm quan trọng" lên tầng trên?</h3>
+<div class="grid2">
+  <div class="card"><b class="h">Chọn có chủ đích</b><p>Ví dụ đưa các điểm ở trung tâm cụm lên tầng cao. Phải nhìn toàn bộ dữ liệu mới biết điểm nào "trung tâm". Thêm dữ liệu thì lựa chọn cũ không còn đúng, phải dựng lại index. Đó là điểm yếu của IVFFlat.</p></div>
+  <div class="card" style="border-color:var(--accent)"><b class="h">Chọn ngẫu nhiên</b><p>Mỗi điểm tự quyết định trong tích tắc, không cần biết các điểm khác. Tỷ lệ vẫn đúng (mỗi tầng ~1/m tầng dưới), các điểm tầng trên rải đều khắp không gian. Thêm một triệu điểm cũng không phải dựng lại.</p></div>
+</div>
+<p>Skip list dùng đúng mẹo này: khi chèn một phần tử, tung đồng xu để quyết định phần tử cao mấy tầng, trước khi gắn vào danh sách. Trong mô phỏng ở tab 04, màu của mỗi điểm chính là L đã tung ra: xám là 0, cam là 1, xanh dương là 2, tím là 3. Bấm "Dựng đồ thị mới" là tung lại cho cả 300 điểm.</p>
+
+<h2>Chọn hàng xóm: lấy gần nhất chưa chắc đã tốt</h2>
+<p>Ở bước 3 khi thêm X, HNSW đã có một danh sách ứng viên (tìm bằng thủ tục giỏ, tab 05) và phải <b>chọn m điểm trong đó để nối cạnh</b>. Ở bước 4, khi một điểm có quá nhiều cạnh, nó cũng phải chọn giữ lại cạnh nào. Có hai cách chọn.</p>
+
+<h3>Cách 1: lấy m điểm gần nhất</h3>
+<p>Sắp ứng viên theo khoảng cách tới X, lấy m điểm đầu. Đơn giản, và là cách mô phỏng ở tab 04 dùng khi chọn "chỉ lấy gần nhất".</p>
+
+<h3>Cách 2: quy tắc chọn hàng xóm "đa hướng"</h3>
+<p><b>Nguồn gốc:</b> do chính các tác giả HNSW (Malkov &amp; Yashunin) đề xuất trong bài báo gốc, tên là <i>SELECT-NEIGHBORS-HEURISTIC</i> (Algorithm 4 trong bài). <b>"Heuristic"</b> nghĩa là <b>quy tắc kinh nghiệm</b>: một cách làm không có chứng minh là tối ưu, nhưng đo thực tế thì cho kết quả tốt. Ở đây gọi là <b>quy tắc chọn đa hướng</b> cho dễ nhớ.</p>
+<p><b>Ai dùng nó:</b> <b>pgvector</b>, tức extension (phần mở rộng cài thêm) mang kiểu <code>vector</code>, <code>halfvec</code> và index HNSW vào Postgres. Bản thân Postgres không có HNSW; mọi thứ về HNSW trong tài liệu này là của pgvector. Các thư viện HNSW khác (hnswlib, FAISS, Qdrant…) cũng dùng quy tắc này.</p>
+<p><b>Nguyên lý:</b> nếu ứng viên Y nằm "sau lưng" một hàng xóm Z đã chọn (tức Y gần Z hơn gần X), thì nối X–Y là thừa: từ X đi sang Z, Z có cạnh tới Y. Chỗ cạnh đó nên dành cho một hướng khác mà chưa có hàng xóm nào phủ.</p>
+<p><b>Logic, từng bước:</b></p>
+<div class="steps">
+  <div class="step"><b>Sắp ứng viên theo khoảng cách tới X, gần trước</b><p>Danh sách đã chọn ban đầu rỗng.</p></div>
+  <div class="step"><b>Xét từng ứng viên Y theo thứ tự đó</b><p>Tính khoảng cách từ Y tới <b>từng điểm đã chọn</b>.</p></div>
+  <div class="step"><b>Y gần X hơn gần mọi điểm đã chọn → nhận Y</b><p>Ngược lại, có ít nhất một điểm đã chọn Z mà Y gần Z hơn gần X → loại Y (đi qua Z cũng tới được Y).</p></div>
+  <div class="step"><b>Dừng khi đã chọn đủ m điểm hoặc hết ứng viên</b><p>Có thể chọn ít hơn m. Ít cạnh hơn nhưng mỗi cạnh chỉ về một hướng khác nhau.</p></div>
+</div>
+
+<figure><svg viewBox="0 0 760 180" role="img" aria-label="Lấy gần nhất nối X với A, C, B cùng một phía; quy tắc chọn đa hướng nối X với A và D ở hai phía"><text class="tb" x="170" y="22" text-anchor="middle">Cách 1: lấy 3 điểm gần nhất</text><line x1="120" y1="100" x2="25" y2="100" stroke="#B8C3BF" stroke-width="1.2" stroke-dasharray="4 3"/><line x1="120" y1="100" x2="180" y2="80" stroke="#0E6E5C" stroke-width="2.6"/><line x1="120" y1="100" x2="190" y2="135" stroke="#0E6E5C" stroke-width="2.6"/><line x1="120" y1="100" x2="205" y2="95" stroke="#0E6E5C" stroke-width="2.6"/><circle cx="180" cy="80" r="11" fill="#0E6E5C" stroke="#4A5753" stroke-width="1.2"/><text x="180" y="84" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">A</text><circle cx="205" cy="95" r="11" fill="#0E6E5C" stroke="#4A5753" stroke-width="1.2"/><text x="205" y="99" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">B</text><circle cx="190" cy="135" r="11" fill="#0E6E5C" stroke="#4A5753" stroke-width="1.2"/><text x="190" y="139" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">C</text><circle cx="25" cy="100" r="11" fill="#FFFFFF" stroke="#4A5753" stroke-width="1.2"/><text x="25" y="104" text-anchor="middle" font-size="12" font-weight="600" fill="#16201D">D</text><circle cx="120" cy="100" r="12" fill="#eb6834"/><text x="120" y="104" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">X</text><text class="ts" x="170" y="168" text-anchor="middle">3 cạnh cùng chỉ về một phía</text><text class="tb" x="550" y="22" text-anchor="middle">Cách 2: quy tắc chọn đa hướng</text><line x1="500" y1="100" x2="570" y2="135" stroke="#B8C3BF" stroke-width="1.2" stroke-dasharray="4 3"/><line x1="500" y1="100" x2="585" y2="95" stroke="#B8C3BF" stroke-width="1.2" stroke-dasharray="4 3"/><line x1="500" y1="100" x2="560" y2="80" stroke="#0E6E5C" stroke-width="2.6"/><line x1="500" y1="100" x2="405" y2="100" stroke="#0E6E5C" stroke-width="2.6"/><circle cx="560" cy="80" r="11" fill="#0E6E5C" stroke="#4A5753" stroke-width="1.2"/><text x="560" y="84" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">A</text><circle cx="585" cy="95" r="11" fill="#FFFFFF" stroke="#4A5753" stroke-width="1.2"/><text x="585" y="99" text-anchor="middle" font-size="12" font-weight="600" fill="#16201D">B</text><circle cx="570" cy="135" r="11" fill="#FFFFFF" stroke="#4A5753" stroke-width="1.2"/><text x="570" y="139" text-anchor="middle" font-size="12" font-weight="600" fill="#16201D">C</text><circle cx="405" cy="100" r="11" fill="#0E6E5C" stroke="#4A5753" stroke-width="1.2"/><text x="405" y="104" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">D</text><circle cx="500" cy="100" r="12" fill="#eb6834"/><text x="500" y="104" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">X</text><text class="ts" x="550" y="168" text-anchor="middle">C, B bị loại vì gần A hơn gần X</text><line x1="385" y1="30" x2="385" y2="160" stroke="#D9E0DD"/></svg>
+<figcaption><b>Hình 2b.</b> Cùng 4 ứng viên, m = 3. Cách 1 nối A, C, B, cả ba cùng phía phải. Cách 2 nối A và D: C và B bị loại vì nằm sau lưng A. Số liệu trong bảng dưới.</figcaption>
+</figure>
+<div class="tbl"><table>
+<thead><tr><th>Lượt</th><th>Ứng viên (theo thứ tự gần X)</th><th class="num">Cách X</th><th>Cách các điểm đã chọn</th><th>So sánh</th><th>Kết quả</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>A</td><td class="num">63,2</td><td>(chưa chọn ai)</td><td>—</td><td><b>nhận</b></td></tr>
+<tr><td>2</td><td>C</td><td class="num">78,3</td><td>cách A 55,9</td><td>55,9 &lt; 78,3: C gần A hơn gần X</td><td>loại</td></tr>
+<tr><td>3</td><td>B</td><td class="num">85,1</td><td>cách A 29,2</td><td>29,2 &lt; 85,1: B gần A hơn gần X</td><td>loại</td></tr>
+<tr><td>4</td><td>D</td><td class="num">95,0</td><td>cách A 156,3</td><td>156,3 &gt; 95,0: D gần X hơn gần A</td><td><b>nhận</b></td></tr>
+</tbody></table></div>
+<p>Cách 1 không bao giờ chọn D vì D xa X nhất. Nhưng D là đường duy nhất từ X sang phía trái: không có D, muốn đi từ X sang trái phải vòng qua nơi khác.</p>
+<h3>Vì sao quan trọng: điểm "mồ côi"</h3>
+<p>Một điểm lẻ loi nằm xa các cụm (ngoại lai) được nối tới vài điểm trong cụm gần nó. Nhưng khi các điểm trong cụm bị đầy cạnh và phải tỉa, cách "giữ gần nhất" bỏ cạnh tới điểm lẻ trước tiên, vì trong cụm có nhiều điểm gần hơn. Kết quả: <b>điểm lẻ vẫn có cạnh đi ra, nhưng không ai còn cạnh đi vào nó</b>. Mọi cuộc tìm đều đi theo cạnh, nên không bao giờ tới được nó, dù <code>ef_search</code> lớn bao nhiêu. Quy tắc chọn đa hướng giữ được cạnh đó: điểm lẻ nằm ở một hướng mà không hàng xóm nào khác "che" (giống D ở trên), nên nó không bị loại khi tỉa.</p>
+<div class="tbl"><table>
+<thead><tr><th>Mô phỏng 2D, 300 điểm, 500 truy vấn</th><th class="num">Điểm không tới được</th><th class="num">Trượt, ef = 1</th><th class="num">ef = 3</th><th class="num">ef = 10</th><th class="num">ef = 30</th><th class="num">Số cạnh</th></tr></thead>
+<tbody>
+<tr><td>Chỉ lấy gần nhất</td><td class="num">1</td><td class="num">98</td><td class="num">66</td><td class="num">45</td><td class="num" style="color:var(--warn);font-weight:600">40</td><td class="num">2.714</td></tr>
+<tr><td>Chọn đa hướng (heuristic)</td><td class="num">0</td><td class="num">56</td><td class="num">9</td><td class="num">0</td><td class="num">0</td><td class="num">1.753</td></tr>
+</tbody></table></div>
+<p>Với cách "gần nhất", 23 trong 40 lần trượt ở <code>ef_search = 30</code> là do đáp án đúng chính là điểm mồ côi. Thử trên 5 đồ thị khác nhau: 0–2 điểm mồ côi mỗi đồ thị; chọn đa hướng thì 0 ở cả 5, và 0/500 lần trượt ở <code>ef_search = 30</code>. Thử ngay ở tab 04: chọn "Chọn hàng xóm", điểm có dấu × là điểm mồ côi.</p>
+
+
+</div>
+
+<!-- ============================ 04 ============================ -->
+<div class="panel" role="tabpanel" id="mo-phong">
+<h2>Tự tay thử</h2>
+<p>Đây là HNSW thật (cùng thuật toán thêm điểm và tìm kiếm như trên), chạy trên 300 điểm 2 chiều để nhìn được. <b>Bấm vào bất kỳ đâu trên mặt phẳng</b> để đặt q, rồi xem từng bước.</p>
+
+<div class="card sim">
+  <div class="sim-ctl">
+    <label>ef_search <input type="range" id="ef" min="1" max="30" value="1"> <b id="efv">1</b></label>
+    <label>Hiện cạnh tầng
+      <select id="lay"><option value="-1">không</option><option value="0">0</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></label>
+    <button id="bRand" type="button">q ngẫu nhiên</button>
+    <button id="bBuild" type="button">Dựng đồ thị mới</button>
+    <button id="bStep" type="button">Chạy lại từng bước</button>
+    <label>Chọn hàng xóm
+      <select id="sel"><option value="0" selected>chỉ lấy gần nhất</option><option value="1">chọn đa hướng (như pgvector)</option></select></label>
+  </div>
+  <svg id="plot" viewBox="0 0 700 440" role="img" aria-label="Mô phỏng HNSW: các điểm, cạnh theo tầng, đường tìm kiếm tới q"></svg>
+  <div class="sim-stats" id="stats"></div>
+  <div class="lg sim-lg">
+    <span><i style="background:#5B45A8"></i>tầng 3</span><span><i style="background:#2F5DA8"></i>tầng 2</span><span><i style="background:#C27A12"></i>tầng 1</span><span><i style="background:#0E6E5C"></i>tầng 0</span>
+    <span><i style="background:#F2C9B8;border:1px solid #eb6834"></i>đã tính khoảng cách</span><span><i style="border:2px solid #16201D;background:transparent"></i>đáp án đúng</span><span style="color:#C0392B;font-weight:700">×</span><span style="margin-left:-8px">không tới được</span>
+  </div>
+</div>
+
+<h3>Nên thử</h3>
+<div class="steps">
+  <div class="step"><b>Để <code>ef_search</code> = 1, bấm nhiều chỗ khác nhau</b><p>Thỉnh thoảng HNSW dừng ở điểm không phải gần nhất (khung báo "trượt"): đó là kẹt tối ưu cục bộ. Hay xảy ra khi q nằm giữa hai cụm.</p></div>
+  <div class="step"><b>Kéo <code>ef_search</code> lên 10–20 rồi bấm lại đúng chỗ đó</b><p>Ở tầng 0, HNSW giữ nhiều ứng viên hơn nên thoát được bẫy. Đổi lại, số điểm phải tính khoảng cách tăng lên. Đây chính là đánh đổi tốc độ ↔ recall.</p></div>
+  <div class="step"><b>Chọn "Hiện cạnh tầng" 2 hoặc 3</b><p>Tầng cao chỉ có vài điểm, cạnh rất dài: đường cao tốc.</p></div>
+  <div class="step"><b>Bấm vào gần điểm có dấu × đỏ, kéo ef_search lên 30</b><p>Vẫn trượt. Không phải giỏ quá nhỏ: điểm đó <b>không có cạnh nào trỏ tới</b>, đi đường nào cũng không tới được. Đổi "Chọn hàng xóm" sang "chọn đa hướng" (cùng điểm, cùng tầng, chỉ khác cách nối): dấu × biến mất và tìm ra ngay. Giải thích ở tab 03, mục "Chọn hàng xóm".</p></div>
+  <div class="step"><b>Nhìn con số "đã tính khoảng cách"</b><p>Thường chỉ 10–25% số điểm. Với 50.000 vector thật, tỷ lệ này còn nhỏ hơn nhiều, vì số bước tăng theo log N.</p></div>
+</div>
+<div class="note"><b>Khác với thật:</b> ở đây là 2 chiều, khoảng cách Euclid, <code>m</code> = 5, 300 điểm. radard dùng 1024 chiều, khoảng cách cosine, <code>m</code> = 16. Cơ chế giống hệt, chỉ khác quy mô.</div>
+</div>
+
+<!-- ============================ 05 ============================ -->
+<div class="panel" role="tabpanel" id="tham-so">
+<h2>Ba tham số, mỗi cái điều khiển một việc</h2>
+<p>HNSW có hai lúc làm việc: <b>lúc dựng</b> (thêm điểm vào đồ thị) và <b>lúc tìm</b>. Hai tham số điều khiển lúc dựng, một tham số điều khiển lúc tìm.</p>
+
+<div class="grid3">
+  <div class="card"><b class="h"><code>m</code> = 16</b><p><b>Mỗi điểm nối với bao nhiêu hàng xóm.</b> Hình dạng của đồ thị. Như mỗi người quen bao nhiêu người.</p></div>
+  <div class="card"><b class="h"><code>ef_construction</code> = 64</b><p><b>Khi thêm điểm, xem xét bao nhiêu ứng viên trước khi chọn hàng xóm.</b> Chất lượng của các cạnh.</p></div>
+  <div class="card"><b class="h"><code>ef_search</code> = 40</b><p><b>Khi tìm, giữ bao nhiêu ứng viên dự phòng.</b> Độ kỹ của mỗi lần tìm.</p></div>
+</div>
+
+<h3>1. <code>m</code>: mỗi điểm có bao nhiêu hàng xóm</h3>
+<p>Ở bước 3 của việc thêm điểm (tab 03), X được nối với <code>m</code> điểm gần nhất ở mỗi tầng. Ở tầng 0 một điểm được giữ tối đa <code>2m</code> cạnh, vì các điểm thêm sau còn nối ngược về nó.</p>
+<div class="grid2">
+  <div class="card"><b class="h">Tăng m</b><ul><li>Nhiều đường đi hơn, khó bị kẹt ở điểm tối ưu cục bộ, <b>recall tăng</b>.</li><li>Nhưng mỗi bước phải xem nhiều hàng xóm hơn, tức tính nhiều khoảng cách hơn.</li><li>Index to hơn: mỗi điểm lưu tới 2m cạnh ở tầng 0.</li><li>Dựng chậm hơn.</li></ul></div>
+  <div class="card"><b class="h">Giảm m</b><ul><li>Index nhỏ, dựng nhanh.</li><li>Đồ thị thưa: dễ có vùng bị "cô lập", đi tham lam kẹt lại, <b>recall giảm mạnh</b>.</li><li>m còn quyết định tỷ lệ giữa các tầng (1/m, tab 03).</li></ul></div>
+</div>
+
+<h3>Trước hết: q là gì, X là gì</h3>
+<div class="grid2">
+  <div class="card"><b class="h">q: vector câu hỏi (query)</b><p>Vector mà ta <b>muốn tìm hàng xóm gần nhất cho nó</b>. Nó là đầu vào của một lần tìm kiếm, không nhất thiết nằm trong index.</p>
+  <p style="margin-top:8px">Trong SQL: <code>ORDER BY centroid &lt;=&gt; q LIMIT 1</code>. Trong radard: q là <b>embedding của tài liệu mới</b>, và câu hỏi là "sự kiện nào có tâm gần q nhất?".</p></div>
+  <div class="card"><b class="h">X: điểm đang được thêm vào index</b><p>Lúc dựng index, để nối X với hàng xóm, HNSW phải tìm các điểm gần X trong đồ thị đang có. Tức là <b>X đóng vai q</b> trong một lần tìm kiếm.</p>
+  <p style="margin-top:8px">Vì vậy <code>ef_construction</code> và <code>ef_search</code> dùng <b>cùng một thủ tục tìm</b>, chỉ khác lúc dùng.</p></div>
+</div>
+
+<h3>Thủ tục tìm dùng chung: "giỏ" và "danh sách chờ"</h3>
+<p>Thủ tục này tìm các điểm gần q trên một tầng của đồ thị, với một con số k cho trước. Khi dựng index thì k = <code>ef_construction</code>, khi tìm kiếm thì k = <code>ef_search</code>. Nó dùng hai danh sách:</p>
+<div class="grid2">
+  <div class="card" style="border-color:var(--accent)"><b class="h">Giỏ kết quả (k chỗ)</b><p>k điểm <b>gần q nhất đã gặp tới giờ</b>. Giỏ đầy mà gặp điểm tốt hơn thì bỏ điểm tệ nhất (xa q nhất) ra để lấy chỗ.</p></div>
+  <div class="card" style="border-color:#eb6834"><b class="h">Danh sách chờ xem</b><p>Các điểm đã gặp nhưng <b>chưa xem hàng xóm của chúng</b>. Mỗi vòng lấy ra một điểm để xem hàng xóm.</p></div>
+</div>
+<div class="steps">
+  <div class="step"><b>Bắt đầu</b><p>Bỏ điểm xuất phát (do tầng trên đưa xuống) vào cả giỏ lẫn danh sách chờ.</p></div>
+  <div class="step"><b>Chọn điểm để xem</b><p>Trong danh sách chờ, lấy ra điểm <b>gần q nhất</b>.</p></div>
+  <div class="step"><b>Hỏi: còn đáng xem tiếp không?</b><p>Nếu điểm vừa lấy <b>còn xa q hơn điểm tệ nhất trong giỏ</b> thì dừng: mọi điểm còn chờ đều xa hơn nữa, khó dẫn tới điểm nào tốt hơn. Trả giỏ làm kết quả.</p></div>
+  <div class="step"><b>Xem hàng xóm của nó</b><p>Bỏ qua hàng xóm đã gặp. Với mỗi hàng xóm mới: nếu giỏ còn chỗ, <b>hoặc</b> nó gần q hơn điểm tệ nhất trong giỏ, thì cho vào giỏ (giỏ tràn thì bỏ điểm tệ nhất ra) và cho vào danh sách chờ. Ngược lại thì bỏ qua.</p></div>
+  <div class="step"><b>Quay lại bước 2</b><p>Danh sách chờ hết thì cũng dừng.</p></div>
+</div>
+<p>Cỡ giỏ k quyết định tất cả. Giỏ càng to thì điểm "tệ nhất trong giỏ" càng xa, nên điều kiện dừng ở bước 3 càng khó đạt. Cuộc tìm đi xa hơn, xem nhiều vùng hơn, và những điểm hơi xa nhưng là "cầu nối" sang vùng khác không bị loại sớm.</p>
+
+<h3>2. <code>ef_construction</code>: ví dụ chạy từng bước</h3>
+<p>Đồ thị đã có 8 điểm A–H trên một trục số (để khoảng cách chỉ là hiệu hai số). Cung phía trên là cạnh hàng xóm. Thêm điểm mới <b>X = 11</b>, với <code>ef_construction</code> = 3 (giỏ 3 chỗ) và <code>m</code> = 2. Tầng trên đưa xuống điểm xuất phát <b>A</b>. Bấm "Tiếp" để chạy.</p>
+<div class="card stepper" id="stA"></div>
+<p>Kết quả: giỏ chứa đúng 3 điểm gần 11 nhất (E, F, D), mà chỉ phải tính khoảng cách tới 7 trên 8 điểm. Với hàng triệu điểm, tỷ lệ này còn nhỏ hơn rất nhiều. Giỏ to hơn <code>m</code> để có "dư" mà chọn: tìm 3, nối 2.</p>
+<div class="grid2">
+  <div class="card"><b class="h">ef_construction nhỏ</b><p>Giỏ nhỏ, dừng sớm, dễ chọn nhầm hàng xóm. X bị nối với điểm không thật sự gần nó. <b>Cạnh sai nằm trong đồ thị mãi mãi</b>: mọi lần tìm sau đều đi trên đồ thị kém này. Muốn sửa phải dựng lại index (<code>REINDEX</code>).</p></div>
+  <div class="card"><b class="h">ef_construction lớn</b><p>Hàng xóm được chọn đúng hơn, đồ thị tốt hơn, nhưng dựng chậm hơn. Qua một mức thì không lợi thêm: đã tìm đúng các điểm gần nhất rồi. pgvector yêu cầu <code>ef_construction ≥ 2 × m</code>.</p></div>
+</div>
+
+<h3>3. <code>ef_search</code>: ví dụ giỏ 1 chỗ bị kẹt, giỏ 2 chỗ thoát</h3>
+<p>Lúc tìm kiếm, HNSW đi tham lam ở các tầng trên, rồi chạy thủ tục giỏ ở <b>tầng 0</b> với k = <code>ef_search</code>. Đồ thị dưới đây có một cái bẫy: điểm gần <b>q = 16</b> nhất là <b>E</b>, nhưng muốn tới E phải đi qua <b>C</b>. Mà nhìn từ A thì C có vẻ kém hơn B. Chọn cỡ giỏ rồi bấm "Tiếp".</p>
+<div class="card stepper" id="stB"></div>
+<div class="grid2">
+  <div class="card"><b class="h">ef_search = 1</b><p>Giỏ chỉ có một chỗ. Ở vòng 1, B (cách 6) chiếm chỗ đó nên C (cách 11) bị bỏ qua, và <b>đường tới E bị cắt</b>. Hàng xóm của B đều xa hơn B, nên dừng ở B. Đây là bẫy tối ưu cục bộ: giống người tìm đường chỉ nhớ một phương án, đi vào ngõ cụt là chịu.</p></div>
+  <div class="card" style="border-color:var(--accent)"><b class="h">ef_search = 2</b><p>Giỏ có chỗ cho cả B lẫn C. Xem hết B thấy cụt, C vẫn còn trong danh sách chờ, xem C thì gặp E. Đó là "phương án dự phòng": giỏ to hơn thì những điểm tạm kém vẫn được giữ lại để thử.</p></div>
+</div>
+<p>Đánh đổi: giỏ to thì xem nhiều điểm hơn, tức tính nhiều khoảng cách hơn, nên chậm hơn. Mặc định pgvector là 40. Hai hệ quả thực tế:</p>
+<ul>
+  <li><b>Đổi được lúc chạy</b>, không cần dựng lại index: <code>SET hnsw.ef_search = 100;</code> Đây là tham số nên chỉnh đầu tiên khi tìm chưa đủ đúng.</li>
+  <li><b>Giới hạn số kết quả</b>: giỏ chỉ có <code>ef_search</code> chỗ, nên <code>LIMIT 100</code> với <code>ef_search = 40</code> chỉ trả tối đa 40 dòng.</li>
+</ul>
+
+<h3>Tóm lại</h3>
+<div class="tbl"><table>
+<thead><tr><th>Tham số</th><th>Lúc nào</th><th>Tăng lên được</th><th>Tăng lên mất</th><th>Đổi thì</th></tr></thead>
+<tbody>
+<tr><td><code>m</code></td><td>Dựng</td><td>Recall</td><td>Bộ nhớ, thời gian dựng, thời gian tìm</td><td>Phải dựng lại index</td></tr>
+<tr><td><code>ef_construction</code></td><td>Dựng</td><td>Recall (tới một mức)</td><td>Thời gian dựng</td><td>Phải dựng lại index</td></tr>
+<tr><td><code>ef_search</code></td><td>Tìm</td><td>Recall</td><td>Thời gian tìm</td><td>Đổi ngay, theo phiên hoặc transaction</td></tr>
+</tbody></table></div>
+<p><b>Cách chỉnh:</b> để mặc định (16, 64, 40). Nếu đo thấy recall chưa đủ, tăng <code>ef_search</code> trước vì rẻ và không phải dựng lại. Chỉ khi <code>ef_search</code> đã lớn mà recall vẫn thấp mới tăng <code>m</code> hoặc <code>ef_construction</code> rồi dựng lại.</p>
+
+<h2>Phòng thử nghiệm: tự vặn ba tham số</h2>
+<p>HNSW thật chạy trong trình duyệt, trên 2.000 vector 24 chiều có cấu trúc cụm, đo với 300 truy vấn mà đáp án đúng đã biết trước (quét hết). Kéo <code>m</code> và <code>ef_construction</code> rồi bấm "Dựng lại"; kéo <code>ef_search</code> thì đo lại ngay. Mỗi lần đo thêm một dòng vào bảng để so sánh.</p>
+<div class="card sim" id="lab">
+  <div class="sim-ctl">
+    <label>m <input type="range" id="lm" min="2" max="32" value="16"> <b id="lmv">16</b></label>
+    <label>ef_construction <input type="range" id="lc" min="4" max="128" value="64"> <b id="lcv">64</b></label>
+    <label>Chọn hàng xóm <select id="lsel"><option value="1" selected>chọn đa hướng</option><option value="0">gần nhất</option></select></label>
+    <button id="lb" type="button">Dựng lại</button>
+    <label>ef_search <input type="range" id="le" min="1" max="100" value="40"> <b id="lev">40</b></label>
+  </div>
+  <div class="tiles lab-tiles">
+    <div class="tile"><b id="rRecall">…</b><span>recall@1 (truy vấn trả đúng điểm gần nhất)</span></div>
+    <div class="tile"><b id="rDist">…</b><span>khoảng cách phải tính mỗi truy vấn (quét hết: 2.000)</span></div>
+    <div class="tile"><b id="rEdges">…</b><span>số cạnh trong đồ thị (≈ bộ nhớ index)</span></div>
+    <div class="tile"><b id="rBuild">…</b><span>phép tính khoảng cách khi dựng</span></div>
+  </div>
+  <div class="tbl" style="max-height:260px;overflow-y:auto"><table id="lh">
+    <thead><tr><th class="num">m</th><th class="num">ef_construction</th><th class="num">ef_search</th><th class="num">Recall@1</th><th class="num">Khoảng cách / truy vấn</th><th class="num">Cạnh</th><th class="num">Chi phí dựng</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+</div>
+<div class="steps">
+  <div class="step"><b>Để m = 16, ef_construction = 64, kéo ef_search từ 1 lên 100</b><p>Recall tăng nhanh rồi chững lại; số khoảng cách phải tính tăng đều. Đó là đường cong đánh đổi tốc độ ↔ độ chính xác.</p></div>
+  <div class="step"><b>Đặt ef_search = 10, rồi dựng lại với m = 2, 4, 8, 16, 32</b><p>m nhỏ thì recall rất thấp dù tìm kỹ; m lớn thì số cạnh (bộ nhớ) tăng theo.</p></div>
+  <div class="step"><b>Giữ m = 16, dựng lại với ef_construction = 4 rồi 64</b><p>Đồ thị dựng ẩu cho recall thấp hơn ở cùng ef_search, đổi lại dựng rẻ hơn nhiều.</p></div>
+</div>
+<p class="muted" style="font-size:14px">Mặc định dùng quy tắc chọn hàng xóm đa hướng như pgvector (tab 03): m = 16, ef_search = 40 cho recall ~100%. Đổi sang "gần nhất" rồi dựng lại để so: ở cùng ef_search = 10, recall 99% (chọn đa hướng) so với 89% (gần nhất), dù cách này chỉ dùng chưa tới một nửa số cạnh. Mỗi lần dựng có yếu tố ngẫu nhiên (tầng của từng điểm), nên hai lần đo cùng tham số có thể lệch vài phần trăm. Xu hướng mới là điều cần nhìn.</p>
+
+<h2>Số đo thật trên máy bạn</h2>
+<p>Dựng DB tạm <code>radard_bench</code>: 1.000 tâm chủ đề ngẫu nhiên, 50.000 vector 1024 chiều rải quanh chúng (có cấu trúc cụm như embedding thật), lưu <code>halfvec</code>. 100 truy vấn mới, mỗi truy vấn lấy 10 vector gần nhất. Đáp án đúng lấy bằng quét toàn bộ.</p>
+
+<div class="bars" role="img" aria-label="Thời gian mỗi truy vấn: quét hết 120,6 ms; HNSW ef 40 là 1,2 ms; ef 100 là 2,7 ms; ef 200 là 5,0 ms">
+  <div class="bar"><span class="bl">Quét hết (chính xác)</span><span class="bt"><i style="width:100%"></i></span><span class="bv">120,6 ms</span></div>
+  <div class="bar"><span class="bl">HNSW ef_search = 200</span><span class="bt"><i class="a" style="width:4.2%"></i></span><span class="bv">5,0 ms</span></div>
+  <div class="bar"><span class="bl">HNSW ef_search = 100</span><span class="bt"><i class="a" style="width:2.3%"></i></span><span class="bv">2,7 ms</span></div>
+  <div class="bar"><span class="bl">HNSW ef_search = 40</span><span class="bt"><i class="a" style="width:1%"></i></span><span class="bv">1,2 ms</span></div>
+</div>
+
+<div class="tbl"><table>
+<thead><tr><th>Cách</th><th class="num">ms / truy vấn</th><th class="num">Recall@1</th><th class="num">Recall@10</th></tr></thead>
+<tbody>
+<tr><td>Quét hết</td><td class="num">120,6</td><td class="num">100%</td><td class="num">100%</td></tr>
+<tr><td>HNSW, ef_search = 40</td><td class="num">1,2</td><td class="num">99%</td><td class="num">98,2%</td></tr>
+<tr><td>HNSW, ef_search = 100</td><td class="num">2,7</td><td class="num">100%</td><td class="num">99,3%</td></tr>
+<tr><td>HNSW, ef_search = 200</td><td class="num">5,0</td><td class="num">100%</td><td class="num">99,3%</td></tr>
+</tbody></table></div>
+<p class="muted" style="font-size:14px">Recall@1: tỷ lệ truy vấn mà kết quả đầu tiên đúng là vector gần nhất. Recall@10: trong 10 kết quả, bao nhiêu nằm trong 10 vector gần nhất thật. Đo khi cache đã nóng (lần chạy đầu, lúc index chưa nằm trong RAM, HNSW ef 40 mất 9,6 ms).</p>
+
+<h3>Cái giá khi dựng</h3>
+<div class="grid3">
+  <div class="card"><b class="h">130 MB</b><p>Index, gần bằng chính bảng (137 MB). Mỗi vector nằm trong index kèm danh sách hàng xóm.</p></div>
+  <div class="card"><b class="h">3 phút 5 giây</b><p>Dựng index cho 50.000 vector. Chèn dữ liệu chỉ mất 1 phút.</p></div>
+  <div class="card"><b class="h">Tràn bộ nhớ</b><p>Postgres báo đồ thị không còn vừa <code>maintenance_work_mem</code> sau 24.282 điểm, phần sau dựng chậm hơn nhiều. Tăng tham số này trước khi dựng index lớn.</p></div>
+</div>
+
+<div class="note"><b>Giới hạn của bài đo:</b> dữ liệu tổng hợp, không phải embedding thật; một máy, một lần đo. Con số tuyệt đối sẽ khác trên Railway, nhưng tỷ lệ (HNSW nhanh hơn ~100 lần, recall ~99% ở mặc định) khớp với các benchmark công khai của pgvector.</div>
+</div>
+
+<!-- ============================ 06 ============================ -->
+<div class="panel" role="tabpanel" id="pgvector">
+<h2>Tạo và dùng index</h2>
+<pre><code><span class="c">-- Tạo: chọn cột và "phép đo khoảng cách" (operator class)</span>
+CREATE INDEX events_centroid_hnsw ON events
+  USING hnsw (centroid halfvec_cosine_ops)
+  WITH (m = 16, ef_construction = 64);     <span class="c">-- có thể bỏ WITH để dùng mặc định</span>
+
+<span class="c">-- Dùng: truy vấn PHẢI có dạng ORDER BY &lt;cột&gt; &lt;toán tử&gt; &lt;vector&gt; LIMIT k</span>
+SELECT id FROM events
+ORDER BY centroid &lt;=&gt; '[0.012, -0.08, ...]'
+LIMIT 1;</code></pre>
+
+<div class="tbl"><table>
+<thead><tr><th>Toán tử</th><th>Khoảng cách</th><th>Operator class cho halfvec</th></tr></thead>
+<tbody>
+<tr><td class="mono">&lt;-&gt;</td><td>Euclid (L2)</td><td class="mono">halfvec_l2_ops</td></tr>
+<tr><td class="mono">&lt;=&gt;</td><td><b>Cosine</b>: 1 − cos, từ 0 (cùng hướng) tới 2</td><td class="mono"><b>halfvec_cosine_ops</b></td></tr>
+<tr><td class="mono">&lt;#&gt;</td><td>Tích vô hướng, đổi dấu</td><td class="mono">halfvec_ip_ops</td></tr>
+</tbody></table></div>
+<p>Toán tử trong truy vấn phải khớp operator class của index. Index <code>cosine_ops</code> mà truy vấn dùng <code>&lt;-&gt;</code> thì Postgres không dùng index, lặng lẽ quét hết. Kiểu <code>vector</code> chỉ đánh index HNSW được tới 2.000 chiều, <code>halfvec</code> tới 4.000.</p>
+
+<h2>Postgres tự quyết có dùng index hay không</h2>
+<p>Có index không có nghĩa là truy vấn dùng nó. Planner ước lượng chi phí từng cách và chọn cách rẻ nhất. Xem bằng <code>EXPLAIN ANALYZE</code>: có dòng <code>Index Scan using …_hnsw</code> là dùng HNSW, còn <code>Seq Scan</code> + <code>Sort</code> là quét hết.</p>
+<p>Khi bảng nhỏ (vài trăm, vài nghìn dòng), quét hết thường rẻ hơn, và kết quả chính xác 100%. radard đang ở trường hợp này (tab 07).</p>
+
+<h2>Cái bẫy: HNSW + điều kiện WHERE</h2>
+<p>Truy vấn thật hiếm khi chỉ "tìm gần nhất". radard cần "gần nhất <b>trong số sự kiện còn hoạt động quanh thời điểm này</b>". Vấn đề: HNSW tìm trước, lọc sau.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="HNSW lấy 40 ứng viên gần nhất rồi mới lọc; chỉ khoảng 4 phần trăm thoả điều kiện thời gian nên còn 1 đến 2 kết quả thay vì 10">
+  <text class="tb" x="20" y="28">1. HNSW trả ef_search = 40 ứng viên gần q nhất (không biết gì về WHERE)</text>
+  <g><rect x="20" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="20" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="22" y1="156" x2="32" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="37" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="37" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="39" y1="156" x2="49" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="54" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="54" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="56" y1="156" x2="66" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="71" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="71" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="73" y1="156" x2="83" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="88" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="88" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="90" y1="156" x2="100" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="105" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="105" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="107" y1="156" x2="117" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="122" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="122" y="144" width="14" height="14" rx="3" fill="#0E6E5C"/><rect x="139" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="139" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="141" y1="156" x2="151" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="156" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="156" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="158" y1="156" x2="168" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="173" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="173" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="175" y1="156" x2="185" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="190" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="190" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="192" y1="156" x2="202" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="207" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="207" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="209" y1="156" x2="219" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="224" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="224" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="226" y1="156" x2="236" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="241" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="241" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="243" y1="156" x2="253" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="258" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="258" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="260" y1="156" x2="270" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="275" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="275" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="277" y1="156" x2="287" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="292" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="292" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="294" y1="156" x2="304" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="309" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="309" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="311" y1="156" x2="321" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="326" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="326" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="328" y1="156" x2="338" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="343" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="343" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="345" y1="156" x2="355" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="360" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="360" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="362" y1="156" x2="372" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="377" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="377" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="379" y1="156" x2="389" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="394" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="394" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="396" y1="156" x2="406" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="411" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="411" y="144" width="14" height="14" rx="3" fill="#0E6E5C"/><rect x="428" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="428" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="430" y1="156" x2="440" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="445" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="445" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="447" y1="156" x2="457" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="462" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="462" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="464" y1="156" x2="474" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="479" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="479" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="481" y1="156" x2="491" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="496" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="496" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="498" y1="156" x2="508" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="513" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="513" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="515" y1="156" x2="525" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="530" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="530" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="532" y1="156" x2="542" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="547" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="547" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="549" y1="156" x2="559" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="564" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="564" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="566" y1="156" x2="576" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="581" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="581" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="583" y1="156" x2="593" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="598" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="598" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="600" y1="156" x2="610" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="615" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="615" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="617" y1="156" x2="627" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="632" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="632" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="634" y1="156" x2="644" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="649" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="649" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="651" y1="156" x2="661" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="666" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="666" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="668" y1="156" x2="678" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><rect x="683" y="42" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#4A5753" stroke-width="1"/><rect x="683" y="144" width="14" height="14" rx="3" fill="#E6EBE9"/><line x1="685" y1="156" x2="695" y2="146" stroke="#9FB3AC" stroke-width="1.2"/><text class="ts" x="20" y="76">gần q nhất</text><text class="ts" x="700" y="76" text-anchor="end">xa hơn</text><text class="ts" x="20" y="176">còn lại 2 / 40</text></g>
+  <text class="tb" x="20" y="130">2. Postgres lọc theo WHERE (cửa sổ 14 ngày trên dữ liệu 1 năm: ~4% thoả)</text>
+  <text class="t" x="20" y="200">3. Muốn LIMIT 10, nhận được trung bình</text>
+  <text x="300" y="200" style="font-size:22px;font-weight:700;fill:#9A5B00">1,55</text>
+  <text class="t" x="352" y="200">dòng. Sự kiện đúng tồn tại nhưng không nằm trong 40 ứng viên.</text>
+  <text class="ts" x="20" y="232">Với truy vấn LIMIT 1 của radard: 21% lần trả sai hoặc rỗng, nên tài liệu mở sự kiện mới dù đáng lẽ phải gộp.</text>
+</svg>
+<figcaption><b>Hình 3.</b> Ô xanh: ứng viên thoả điều kiện thời gian. Ô xám gạch: bị lọc bỏ sau khi HNSW đã chọn xong. Số liệu đo trên <code>radard_bench</code>.</figcaption>
+</figure>
+
+<h3>Cách khắc phục: iterative scan (pgvector 0.8+)</h3>
+<p>Bật <code>hnsw.iterative_scan</code>: lọc xong mà chưa đủ dòng thì HNSW <b>tìm tiếp</b> lô ứng viên kế tiếp, tới khi đủ hoặc chạm giới hạn <code>hnsw.max_scan_tuples</code> (mặc định 20.000).</p>
+<pre><code>SET hnsw.iterative_scan = relaxed_order;   <span class="c">-- off (mặc định) | strict_order | relaxed_order</span></code></pre>
+
+<div class="tbl"><table>
+<thead><tr><th>Có lọc cửa sổ 14 ngày, LIMIT 10</th><th class="num">ms</th><th class="num">Số dòng nhận</th><th class="num">Recall@1</th><th class="num">Recall@10</th></tr></thead>
+<tbody>
+<tr><td>HNSW, iterative scan tắt (mặc định)</td><td class="num">1,1</td><td class="num" style="color:var(--warn);font-weight:600">1,55 / 10</td><td class="num">79%</td><td class="num">15,5%</td></tr>
+<tr><td>HNSW, <code>strict_order</code></td><td class="num">6,0</td><td class="num">10 / 10</td><td class="num">97%</td><td class="num">69,1%</td></tr>
+<tr><td>HNSW, <code>relaxed_order</code></td><td class="num">5,6</td><td class="num">10 / 10</td><td class="num">98%</td><td class="num">78,3%</td></tr>
+<tr><td>Quét hết phần đã lọc</td><td class="num">9,7</td><td class="num">10 / 10</td><td class="num">100%</td><td class="num">100%</td></tr>
+<tr><td><b>Btree trên thời gian + tính chính xác</b> (planner tự chọn)</td><td class="num"><b>4,4</b></td><td class="num">10 / 10</td><td class="num"><b>100%</b></td><td class="num"><b>100%</b></td></tr>
+</tbody></table></div>
+<p>Dòng cuối là điểm mấu chốt. Khi có index btree trên cột thời gian, planner thấy chỉ ~2.000 dòng thoả điều kiện, nên <b>dùng btree lọc trước rồi tính khoảng cách chính xác</b>, bỏ qua HNSW. Nhanh hơn và đúng 100%. Bộ lọc càng hẹp, cách này càng thắng; HNSW thắng khi bộ lọc rộng hoặc không có bộ lọc.</p>
+<div class="note"><b>Rủi ro còn lại:</b> planner chọn dựa trên <b>ước lượng</b> số dòng. Nếu ước lượng sai (thống kê cũ, cửa sổ rộng hơn), nó có thể chọn HNSW không có iterative scan và trả thiếu, mà không báo lỗi gì. Vì vậy nên bật <code>relaxed_order</code> làm lưới an toàn.</div>
+
+<h2>Khi dữ liệu thay đổi</h2>
+<div class="grid3">
+  <div class="card"><b class="h">INSERT</b><p>Chèn điểm vào đồ thị ngay (thuật toán ở tab 03). Không cần dựng lại, khác IVFFlat.</p></div>
+  <div class="card"><b class="h">UPDATE cột vector</b><p>Postgres không sửa tại chỗ: ghi phiên bản dòng mới, nên index nhận thêm một điểm mới. Điểm cũ thành "rác" chờ dọn.</p></div>
+  <div class="card"><b class="h">DELETE, VACUUM</b><p>Điểm bị xoá chỉ được đánh dấu. <code>VACUUM</code> (autovacuum tự chạy) mới gỡ khỏi đồ thị và nối lại hàng xóm, khá tốn kém với index lớn.</p></div>
+</div>
+</div>
+
+<!-- ============================ 07 ============================ -->
+<div class="panel" role="tabpanel" id="radard">
+<h2>radard có một index HNSW</h2>
+<pre><code><span class="c">// packages/db/src/schema/layer2.ts, bảng events</span>
+index("events_centroid_hnsw").using("hnsw", t.centroid.op("halfvec_cosine_ops")),
+index("events_last_seen_idx").on(t.lastSeenAt),          <span class="c">// btree thường</span></code></pre>
+<p>Nó đánh index cho <b>tâm cụm</b> của sự kiện. Không có index HNSW nào trên <code>doc_text.embedding</code> (vector của từng tài liệu), vì hiện chưa có tính năng nào tìm kiếm trên đó.</p>
+
+<h2>Truy vấn dùng tới nó: tìm sự kiện gần nhất</h2>
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="Luồng xử lý một tài liệu: cùng URL thì gộp; không thì tìm sự kiện gần nhất trong cửa sổ, cosine từ 0,9 thì gộp, không thì mở sự kiện mới">
+  <defs><marker id="g7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bx" x="20" y="120" width="120" height="50" rx="8"/><text class="tb" x="80" y="150" text-anchor="middle">Tài liệu mới</text>
+  <rect class="bp" x="180" y="30" width="160" height="50" rx="8"/><text class="t" x="260" y="52" text-anchor="middle">1. Cùng URL với tài</text><text class="t" x="260" y="68" text-anchor="middle">liệu trong sự kiện?</text>
+  <rect class="bc" x="180" y="120" width="190" height="50" rx="8"/><text class="tb" x="275" y="142" text-anchor="middle">2. nearestEvent</text><text class="tm" x="275" y="159" text-anchor="middle">ORDER BY &lt;=&gt; LIMIT 1</text>
+  <rect class="ba" x="420" y="100" width="170" height="36" rx="8"/><text class="t" x="505" y="123" text-anchor="middle">btree + tính chính xác</text>
+  <rect class="bd" x="420" y="150" width="170" height="36" rx="8"/><text class="t" x="505" y="173" text-anchor="middle">hoặc HNSW</text>
+  <text class="ts" x="505" y="92" text-anchor="middle">planner chọn</text>
+  <rect class="bx" x="620" y="120" width="120" height="50" rx="8"/><text class="t" x="680" y="142" text-anchor="middle">cosine ≥ 0,9?</text>
+  <rect class="bx" x="400" y="30" width="150" height="50" rx="8"/><text class="t" x="475" y="59" text-anchor="middle">gộp (reason url)</text>
+  <rect class="bx" x="600" y="230" width="140" height="50" rx="8"/><text class="t" x="670" y="252" text-anchor="middle">gộp (vector),</text><text class="t" x="670" y="268" text-anchor="middle">UPDATE centroid</text>
+  <rect class="bx" x="320" y="230" width="230" height="50" rx="8"/><text class="t" x="435" y="252" text-anchor="middle">mở sự kiện mới:</text><text class="t" x="435" y="268" text-anchor="middle">INSERT, thêm điểm vào HNSW</text>
+  <g class="ln" marker-end="url(#g7)">
+    <path d="M140,140 L180,60"/><path d="M340,55 L400,55"/><path d="M260,80 L260,120"/><path d="M370,145 L420,120"/><path d="M370,145 L420,168"/>
+    <path d="M590,118 L620,140"/><path d="M590,168 L620,150"/><path d="M680,170 L680,230"/><path d="M640,170 Q560,200 520,230"/>
+  </g>
+  <g class="lb"><text x="354" y="48">có</text><text x="266" y="104">không</text><text x="690" y="205">có</text><text x="560" y="205">không</text></g>
+</svg>
+<figcaption><b>Hình 4.</b> Luồng pha B cho mỗi tài liệu (<code>apps/daemon/src/jobs/process.ts</code>). Chỉ bước 2 có thể dùng HNSW. Mỗi lần gộp theo vector là một UPDATE <code>centroid</code>, nên index nhận thêm một điểm mới và điểm cũ chờ VACUUM.</figcaption>
+</figure>
+
+<pre><code><span class="c">-- SQL mà Drizzle sinh ra cho nearestEvent (rút gọn)</span>
+SELECT id, centroid, n_vectors, centroid &lt;=&gt; $1 AS distance
+FROM events
+WHERE last_seen_at  &gt;= $2            <span class="c">-- doc.at − 7 ngày</span>
+  AND first_seen_at &lt;= $3            <span class="c">-- doc.at + 7 ngày</span>
+  AND embedding_model = $4
+ORDER BY centroid &lt;=&gt; $1
+LIMIT 1;</code></pre>
+
+<h2>Thực tế hiện tại: HNSW chưa được dùng</h2>
+<p><code>EXPLAIN ANALYZE</code> đúng truy vấn này trên DB radard của bạn (512 sự kiện):</p>
+<pre><code>Limit  (actual time=6.96 ms)
+  -&gt; Sort  (Sort Method: top-N heapsort)
+       -&gt; Index Scan using <b>events_last_seen_idx</b> on events  (rows=424)
+            Index Cond: (last_seen_at &gt;= now() - '7 days')
+            Filter: (embedding_model = ... AND first_seen_at &lt;= now() + '7 days')
+Execution Time: 7.18 ms</code></pre>
+<p>Planner dùng <b>btree trên <code>last_seen_at</code></b> lấy 424 sự kiện trong cửa sổ, tính cosine chính xác cho từng cái, lấy cái nhỏ nhất. Đúng 100%, 7 ms. Index HNSW (1,4 MB) nằm đó nhưng không được chạm tới.</p>
+<p><b>Kiểm lại bằng bộ đếm của Postgres</b> (06/10): đặt lại <code>pg_stat_user_indexes</code> của hai index rồi chạy một lượt <code>layer2 recluster</code> + <code>process</code> đầy đủ: <code>events_last_seen_idx</code> được dùng <b>422 lần</b>, <code>events_centroid_hnsw</code> <b>0 lần</b> (khoảng 95 tài liệu đầu được xét khi bảng còn gần trống nên quét thẳng). Trước khi đặt lại, bộ đếm của HNSW là 814: có lúc nó đã được dùng, nhưng thử lại 4 kịch bản (sau TRUNCATE chưa có thống kê, prepared statement với kế hoạch chung, tài liệu ở nhiều thời điểm, bảng 2.048 sự kiện) đều không tái hiện được. Nguồn có thể là lượt chạy với code hoặc ngưỡng cũ, hoặc truy vấn chạy tay; <b>chưa xác minh</b>.</p>
+
+<h2>Sẽ cần HNSW lúc nào?</h2>
+<p>Số sự kiện trong cửa sổ quyết định, không phải tổng số sự kiện. Cửa sổ 14 ngày chỉ chứa những gì xảy ra trong 2 tuần, bất kể radard đã chạy bao lâu.</p>
+<div class="tbl"><table>
+<thead><tr><th>Sự kiện trong cửa sổ</th><th>Btree + chính xác (ước tính)</th><th>Ghi chú</th></tr></thead>
+<tbody>
+<tr><td class="num">~400 (hiện tại)</td><td>~7 ms</td><td>Đo thật</td></tr>
+<tr><td class="num">~2.000</td><td>~5–10 ms</td><td>Tương ứng bài đo ở tab 06</td></tr>
+<tr><td class="num">~20.000</td><td>~50–100 ms</td><td>Thêm nhiều nguồn; mỗi tài liệu vẫn chấp nhận được với job chạy nền</td></tr>
+</tbody></table></div>
+<p>Với vài nguồn và vài trăm sự kiện mỗi tuần, <b>gộp sự kiện có lẽ không bao giờ cần HNSW</b>. Index trên <code>events</code> là bảo hiểm cho khi thêm nhiều nguồn, và có giá: mỗi UPDATE centroid ghi thêm một điểm vào đồ thị.</p>
+
+<h3>Nơi HNSW thật sự cần: tìm kiếm không có bộ lọc thời gian</h3>
+<div class="grid2">
+  <div class="card"><b class="h">Tìm kiếm ngữ nghĩa (MVP sau)</b><p>MCP hoặc UI hỏi "các bài về agent memory trong 6 tháng qua": quét toàn bộ <code>doc_text</code>, hàng chục nghìn tới hàng triệu vector, không có cửa sổ hẹp. Cần index HNSW trên <code>doc_text.embedding</code>.</p></div>
+  <div class="card"><b class="h">Chống trùng với toàn bộ lịch sử</b><p>"Bài này có phải đăng lại của một bài từ 3 tháng trước?" Cũng là tìm trên toàn bộ tài liệu.</p></div>
+</div>
+
+<h2>Việc nên làm (đã ghi vào checklist)</h2>
+<div class="steps">
+  <div class="step"><b>Giữ btree <code>events_last_seen_idx</code></b><p>Đây là thứ đang làm truy vấn nhanh và chính xác.</p></div>
+  <div class="step"><b>Bật <code>hnsw.iterative_scan = relaxed_order</code> cho truy vấn nearestEvent</b><p>Lưới an toàn nếu một ngày planner chọn HNSW. Đặt bằng <code>SET LOCAL</code> trong transaction của job, chỉ khi số sự kiện lên hàng chục nghìn.</p></div>
+  <div class="step"><b>Khi làm tìm kiếm ngữ nghĩa: thêm HNSW trên <code>doc_text.embedding</code></b><p>Tăng <code>maintenance_work_mem</code> trước khi dựng, cân nhắc <code>ef_search</code> 100 nếu cần recall cao.</p></div>
+  <div class="step"><b>Luôn kiểm bằng <code>EXPLAIN ANALYZE</code></b><p>Có index không có nghĩa là được dùng; không dùng cũng không phải lỗi.</p></div>
+</div>
+</div>
+
+<footer>radard · docs/hnsw.html · Số đo: DB tạm <code>radard_bench</code> (đã xoá sau khi đo) và DB <code>radard</code> local, 29/09/2026. Tham khảo: Malkov &amp; Yashunin, "Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs" (2016); README pgvector 0.8.</footer>
+
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+<script>// Lõi HNSW dùng chung cho mô phỏng 2D và phòng thử nghiệm. Đếm số lần tính khoảng cách.
+function makeRng(seed){return function(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};}
+function HNSW(points,M,efC,rnd,maxTop,heur){
+  var self={P:points,M:M,M0:2*M,efC:efC,level:[],nb:[],entry:-1,maxL:-1,nDist:0,edges:0};
+  var mL=1/Math.log(Math.max(M,2));
+  function dist(a,b){self.nDist++;var s=0;for(var i=0;i<a.length;i++){var d=a[i]-b[i];s+=d*d;}return Math.sqrt(s);}
+  self.dist=dist;
+  function byD(a,b){return a[0]-b[0];}
+  self.searchLayer=function(x,eps,ef,l,rec){
+    var seen={},C=[],Wl=[];
+    eps.forEach(function(e){seen[e]=1;var de=dist(x,points[e]);C.push([de,e]);Wl.push([de,e]);});
+    Wl.sort(byD);
+    while(C.length){
+      C.sort(byD);var c=C.shift();
+      if(c[0]>Wl[Wl.length-1][0]) break;
+      var ns=self.nb[c[1]][l];
+      for(var k=0;k<ns.length;k++){
+        var e=ns[k];if(seen[e]) continue;seen[e]=1;
+        var de=dist(x,points[e]);
+        if(rec) rec.push({t:'eval',id:e,l:l});
+        if(Wl.length<ef||de<Wl[Wl.length-1][0]){
+          if(rec&&de<Wl[0][0]) rec.push({t:'move',from:c[1],to:e,l:l});
+          C.push([de,e]);Wl.push([de,e]);Wl.sort(byD);if(Wl.length>ef) Wl.pop();
+        }
+      }
+    }
+    return Wl;
+  };
+  // Chọn hàng xóm từ danh sách ứng viên [khoảng cách, id] đã sắp tăng dần.
+  // Đơn giản: lấy n điểm gần nhất. Heuristic (bài báo gốc, pgvector): chỉ nhận ứng viên nếu nó
+  // gần điểm gốc hơn gần mọi hàng xóm đã chọn, để các cạnh toả ra nhiều hướng.
+  function select(cands,n){
+    if(!heur) return cands.slice(0,n).map(function(c){return c[1];});
+    var R=[];
+    for(var k=0;k<cands.length&&R.length<n;k++){
+      var e=cands[k][1],de=cands[k][0],ok=true;
+      for(var j=0;j<R.length;j++){if(dist(points[e],points[R[j]])<de){ok=false;break;}}
+      if(ok) R.push(e);
+    }
+    return R;
+  }
+  self.insert=function(i){
+    var lv=Math.floor(-Math.log(rnd()+1e-12)*mL);if(maxTop!=null) lv=Math.min(lv,maxTop);
+    self.level[i]=lv;self.nb[i]=[];for(var l=0;l<=lv;l++) self.nb[i][l]=[];
+    if(self.entry<0){self.entry=i;self.maxL=lv;return;}
+    var ep=[self.entry];
+    for(l=self.maxL;l>lv;l--) ep=[self.searchLayer(points[i],ep,1,l)[0][1]];
+    for(l=Math.min(lv,self.maxL);l>=0;l--){
+      var Wl=self.searchLayer(points[i],ep,Math.max(efC,M),l);
+      var mx=l===0?self.M0:M;
+      select(Wl,M).forEach(function(e){
+        self.nb[i][l].push(e);self.nb[e][l].push(i);
+        if(self.nb[e][l].length>mx){
+          var pe=points[e];
+          self.nb[e][l]=select(self.nb[e][l].map(function(n){return [dist(pe,points[n]),n];}).sort(byD),mx);
+        }
+      });
+      ep=Wl.map(function(w){return w[1];});
+    }
+    if(lv>self.maxL){self.maxL=lv;self.entry=i;}
+  };
+  for(var i=0;i<points.length;i++) self.insert(i);
+  self.buildDist=self.nDist;
+  self.nb.forEach(function(ls){ls.forEach(function(a){self.edges+=a.length;});});
+  // Tìm: tham lam ở tầng trên, danh sách ef ở tầng 0.
+  self.search=function(x,ef,rec){
+    var cur=self.entry,cd=dist(x,points[cur]);if(rec) rec.push({t:'eval',id:cur,l:self.maxL});
+    for(var l=self.maxL;l>0;l--){
+      var moved=true;
+      while(moved){
+        moved=false;var best=cur,bd=cd,ns=self.nb[cur][l];
+        for(var k=0;k<ns.length;k++){var e=ns[k];if(rec) rec.push({t:'eval',id:e,l:l});var de=dist(x,points[e]);if(de<bd){bd=de;best=e;}}
+        if(best!==cur){if(rec) rec.push({t:'move',from:cur,to:best,l:l});cur=best;cd=bd;moved=true;}
+      }
+    }
+    return self.searchLayer(x,[cur],Math.max(ef,1),0,rec);
+  };
+  return self;
+}
+
+
+
+
+/* ---------- Mô phỏng 2D (tab 04) ---------- */
+(function(){
+  var svg=document.getElementById('plot'); if(!svg) return;
+  var NS='http://www.w3.org/2000/svg',W=700,H=440,N=300;
+  var LC=['#0E6E5C','#C27A12','#2F5DA8','#5B45A8'],NC=['#AEBDB8','#C27A12','#2F5DA8','#5B45A8'];
+  var seed=11,rnd,idx,P,q,timer,unreach=[];
+  function gauss(){return Math.sqrt(-2*Math.log(rnd()+1e-12))*Math.cos(2*Math.PI*rnd());}
+  function d2(a,b){var x=a[0]-b[0],y=a[1]-b[1];return Math.sqrt(x*x+y*y);}
+  function build(){
+    rnd=makeRng(seed);P=[];
+    var centers=[];for(var k=0;k<9;k++) centers.push([70+rnd()*560,50+rnd()*340]);
+    for(var i=0;i<N;i++){
+      var p;
+      if(rnd()<0.2) p=[20+rnd()*660,20+rnd()*400];
+      else {var c=centers[i%9];p=[c[0]+gauss()*30,c[1]+gauss()*30];}
+      p[0]=Math.max(12,Math.min(W-12,p[0]));p[1]=Math.max(12,Math.min(H-12,p[1]));P.push(p);
+    }
+    idx=HNSW(P,5,24,rnd,3,document.getElementById('sel').value==='1');
+    // Điểm không tới được: đi theo cạnh tầng 0 từ điểm vào mà không bao giờ gặp.
+    var seen={},st=[idx.entry];seen[idx.entry]=1;
+    while(st.length){var c=st.pop();idx.nb[c][0].forEach(function(e){if(!seen[e]){seen[e]=1;st.push(e);}});}
+    unreach=[];for(i=0;i<N;i++) if(!seen[i]) unreach.push(i);
+  }
+  function search(x,ef){
+    var rec=[],Wl=idx.search(x,ef,rec),truth=0;
+    for(var i=1;i<N;i++) if(d2(x,P[i])<d2(x,P[truth])) truth=i;
+    return {steps:rec,result:Wl[0][1],truth:truth};
+  }
+  function el(n,a,parent){var e=document.createElementNS(NS,n);for(var k in a) e.setAttribute(k,a[k]);(parent||svg).appendChild(e);return e;}
+  var gEdges,gEval,gPath,gNodes,gMarks;
+  function drawBase(){
+    svg.textContent='';
+    el('rect',{x:0,y:0,width:W,height:H,rx:10,fill:'#FBFCFB',stroke:'#D9E0DD'});
+    gEdges=el('g',{});gEval=el('g',{});gPath=el('g',{});gNodes=el('g',{});gMarks=el('g',{});
+    drawEdges();
+    for(var i=0;i<N;i++){var lv=idx.level[i];el('circle',{cx:P[i][0],cy:P[i][1],r:2.6+lv*1.7,fill:NC[lv],stroke:'#fff','stroke-width':lv?1.2:0.6},gNodes);}
+    var e=P[idx.entry];
+    el('circle',{cx:e[0],cy:e[1],r:11,fill:'none',stroke:LC[idx.maxL],'stroke-width':1.5,'stroke-dasharray':'3 2'},gNodes);
+    el('text',{x:e[0]+13,y:e[1]-10,'class':'lb'},gNodes).textContent='điểm vào';
+    unreach.forEach(function(u){
+      var x=P[u][0],y=P[u][1];
+      el('path',{d:'M'+(x-7)+','+(y-7)+'L'+(x+7)+','+(y+7)+'M'+(x+7)+','+(y-7)+'L'+(x-7)+','+(y+7),stroke:'#C0392B','stroke-width':2.2},gNodes);
+    });
+  }
+  function drawEdges(){
+    gEdges.textContent='';
+    var l=+document.getElementById('lay').value;if(l<0) return;
+    var done={};
+    for(var i=0;i<N;i++){
+      if(idx.level[i]<l) continue;
+      idx.nb[i][l].forEach(function(e){
+        var k=i<e?i+'-'+e:e+'-'+i;if(done[k]) return;done[k]=1;
+        el('line',{x1:P[i][0],y1:P[i][1],x2:P[e][0],y2:P[e][1],stroke:l?LC[l]:'#9FB3AC','stroke-width':l?1.3:0.8,opacity:l?0.55:0.6},gEdges);
+      });
+    }
+  }
+  function star(x,y){
+    var pts=[];for(var k=0;k<10;k++){var r=k%2?5:12,a=-Math.PI/2+k*Math.PI/5;pts.push((x+r*Math.cos(a)).toFixed(1)+','+(y+r*Math.sin(a)).toFixed(1));}
+    el('polygon',{points:pts.join(' '),fill:'#eb6834',stroke:'#fff','stroke-width':1.5},gMarks);
+  }
+  function setStats(parts){
+    var box=document.getElementById('stats');box.textContent='';
+    parts.forEach(function(p){var s=document.createElement('span');if(p.cls) s.className=p.cls;
+      if(p.b!=null){var b=document.createElement('b');b.textContent=p.b;s.appendChild(b);}
+      s.appendChild(document.createTextNode(p.t));box.appendChild(s);});
+  }
+  function run(animate){
+    clearInterval(timer);
+    var ef=+document.getElementById('ef').value,res=search(q,ef),steps=res.steps;
+    gEval.textContent='';gPath.textContent='';gMarks.textContent='';star(q[0],q[1]);
+    var i=0,seen={},nEval=0,hops=0;
+    function apply(s){
+      if(s.t==='eval'){if(!seen[s.id]){seen[s.id]=1;nEval++;
+        el('circle',{cx:P[s.id][0],cy:P[s.id][1],r:6+idx.level[s.id]*1.7,fill:'#F2C9B8',stroke:'#eb6834','stroke-width':0.8,opacity:0.9},gEval);}}
+      else {hops++;el('line',{x1:P[s.from][0],y1:P[s.from][1],x2:P[s.to][0],y2:P[s.to][1],stroke:LC[s.l],'stroke-width':3,'stroke-linecap':'round'},gPath);}
+    }
+    function finish(){
+      var r=P[res.result],t=P[res.truth],ok=res.result===res.truth;
+      el('circle',{cx:t[0],cy:t[1],r:13,fill:'none',stroke:'#16201D','stroke-width':1.6,'stroke-dasharray':'4 3'},gMarks);
+      el('circle',{cx:r[0],cy:r[1],r:9,fill:'none',stroke:'#0E6E5C','stroke-width':3},gMarks);
+      setStats([{b:nEval,t:' / '+N+' điểm đã tính khoảng cách ('+Math.round(nEval*100/N)+'%)'},{b:hops,t:' bước nhảy'},
+        {b:unreach.length,t:' điểm không tới được (dấu ×)'},
+        ok?{cls:'ok',t:'Kết quả đúng là điểm gần nhất'}
+          :(unreach.indexOf(res.truth)>=0
+            ?{cls:'miss',t:'Trượt: điểm gần nhất thật (cách '+d2(q,t).toFixed(0)+') là điểm KHÔNG TỚI ĐƯỢC, không ai nối cạnh tới nó. Tăng ef_search vô ích; thử đổi "Chọn hàng xóm" sang "chọn đa hướng".'}
+            :{cls:'miss',t:'Trượt: HNSW trả điểm cách q '+d2(q,r).toFixed(0)+', điểm gần nhất thật cách '+d2(q,t).toFixed(0)+'. Thử tăng ef_search.'})]);
+    }
+    setStats([{t:'Đang tìm…'}]);
+    if(!animate){steps.forEach(apply);finish();return;}
+    timer=setInterval(function(){
+      if(i>=steps.length){clearInterval(timer);finish();return;}
+      apply(steps[i++]);
+      while(i<steps.length&&steps[i].t==='eval'&&steps[i-1].t==='eval'&&steps[i].l===0&&Math.random()<0.5) apply(steps[i++]);
+    },55);
+  }
+  function pickMissQ(){
+    var r2=makeRng(3);
+    for(var k=0;k<300;k++){var x=[30+r2()*640,30+r2()*380],r=search(x,1);if(r.result!==r.truth) return x;}
+    return [W/2,H/2];
+  }
+  function init(){build();drawBase();q=pickMissQ();run(true);}
+  svg.addEventListener('click',function(ev){
+    var pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;
+    var p=pt.matrixTransform(svg.getScreenCTM().inverse());q=[p.x,p.y];run(true);
+  });
+  document.getElementById('ef').addEventListener('input',function(){document.getElementById('efv').textContent=this.value;run(false);});
+  document.getElementById('lay').addEventListener('change',drawEdges);
+  // Đổi cách chọn hàng xóm: cùng điểm, cùng tầng (cùng seed), chỉ khác cạnh; giữ nguyên q.
+  document.getElementById('sel').addEventListener('change',function(){build();drawBase();run(false);});
+  document.getElementById('bRand').addEventListener('click',function(){q=[30+Math.random()*640,30+Math.random()*380];run(true);});
+  document.getElementById('bStep').addEventListener('click',function(){run(true);});
+  document.getElementById('bBuild').addEventListener('click',function(){seed=(Math.random()*1e9)>>>0;init();});
+  init();
+})();
+
+/* ---------- Phòng thử nghiệm tham số (tab 05) ---------- */
+(function(){
+  if(!document.getElementById('lab')) return;
+  var D=24,N=2000,Q=300,P,Qs,truth,idx,built=false;
+  var fmt=function(n){return n.toLocaleString('vi-VN');};
+  function data(){
+    var rnd=makeRng(5),g=function(){return Math.sqrt(-2*Math.log(rnd()+1e-12))*Math.cos(2*Math.PI*rnd());};
+    var C=[];for(var k=0;k<40;k++){var c=[];for(var j=0;j<D;j++) c.push(g());C.push(c);}
+    function mk(){var c=C[Math.floor(rnd()*40)];return c.map(function(x){return x+g()*0.6;});}
+    P=[];for(var i=0;i<N;i++) P.push(mk());
+    Qs=[];for(i=0;i<Q;i++) Qs.push(mk());
+    truth=Qs.map(function(q){var b=0,bd=Infinity;for(var i=0;i<N;i++){var s=0;for(var j=0;j<D;j++){var t=q[j]-P[i][j];s+=t*t;}if(s<bd){bd=s;b=i;}}return b;});
+  }
+  function val(id){return +document.getElementById(id).value;}
+  function measure(){
+    var ef=val('le');idx.nDist=0;var hit=0;
+    Qs.forEach(function(q,i){if(idx.search(q,ef)[0][1]===truth[i]) hit++;});
+    var rec=Math.round(hit*100/Q),dq=Math.round(idx.nDist/Q);
+    document.getElementById('rRecall').textContent=rec+'%';
+    document.getElementById('rDist').textContent=fmt(dq);
+    document.getElementById('rEdges').textContent=fmt(idx.edges);
+    document.getElementById('rBuild').textContent=(idx.buildDist/1e6).toFixed(2).replace('.',',')+' triệu';
+    var tr=document.createElement('tr');
+    [(document.getElementById('lsel').value==='1'?'đa hướng · ':'gần nhất · ')+idx.M,idx.efC,ef,rec+'%',fmt(dq),fmt(idx.edges),(idx.buildDist/1e6).toFixed(2).replace('.',',')+' tr'].forEach(function(v){
+      var td=document.createElement('td');td.className='num';td.textContent=v;tr.appendChild(td);});
+    var tb=document.querySelector('#lh tbody');tb.insertBefore(tr,tb.firstChild);
+  }
+  function rebuild(){
+    var b=document.getElementById('lb');b.disabled=true;b.textContent='Đang dựng…';
+    setTimeout(function(){
+      if(!P) data();
+      idx=HNSW(P,val('lm'),val('lc'),makeRng(9),null,document.getElementById('lsel').value==='1');built=true;
+      b.disabled=false;b.textContent='Dựng lại';measure();
+    },30);
+  }
+  [['lm','lmv'],['lc','lcv'],['le','lev']].forEach(function(p){
+    document.getElementById(p[0]).addEventListener('input',function(){document.getElementById(p[1]).textContent=this.value;});
+  });
+  var t;
+  document.getElementById('le').addEventListener('input',function(){if(!built) return;clearTimeout(t);t=setTimeout(measure,120);});
+  document.getElementById('lb').addEventListener('click',rebuild);
+  // Dựng lần đầu khi mở tab 05, để không làm chậm lúc tải trang.
+  function maybe(){if(!built&&location.hash==='#tham-so') rebuild();}
+  window.addEventListener('hashchange',maybe);maybe();
+})();
+
+/* ---------- Ví dụ chạy từng bước trên trục số (tab 05) ---------- */
+(function(){
+  var NS='http://www.w3.org/2000/svg';
+  function el(n,a,p){var e=document.createElementNS(NS,n);for(var k in a) e.setAttribute(k,a[k]);if(p) p.appendChild(e);return e;}
+  function h(tag,cls,text,p){var e=document.createElement(tag);if(cls) e.className=cls;if(text!=null) e.textContent=text;if(p) p.appendChild(e);return e;}
+  var fmt=function(d){return String(d);};
+
+  // Chạy thủ tục "giỏ + danh sách chờ", ghi lại trạng thái sau mỗi vòng.
+  function trace(cfg,k){
+    var pos={};cfg.points.forEach(function(p){pos[p.n]=p.x;});
+    var d=function(n){return Math.abs(pos[n]-cfg.target);};
+    var W=[cfg.start],C=[cfg.start],seen={},steps=[];
+    seen[cfg.start]=1;
+    var byD=function(a,b){return d(a)-d(b);};
+    function snap(title,notes,cur,extra){steps.push({title:title,notes:notes,W:W.slice(),C:C.slice(),seen:Object.assign({},seen),cur:cur,extra:extra});}
+    snap('Bắt đầu',['Bỏ điểm xuất phát '+cfg.start+' (cách '+cfg.label+' '+fmt(d(cfg.start))+') vào giỏ và danh sách chờ.'],null);
+    var round=0;
+    for(;;){
+      if(!C.length){snap('Dừng',['Danh sách chờ đã hết. Kết quả là giỏ hiện tại.'],null,{done:true});break;}
+      C.sort(byD);var c=C.shift();round++;
+      var worst=W[W.length-1];
+      if(d(c)>d(worst)){
+        snap('Vòng '+round+': lấy '+c+' (cách '+fmt(d(c))+')',[c+' cách '+fmt(d(c))+', còn xa hơn điểm tệ nhất trong giỏ là '+worst+' (cách '+fmt(d(worst))+').','→ Dừng. Kết quả là giỏ hiện tại.'],c,{done:true});
+        break;
+      }
+      var notes=['Lấy '+c+' ra khỏi danh sách chờ: nó gần '+cfg.label+' nhất trong danh sách (cách '+fmt(d(c))+').',
+        'Điểm tệ nhất trong giỏ là '+worst+' (cách '+fmt(d(worst))+'). '+c+' không xa hơn, nên xem tiếp hàng xóm của '+c+': '+cfg.edges[c].join(', ')+'.'];
+      cfg.edges[c].forEach(function(e){
+        if(seen[e]){notes.push('• '+e+': đã gặp, bỏ qua.');return;}
+        seen[e]=1;
+        var w=W[W.length-1];
+        if(W.length<k||d(e)<d(w)){
+          var why=W.length<k?'giỏ còn chỗ':'gần hơn điểm tệ nhất trong giỏ ('+w+', cách '+fmt(d(w))+')';
+          C.push(e);W.push(e);W.sort(byD);var out='';
+          if(W.length>k){var r=W.pop();out=', giỏ tràn nên bỏ '+r+' (cách '+fmt(d(r))+') ra';}
+          notes.push('• '+e+' cách '+fmt(d(e))+': '+why+' → vào giỏ và danh sách chờ'+out+'.');
+        } else {
+          notes.push('• '+e+' cách '+fmt(d(e))+': không gần hơn điểm tệ nhất trong giỏ ('+w+', cách '+fmt(d(w))+'), giỏ đã đầy → bỏ qua.');
+        }
+      });
+      snap('Vòng '+round+': xem hàng xóm của '+c,notes,c);
+    }
+    if(cfg.m){
+      var pick=W.slice(0,cfg.m);
+      snap('Nối X vào đồ thị',['Giỏ có '+W.length+' ứng viên: '+W.map(function(n){return n+' ('+fmt(d(n))+')';}).join(', ')+'.','Chọn m = '+cfg.m+' điểm gần nhất: '+pick.join(', ')+' → nối X–'+pick.join(', X–')+'. Đến đây X mới thật sự nằm trong đồ thị.'],null,{done:true,link:pick});
+    } else {
+      var best=W[0],truth=cfg.points.slice().sort(function(a,b){return d(a.n)-d(b.n);})[0].n;
+      var last=steps[steps.length-1];
+      last.notes.push(best===truth?'Điểm gần '+cfg.label+' nhất tìm được: '+best+' (cách '+fmt(d(best))+'). Đúng là điểm gần nhất thật.'
+        :'Điểm gần '+cfg.label+' nhất tìm được: '+best+' (cách '+fmt(d(best))+'). SAI: điểm gần nhất thật là '+truth+' (cách '+fmt(d(truth))+'), nhưng không bao giờ được gặp.');
+      last.extra.ok=best===truth;
+    }
+    return {steps:steps,d:d};
+  }
+
+  function mount(id,cfg){
+    var root=document.getElementById(id);if(!root) return;
+    var k=cfg.k[0],tr,i=0;
+    var ctl=h('div','sim-ctl',null,root);
+    if(cfg.k.length>1){
+      var lab=h('label',null,null,ctl);lab.appendChild(document.createTextNode(cfg.kName+' = '));
+      cfg.k.forEach(function(v){var b=h('button','kbtn',String(v),lab);b.type='button';b.dataset.k=v;b.addEventListener('click',function(){k=v;build();});});
+    } else h('span','muted',cfg.kName+' = '+k+(cfg.m?', m = '+cfg.m:''),ctl);
+    var bPrev=h('button',null,'◀ Trước',ctl),bNext=h('button',null,'Tiếp ▶',ctl),bReset=h('button',null,'Từ đầu',ctl);
+    [bPrev,bNext,bReset].forEach(function(b){b.type='button';});
+    var counter=h('span','muted',null,ctl);
+    var svg=el('svg',{viewBox:'0 30 720 180',role:'img','aria-label':cfg.aria},root);
+    var bins=h('div','bins',null,root);
+    var title=h('div','st-title',null,root),list=h('ul','st-notes',null,root);
+    var lg=h('div','lg sim-lg',null,root);
+    [['#0E6E5C','trong giỏ'],['#fff;border:3px solid #eb6834','trong danh sách chờ'],['#E6EBE9','đã gặp, bị loại'],['#fff;border:1px solid #4A5753','chưa gặp']].forEach(function(x){
+      var s=h('span',null,null,lg);var ii=h('i',null,null,s);ii.setAttribute('style','background:'+x[0]);s.appendChild(document.createTextNode(x[1]));});
+
+    var xs=cfg.points.map(function(p){return p.x;}).concat([cfg.target]);
+    var lo=Math.min.apply(null,xs),hi=Math.max.apply(null,xs);
+    var X=function(v){return 50+(v-lo)/(hi-lo)*620;};
+    var Y=130;
+
+    function build(){
+      tr=trace(cfg,k);i=0;
+      [].forEach.call(root.querySelectorAll('.kbtn'),function(b){b.classList.toggle('on',+b.dataset.k===k);});
+      draw();
+    }
+    function draw(){
+      var s=tr.steps[i],d=tr.d;
+      svg.textContent='';
+      el('line',{x1:30,y1:Y,x2:690,y2:Y,stroke:'#D9E0DD','stroke-width':2},svg);
+      var done={};
+      Object.keys(cfg.edges).forEach(function(a){cfg.edges[a].forEach(function(b){
+        var key=a<b?a+b:b+a;if(done[key]) return;done[key]=1;
+        var pa=cfg.points.filter(function(p){return p.n===a;})[0],pb=cfg.points.filter(function(p){return p.n===b;})[0];
+        var x1=X(pa.x),x2=X(pb.x),hgt=Math.min(46,10+Math.abs(x2-x1)*0.13);
+        el('path',{d:'M'+x1+','+(Y-11)+' Q'+((x1+x2)/2)+','+(Y-11-hgt*2)+' '+x2+','+(Y-11),fill:'none',stroke:'#B8C3BF','stroke-width':1.3},svg);
+      });});
+      if(s.extra&&s.extra.link) s.extra.link.forEach(function(n){
+        var p=cfg.points.filter(function(z){return z.n===n;})[0];
+        var x1=X(cfg.target),x2=X(p.x);
+        el('path',{d:'M'+x1+','+(Y+30)+' Q'+((x1+x2)/2)+','+(Y+62)+' '+x2+','+(Y+11),fill:'none',stroke:'#0E6E5C','stroke-width':2.5,'stroke-dasharray':'5 3'},svg);
+      });
+      cfg.points.forEach(function(p){
+        var x=X(p.x),inW=s.W.indexOf(p.n)>=0,inC=s.C.indexOf(p.n)>=0,seen=s.seen[p.n];
+        if(s.cur===p.n) el('circle',{cx:x,cy:Y,r:17,fill:'none',stroke:'#16201D','stroke-width':1.5,'stroke-dasharray':'3 2'},svg);
+        el('circle',{cx:x,cy:Y,r:11,fill:inW?'#0E6E5C':(seen?'#E6EBE9':'#FFFFFF'),stroke:inC?'#eb6834':'#4A5753','stroke-width':inC?3:1.2},svg);
+        var t=el('text',{x:x,y:Y+4,'text-anchor':'middle','font-size':12,'font-weight':600,fill:inW?'#FFFFFF':'#16201D'},svg);t.textContent=p.n;
+        var t2=el('text',{x:x,y:Y+30,'text-anchor':'middle','font-size':11,fill:'#6B7773'},svg);t2.textContent=p.x;
+      });
+      var tx=X(cfg.target);
+      var pts=[];for(var j=0;j<10;j++){var r=j%2?4.5:10,a=-Math.PI/2+j*Math.PI/5;pts.push((tx+r*Math.cos(a)).toFixed(1)+','+(Y+48+r*Math.sin(a)).toFixed(1));}
+      el('polygon',{points:pts.join(' '),fill:'#eb6834'},svg);
+      var tl=el('text',{x:tx,y:Y+74,'text-anchor':'middle','font-size':12,'font-weight':600,fill:'#B4471F'},svg);tl.textContent=cfg.label+' = '+cfg.target;
+      // giỏ và danh sách chờ
+      bins.textContent='';
+      var g=h('div','bin',null,bins);h('b',null,'Giỏ kết quả ('+k+' chỗ)',g);var gr=h('div','chips',null,g);
+      for(var q=0;q<k;q++){var n=s.W[q];h('span',n?'chip w':'chip empty',n?n+' · '+d(n):'trống',gr);}
+      var c=h('div','bin',null,bins);h('b',null,'Danh sách chờ xem',c);var cr=h('div','chips',null,c);
+      var Cs=s.C.slice().sort(function(a,b){return d(a)-d(b);});
+      if(!Cs.length) h('span','chip empty','trống',cr);
+      Cs.forEach(function(n){h('span','chip c',n+' · '+d(n),cr);});
+      title.textContent=s.title;
+      if(s.extra&&s.extra.ok===false) title.className='st-title miss';
+      else if(s.extra&&(s.extra.ok||s.extra.link)) title.className='st-title ok';
+      else title.className='st-title';
+      list.textContent='';s.notes.forEach(function(n){h('li',null,n,list);});
+      counter.textContent='Bước '+(i+1)+' / '+tr.steps.length;
+      bPrev.disabled=i===0;bNext.disabled=i===tr.steps.length-1;
+    }
+    bPrev.addEventListener('click',function(){if(i>0){i--;draw();}});
+    bNext.addEventListener('click',function(){if(i<tr.steps.length-1){i++;draw();}});
+    bReset.addEventListener('click',function(){i=0;draw();});
+    build();
+  }
+
+  mount('stA',{
+    points:[{n:'A',x:0},{n:'B',x:3},{n:'C',x:5},{n:'D',x:8},{n:'E',x:10},{n:'F',x:13},{n:'G',x:15},{n:'H',x:18}],
+    edges:{A:['B','C'],B:['A','C','D'],C:['A','B','E'],D:['B','E','F'],E:['C','D','G'],F:['D','G','H'],G:['E','F','H'],H:['F','G']},
+    start:'A',target:11,label:'X',k:[3],kName:'ef_construction',m:2,
+    aria:'Trục số với 8 điểm A đến H, điểm mới X bằng 11, tìm 3 ứng viên gần nhất'
+  });
+  mount('stB',{
+    points:[{n:'A',x:0},{n:'D',x:3},{n:'C',x:5},{n:'B',x:10},{n:'E',x:15},{n:'F',x:20}],
+    edges:{A:['B','C'],B:['A','D'],C:['A','E'],D:['B'],E:['C','F'],F:['E']},
+    start:'A',target:16,label:'q',k:[1,2],kName:'ef_search',
+    aria:'Trục số với 6 điểm, q bằng 16; muốn tới E phải đi qua C'
+  });
+})();
+</script>
+</body>
+</html>

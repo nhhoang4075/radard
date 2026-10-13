@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · apps/daemon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · GIẢI THÍCH CODE · MVP-0 TUẦN 1 · 28/09/2026</div>
+<h1>apps/daemon: chương trình chạy thật</h1>
+<p class="lede">Nếu <a href="packages.html">các package</a> là linh kiện, thì <code>apps/daemon</code> là nơi lắp chúng thành một tiến trình chạy liên tục: đến giờ thì cào nguồn, lưu lại, ghi nhật ký. Cùng một mã nguồn chạy được ba vai trò, kèm một CLI để thao tác tay.</p>
+
+<nav class="toc">
+  <a href="#cay">1. Các file</a><a href="#khoi-dong">2. Khởi động</a><a href="#vai-tro">3. Vai trò</a><a href="#boss">4. boss.ts</a>
+  <a href="#scheduler">5. Scheduler</a><a href="#worker">6. Worker</a><a href="#fetch">7. Job fetch</a><a href="#sources">8. Nguồn và adapter HN</a>
+  <a href="#runtime">9. runtime + env</a><a href="#cli">10. CLI</a><a href="#test">11. Test</a><a href="#gioi-han">12. Giới hạn đã biết</a>
+</nav>
+
+<div class="tldr"><b>Tóm tắt</b>
+<ul>
+  <li><b>main.ts</b> migrate database, khởi động pg-boss, rồi bật scheduler và/hoặc worker theo <code>SERVICE_ROLE</code>.</li>
+  <li><b>Scheduler</b> chép lịch từ bảng <code>sources</code> sang pg-boss mỗi 5 phút; <b>worker</b> nhận job <code>fetch</code> và gọi <code>runFetch()</code>.</li>
+  <li><b>runFetch()</b> là trái tim: gọi adapter nguồn, lưu bản thô, ghi <code>documents</code>, cập nhật con trỏ và <code>fetch_runs</code>; idempotent, lỗi thì con trỏ đứng yên.</li>
+  <li><b>sources/</b> chứa adapter theo từng kiểu nguồn; hiện có Hacker News.</li>
+  <li><b>cli.ts</b> để migrate, thêm nguồn, chạy tay, xem kết quả; dùng chung phụ thuộc với daemon qua <b>runtime.ts</b>.</li>
+</ul></div>
+
+<!-- 1 -->
+<h2 id="cay">1. Các file</h2>
+<pre><code>apps/daemon/
+├── src/
+│   ├── main.ts            <span class="c"># điểm vào daemon (bun run dev)</span>
+│   ├── cli.ts             <span class="c"># điểm vào CLI (bun run cli …)</span>
+│   ├── env.ts             <span class="c"># đọc biến môi trường</span>
+│   ├── runtime.ts         <span class="c"># dựng phụ thuộc: db, kho bản thô, http</span>
+│   ├── boss.ts            <span class="c"># tạo pg-boss, khai báo queue</span>
+│   ├── roles/
+│   │   ├── scheduler.ts   <span class="c"># đồng bộ lịch sources → pg-boss</span>
+│   │   └── worker.ts      <span class="c"># nhận job fetch</span>
+│   ├── jobs/
+│   │   └── fetch.ts       <span class="c"># runFetch(): một lượt cào</span>
+│   └── sources/
+│       ├── index.ts       <span class="c"># danh bạ adapter + nguồn mặc định</span>
+│       └── hn.ts          <span class="c"># adapter Hacker News</span>
+└── test/
+    ├── hn.test.ts, fetch.test.ts
+    └── fixtures/hn-search.json   <span class="c"># phản hồi thật của API HN, dùng cho test</span></code></pre>
+
+<!-- 2 -->
+<h2 id="khoi-dong">2. Khởi động: main.ts</h2>
+<figure>
+<svg viewBox="0 0 900 200" role="img" aria-label="Trình tự khởi động daemon">
+  <defs><marker id="k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bd" x="10" y="40" width="150" height="70" rx="8"/><text class="tb" x="85" y="66" text-anchor="middle">① migrate</text><text class="ts" x="85" y="84" text-anchor="middle">khoá tư vấn,</text><text class="ts" x="85" y="99" text-anchor="middle">schema mới nhất</text>
+  <rect class="bx" x="190" y="40" width="150" height="70" rx="8"/><text class="tb" x="265" y="66" text-anchor="middle">② createDeps</text><text class="ts" x="265" y="84" text-anchor="middle">db · kho bản thô</text><text class="ts" x="265" y="99" text-anchor="middle">· http client</text>
+  <rect class="bp" x="370" y="40" width="150" height="70" rx="8"/><text class="tb" x="445" y="66" text-anchor="middle">③ pg-boss</text><text class="ts" x="445" y="84" text-anchor="middle">start + tạo queue</text><text class="ts" x="445" y="99" text-anchor="middle">fetch, fetch_dead</text>
+  <rect class="bc" x="550" y="40" width="160" height="70" rx="8"/><text class="tb" x="630" y="66" text-anchor="middle">④ bật vai trò</text><text class="ts" x="630" y="84" text-anchor="middle">scheduler và/hoặc</text><text class="ts" x="630" y="99" text-anchor="middle">worker</text>
+  <rect class="bx" x="740" y="40" width="150" height="70" rx="8"/><text class="tb" x="815" y="66" text-anchor="middle">⑤ chờ tín hiệu</text><text class="ts" x="815" y="84" text-anchor="middle">SIGTERM / SIGINT</text><text class="ts" x="815" y="99" text-anchor="middle">→ tắt êm</text>
+  <path class="ln" d="M160,75 L188,75" marker-end="url(#k)"/><path class="ln" d="M340,75 L368,75" marker-end="url(#k)"/><path class="ln" d="M520,75 L548,75" marker-end="url(#k)"/><path class="ln" d="M710,75 L738,75" marker-end="url(#k)"/>
+  <text class="ts" x="10" y="150">Lỗi ở bất kỳ bước nào trong ①–④: log "khởi động thất bại" kèm stack, thoát mã 1, để Railway khởi động lại.</text>
+  <text class="ts" x="10" y="170">Tắt êm: dừng timer scheduler → boss.stop({graceful, timeout 25s}) chờ job đang chạy → đóng db → thoát mã 0.</text>
+</svg>
+<figcaption><b>Hình 1.</b> Migrate chạy <b>trước</b> mọi thứ, nên daemon không bao giờ chạy trên schema cũ. Nhiều bản khởi động cùng lúc cũng an toàn nhờ khoá tư vấn trong <code>runMigrations</code>.</figcaption>
+</figure>
+<div class="grid2">
+  <div class="card"><b class="h">Vì sao timeout 25 giây?</b><p>Railway gửi SIGTERM rồi chờ khoảng 30 giây mới giết hẳn. Chờ job 25 giây để còn thời gian đóng kết nối. Job chưa xong thì pg-boss trả nó về hàng đợi (hết hạn → retry), và vì job idempotent nên chạy lại không sao.</p></div>
+  <div class="card"><b class="h">Đã kiểm chứng</b><p>01:00:40 UTC ngày 28/09: gửi SIGTERM, log ghi "dừng", tiến trình thoát mã 0, 4 job trong pg-boss ở <code>completed</code>.</p></div>
+</div>
+
+<!-- 3 -->
+<h2 id="vai-tro">3. Vai trò: một image, ba cách chạy</h2>
+<div class="tbl"><table>
+  <thead><tr><th><code>SERVICE_ROLE</code></th><th>Làm gì</th><th>pg-boss <code>schedule</code></th><th>Chạy mấy bản</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">scheduler</td><td>Đồng bộ lịch; chạy timekeeper của pg-boss (biến lịch thành job)</td><td>bật</td><td>Một bản là đủ; nhiều bản vẫn an toàn nhờ pg-boss giành quyền</td></tr>
+    <tr><td class="mono">worker</td><td>Nhận và chạy job <code>fetch</code></td><td>tắt</td><td>Bao nhiêu cũng được; <code>SKIP LOCKED</code> chia việc</td></tr>
+    <tr><td class="mono">all</td><td>Cả hai trong một tiến trình (mặc định)</td><td>bật</td><td>Khi dev trên máy</td></tr>
+  </tbody>
+</table></div>
+<p>Tách vai trò để khi deploy có thể tăng số worker mà không tăng số bản chạy lịch. Trên máy, <code>all</code> cho gọn.</p>
+
+<!-- 4 -->
+<h2 id="boss">4. boss.ts: khai báo hàng đợi một chỗ</h2>
+<pre><code>export const QUEUE = { fetch: "fetch", fetchDead: "fetch_dead" } as const;
+export interface FetchJob { sourceId: number }       <span class="c">// dữ liệu job chỉ là id nguồn</span>
+
+new PgBoss({ connectionString, schedule: opts.schedule, max: 4 });   <span class="c">// pool riêng của pg-boss: 4 kết nối</span>
+
+await boss.createQueue("fetch", {
+  policy: "stately",   retryLimit: 3,   retryDelay: 30,   retryBackoff: true,
+  expireInSeconds: 600,   deadLetter: "fetch_dead",
+});</code></pre>
+<ul>
+  <li><b>Job chỉ mang <code>sourceId</code></b>, không mang cấu hình nguồn. Worker đọc cấu hình mới nhất từ bảng <code>sources</code> lúc chạy, nên sửa cấu hình không cần đợi job cũ hết.</li>
+  <li><code>createQueue</code> chạy mỗi lần khởi động; queue đã có thì không đổi gì. Cấu hình queue giải thích kỹ ở <a href="pg-boss.html">pg-boss.html</a> mục 4–5.</li>
+</ul>
+
+<!-- 5 -->
+<h2 id="scheduler">5. roles/scheduler.ts: chép lịch từ bảng sang pg-boss</h2>
+<pre><code>for (const s of await db.select().from(sources)) {
+  if (!s.enabled) continue;
+  wanted.add(String(s.id));
+  await boss.schedule("fetch", s.cadence, { sourceId: s.id },
+    { key: String(s.id), singletonKey: String(s.id), tz: "UTC" });
+}
+for (const sched of await boss.getSchedules("fetch"))
+  if (sched.key &amp;&amp; !wanted.has(sched.key)) await boss.unschedule("fetch", sched.key);</code></pre>
+<p>Chạy một lần khi khởi động, rồi <b>mỗi 5 phút</b>. Nhờ vậy nguồn là <b>dữ liệu</b>: đổi <code>cadence</code>, tắt bằng <code>enabled = false</code>, hay xoá một nguồn thì trong 5 phút lịch tự khớp theo, không phải khởi động lại. <code>schedule()</code> là upsert nên chạy lại nhiều lần không sinh lịch trùng. Lỗi khi đồng bộ chỉ ghi log, không làm sập tiến trình.</p>
+
+<!-- 6 -->
+<h2 id="worker">6. roles/worker.ts</h2>
+<pre><code>await boss.work&lt;FetchJob&gt;("fetch", { localConcurrency: opts.concurrency }, async (jobs) =&gt; {
+  for (const job of jobs) {
+    const outcome = await runFetch(job.data.sourceId, deps);
+    log.info("fetch xong", { sourceId: job.data.sourceId, ...outcome });
+  }
+});</code></pre>
+<p>Handler nhận một <b>mảng</b> job (pg-boss 12; mặc định mỗi lần 1 job). <code>runFetch</code> ném lỗi thì handler ném theo, pg-boss đánh dấu job lỗi và retry. <code>localConcurrency</code> (mặc định 4, biến <code>FETCH_CONCURRENCY</code>) là số vòng nhận job song song trong tiến trình, để một nguồn chậm không chặn nguồn khác.</p>
+
+<!-- 7 -->
+<h2 id="fetch">7. jobs/fetch.ts: một lượt cào</h2>
+<figure>
+<svg viewBox="0 0 900 330" role="img" aria-label="Luồng runFetch với nhánh thành công và nhánh lỗi">
+  <defs>
+    <marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker>
+  </defs>
+  <rect class="bd" x="10" y="20" width="170" height="64" rx="8"/><text class="tb" x="95" y="44" text-anchor="middle">đọc nguồn</text><text class="tm" x="95" y="62" text-anchor="middle">sources, source_state</text><text class="ts" x="95" y="77" text-anchor="middle">+ fetch_runs = running</text>
+  <rect class="bx" x="210" y="20" width="170" height="64" rx="8"/><text class="tb" x="295" y="44" text-anchor="middle">gọi adapter</text><text class="tm" x="295" y="62" text-anchor="middle">adapterFor(kind)</text><text class="ts" x="295" y="77" text-anchor="middle">.fetch(config, state)</text>
+  <rect class="bx" x="410" y="20" width="170" height="64" rx="8"/><text class="tb" x="495" y="44" text-anchor="middle">lọc mục đã có</text><text class="ts" x="495" y="62" text-anchor="middle">1 câu SELECT theo</text><text class="ts" x="495" y="77" text-anchor="middle">external_id</text>
+  <rect class="bx" x="610" y="20" width="280" height="64" rx="8"/><text class="tb" x="750" y="44" text-anchor="middle">mỗi mục mới</text><text class="ts" x="750" y="62" text-anchor="middle">NFC → sha256 → store.put(rawKey)</text><text class="ts" x="750" y="77" text-anchor="middle">→ INSERT documents ON CONFLICT DO NOTHING</text>
+  <path class="ln" d="M180,52 L208,52" marker-end="url(#f)"/><path class="ln" d="M380,52 L408,52" marker-end="url(#f)"/><path class="ln" d="M580,52 L608,52" marker-end="url(#f)"/>
+  <rect class="bc" x="470" y="140" width="420" height="72" rx="8"/><text class="tb" x="680" y="164" text-anchor="middle">thành công</text><text class="ts" x="680" y="184" text-anchor="middle">source_state: state mới, last_ok_at, fail_count = 0</text><text class="ts" x="680" y="200" text-anchor="middle">fetch_runs: ok | not_modified, n_fetched, n_new</text>
+  <path class="ln" d="M750,84 L720,138" marker-end="url(#f)"/>
+  <rect class="bp" x="10" y="140" width="420" height="72" rx="8"/><text class="tb" x="220" y="164" text-anchor="middle">lỗi ở bất kỳ bước nào sau khi tạo fetch_run</text><text class="ts" x="220" y="184" text-anchor="middle">fetch_runs: error + thông điệp · fail_count + 1 · last_error_at</text><text class="ts" x="220" y="200" text-anchor="middle">state GIỮ NGUYÊN → ném lỗi lại cho pg-boss retry</text>
+  <path class="ln" d="M295,84 L260,138" marker-end="url(#f)"/><text class="lb" x="282" y="118">ném lỗi</text>
+  <text class="ts" x="10" y="250">Idempotent vì: (1) khoá UNIQUE (source_id, external_id) chặn ghi trùng; (2) con trỏ chỉ tiến khi cả lượt xong;</text>
+  <text class="ts" x="10" y="268">(3) bản thô đặt tên theo hash nội dung, ghi lại là vô hại. Lỗi giữa chừng khi đã ghi một phần: lượt sau đọc lại từ con trỏ cũ,</text>
+  <text class="ts" x="10" y="286">mục đã ghi bị khoá chặn, mục chưa ghi được ghi tiếp. Không mất, không trùng.</text>
+</svg>
+<figcaption><b>Hình 2.</b> Hai nhánh của <code>runFetch()</code>. Điều quan trọng nhất: <b>con trỏ nguồn chỉ tiến ở nhánh thành công</b>.</figcaption>
+</figure>
+<div class="grid2">
+  <div class="card"><b class="h">Vì sao lọc trước bằng SELECT?</b><p>Lượt HN nào cũng trả về vài mục đã thấy (do khoảng lùi 60 giây). Hỏi trước một lần rồi bỏ qua chúng thì khỏi nén và ghi lại bản thô vô ích. Khoá UNIQUE vẫn là lớp bảo vệ cuối cùng nếu hai lượt chạy chồng.</p></div>
+  <div class="card"><b class="h">Phụ thuộc truyền vào (<code>FetchDeps</code>)</b><p><code>db</code>, <code>store</code>, <code>http</code>, <code>now</code>, <code>resolveAdapter</code> đều được truyền vào chứ không import cứng. Test thay bằng database test, thư mục tạm, adapter giả, và không gọi mạng.</p></div>
+</div>
+<p>Kết quả trả về (<code>FetchOutcome</code>): <code>runId</code>, <code>status</code>, <code>nFetched</code> (số mục adapter trả), <code>nNew</code> (số mục thật sự mới). Log của worker in đúng các trường này, ví dụ <code>fetch xong sourceId=1 runId=2 status=ok nFetched=3 nNew=2</code>.</p>
+
+<!-- 8 -->
+<h2 id="sources">8. sources/: danh bạ nguồn và adapter Hacker News</h2>
+<h3>8.1 index.ts</h3>
+<pre><code>const registry = new Map([[hnSource.kind, hnSource]]);   <span class="c">// "hn" → adapter</span>
+export function adapterFor(kind: string) { … }            <span class="c">// ném lỗi nếu chưa có adapter cho kind</span>
+
+export const DEFAULT_SOURCES = [
+  { kind: "hn", name: "Hacker News", cadence: "*/15 * * * *",
+    config: { backfillHours: 24 }, defaultRole: "community", trustScore: 0.5 },
+];</code></pre>
+<p>Thêm nguồn kiểu mới = viết một file adapter + thêm một dòng vào <code>registry</code>. <code>DEFAULT_SOURCES</code> được lệnh <code>sources seed</code> chèn vào bảng; nguồn đã có thì bỏ qua, không ghi đè cấu hình bạn đã sửa.</p>
+
+<h3>8.2 hn.ts</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Chi tiết</th><th>Cách làm</th><th>Vì sao</th></tr></thead>
+  <tbody>
+    <tr><td>API</td><td>Algolia <code>search_by_date?tags=story&amp;numericFilters=created_at_i&gt;…</code></td><td>API công khai, trả JSON, lọc theo thời gian được</td></tr>
+    <tr><td>Lấy gì</td><td><b>Mọi</b> story mới, không lọc từ khoá</td><td>Lọc là việc của lớp 2 (embedding); lọc bằng từ khoá sẽ sót bài về AI mà tiêu đề không chứa từ khoá. ~30 story/giờ nên lưu hết vẫn rẻ</td></tr>
+    <tr><td>Con trỏ</td><td><code>state = { lastCreatedAt }</code>, lần sau hỏi từ <code>lastCreatedAt − 60 giây</code></td><td>Story đăng đúng giây cuối không bị rơi; trùng thì khoá UNIQUE bỏ</td></tr>
+    <tr><td>Lần đầu</td><td>Lấy lùi <code>backfillHours</code> (24)</td><td>Có dữ liệu ngay; lượt đầu được 717 story</td></tr>
+    <tr><td>Phân trang</td><td>100 mục/trang, tối đa 10 trang</td><td>Algolia chỉ cho tới 1000 kết quả; lịch 15 phút không bao giờ chạm</td></tr>
+    <tr><td>URL</td><td><code>hit.url</code>, không có thì trang thảo luận</td><td>Ask HN không có link ngoài</td></tr>
+    <tr><td><code>meta</code></td><td>tác giả, điểm, số bình luận, link thảo luận</td><td>Tra nhanh mà không mở bản thô; điểm là ảnh chụp lúc cào</td></tr>
+    <tr><td><code>body</code></td><td><code>JSON.stringify(hit)</code></td><td>Giữ nguyên dữ liệu gốc làm bản thô</td></tr>
+  </tbody>
+</table></div>
+
+<!-- 9 -->
+<h2 id="runtime">9. runtime.ts và env.ts</h2>
+<pre><code>export function createDeps(): FetchDeps {
+  return { db: createDatabase(env.databaseUrl), store: fsObjectStore(env.dataDir), http: createHttpClient() };
+}</code></pre>
+<p>Daemon và CLI cùng gọi <code>createDeps()</code>, nên <code>bun run cli run "Hacker News"</code> chạy <b>đúng</b> đường code mà worker chạy. Tuần 3 chỉ cần sửa chỗ này để chọn R2 thay đĩa theo biến <code>OBJECT_STORE</code>.</p>
+<div class="tbl"><table>
+  <thead><tr><th>Biến</th><th>Mặc định</th><th>Dùng cho</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">DATABASE_URL</td><td class="mono">postgres://localhost:5432/radard</td><td>Kết nối Postgres (cả radard lẫn pg-boss)</td></tr>
+    <tr><td class="mono">DATA_DIR</td><td class="mono">./data</td><td>Thư mục bản thô khi ghi ra đĩa</td></tr>
+    <tr><td class="mono">SERVICE_ROLE</td><td class="mono">all</td><td>scheduler · worker · all</td></tr>
+    <tr><td class="mono">FETCH_CONCURRENCY</td><td class="mono">4</td><td><code>localConcurrency</code> của worker</td></tr>
+  </tbody>
+</table></div>
+
+<!-- 10 -->
+<h2 id="cli">10. cli.ts</h2>
+<p>Chạy bằng <code>bun run cli &lt;lệnh&gt;</code> trong thư mục repo. Không lệnh nào gọi model hay tốn tiền; <code>run</code> chỉ gọi API của nguồn.</p>
+<div class="tbl"><table>
+  <thead><tr><th>Lệnh</th><th>Làm gì</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">db migrate</td><td>Dựng hoặc cập nhật schema</td></tr>
+    <tr><td class="mono">sources seed</td><td>Thêm nguồn mặc định còn thiếu</td></tr>
+    <tr><td class="mono">sources</td><td>Bảng nguồn: lịch, bật/tắt, lần ok gần nhất, số lỗi liên tiếp, số tài liệu</td></tr>
+    <tr><td class="mono">run &lt;id|tên&gt;</td><td>Chạy <code>runFetch</code> ngay cho một nguồn, không qua hàng đợi</td></tr>
+    <tr><td class="mono">runs [--limit=20]</td><td>Các lượt cào gần nhất: trạng thái, số lấy/mới, lỗi</td></tr>
+    <tr><td class="mono">docs [--since=24h] [--limit=20]</td><td>Tài liệu mới nhất trong khoảng thời gian (<code>24h</code>, <code>7d</code>)</td></tr>
+  </tbody>
+</table></div>
+
+<!-- 11 -->
+<h2 id="test">11. Test</h2>
+<div class="tbl"><table>
+  <thead><tr><th>File</th><th>Kiểm gì</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">test/hn.test.ts</td><td>Đọc phản hồi thật đã lưu làm fixture; Ask HN dùng trang thảo luận; lần đầu lấy lùi và đi hết trang (HTTP giả); lần sau lùi 60 giây; không có gì mới thì con trỏ không tụt</td></tr>
+    <tr><td class="mono">test/fetch.test.ts</td><td>Trên database <code>radard_test</code> thật, adapter giả: chạy hai lần không trùng; bản thô đọc lại đúng; lỗi thì con trỏ giữ nguyên, <code>fail_count</code> tăng, <code>fetch_runs</code> ghi lỗi; thành công sau lỗi đặt lại <code>fail_count</code></td></tr>
+  </tbody>
+</table></div>
+
+<!-- 12 -->
+<h2 id="gioi-han">12. Giới hạn đã biết</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Điểm</th><th>Ảnh hưởng</th><th>Xử lý</th></tr></thead>
+  <tbody>
+    <tr><td><code>cli run</code> không qua hàng đợi</td><td>Có thể chạy chồng với job theo lịch của cùng nguồn. Không sinh bản trùng (khoá UNIQUE), nhưng lượt ghi state sau có thể là lượt có con trỏ nhỏ hơn, làm con trỏ lùi một chút; lượt sau đọc lại phần chồng và bỏ trùng</td><td>Chấp nhận khi dev. Sau này thêm lệnh <code>enqueue</code> gửi job qua pg-boss để được chính sách <code>stately</code> bảo vệ</td></tr>
+    <tr><td>Chỉ có một nguồn</td><td>3 trong 4 vòng worker chỉ polling rỗng</td><td>Tuần 2 thêm arXiv, GitHub; cân nhắc <code>pollingIntervalSeconds: 10</code></td></tr>
+    <tr><td>Kho bản thô là đĩa</td><td>MacBook ngủ là daemon dừng</td><td>Tuần 3: R2 + deploy Railway</td></tr>
+    <tr><td>Chưa có lớp 2</td><td>Mới lưu, chưa lọc, chưa gộp</td><td>Tuần 2: chuẩn hoá, embedding, lọc, gộp sự kiện</td></tr>
+  </tbody>
+</table></div>
+
+<footer>Viết theo code thật trong <code>~/Personal/radard/apps/daemon</code> ngày 28/09/2026 (MVP-0 tuần 1, 10 file nguồn, 556 dòng). Code đã rút gọn để dễ đọc. Tài liệu liên quan: <a href="packages.html">packages.html</a>, <a href="pg-boss.html">pg-boss.html</a>, <a href="checklist.html">checklist.html</a>.</footer>
+</div>
+</body>
+</html>

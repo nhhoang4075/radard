@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Thư viện chủ đề</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+
+.dec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:760px){.dec{grid-template-columns:1fr}}
+.tg{max-width:520px;margin:16px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#DCE8DF}
+.tg-head{display:flex;gap:10px;align-items:center;background:#fff;padding:10px 14px;border-bottom:1px solid var(--line)}
+.tg-head small{display:block;color:var(--ink-3);font-size:12px}
+.tg-av{width:34px;height:34px;border-radius:50%;background:#2BB3A0;color:#fff;display:grid;place-items:center;font-weight:700}
+.tg-body{padding:14px;display:grid;gap:10px}
+.tg-msg{background:#fff;border-radius:12px 12px 12px 4px;padding:9px 12px;font-size:14.5px;line-height:1.5;max-width:92%;box-shadow:0 1px 1px rgba(0,0,0,.06)}
+.tg-msg b{display:block;margin-bottom:2px}
+.tg-msg a{font-size:13px;word-break:break-all}
+.tg-msg .tg-time{display:block;text-align:right;font-size:11px;color:var(--ink-3);margin-top:2px}
+.tg-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:-6px;max-width:92%}
+.tg-btns span{background:rgba(255,255,255,.7);border-radius:8px;text-align:center;padding:6px;font-size:14px;color:#2A7A6E;font-weight:600}
+</style>
+<style>
+.tp{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:16px}
+.tp-h b{font-family:var(--display);font-size:19px}
+.tp .en{font-family:var(--mono);font-size:13px;color:var(--ink-2);margin-top:6px;max-width:none}
+.tp .nt{background:var(--warn-soft);border-radius:8px;padding:6px 10px;font-size:14px;margin-top:8px;max-width:none}
+.sub{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin-top:4px}
+ol.top{margin:6px 0 0;padding-left:0;list-style:none;display:grid;gap:4px;font-size:14px}
+ol.top .c{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+ol.top .src{font-size:11.5px;font-weight:600;background:var(--ground);border-radius:4px;padding:0 5px;color:var(--ink-2)}
+.tp .tbl{margin-top:6px}
+.bar{grid-template-columns:200px 1fr 110px}
+</style></head>
+<body>
+<div class="wrap">
+<div class="eyebrow">RADARD · THƯ VIỆN CHỦ ĐỀ · BẢN NHÁP ĐỂ DUYỆT · 12/10/2026</div>
+<h1>Thư viện chủ đề</h1>
+<p class="lede">16 chủ đề radard soạn sẵn để bạn bấm chọn, không phải viết gì. Mỗi chủ đề có một câu mô tả tiếng Anh (ẩn với người dùng) để embed. Tài liệu này cho thấy mỗi câu mô tả bắt được bài nào trên 21.191 tài liệu thật, để bạn duyệt trước khi chọn chủ đề cho hồ sơ.</p>
+<nav class="tabs" aria-label="Các phần"><div class="tablist" role="tablist">
+<button class="tab" role="tab" aria-controls="tong-quan"><span class="n">01</span>Tổng quan</button><button class="tab" role="tab" aria-controls="ung-dung"><span class="n">02</span>AI ứng dụng</button><button class="tab" role="tab" aria-controls="model"><span class="n">03</span>Model</button><button class="tab" role="tab" aria-controls="nghien-cuu"><span class="n">04</span>Nghiên cứu</button><button class="tab" role="tab" aria-controls="ha-tang"><span class="n">05</span>Hạ tầng</button><button class="tab" role="tab" aria-controls="nganh"><span class="n">06</span>Ngành AI</button></div></nav>
+<div class="panel" role="tabpanel" id="tong-quan">
+<h2>Đọc tài liệu này thế nào</h2>
+<div class="grid3">
+<div class="card"><b class="h">Cosine</b><p>Mức giống nhau giữa vector của câu mô tả và vector của một tài liệu, từ −1 tới 1. Càng cao càng khớp. Mỗi tab có 8 bài cosine cao nhất của từng chủ đề.</p></div>
+<div class="card"><b class="h">Trung vị, mốc 1%, mốc 0,1%</b><p>Trung vị: một nửa tài liệu của nguồn có cosine dưới số này. Mốc 0,1%: chỉ 1 trên 1.000 tài liệu vượt số này. Đây là "mặt bằng" dùng để chuẩn hoá (xep-hang.html, tab 03).</p></div>
+<div class="card"><b class="h">Bạn cần làm gì</b><p>Xem 8 bài của mỗi chủ đề: có đúng thứ bạn muốn đọc khi chọn chủ đề đó không. Chủ đề nào lạc thì báo, tôi sửa câu mô tả. Rồi chọn chủ đề cho hồ sơ.</p></div>
+</div>
+<h2>Mỗi chủ đề một mặt bằng khác nhau</h2>
+<p>Thanh đi từ trung vị tới mốc 0,1% của tiêu đề Hacker News với từng chủ đề (trục từ 0,2 tới 0,9). Cùng một cosine 0,6 là rất cao với "Chính sách & pháp lý AI" nhưng chỉ ngang mức thường với "Công cụ lập trình AI". Vì vậy một ngưỡng chung là sai, và radard chuẩn hoá theo từng (nguồn × chủ đề).</p>
+<div class="bars"><div class='bar'><span>Chính sách &amp; pháp lý AI</span><div class='bt'><i style='margin-left:10.6%;width:44.4%' class='a'></i></div><span class='bv'>0,274 → 0,585</span></div><div class='bar'><span>Agent AI</span><div class='bt'><i style='margin-left:21.7%;width:50.1%' class='a'></i></div><span class='bv'>0,352 → 0,703</span></div><div class='bar'><span>GPU &amp; inference</span><div class='bt'><i style='margin-left:21.7%;width:42.9%' class='a'></i></div><span class='bv'>0,352 → 0,652</span></div><div class='bar'><span>Huấn luyện &amp; fine-tune</span><div class='bt'><i style='margin-left:22.0%;width:48.7%' class='a'></i></div><span class='bv'>0,354 → 0,695</span></div><div class='bar'><span>Nghiên cứu ML</span><div class='bt'><i style='margin-left:26.9%;width:41.7%' class='a'></i></div><span class='bv'>0,388 → 0,680</span></div><div class='bar'><span>MLOps &amp; vận hành LLM</span><div class='bt'><i style='margin-left:32.3%;width:40.6%' class='a'></i></div><span class='bv'>0,426 → 0,710</span></div><div class='bar'><span>An toàn &amp; nguyên lý AI</span><div class='bt'><i style='margin-left:34.1%;width:44.9%' class='a'></i></div><span class='bv'>0,439 → 0,753</span></div><div class='bar'><span>RAG &amp; tìm kiếm</span><div class='bt'><i style='margin-left:34.9%;width:42.6%' class='a'></i></div><span class='bv'>0,444 → 0,742</span></div><div class='bar'><span>Xây ứng dụng LLM</span><div class='bt'><i style='margin-left:35.0%;width:40.7%' class='a'></i></div><span class='bv'>0,445 → 0,730</span></div><div class='bar'><span>Model mã nguồn mở</span><div class='bt'><i style='margin-left:35.7%;width:46.3%' class='a'></i></div><span class='bv'>0,450 → 0,774</span></div><div class='bar'><span>Đánh giá &amp; benchmark</span><div class='bt'><i style='margin-left:37.7%;width:45.7%' class='a'></i></div><span class='bv'>0,464 → 0,784</span></div><div class='bar'><span>Model ảnh, video, giọng nói</span><div class='bt'><i style='margin-left:44.9%;width:43.9%' class='a'></i></div><span class='bv'>0,514 → 0,821</span></div><div class='bar'><span>Model mới ra</span><div class='bt'><i style='margin-left:45.3%;width:44.1%' class='a'></i></div><span class='bv'>0,517 → 0,826</span></div><div class='bar'><span>Công ty &amp; đầu tư AI</span><div class='bt'><i style='margin-left:46.0%;width:36.9%' class='a'></i></div><span class='bv'>0,522 → 0,780</span></div><div class='bar'><span>Công cụ lập trình AI</span><div class='bt'><i style='margin-left:48.1%;width:44.0%' class='a'></i></div><span class='bv'>0,537 → 0,845</span></div><div class='bar'><span>Phần mềm có AI</span><div class='bt'><i style='margin-left:48.7%;width:39.1%' class='a'></i></div><span class='bv'>0,541 → 0,815</span></div></div>
+<h2>Chủ đề gần nhau nhất</h2>
+<p>Cosine giữa câu mô tả của hai chủ đề. Chọn cả hai không hại gì (R lấy chủ đề khớp nhất), chỉ là chúng bắt nhiều bài chung.</p>
+<div class="tbl"><table><thead><tr><th>Chủ đề</th><th>Chủ đề</th><th>Cosine</th></tr></thead><tbody><tr><td>Phần mềm có AI</td><td>Công ty &amp; đầu tư AI</td><td class='num'>0,840</td></tr><tr><td>Model mới ra</td><td>Model mã nguồn mở</td><td class='num'>0,812</td></tr><tr><td>Phần mềm có AI</td><td>Model mới ra</td><td class='num'>0,810</td></tr><tr><td>Model mới ra</td><td>Công ty &amp; đầu tư AI</td><td class='num'>0,797</td></tr><tr><td>Model mới ra</td><td>Đánh giá &amp; benchmark</td><td class='num'>0,774</td></tr><tr><td>Công cụ lập trình AI</td><td>Phần mềm có AI</td><td class='num'>0,770</td></tr><tr><td>An toàn &amp; nguyên lý AI</td><td>Đánh giá &amp; benchmark</td><td class='num'>0,734</td></tr><tr><td>Đánh giá &amp; benchmark</td><td>MLOps &amp; vận hành LLM</td><td class='num'>0,733</td></tr></tbody></table></div>
+<h2>Đã sửa gì trong lúc thử</h2>
+<ul>
+<li>Lần 1: 4 chủ đề yếu (llm_apps, open_models, multimodal, training) vì câu mô tả có nhiều chữ chung chung ("AI models", "LLM") nên kéo về mọi tiêu đề có chữ đó. Viết lại bằng tên sản phẩm, kỹ thuật cụ thể.</li>
+<li>Đính chính: "decision models" trong dữ liệu là một loại model AI (Jev, d1, GLiNER2.5-Decide), không phải bài lạc đề như tôi viết hôm trước. Bạn phát hiện.</li>
+</ul>
+<h2>Chọn chủ đề</h2>
+<pre>bun run cli topics                              # xem thư viện, ✓ là đã chọn
+bun run cli topics pick agents,rag_search,evals  # chọn theo key
+bun run cli topics add "Tên" "mô tả bằng lời của bạn"   # tự thêm, LLM viết câu tiếng Anh
+bun run cli topics off &lt;id&gt;                      # tắt, không xoá</pre>
+<p>Từ bước 5, chọn được ngay trên Telegram bằng <code>/topics</code>.</p>
+</div>
+<div class="panel" role="tabpanel" id="ung-dung"><h2>AI ứng dụng</h2><div class="tp"><div class="tp-h"><b>Agent AI</b> <code>agents</code></div>
+<p class="en">AI agents: LLM agents that use tools and take actions, planning, memory, multi-agent systems, coding agents, computer-use agents, Model Context Protocol (MCP), agent frameworks and agent evaluation</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,764</span> <span class='src'>HN</span> Covert Assistance: Helpful LLM Agents Evade Oversight in Multi-Agent Systems</li><li><span class='c'>0,763</span> <span class='src'>HN</span> Evaluating Memory Structure in LLM Agents</li><li><span class='c'>0,757</span> <span class='src'>HN</span> Early last year, I got frustrated with MCP docs. So I wrote AI Agents with MCP</li><li><span class='c'>0,755</span> <span class='src'>HN</span> Agent in a Bottle: Can LLM Agents Turn Their Capabilities into Cheap Artifacts?</li><li><span class='c'>0,743</span> <span class='src'>HN</span> A-Mem: Agentic Memory for LLM Agents</li><li><span class='c'>0,739</span> <span class='src'>arXiv</span> Agentic Cognitive Depth: Operational Criteria for Evaluating LLM Agents</li><li><span class='c'>0,733</span> <span class='src'>arXiv</span> Forms of LLM-Integrated Applications from LLM-Chats to Autonomous AI Agent System</li><li><span class='c'>0,724</span> <span class='src'>HN</span> Two Types of AI Agents</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,371</td><td class='num'>0,625</td><td class='num'>0,671</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,388</td><td class='num'>0,544</td><td class='num'>0,555</td></tr><tr><td>HN</td><td class='num'>11.397</td><td class='num'>0,352</td><td class='num'>0,633</td><td class='num'>0,703</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Xây ứng dụng LLM</b> <code>llm_apps</code></div>
+<p class="en">How developers build products on top of LLM APIs: prompt engineering, context engineering, structured JSON output, function calling, AI SDKs, LLM gateways and routers, testing and debugging AI features</p><p class='nt'>Còn rộng: tiêu đề HN hiếm khi nói rõ cách làm (structured output, function calling), nên bài khớp nhất là bài chung chung về LLM. Đã viết lại 1 lần.</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,785</span> <span class='src'>HN</span> The-engineering-behind-LLM-inference</li><li><span class='c'>0,764</span> <span class='src'>HN</span> Ask HN: Where can a solo dev still find a moat in LLM inference?</li><li><span class='c'>0,760</span> <span class='src'>HN</span> LLMs in Professional Software Engineering</li><li><span class='c'>0,758</span> <span class='src'>HN</span> AI: LLMs, Agents, Work, and Us – Engineers. Personal Thoughts</li><li><span class='c'>0,747</span> <span class='src'>HN</span> Show HN: App2Api; App actions into API calls for LLMs</li><li><span class='c'>0,743</span> <span class='src'>HN</span> Understanding LLMs with an Interactive Tutorial</li><li><span class='c'>0,741</span> <span class='src'>HN</span> FreeLLMAPI – One OpenAI-Compatible API for Multiple Free LLM Providers</li><li><span class='c'>0,739</span> <span class='src'>HN</span> LLM-OpenAI-Decisions 0.1a0</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,378</td><td class='num'>0,559</td><td class='num'>0,606</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,524</td><td class='num'>0,669</td><td class='num'>0,685</td></tr><tr><td>HN</td><td class='num'>11.397</td><td class='num'>0,445</td><td class='num'>0,673</td><td class='num'>0,730</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>RAG &amp; tìm kiếm</b> <code>rag_search</code></div>
+<p class="en">Retrieval-augmented generation and semantic search: embeddings, vector databases, hybrid search, reranking, chunking documents, knowledge graphs for LLMs</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,805</span> <span class='src'>HN</span> Show HN: Vectorless, Reasoning-Based RAG</li><li><span class='c'>0,785</span> <span class='src'>HN</span> Building a RAG pipeline for semantic code search</li><li><span class='c'>0,781</span> <span class='src'>HN</span> PageIndex Emerges as Vectorless RAG Alternative for AI Retrieval</li><li><span class='c'>0,769</span> <span class='src'>HN</span> EmbeddingGemma 2: Google&#x27;s Offline Search Beyond Text</li><li><span class='c'>0,764</span> <span class='src'>HN</span> We Built an Alternative to Vector RAG for AI Agent Memory</li><li><span class='c'>0,764</span> <span class='src'>HN</span> Fine-tuning Qwen3.5-4B to replace Gemini Flash-Lite in a RAG pipeline</li><li><span class='c'>0,759</span> <span class='src'>HN</span> Using Jev as a Search Reranker</li><li><span class='c'>0,750</span> <span class='src'>HN</span> Why embeddings don&#x27;t solve RAG [video]</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,386</td><td class='num'>0,593</td><td class='num'>0,668</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,451</td><td class='num'>0,697</td><td class='num'>0,702</td></tr><tr><td>HN</td><td class='num'>11.397</td><td class='num'>0,444</td><td class='num'>0,672</td><td class='num'>0,742</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Công cụ lập trình AI</b> <code>ai_coding</code></div>
+<p class="en">AI coding tools: AI code assistants and AI IDEs such as GitHub Copilot, Cursor and Claude Code, code generation with LLMs, AI code review, vibe coding</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,899</span> <span class='src'>HN</span> CodeCrab – Local-first desktop app for AI code reviews</li><li><span class='c'>0,893</span> <span class='src'>HN</span> Gentle AI: AI Coding Ecosystem</li><li><span class='c'>0,892</span> <span class='src'>HN</span> Run Claude Code, Codex and Cursor side by side with your team</li><li><span class='c'>0,892</span> <span class='src'>HN</span> Diffsmith AI Code Review Tool</li><li><span class='c'>0,884</span> <span class='src'>HN</span> Show HN: RepoGuard – Architecture linter for AI-generated code (Cursor, Claude)</li><li><span class='c'>0,860</span> <span class='src'>HN</span> OptimAIzr – analyze and optimize your Claude Code usage</li><li><span class='c'>0,856</span> <span class='src'>HN</span> Show HN: Offrun – manage every coding agent from one workspace</li><li><span class='c'>0,852</span> <span class='src'>HN</span> Show HN: Baloo, self-hosted AI code review for GitHub</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,340</td><td class='num'>0,523</td><td class='num'>0,603</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,539</td><td class='num'>0,703</td><td class='num'>0,707</td></tr><tr><td>HN</td><td class='num'>11.397</td><td class='num'>0,537</td><td class='num'>0,755</td><td class='num'>0,845</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Phần mềm có AI</b> <code>ai_products</code></div>
+<p class="en">Software products with AI built in: new AI features in apps and developer platforms, open-source AI tools, AI product launches</p><p class='nt'>Rộng theo bản chất; gần với &quot;Công ty &amp; đầu tư AI&quot; (giống 0,84).</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,855</span> <span class='src'>HN</span> Build native iOS and Android apps at once, with your own AI</li><li><span class='c'>0,828</span> <span class='src'>HN</span> Top Consumer AI Apps</li><li><span class='c'>0,827</span> <span class='src'>HN</span> Show HN: UsageAtlas(OSS), All your AI coding usage insights. One beautiful view</li><li><span class='c'>0,826</span> <span class='src'>HN</span> Vibe Coding Discover – A Catalog of AI OSS for Agents, MCP, Skills, RAG</li><li><span class='c'>0,822</span> <span class='src'>HN</span> xAI. AI coworkers that learn from your team</li><li><span class='c'>0,822</span> <span class='src'>HN</span> Braxis: Auto-generate and track AI agent readiness (0-100 score and history)</li><li><span class='c'>0,821</span> <span class='src'>HN</span> OpenAI Launches Decisions API for Fast AI Choices</li><li><span class='c'>0,818</span> <span class='src'>HN</span> Show HN: Orbtile – See which AI coding agent needs you, on a Logitech keypad</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,358</td><td class='num'>0,496</td><td class='num'>0,546</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,516</td><td class='num'>0,708</td><td class='num'>0,718</td></tr><tr><td>HN</td><td class='num'>11.397</td><td class='num'>0,541</td><td class='num'>0,768</td><td class='num'>0,815</td></tr></tbody></table></div></div></div></div></div><div class="panel" role="tabpanel" id="model"><h2>Model</h2><div class="tp"><div class="tp-h"><b>Model mới ra</b> <code>new_models</code></div>
+<p class="en">New AI model releases: new large language models from OpenAI, Anthropic, Google, Meta and others, new model versions, their benchmark results, pricing and context windows</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,905</span> <span class='src'>HN</span> OpenAI Scrapped Newest Model Release</li><li><span class='c'>0,853</span> <span class='src'>HN</span> OpenAI halts training of latest models</li><li><span class='c'>0,853</span> <span class='src'>HN</span> OpenAI alerts 100 orgs that its &#x27;misaligned models&#x27; attempted to break in</li><li><span class='c'>0,847</span> <span class='src'>HN</span> Check is your OpenAI GPT-6-Astra nerfed?</li><li><span class='c'>0,846</span> <span class='src'>HN</span> OpenAI Decisions API is now available in Public Beta</li><li><span class='c'>0,842</span> <span class='src'>HN</span> OpenAI Decisions API</li><li><span class='c'>0,841</span> <span class='src'>HN</span> Range – open a 1 TB AI model in 3 seconds without downloading it</li><li><span class='c'>0,834</span> <span class='src'>HN</span> OpenAI pauses training of latest models</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,433</td><td class='num'>0,593</td><td class='num'>0,639</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,575</td><td class='num'>0,793</td><td class='num'>0,800</td></tr><tr><td>HN</td><td class='num'>11.397</td><td class='num'>0,517</td><td class='num'>0,760</td><td class='num'>0,826</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Model mã nguồn mở</b> <code>open_models</code></div>
+<p class="en">Open-weight models anyone can download: new Llama, Qwen, Mistral, DeepSeek, Gemma and Kimi releases, weights published on Hugging Face, running them locally with llama.cpp, Ollama or MLX</p><p class='nt'>Đã thêm llama.cpp, Ollama, MLX. Vẫn lẫn vài tin model không mở (OpenAI).</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,845</span> <span class='src'>HN</span> Range – open a 1 TB AI model in 3 seconds without downloading it</li><li><span class='c'>0,821</span> <span class='src'>HN</span> MicroLLM Lab – Try 7 tiny LLM&#x27;s in the browser</li><li><span class='c'>0,810</span> <span class='src'>HN</span> FreeLLMAPI – One OpenAI-Compatible API for Multiple Free LLM Providers</li><li><span class='c'>0,809</span> <span class='src'>HN</span> OpenAI Scrapped Newest Model Release</li><li><span class='c'>0,794</span> <span class='src'>HN</span> Run Decision Models on vLLM and Red Hat AI Using DiffusionGemma</li><li><span class='c'>0,784</span> <span class='src'>HN</span> Full-fabric VHDL LLM inference engine. Runs Qwen3.5-class transformer inference</li><li><span class='c'>0,781</span> <span class='src'>HN</span> Mistral Large 4</li><li><span class='c'>0,779</span> <span class='src'>HN</span> Vast-10M: The First Frontier LLM with 10M Tokens of Context</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,407</td><td class='num'>0,587</td><td class='num'>0,633</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,516</td><td class='num'>0,830</td><td class='num'>0,838</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,450</td><td class='num'>0,709</td><td class='num'>0,774</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Model ảnh, video, giọng nói</b> <code>multimodal</code></div>
+<p class="en">Generating and understanding images, video and audio with AI: image generators like Midjourney, Stable Diffusion and Flux, video generators like Sora and Veo, speech-to-text, text-to-speech, voice cloning</p><p class='nt'>Bản đầu (&quot;Multimodal AI models: …&quot;) kéo về tin model chung chung; viết lại bằng tên cụ thể (Midjourney, Sora, text-to-speech) thì đúng chủ đề.</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,880</span> <span class='src'>HN</span> ImageGen: Local AI image generation for Mac with Qwen-Image 2.1</li><li><span class='c'>0,876</span> <span class='src'>HN</span> Voice Cloner for AI Video Production on macOS</li><li><span class='c'>0,875</span> <span class='src'>HN</span> Artist shares prompts/assets for pop music video created with Claude in 18 hours</li><li><span class='c'>0,851</span> <span class='src'>HN</span> Show HN: Best Prompt Generator Extension</li><li><span class='c'>0,847</span> <span class='src'>HN</span> Turn X Posts into Beautiful Visual Stories with AI</li><li><span class='c'>0,837</span> <span class='src'>HN</span> Show HN: Hotel Lobby AI Video Generator – Two Photos to Rap Duet</li><li><span class='c'>0,836</span> <span class='src'>HN</span> Show HN: Telegram AI Video Generator – Create AI Videos in Chat</li><li><span class='c'>0,835</span> <span class='src'>HN</span> Toketer – See what every AI prompt costs you, live in your editor</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,337</td><td class='num'>0,526</td><td class='num'>0,581</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,491</td><td class='num'>0,696</td><td class='num'>0,709</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,514</td><td class='num'>0,742</td><td class='num'>0,821</td></tr></tbody></table></div></div></div></div></div><div class="panel" role="tabpanel" id="nghien-cuu"><h2>Nghiên cứu</h2><div class="tp"><div class="tp-h"><b>Nghiên cứu ML</b> <code>ml_research</code></div>
+<p class="en">Machine learning and deep learning research: new neural network architectures, transformers and attention, scaling laws, reasoning in language models, research papers</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,747</span> <span class='src'>HN</span> Foundations of Large Language Models</li><li><span class='c'>0,731</span> <span class='src'>HN</span> Temporal computing surpassing Transformers – Sleeping Machines [pdf]</li><li><span class='c'>0,727</span> <span class='src'>HN</span> Beyond LLMs: A Post-Transformer World Emerges</li><li><span class='c'>0,705</span> <span class='src'>HN</span> Show HN: FGRF v3.0 – Scale-dependent structural probing of LLM weight topologies</li><li><span class='c'>0,703</span> <span class='src'>HN</span> Dust: Pretraining Transformers Without Backpropagation</li><li><span class='c'>0,702</span> <span class='src'>HN</span> O(N) the Money: Scaling Vulnerability Research with LLMs (2025)</li><li><span class='c'>0,699</span> <span class='src'>arXiv</span> ScAn-Bench: Evaluating Scaling Analysis Methodology</li><li><span class='c'>0,698</span> <span class='src'>HN</span> Deep Learning Mechanics on Mnist</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,431</td><td class='num'>0,598</td><td class='num'>0,645</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,374</td><td class='num'>0,571</td><td class='num'>0,580</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,388</td><td class='num'>0,620</td><td class='num'>0,680</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Huấn luyện &amp; fine-tune</b> <code>training</code></div>
+<p class="en">Techniques for training language models: pretraining datasets, supervised fine-tuning, LoRA adapters, reinforcement learning from human feedback, RLHF, GRPO, reward models, distillation, synthetic training data</p><p class='nt'>Đã viết lại 1 lần cho bớt chữ chung chung.</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,759</span> <span class='src'>HN</span> Foundations of Large Language Models</li><li><span class='c'>0,740</span> <span class='src'>HN</span> ALoDLM: Adaptively Looped Diffusion Language Models</li><li><span class='c'>0,729</span> <span class='src'>arXiv</span> It&#x27;s All Training: A Fully Synthetic Single-Stage Recipe for LLMs</li><li><span class='c'>0,719</span> <span class='src'>HN</span> Single CPU Language Modeling Benchmark Shattered</li><li><span class='c'>0,717</span> <span class='src'>HN</span> Dust: Pretraining Transformers Without Backpropagation</li><li><span class='c'>0,712</span> <span class='src'>arXiv</span> Self-Play Pretraining with Zero Data</li><li><span class='c'>0,712</span> <span class='src'>HN</span> Context Language Models</li><li><span class='c'>0,712</span> <span class='src'>HN</span> Generalization Dynamics of LM Pre-Training</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,436</td><td class='num'>0,636</td><td class='num'>0,680</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,372</td><td class='num'>0,590</td><td class='num'>0,597</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,354</td><td class='num'>0,613</td><td class='num'>0,695</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>An toàn &amp; nguyên lý AI</b> <code>ai_safety</code></div>
+<p class="en">AI safety and interpretability: alignment, jailbreaks, prompt injection, red teaming, mechanistic interpretability, dangerous model behavior and misuse of AI</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,793</span> <span class='src'>HN</span> Against &quot;solving alignment&quot; as the major frame for AI safety and security</li><li><span class='c'>0,779</span> <span class='src'>HN</span> &quot;The Dangerous Myths Behind AI Agent Hacks&quot; – Yoshua Bengio</li><li><span class='c'>0,772</span> <span class='src'>HN</span> AI is not an alien, it&#x27;s our offspring: Reframing the alignment problem</li><li><span class='c'>0,762</span> <span class='src'>HN</span> Uncensored and Offensive Security AI Models Benchmark</li><li><span class='c'>0,760</span> <span class='src'>HN</span> Human Friction Makes Agentic AI Safer and Smarter</li><li><span class='c'>0,759</span> <span class='src'>HN</span> Current ways of developing AI agents contribute to degradation of oversight</li><li><span class='c'>0,758</span> <span class='src'>HN</span> Nvidia research finds AI agents become less safe when using tools</li><li><span class='c'>0,757</span> <span class='src'>HN</span> AI Companies Are Not (Necessarily) Liable for Unintended AI Cyberattacks</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,426</td><td class='num'>0,611</td><td class='num'>0,661</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,450</td><td class='num'>0,580</td><td class='num'>0,583</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,439</td><td class='num'>0,704</td><td class='num'>0,753</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Đánh giá &amp; benchmark</b> <code>evals</code></div>
+<p class="en">Evaluating AI models: LLM benchmarks, leaderboards, evaluation methods, LLM-as-a-judge, measuring hallucination and reliability of AI systems</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,849</span> <span class='src'>HN</span> A challenging, contamination-free LLM benchmark</li><li><span class='c'>0,841</span> <span class='src'>HN</span> Inspect: An open-source framework for large language model evaluations</li><li><span class='c'>0,841</span> <span class='src'>HN</span> Inspect: An open-source framework for large language model evaluations</li><li><span class='c'>0,833</span> <span class='src'>HN</span> What AI Benchmarks Measure: Fifty-Six AI Benchmarks Compared</li><li><span class='c'>0,819</span> <span class='src'>HN</span> Show HN: LLM verification pipeline against hallucinations</li><li><span class='c'>0,818</span> <span class='src'>HN</span> Are your AI evals measuring the right things?</li><li><span class='c'>0,809</span> <span class='src'>HN</span> Causeval – statistically rigorous, causal evaluation for LLM apps</li><li><span class='c'>0,802</span> <span class='src'>HN</span> LLM analytics benchmark: the best model for your analytics agent</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,448</td><td class='num'>0,672</td><td class='num'>0,723</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,494</td><td class='num'>0,704</td><td class='num'>0,721</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,464</td><td class='num'>0,721</td><td class='num'>0,784</td></tr></tbody></table></div></div></div></div></div><div class="panel" role="tabpanel" id="ha-tang"><h2>Hạ tầng</h2><div class="tp"><div class="tp-h"><b>GPU &amp; inference</b> <code>inference</code></div>
+<p class="en">AI infrastructure: GPUs and AI chips, LLM inference serving and optimization, quantization, vLLM, distributed training, AI data centers</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,705</span> <span class='src'>HN</span> Beyond Utilization: Energy-Conscious GPU Sharing for Inference Serving</li><li><span class='c'>0,684</span> <span class='src'>HN</span> Nvidia DGX Spark 64GB Gives Developers More Ways to Build and Scale Local AI</li><li><span class='c'>0,667</span> <span class='src'>HN</span> Where&#x27;re All the AI Chips?</li><li><span class='c'>0,664</span> <span class='src'>HN</span> Toward a future space-based, highly scalable AI infrastructure system design</li><li><span class='c'>0,662</span> <span class='src'>HN</span> Glyd – Run LLMs in 33% less GPU memory, bit for bit</li><li><span class='c'>0,661</span> <span class='src'>HN</span> Show HN: Nibia Fabric – Turn everyday computers into a shared AI compute cluster</li><li><span class='c'>0,661</span> <span class='src'>HN</span> Decide where your AI workload should run (local/edge/cloud)</li><li><span class='c'>0,661</span> <span class='src'>HN</span> The Physical Stack Behind AI</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,368</td><td class='num'>0,535</td><td class='num'>0,609</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,432</td><td class='num'>0,613</td><td class='num'>0,614</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,352</td><td class='num'>0,596</td><td class='num'>0,652</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>MLOps &amp; vận hành LLM</b> <code>mlops</code></div>
+<p class="en">Running ML and LLM systems in production: MLOps, LLM observability and tracing, model deployment and monitoring, data pipelines for AI</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,809</span> <span class='src'>HN</span> Local LLM Observability</li><li><span class='c'>0,755</span> <span class='src'>HN</span> Rethinking LLM Serving with System One Models</li><li><span class='c'>0,732</span> <span class='src'>HN</span> Everything you need to deploy your next AI CEO</li><li><span class='c'>0,728</span> <span class='src'>HN</span> What Happens Inside an LLM Server</li><li><span class='c'>0,725</span> <span class='src'>HN</span> The Case for Bringing Your LLMs Home</li><li><span class='c'>0,722</span> <span class='src'>HN</span> AI Performance Engineering</li><li><span class='c'>0,721</span> <span class='src'>HN</span> LLM analytics benchmark: the best model for your analytics agent</li><li><span class='c'>0,721</span> <span class='src'>HN</span> Sentry: Learning to Recover from LLM Agent Failures at Test Time</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,420</td><td class='num'>0,591</td><td class='num'>0,624</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,494</td><td class='num'>0,674</td><td class='num'>0,681</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,426</td><td class='num'>0,665</td><td class='num'>0,710</td></tr></tbody></table></div></div></div></div></div><div class="panel" role="tabpanel" id="nganh"><h2>Ngành AI</h2><div class="tp"><div class="tp-h"><b>Công ty &amp; đầu tư AI</b> <code>ai_industry</code></div>
+<p class="en">AI industry news: AI labs and AI startups, funding rounds, acquisitions, partnerships, executives and business strategy of OpenAI, Anthropic, Google, Microsoft and Nvidia</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,833</span> <span class='src'>HN</span> Zordt – AI news distilled to what happened and why it matters</li><li><span class='c'>0,811</span> <span class='src'>HN</span> GPT-6.1 Sol: Release Intelligence, Performance and Price</li><li><span class='c'>0,807</span> <span class='src'>HN</span> Cohesix – find out what happened to a local AI job</li><li><span class='c'>0,804</span> <span class='src'>HN</span> It&#x27;s Time to Investigate the AI Labs</li><li><span class='c'>0,804</span> <span class='src'>HN</span> It&#x27;s Time to Investigate the AI Labs</li><li><span class='c'>0,804</span> <span class='src'>HN</span> Crunchbase Data Shows AI&#x27;s Most Active Startups Are Becoming Serial Acquirers</li><li><span class='c'>0,795</span> <span class='src'>HN</span> OpenAI Misalignment Reports and Notices</li><li><span class='c'>0,793</span> <span class='src'>HN</span> AI Companies Are in a Race Against Time</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,368</td><td class='num'>0,495</td><td class='num'>0,548</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,498</td><td class='num'>0,625</td><td class='num'>0,629</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,522</td><td class='num'>0,733</td><td class='num'>0,780</td></tr></tbody></table></div></div></div></div><div class="tp"><div class="tp-h"><b>Chính sách &amp; pháp lý AI</b> <code>ai_policy</code></div>
+<p class="en">AI policy and regulation: AI laws, government AI policy, copyright lawsuits over AI training data, AI and jobs, societal impact of AI</p><p class='nt'>Mặt bằng thấp hẳn (trung vị HN 0,27): đúng lý do phải chuẩn hoá theo từng chủ đề.</p>
+<div class="grid2"><div><div class="sub">8 bài khớp nhất (trừ GitHub releases)</div><ol class="top"><li><span class='c'>0,628</span> <span class='src'>HN</span> Time for an Accountability Regime for the AI Industry</li><li><span class='c'>0,622</span> <span class='src'>HN</span> A.I. Is Going Rogue. Who Should Be Held Responsible?</li><li><span class='c'>0,619</span> <span class='src'>HN</span> AI Policy Enforcement Report</li><li><span class='c'>0,614</span> <span class='src'>HN</span> Banning AI in Law School: We&#x27;ve Seen This Before</li><li><span class='c'>0,609</span> <span class='src'>HN</span> There Are Plenty of Laws on the Books to Check the A.I. Giants. Use Them</li><li><span class='c'>0,604</span> <span class='src'>HN</span> OpenAI is accused in lawsuit over rogue AI agents</li><li><span class='c'>0,603</span> <span class='src'>HN</span> As A.I. Accelerates, Governments Are Increasingly Being Left Behind</li><li><span class='c'>0,601</span> <span class='src'>HN</span> AI won&#x27;t suppress legal rates</li></ol></div>
+<div><div class="sub">Mặt bằng cosine theo nguồn</div><div class="tbl"><table><thead><tr><th>Nguồn</th><th>Tài liệu</th><th>Trung vị</th><th>Mốc 1%</th><th>Mốc 0,1%</th></tr></thead><tbody><tr><td>arXiv</td><td class='num'>9.654</td><td class='num'>0,264</td><td class='num'>0,410</td><td class='num'>0,479</td></tr><tr><td>GitHub</td><td class='num'>140</td><td class='num'>0,281</td><td class='num'>0,414</td><td class='num'>0,421</td></tr><tr><td>HN</td><td class='num'>11.525</td><td class='num'>0,274</td><td class='num'>0,524</td><td class='num'>0,585</td></tr></tbody></table></div></div></div></div></div>
+<footer>radard · docs/thu-vien-chu-de.html · Câu mô tả: apps/daemon/src/topics/library.ts. Embedding alibaba/qwen3-embedding-0.6b qua AI Gateway (1 request, $0,0000056). Dữ liệu: DB radard local 12/10/2026, 21.191 tài liệu đã embed lúc thử.</footer>
+</div><script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

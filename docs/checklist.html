@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Checklist MVP-0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.55}
+.wrap{max-width:960px;margin:0 auto;padding:40px 20px 80px}
+h1,h2{font-family:var(--display);margin:0;line-height:1.15}
+h1{font-size:clamp(28px,4.5vw,38px)}
+h2{font-size:22px;margin-top:40px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:70ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-family:var(--display);font-size:24px}
+.stat span{font-size:13px;color:var(--ink-2)}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:14px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);margin-top:10px}
+.group{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.group-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);background:#FAFBFA}
+.group-head b{font-size:15px}
+.group-head span{font-size:12.5px;color:var(--ink-3);font-family:var(--mono)}
+.task{display:grid;grid-template-columns:28px 1fr auto;gap:4px 12px;padding:12px 16px;border-bottom:1px solid var(--line);align-items:start}
+.task:last-child{border-bottom:0}
+.task input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent)}
+.task .name{font-weight:600}
+.task .desc{grid-column:2;font-size:14px;color:var(--ink-2)}
+.task .note{grid-column:2;font-size:13px;color:var(--warn)}
+.task.done .name{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--ink-3)}
+.badge{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.s-done{background:var(--accent-soft);color:var(--accent)}
+.s-wip{background:var(--warn-soft);color:var(--warn)}
+.s-todo{background:var(--ground);color:var(--ink-2);border:1px solid var(--line)}
+.s-you{background:var(--blue-soft);color:var(--blue)}
+.rules{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-top:14px}
+.rules ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px;font-size:14.5px}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:640px){.summary{grid-template-columns:repeat(2,1fr)}.task{grid-template-columns:24px 1fr}.task .badge{grid-column:2;justify-self:start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · CHECKLIST MVP-0 · CẬP NHẬT 12/10/2026</div>
+<h1>Việc cần làm cho MVP-0</h1>
+<p class="lede">Mỗi đầu việc có mô tả ngắn và ô đánh dấu. Tôi chỉ tick khi việc đã xong <b>và đã kiểm chứng</b> (chạy được, test xanh). Việc đã viết code nhưng chưa kiểm chứng để ở trạng thái “Đang làm”. Chi tiết thiết kế ở <code>radard-thiet-ke.html</code>.</p>
+
+<div class="summary" id="summary"></div>
+<div class="bar"><i id="bar"></i></div>
+<div class="legend"><span><span class="badge s-done">Xong</span> đã kiểm chứng</span><span><span class="badge s-wip">Đang làm</span> đã viết, chưa kiểm chứng</span><span><span class="badge s-todo">Chưa làm</span></span><span><span class="badge s-you">Cần bạn</span> tài khoản, thông tin, quyết định</span></div>
+
+<div class="rules">
+  <b>Cách tôi làm việc</b>
+  <ul>
+    <li>Làm theo thứ tự trong danh sách; cập nhật file này sau mỗi đầu việc</li>
+    <li><b>Không commit, không push, không deploy</b> khi bạn chưa đồng ý</li>
+    <li>Không tạo tài khoản, không nhập khoá API thay bạn; việc nào cần bạn thì đánh dấu “Cần bạn”</li>
+    <li>Mọi thứ chạy trên máy trước (Postgres local, bản thô ghi vào <code>./data</code>)</li>
+  </ul>
+</div>
+
+<h2>Tuần 1 · Daemon ghi chép Hacker News</h2>
+<p class="lede">Mục tiêu: HN được cào mỗi 15 phút vào Postgres local; chạy lại không sinh bản trùng.</p>
+
+<div class="group">
+  <div class="group-head"><b>Khung dự án</b><span>~/Personal/radard</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Khởi tạo monorepo Bun</span><span class="badge s-done">Xong</span>
+    <span class="desc"><code>package.json</code> workspaces, <code>tsconfig.base.json</code>, <code>biome.json</code> (theo quy ước seongon-content), <code>.gitignore</code>, <code>git init</code>.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Cài dependencies</span><span class="badge s-done">Xong</span>
+    <span class="desc">pg-boss 12.35, drizzle-orm 0.45.3, drizzle-kit, TypeScript 7, Biome 2.5. Đã đọc file kiểu của pg-boss 12 để viết đúng API mới.</span></div>
+</div>
+
+<div class="group">
+  <div class="group-head"><b>Lõi và adapter</b><span>packages/core · packages/adapters</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Interface <code>SourceAdapter</code>, <code>ObjectStore</code></span><span class="badge s-done">Xong</span>
+    <span class="desc">Hợp đồng giữa lõi và nguồn/kho bản thô; trạng thái nguồn do adapter tự quản.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Tiện ích: hash, chuẩn hoá URL, HTTP, logger</span><span class="badge s-done">Xong</span>
+    <span class="desc">SHA-256 sau NFC; bỏ tham số theo dõi khỏi URL; GET có điều kiện (ETag) và giới hạn tốc độ theo host.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name"><code>ObjectStore</code> ghi ra đĩa</span><span class="badge s-done">Xong</span>
+    <span class="desc">Nén gzip, key <code>raw/ab/&lt;sha&gt;.gz</code>; dùng khi dev và test.</span></div>
+</div>
+
+<div class="group">
+  <div class="group-head"><b>Database</b><span>packages/db</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Schema dữ liệu thu thập</span><span class="badge s-done">Xong</span>
+    <span class="desc">Bảng <code>sources</code>, <code>source_state</code>, <code>fetch_runs</code>, <code>documents</code> (khoá idempotent: nguồn + id bên ngoài).</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Kết nối và migration</span><span class="badge s-done">Xong</span>
+    <span class="desc">Driver <code>bun-sql</code>; migration có khoá tư vấn; bật sẵn <code>vector</code>, <code>pg_trgm</code>.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Tạo database, sinh và chạy migration</span><span class="badge s-done">Xong</span>
+    <span class="desc">Tạo <code>radard</code> và <code>radard_test</code> trên Postgres 17 local; <code>drizzle-kit generate</code>; chạy migrate.</span>
+    <span class="note">Đã tạo <code>radard</code>, <code>radard_test</code>; migration <code>0000_layer1.sql</code> chạy được trên cả hai.</span></div>
+</div>
+
+<div class="group">
+  <div class="group-head"><b>Daemon</b><span>apps/daemon</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Adapter Hacker News</span><span class="badge s-done">Xong</span>
+    <span class="desc">API Algolia <code>search_by_date</code>, lấy mọi story mới từ con trỏ trước (lùi 60 giây để không sót). Đã lưu một phản hồi thật làm fixture.</span>
+    <span class="note">Chạy thật: lượt đầu lấy lùi 24 giờ được 717 story.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Job <code>fetch</code></span><span class="badge s-done">Xong</span>
+    <span class="desc">Chạy adapter, lưu bản thô cho mục mới, ghi <code>documents</code> và <code>fetch_runs</code>; chỉ cập nhật con trỏ khi thành công.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Queue pg-boss</span><span class="badge s-done">Xong</span>
+    <span class="desc">Queue <code>fetch</code> chính sách <code>stately</code> (mỗi nguồn không chồng job), retry 3 lần có backoff, dead-letter.</span>
+    <span class="note">Lượt theo lịch đầu tiên 00:15 UTC: job tạo từ cron, worker nhận, 3 story (2 mới, 1 trùng do khoảng lùi được bỏ qua).</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Vai trò scheduler</span><span class="badge s-done">Xong</span>
+    <span class="desc">Đồng bộ lịch cron từ bảng <code>sources</code> sang pg-boss, định kỳ; nguồn tắt thì gỡ lịch.</span>
+    <span class="note">Lịch <code>*/15 * * * *</code> chạy đúng giờ; đồng bộ lại mỗi 5 phút.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Vai trò worker</span><span class="badge s-done">Xong</span>
+    <span class="desc">Nhận job <code>fetch</code>, chạy song song có giới hạn, ghi log kết quả.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Điểm vào <code>main.ts</code></span><span class="badge s-done">Xong</span>
+    <span class="desc">Chạy migrate, khởi động theo <code>SERVICE_ROLE</code> (scheduler | worker | all), tắt êm khi nhận SIGTERM.</span>
+    <span class="note">SIGTERM lúc 01:00:40: ghi log "dừng", chờ job xong, đóng kết nối, thoát mã 0.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">CLI</span><span class="badge s-done">Xong</span>
+    <span class="desc"><code>db migrate</code>, <code>sources seed</code>, <code>sources</code>, <code>run &lt;nguồn&gt;</code>, <code>runs</code>, <code>docs --since 24h</code>.</span>
+    <span class="note">Đã chạy thật: <code>db migrate</code>, <code>sources seed</code>, <code>sources</code>, <code>run</code>, <code>runs</code>, <code>docs</code>.</span></div>
+</div>
+
+<div class="group">
+  <div class="group-head"><b>Kiểm chứng</b><span>bun test · typecheck · lint</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Unit test</span><span class="badge s-done">Xong</span>
+    <span class="desc">Chuẩn hoá URL, hash NFC (hai cách mã hoá tiếng Việt ra cùng hash), parse fixture HN.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Test tích hợp job <code>fetch</code></span><span class="badge s-done">Xong</span>
+    <span class="desc">Trên <code>radard_test</code> với adapter giả: chạy hai lần không trùng; lỗi thì con trỏ giữ nguyên, <code>fail_count</code> tăng.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Typecheck, lint, test đều xanh</span><span class="badge s-done">Xong</span>
+    <span class="desc"><code>bun run check</code> không lỗi.</span>
+    <span class="note"><code>bun run check</code>: typecheck, Biome, 15/15 test.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Chạy thật trên máy khoảng 1 giờ</span><span class="badge s-done">Xong</span>
+    <span class="desc">Ít nhất 4 lượt HN theo lịch; kiểm tra số tài liệu mới mỗi lượt, không bản trùng, bản thô có trong <code>./data</code>.</span>
+    <span class="note">00:03–01:00 UTC: 4 lượt theo lịch (00:15, 00:30, 00:45, 01:00) đều ok, 0 lượt lỗi. Tổng 737 tài liệu, 737 khoá duy nhất, 737 file bản thô, không bản trùng.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Commit đầu tiên</span><span class="badge s-you">Cần bạn</span>
+    <span class="desc">Chỉ làm khi bạn đồng ý sau khi xem kết quả tuần 1.</span></div>
+</div>
+
+<h2>Tuần 2 · Thêm nguồn, lọc và gộp</h2>
+<p class="lede">Mục tiêu: lệnh <code>events --since 24h</code> ra danh sách sự kiện có nghĩa.</p>
+<div class="group">
+  <div class="group-head"><b>Nguồn và xử lý tối thiểu</b><span>chưa bắt đầu</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Một <code>cadence</code> sai không làm hỏng lịch của nguồn khác</span><span class="badge s-done">Xong</span>
+    <span class="desc">Trong <code>syncSchedules()</code>, bắt lỗi riêng từng nguồn: nguồn có biểu thức cron sai được ghi log (và bỏ qua), các nguồn khác vẫn được đăng ký lịch. Kèm test cho trường hợp này. Làm trước khi thêm nguồn thứ hai.</span>
+    <span class="note">Bắt lỗi từng nguồn; cadence mới sai thì giữ lịch cũ. 3 test với pg-boss thật trên <code>radard_test</code>.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Adapter arXiv</span><span class="badge s-done">Xong</span>
+    <span class="desc">API Atom, truy vấn cs.CL, cs.AI, cs.LG, cs.MA; chạy một lần mỗi ngày.</span>
+    <span class="note">Chạy thật: 954 bài (cửa sổ 5 ngày, 14 giây); lần 2 đọc 1.742, 788 mới. Sửa bẫy "published là lúc nộp, công bố trễ 1–3 ngày" bằng cửa sổ đọc lại <code>lookbackDays</code>.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Adapter GitHub releases</span><span class="badge s-done">Xong</span>
+    <span class="desc">~10 repo, GET có điều kiện theo ETag; cần token GitHub thì 304 mới không bị trừ quota.</span>
+    <span class="note">Chạy thật: 90 release từ 10 repo; chạy lại ngay thì 304 cho cả 10 repo (<code>not_modified</code>). Danh sách repo là TẠM, bạn sửa trong bảng <code>sources</code>.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Bổ sung tham số theo dõi vào chuẩn hoá URL</span><span class="badge s-done">Xong</span>
+    <span class="desc">Thêm <code>msclkid</code> (Microsoft Ads), <code>twclid</code> (X Ads), <code>yclid</code> (Yandex), <code>_hsenc</code>, <code>_hsmi</code> (HubSpot) vào <code>TRACKING</code> trong <code>packages/core/src/url.ts</code>, cân nhắc thêm <code>ttclid</code>, <code>li_fat_id</code>, <code>dclid</code>, <code>gbraid</code>, <code>wbraid</code>, <code>mkt_tok</code>. Kiểm chứng tên tham số trên link thật trước khi thêm; kèm test. Việc nhỏ, làm trong tuần 2; muộn nhất là trước khi thêm nguồn RSS và nguồn thủ công (MVP-1).</span>
+    <span class="note">Đã tra tài liệu từng nền tảng; thêm cả 11 tham số, kèm test không bỏ nhầm tham số gần giống tên.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Bảng <code>llm_calls</code> và <code>LlmProvider</code>, <code>EmbeddingProvider</code></span><span class="badge s-done">Xong</span>
+    <span class="desc">Qua Vercel AI Gateway: <code>openai/gpt-5.6-luna</code>, <code>alibaba/qwen3-embedding-0.6b</code>; ghi token và chi phí mỗi lời gọi.</span>
+    <span class="note">Embedding qua Gateway chạy thật: 1.024 chiều (đã kiểm), 2.569 tài liệu, 543 nghìn token, $0,0054, 0 lỗi; <code>costs</code> hiển thị đúng. Phần LLM (<code>generateText</code>) sẽ chạy thật ở tuần 3 khi làm digest.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Xử lý: chuẩn hoá, ngôn ngữ, embedding</span><span class="badge s-done">Xong</span>
+    <span class="desc">Bảng <code>doc_text</code>; NFC, phát hiện ngôn ngữ; kiểm tra số chiều vector thật trước khi viết migration.</span>
+    <span class="note">Chạy thật trên 2.569 tài liệu. Phát hiện và sửa lỗi jsonb bị mã hoá hai lần (driver bun-sql): SQL đọc <code>config-&gt;&gt;</code> ra NULL; thêm cột jsonb an toàn, migration 0002 sửa dữ liệu cũ, test quét mọi cột jsonb.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Lọc theo mức liên quan</span><span class="badge s-done">Xong</span>
+    <span class="desc">Cosine giữa tài liệu và đoạn mô tả lĩnh vực + hồ sơ của bạn.</span>
+    <span class="note">Chỉnh trên dữ liệu thật: ngưỡng chung 0,58 (HN), arXiv 0,55, GitHub 0 (repo bạn chọn). Giữ lại HN 228/737, arXiv 202/1.742, GitHub 90/90. Mô tả lĩnh vực vẫn là TẠM.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Gộp sự kiện bằng vector</span><span class="badge s-done">Xong</span>
+    <span class="desc">Ngưỡng cố định, cửa sổ 7 ngày; CLI <code>events</code>.</span>
+    <span class="note">Ngưỡng 0,9 (0,8–0,9 lẫn đúng và sai; chờ LLM phân xử ở MVP-1); không gộp release GitHub theo vector. 520 tài liệu → 512 sự kiện; 7/8 lượt gộp đúng, ví dụ 5 bài về "OpenAI halts training" thành một sự kiện. Lệnh <code>events rebuild</code> (trước 12/10 tên là <code>layer2 recluster</code>) gộp lại không tốn tiền.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Tách trọng số tâm cụm khỏi số tài liệu</span><span class="badge s-done">Xong</span>
+    <span class="desc">Cột <code>events.n_vectors</code> làm trọng số cho <code>runningMean</code>; <code>n_docs</code> vẫn đếm cả gộp vì cùng URL.</span>
+    <span class="note">Lỗi cũ: gộp URL tăng <code>n_docs</code> mà không đổi tâm, nên tài liệu gộp vector sau đó bị kéo nhẹ đi. Migration 0003 + test (bản cũ lệch 0,167, bản mới &lt; 0,002). DB thật: recluster lại, vẫn 512 sự kiện, 3 sự kiện có n_docs ≠ n_vectors.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Cửa sổ thời gian hai phía, cập nhật first_seen_at</span><span class="badge s-done">Xong</span>
+    <span class="desc">Tìm sự kiện gần nhất trong [doc.at − 7 ngày, doc.at + 7 ngày]; gộp thì nới cả <code>first_seen_at</code> (least) lẫn <code>last_seen_at</code> (greatest).</span>
+    <span class="note">Lỗi cũ: chỉ có cận dưới, nên bài cũ đến muộn có thể gộp vào sự kiện nhiều tuần sau; <code>first_seen_at</code> không bao giờ lùi. 2 test mới cho kịch bản "bài cũ đến muộn", cả hai trượt với code cũ. 45/45 test.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Daemon chạy thật với code tuần 2</span><span class="badge s-done">Xong</span>
+    <span class="desc">Trước 06/10 mọi phần tuần 2 mới kiểm qua CLI và test.</span>
+    <span class="note">06/10: scheduler đăng ký đủ 4 lịch (HN, arXiv, GitHub, process */5); fetch HN, GitHub ok; job process tự chạy, embed 1.027 tài liệu, $0,000366. Phát hiện 2 lỗi bên dưới.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Không mất dữ liệu khi daemon tắt lâu</span><span class="badge s-done">Xong</span>
+    <span class="desc">Lấy theo cửa sổ thời gian (<code>walkWindows</code>), con trỏ chỉ dời tới chỗ đã lấy đủ; lượt chưa bắt kịp ghi <code>behind</code> + <code>fetch_runs.note</code>.</span>
+    <span class="note">Lỗi cũ: HN chỉ lấy 1.000 bài mới nhất (giới hạn Algolia), arXiv 2.000, rồi dời con trỏ lên mới nhất. Đã lấy lại: HN 7.357 bài (28/09–05/10), arXiv 5.684 bài. Test với API giả có giới hạn như thật; 55/55.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Embedding tôn trọng hạn mức Gateway</span><span class="badge s-done">Xong</span>
+    <span class="desc">Giãn nhịp (<code>EMBED_MIN_INTERVAL_MS</code>; 12 giây khi còn gói miễn phí, 1 giây từ 11/10 sau khi nạp credits), chạm rate limit thì chờ đúng "Retry after"; daemon tối đa 60 lô mỗi lượt <code>process</code>.</span>
+    <span class="note">Gói miễn phí: 5 request/phút. Embed nốt 12.273 tài liệu không vấp lần nào; tổng hôm nay 1,92 triệu token, $0,0192. 16.637/16.637 tài liệu, 3.709 sự kiện.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">HNSW khi dữ liệu lớn: bật iterative scan</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Truy vấn sự kiện gần nhất có lọc cửa sổ thời gian; HNSW lấy ứng viên trước rồi mới lọc, nên có thể trả thiếu. Đặt <code>hnsw.iterative_scan</code> khi số sự kiện lên hàng chục nghìn.</span>
+    <span class="note">Hiện 512 sự kiện: Postgres chọn Seq Scan (6 ms, chính xác 100%), chưa dùng index. Xem docs/hnsw.html.</span></div>
+</div>
+
+<h2>Tuần 3 · Digest và deploy</h2>
+<p class="lede">Mục tiêu: digest thật đầu tiên trên điện thoại, rồi chạy 7 ngày trên Railway để nghiệm thu. Kế hoạch 10 bước và lý do: <a href="tuan-3-thuc-thi.html">tuan-3-thuc-thi.html</a> (12/10).</p>
+<div class="group">
+  <div class="group-head"><b>Dữ liệu, chủ đề, điểm</b><span>bước 0–3</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">0 · Bật lại daemon, lấy bù dữ liệu</span><span class="badge s-done">Xong</span>
+    <span class="desc"><code>bun run dev</code> từ 12/10; arXiv chạy tay một lượt; HN theo lịch đi từ con trỏ cũ.</span>
+    <span class="note">12/10: HN 6.204 bài mới, arXiv 4.192 lấy về (2.228 mới), cả hai ok, không còn behind. Tài liệu mỗi ngày 06–09/10: 1.500–1.770; 10–11/10 (cuối tuần) ~700–800, như cuối tuần trước. GitHub lỗi kết nối 2 lượt, lượt thứ 3 ok. Job process đang embed phần mới (23.111/25.091 lúc 15:10 UTC).</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">1 · Thư viện chủ đề và chủ đề của bạn</span><span class="badge s-done">Xong</span>
+    <span class="desc">Bảng <code>topics</code>, <code>profile_topics</code> (migration 0007); 16 chủ đề tên tiếng Việt, câu mô tả tiếng Anh đã thử trên dữ liệu thật; tự thêm chủ đề qua LLM; CLI <code>topics</code>. Chủ đề "không quan tâm": chỉ có cột <code>kind</code>, chưa tính điểm (D3).</span>
+    <span class="note">12/10: code + 10 test, <code>bun run check</code> 79/79; migration và <code>topics seed</code> đã chạy trên DB thật. Thử thư viện: 2 request embed, $0,000011; viết lại 4 câu mô tả yếu. Chờ bạn duyệt <a href="thu-vien-chu-de.html">thu-vien-chu-de.html</a> và chọn chủ đề. 13/10: bạn chọn 8 chủ đề; đổi tên "An toàn &amp; giải thích AI" → "An toàn &amp; nguyên lý AI". Bối cảnh hồ sơ viết lại bằng tiếng Anh từ lời bạn (nghề, stack, sẵn lòng học stack mới và thuật toán/ML, cách giải thích tin); <code>profile set</code> sửa lỗi tạo thêm dòng hồ sơ mỗi lần chạy.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">2 · Điểm theo chủ đề, tín hiệu, mặt bằng</span><span class="badge s-done">Xong</span>
+    <span class="desc">Migration 0008: <code>doc_topic_scores</code>, <code>doc_signals</code>, <code>baselines</code>; bỏ <code>doc_text.relevance</code>, embedding của <code>profile</code>, ngưỡng 0,58 và <code>minRelevance</code>. Job process gộp MỌI tài liệu (D4), có trần 3.000/lượt. Job <code>baselines</code> 06:30 giờ VN. CLI <code>signals refresh</code>, <code>baselines</code>, <code>events rebuild</code>.</span>
+    <span class="note">12/10 trên DB thật: 200.880 điểm (25.110 tài liệu × 8 chủ đề, 1 câu SQL). <code>events rebuild</code>: 25.110 tài liệu → 23.398 sự kiện, 1.018 giây (41 ms/tài liệu). Điểm HN 30 ngày: 307 request, 15.276/15.316 bài (40 bài đã bị xoá khỏi HN); điểm trung bình 17,4 (lúc lấy bài: 1,6). Mặt bằng độ nổi HN: trung vị 1,253, mốc 0,1% 7,113 (đo tay 11/10: 1,099 / 7,04). Test 102/102 + 2 test rank.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">2b · Nội dung trang cho bài HN</span><span class="badge s-done">Xong</span>
+    <span class="desc">13/10: 91,5% tài liệu HN chỉ có tiêu đề để embed (bài HN là một link sang blog, GitHub, báo; API không trả nội dung trang). Hệ quả: gán chủ đề theo 10–15 chữ (Janas "streaming experts from SSD" → RAG) và bỏ sót tin có tiêu đề mơ hồ. Sửa: <code>SourceAdapter.articleUrl</code> (HN khai báo); job <code>pages</code> (5 phút/lần) tải trang, tôn trọng robots.txt, chỉ HTML, ≤ 2 MB, lưu HTML gốc vào ObjectStore + bảng <code>linked_pages</code> (migration 0010, mỗi URL một dòng); job process đợi trang tối đa 30 phút rồi embed tiêu đề + 1.500 ký tự đầu phần chữ chính (Readability trên linkedom). CLI <code>pages</code>, <code>pages fetch --since</code>, <code>reprocess --pages</code>.</span>
+    <span class="note">13/10: thử 40 link thật: 30 rút được chữ (trung vị 7.800 ký tự), 4 chặn 401/403 (WSJ, Reuters, NYT), 6 gần như không có chữ (YouTube, trang cần JS); 0,6 giây/trang. 30 ngày: 14.267 URL khác nhau. 7 test mới, <code>bun run check</code> 144/144. Lấy bù 30 ngày (28 phút): 14.817 URL → ok 11.798 (79,6%), failed 1.571 (10,6%, chủ yếu 401/403), blocked 809 (5,5%, robots.txt), skipped 639 (4,3%, Ask HN/PDF/video); rút được chữ ở 88% trang ok (mẫu 300, trung vị 5.455 ký tự). Embed lại 12.936 tài liệu: 4,0 triệu token, $0,04. <b>Phát hiện khi gộp lại:</b> gộp theo vector giảm 449 → 303; 292 cặp cũ bị tách hầu hết là cùng chuyện (Character.ai phá sản ở hai báo, "Firefox 157"…), cosine với nội dung trang chỉ 0,6–0,88 vì hai trang viết khác nhau. Sửa: mỗi tài liệu hai vector, <code>embedding</code> (bản thô, để gộp, ngưỡng 0,9 giữ nguyên) và <code>content_embedding</code> (bản thô + trang, để chấm chủ đề), migration 0011. Gộp lại lần hai: 445/449 cặp cũ vẫn cùng sự kiện, gộp theo vector 457. Mặt bằng tính lại. Khung 13/10: 182 qua cổng (trước 171), 7 tin; "Just say no to OpenAI and Anthropic" (bài bình luận) rớt cổng vì R 0,98 → 0,45 khi đọc nội dung. Chạy thật 11:05 UTC: 63 bài HN mới → job pages tải 50 trang (43 ok) → process embed 63 bài, 46 có vector nội dung. Kèm theo: nhãn "Chủ đề" do LLM chọn trong danh sách chủ đề của bạn khi viết tóm tắt (nhãn embedding chỉ là dự phòng); prompt cấm model bình luận về đầu vào.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">3 · Xếp hạng và chọn 7 tin</span><span class="badge s-done">Xong</span>
+    <span class="desc">Hàm thuần trong <code>core/src/ranking.ts</code> (R, P, C, A, F, N; cổng R ≥ 0,6; MMR; giữ chỗ, hạn mức, sàn); <code>jobs/rank.ts</code> (cổng R trước, chỉ lấy lại điểm HN cho sự kiện qua cổng); <code>cli rank --at --refresh</code>.</span>
+    <span class="note">12/10: code + test (các ví dụ xep-hang.html: phạt Nvidia 0,153, chọn A, C, D, B, hạn mức 9 → 5 tin). Sửa thiết kế: gửi theo S − phạt, không theo S (sắp theo S thì tin trùng đứng cạnh nhau). Ngày 05/10: Wikimedia đứng thứ 2, sau chuỗi 10 bài "OpenAI Decisions API" (C = 1). 13/10 bạn chốt: hạn mức 5 tin/nguồn (với 3, digest 12/10 chỉ 4 tin); P = lớn nhất theo nguồn, nguồn không có tín hiệu góp 0,3 (không còn luật riêng cho nguồn nào). Sau đó 12/10 ra 6 tin (sàn chặn phần còn lại). Còn lại: rank chạy trong job digest (bước 6).</span></div>
+</div>
+<div class="group">
+  <div class="group-head"><b>Telegram và digest</b><span>bước 4–7</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Schema gửi tin và phản hồi</span><span class="badge s-done">Xong</span>
+    <span class="desc">Bảng <code>digests</code>, <code>deliveries</code> (mỗi tin đã gửi, chụp lại <code>document_ids</code>), <code>feedback</code> (like · dislike · comment, góp ý chung không gắn tin). Không khoá ngoại vào <code>events</code>: phản hồi sống sót khi dựng lại dữ liệu dẫn xuất.</span>
+    <span class="note">11/10: migration 0005, 5 test. Tính năng nhận xét qua Telegram: chưa làm theo quyết định của bạn, chỉ có nút 👍/👎.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">4 · <code>Notifier</code> và bot Telegram</span><span class="badge s-done">Xong</span>
+    <span class="desc">grammY 1.46.0 + @grammyjs/auto-retry 2.0.2, chỉ import trong <code>packages/adapters</code>. <code>core/src/notify.ts</code> (Message, Notifier, ChatChannel); <code>adapters/src/telegram.ts</code> (escape HTML, nút <code>fb:like</code>/<code>fb:dislike</code>, giãn 1 giây, 429 qua auto-retry, lọc chat lạ, <code>bot.catch</code>, không <code>drop_pending_updates</code>); <code>notify-fake.ts</code>; vai trò <code>bot</code>; <code>jobs/feedback.ts</code>; CLI <code>notify test</code>, <code>feedback</code>. Giải thích: <a href="notifier-telegram.html">notifier-telegram.html</a>.</span>
+    <span class="note">13/10: 15 test mới (escape, cắt tin dài, nút, lỗi không lộ token, người lạ, giao lại, "not modified", nút lạ, nối delivery); <code>bun run check</code> 117/117. Daemon chạy với vai trò bot (@radard_bot nhận update). Link của tin: một trường <code>links</code> có vai trò (main · related · discussion), bỏ <code>url</code>/<code>urlLabel</code>; nhãn link mặc định "Đọc chi tiết". 08:09 giờ VN: bạn bấm 👍, 👎, 👎 trên tin thử (message_id 7) → 3 dòng <code>feedback</code>, đều nối đúng delivery, <code>source_message_id</code> dạng <code>cb:…</code>; log không lỗi, không lộ token.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">5 · Chọn chủ đề trên Telegram</span><span class="badge s-done">Xong</span>
+    <span class="desc"><code>/start</code>, <code>/topics</code>: nút bật tắt (chủ đề đang bật có dấu ✓ đơn sắc), "Tự thêm chủ đề" (gửi tên + mô tả → LLM viết câu tiếng Anh → [Lưu] [Huỷ]), "Xong"; menu lệnh qua <code>setMyCommands</code>. Bật/thêm chủ đề thì embed, chấm điểm, tính lại mặt bằng ngay. Không dùng plugin menu/conversations: callback thường + trạng thái trong bộ nhớ đủ cho luồng hai bước. Không dùng emoji màu như ✅ (13/10); dấu ✓ đơn sắc thì được.</span>
+    <span class="note">13/10: 9 test mới (nút, bật tắt, tự thêm, huỷ, người lạ, tách tên/mô tả, lõi bật tắt cả hai loại); <code>bun run check</code> 126/126. Daemon đã chạy lại với lệnh mới. Bạn đã thử trên điện thoại: bật tắt và tự thêm chủ đề chạy được. Chủ đề thử "Bảo mật AI" trùng một phần với thư viện nên đã xoá (SQL); hai việc lộ ra (xoá chủ đề tự thêm, cảnh báo chủ đề gần giống) ghi ở mục Để sau. Từ trong tin: "điểm tin", không dùng "digest".</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">6 · Job điểm tin 07:00</span><span class="badge s-done">Xong</span>
+    <span class="desc"><code>jobs/digest.ts</code>: khung 07:00 giờ VN; plan lưu vào <code>digests.meta.plan</code> trước khi gửi, chạy lại thì gửi tiếp vị trí còn thiếu (migration 0009: cột <code>meta</code>, khoá duy nhất (digest, vị trí)); một lời gọi LLM viết lời mở đầu, tiêu đề, tóm tắt (JSON, thử lại 1 lần, hỏng thì gửi bản không tóm tắt); ngày không có tin gửi "Hôm nay không có tin tức đáng chú ý." kèm số tin thuộc chủ đề nhưng chưa đủ mức đáng đọc (D5, câu chữ bạn chốt 13/10). Link: bài khớp chủ đề nhất, bài khác tối đa 3 (+N bài), thảo luận do adapter khai báo (<code>discussionUrl</code>, HN). Queue <code>digest</code> (stately, thử lại 4 lần), cron <code>0 7 * * *</code> Asia/Ho_Chi_Minh. CLI <code>digest</code>, <code>digest --dry-run [--at]</code>, <code>digest --now</code>. Phản hồi: bấm lại đúng nút vừa bấm không ghi thêm dòng.</span>
+    <span class="note">13/10: 9 test mới (chạy 2 lần gửi 1 lần; chết sau tin 3 gửi tiếp tin 3–4 theo plan cũ dù có sự kiện mới; JSON hỏng → bản không tóm tắt; không có LLM; ngày yên ắng; khung giờ; link; đọc JSON) + 1 test phản hồi; <code>bun run check</code> 135/135. Dry-run thật khung 13/10: 1.057 ứng viên, 144 qua cổng, 6 tin; một lời gọi chạm trần 4.000 token ra (2.788 token suy nghĩ, JSON bị cắt) → nâng trần lên 8.000. Mỗi lần gọi 1.613 token vào, ~$0,0012–0,0022. Daemon đã chạy lại, lịch digest đã đăng ký; bản tự động đầu tiên: 07:00 14/10.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">7 · Hai sáng digest thật trên máy</span><span class="badge s-you">Cần bạn</span>
+    <span class="desc">17–18/10. Cần bạn đọc, bấm nút và góp ý.</span></div>
+</div>
+<div class="group">
+  <div class="group-head"><b>Lên server và nghiệm thu</b><span>bước 8–9</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">8 · R2, Dockerfile, Railway</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc"><code>Bun.s3</code> cùng key với bản ghi đĩa, contract test chung; một image, <code>SERVICE_ROLE=all</code>; tắt daemon trên máy trước khi bật server. Chỉ deploy khi bạn đồng ý.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Project Railway, bucket R2</span><span class="badge s-you">Cần bạn</span>
+    <span class="desc">Bạn tạo tài khoản, đặt biến bí mật; trước 17/10.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">9 · Nghiệm thu 7 ngày</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">≥ 95% lượt fetch thành công, 7/7 digest đúng giờ, phản hồi (đề xuất: ≥ 70% tin có 👍/👎, D6), chi phí model &lt; $0,1/ngày; <code>cli report</code>.</span></div>
+</div>
+
+<h2>Sau digest · Repo GitHub đang nổi</h2>
+<p class="lede">Quyết định 11/10/2026 (xem docs/github-theo-doi.html, tab 07): 1A lấy mọi repo nổi rồi để bước xử lý lọc · 2A dùng trang Trending (2–3 request/ngày, kiểm tra hợp lý, lưu HTML gốc) · 4C giữ nguồn releases, thay danh sách bằng repo bạn thật sự dùng · 5A làm ngay sau digest Telegram · 6A quy tắc lọc rác.</p>
+<div class="group">
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">GITHUB_TOKEN chỉ quyền đọc</span><span class="badge s-done">Xong</span>
+    <span class="desc">Fine-grained token, quyền "Public repositories (read-only)", đặt vào <code>.env</code>.</span>
+    <span class="note">11/10/2026: đã kiểm. Quota REST 5.000/giờ, Search 30/phút, GraphQL 5.000; đọc repo công khai HTTP 200, thử tạo issue bị chặn HTTP 403 (đúng là chỉ đọc). Nguồn releases chạy với token: 90 lấy về, 22 mới.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Nguồn github_new_repos (Search API) + lọc rác</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">Repo tạo trong 7 ngày, nhiều sao; quy tắc "&lt; 10 KB, 0 fork, ≥ 300 sao" → <code>meta.suspicious</code>, không vào digest.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Nguồn github_trending</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">Ngày + tuần; lưu HTML gốc; kiểm tra hợp lý (có repo, có "stars today", ≤ tổng sao) sai thì ghi lỗi. Thử chạy từ Railway.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">README cho repo và bảng repo_stats</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">Embed README (đoạn đầu); chụp số sao mỗi ngày (GraphQL, 100 repo/request); tính tăng_24h, tăng_tốc.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Mục "Repo nổi" trong digest</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">Repo liên quan, xếp theo số sao tăng trong 24 giờ.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Danh sách repo cho nguồn releases</span><span class="badge s-you">Cần bạn</span>
+    <span class="desc">Thay 10 repo TẠM bằng các công cụ bạn thật sự dùng.</span></div>
+</div>
+
+<h2>Để sau · Đã bàn, chưa làm</h2>
+<p class="lede">Những việc đã thống nhất là làm sau, ghi lại để không quên. Ngày ghi là ngày quyết định để sau.</p>
+<div class="group">
+  <div class="group-head"><b>Hồ sơ và trải nghiệm người dùng</b><span>12/10 · xep-hang.html</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Xem trước kết quả khi chọn chủ đề</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Ngay sau khi chọn hoặc thêm chủ đề: hiện "với hồ sơ này, digest sáng nay sẽ có…" gồm 5–7 tin thật từ dữ liệu hôm qua, mỗi tin ghi khớp chủ đề nào.</span>
+    <span class="note">Giai đoạn đầu chỉ làm: chọn từ danh mục + tự thêm chủ đề (tên, mô tả bằng lời của mình, LLM chuyển sang tiếng Anh để embed).</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">👎 có lý do</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Bấm 👎 thì hỏi thêm 3 nút: "Không liên quan" (giảm chủ đề) · "Đã biết rồi" (độ mới) · "Chất lượng kém" (uy tín nguồn). Thêm cột <code>feedback.reason</code>.</span>
+    <span class="note">Mỗi lý do tác động lên một thành phần khác của công thức xếp hạng.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Đề xuất chỉnh hồ sơ hằng tuần</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Tin Telegram mỗi tuần: "Tuần này bạn 👍 4 tin về X, chủ đề chưa có trong hồ sơ. Thêm? [Thêm] [Bỏ qua]". radard đề xuất, bạn duyệt; không tự sửa hồ sơ.</span>
+    <span class="note">Cột <code>profile_topics.origin = suggested</code> để biết chủ đề từ đâu ra.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Lệnh nhanh trên Telegram</span><span class="badge s-todo">Để sau</span>
+    <span class="desc"><code>/add …</code>, <code>/remove …</code>.</span>
+    <span class="note">12/10: <code>/topics</code> (xem, bật tắt chủ đề bằng nút) chuyển vào tuần 3, bước 5.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Chế độ nâng cao</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Xem và sửa câu mô tả tiếng Anh phía sau từng chủ đề, chỉnh trọng số xếp hạng. Ẩn mặc định.</span>
+    <span class="note"></span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Nhận xét bằng chữ cho từng tin</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Reply vào tin, hoặc nút 💬 mở ô trả lời (ForceReply). Schema đã sẵn: <code>feedback.kind = comment</code>, <code>text</code>, <code>source_message_id</code>.</span>
+    <span class="note">11/10: quyết định tuần 3 chỉ có 👍/👎.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Xoá chủ đề tự thêm</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Hiện trên Telegram chủ đề tự thêm chỉ tắt được, vẫn nằm trong danh sách; bot và CLI chưa có cách xoá. Đề xuất: chủ đề tự thêm có nút Xoá, hỏi xác nhận một lần rồi xoá (điểm chủ đề và mặt bằng tự xoá theo nhờ khoá ngoại <code>cascade</code>). Chủ đề thư viện chỉ bật/tắt.</span>
+    <span class="note">13/10: lộ ra khi test bước 5, phải xoá "Bảo mật AI" bằng SQL. Cần bàn thêm trước khi làm.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Cảnh báo chủ đề gần giống khi tự thêm</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Ở bước xem trước, so chủ đề mới với mọi chủ đề trong thư viện và trong hồ sơ; nếu gần giống thì hiện "Gần giống: X" kèm nút bật X thay vào, vẫn cho Lưu cả hai. Cần embed cả 16 mô tả thư viện (hiện chỉ chủ đề đã bật mới có embedding).</span>
+    <span class="note">13/10: "Bảo mật AI" trùng một phần với "An toàn &amp; nguyên lý AI" mà không ai báo. Ngưỡng "gần giống" chưa đo, phải đo trên các cặp thật trước khi chọn. Cần bàn thêm trước khi làm.</span></div>
+</div>
+<div class="group">
+  <div class="group-head"><b>Xếp hạng và học từ phản hồi</b><span>11–12/10 · xep-hang.html</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Cá nhân hoá U</span><span class="badge s-todo">Để sau</span>
+    <span class="desc"><code>U = cos(sự kiện, tâm 👍) − cos(sự kiện, tâm 👎)</code>, bắt đầu w<sub>U</sub> = 0, nâng lên ~0,15 khi có ~30 phản hồi.</span>
+    <span class="note"></span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Học lại trọng số bằng hồi quy logistic</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Sau ~2 tuần có 👍/👎: dự đoán 👍 từ (R, P, C, A, F), hệ số học được là trọng số mới.</span>
+    <span class="note">Tài liệu thiết kế dự kiến ở tuần 11.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Chỉnh lại các hằng số sau tuần đầu</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Hạn mức tin mỗi nguồn (13/10: 3 → 5), sàn điểm (đang 0,59), mốc phạt trùng 0,85, cổng R ≥ 0,6, P trung tính cho nguồn không có tín hiệu (12/10: hạ từ 0,5 xuống 0,3).</span>
+    <span class="note"></span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Releases thành mục riêng cuối digest?</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">"Phiên bản mới của công cụ bạn dùng" thay vì tranh chỗ với tin (2 bản phát hành vào top 5 ngày thử).</span>
+    <span class="note">Đề xuất, chưa quyết.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">LLM phân xử vùng xám khi gộp sự kiện</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Cặp sự kiện giống 0,85–0,9 (ví dụ 2 sự kiện Nvidia giống 0,901 bị tách): hỏi LLM có cùng chuyện không.</span>
+    <span class="note">MVP-1. Hiện bước đa dạng (MMR) tạm che vấn đề này trong digest.</span></div>
+</div>
+<div class="group">
+  <div class="group-head"><b>Vận hành và dữ liệu</b><span>06–11/10</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Xem lại 2 index không dùng</span><span class="badge s-todo">Để sau</span>
+    <span class="desc"><code>documents_sha_idx</code>, <code>fetch_runs_source_started_idx</code>: 0 lần dùng tới 06/10. Xem lại <code>idx_scan</code> sau 7 ngày chạy thật rồi quyết định bỏ hay giữ.</span>
+    <span class="note">btree.html tab 07.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Nguồn 814 lần dùng HNSW chưa rõ</span><span class="badge s-todo">Để sau</span>
+    <span class="desc">Bộ đếm cho thấy <code>events_centroid_hnsw</code> từng được dùng 814 lần; với code hiện tại một lượt process dùng 0 lần. Thử 4 kịch bản không tái hiện được.</span>
+    <span class="note">hnsw.html tab 07.</span></div>
+</div>
+
+<h2>Cần bạn chuẩn bị</h2>
+<div class="group">
+  <div class="group-head"><b>Thông tin và tài khoản</b><span>trước tuần 2–3</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Mô tả lĩnh vực và hồ sơ</span><span class="badge s-you">Cần bạn · tuần 2</span>
+    <span class="desc">5–10 dòng bằng tiếng Anh: chủ đề quan tâm, stack, dự án, những gì không quan tâm. Đặt bằng <code>bun run cli profile set "…"</code>; hiện đang dùng mô tả TẠM.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Danh sách ~10 repo GitHub</span><span class="badge s-you">Cần bạn · tuần 2</span>
+    <span class="desc">Repo muốn theo dõi release.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Token GitHub (chỉ quyền đọc)</span><span class="badge s-done">Xong</span>
+    <span class="desc">Fine-grained token, chỉ đọc repo công khai; đặt vào <code>.env</code> (<code>GITHUB_TOKEN</code>). Có token thì quota 5.000 request/giờ thay vì 60, và request 304 không bị trừ quota.</span>
+    <span class="note">11/10/2026: đã kiểm. Quota REST 5.000/giờ, Search 30/phút, GraphQL 5.000; đọc repo công khai HTTP 200, thử tạo issue bị chặn HTTP 403 (đúng là chỉ đọc). Nguồn releases chạy với token: 90 lấy về, 22 mới.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Khoá Vercel AI Gateway</span><span class="badge s-done">Xong</span>
+    <span class="desc">Đặt vào <code>.env</code> (<code>AI_GATEWAY_API_KEY</code>); tôi không đọc hay in khoá ra.</span>
+    <span class="note">Đặt từ 28/09; embedding chạy thật từ hôm đó; gpt-5.6-luna gọi được từ 11/10 sau khi nạp credits. Cùng ngày đổi model LLM sang <code>anthropic/claude-haiku-5.5</code> ($0,1/$0,5 mỗi MTok, rẻ hơn luna); gọi thử ok, 3,3 giây, $0,000093. Chi phí trong <code>llm_calls</code> lấy theo số Gateway báo (<code>cost_source = gateway</code>); dự phòng ước tính từ bảng giá có bậc của Gateway (<code>gateway-pricing.ts</code>, lệch 0,00% khi so), bỏ cấu hình giá tay. Đổi model qua <code>LLM_MODEL</code>.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Nạp credits Vercel AI Gateway</span><span class="badge s-done">Xong</span>
+    <span class="desc">Gói miễn phí chặn <code>openai/gpt-5.6-luna</code> và giới hạn embedding 5 request/phút.</span>
+    <span class="note">11/10: bạn nạp $10. Gọi thử luna: ok, 2,4 giây, 29 token vào/23 ra, $0,000033. Embedding: 8 request liền nhau qua hết trong 5,2 giây; hạ nhịp mặc định xuống 1 giây.</span></div>
+  <div class="task done"><input type="checkbox" checked disabled><span class="name">Bot Telegram</span><span class="badge s-done">Xong</span>
+    <span class="desc">@radard_bot; <code>TELEGRAM_BOT_TOKEN</code> và <code>TELEGRAM_CHAT_ID</code> trong <code>.env</code>; 11/10 đã nhận tin của bạn và gửi thử 1 tin.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Project Railway, bucket R2</span><span class="badge s-you">Cần bạn · tuần 3</span>
+    <span class="desc">Tạo bot qua BotFather; project Railway có Postgres pgvector; bucket R2 trên tài khoản Cloudflare hiện có.</span></div>
+</div>
+
+<footer>File này được cập nhật sau mỗi đầu việc. Ô đánh dấu chỉ để hiển thị trạng thái, không lưu khi bạn bấm.</footer>
+</div>
+<script>
+(function(){
+  var tasks=[].slice.call(document.querySelectorAll('.task'));
+  var n=function(c){return document.querySelectorAll('.task .'+c).length};
+  var done=n('s-done'), wip=n('s-wip'), you=n('s-you'), todo=n('s-todo');
+  document.getElementById('summary').innerHTML=
+    '<div class="stat"><b>'+done+'/'+tasks.length+'</b><span>đã xong</span></div>'+
+    '<div class="stat"><b>'+wip+'</b><span>đang làm</span></div>'+
+    '<div class="stat"><b>'+todo+'</b><span>chưa làm</span></div>'+
+    '<div class="stat"><b>'+you+'</b><span>cần bạn</span></div>';
+  document.getElementById('bar').style.width=(100*done/tasks.length)+'%';
+})();
+</script>
+</body>
+</html>

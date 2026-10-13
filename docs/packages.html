@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Các package</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · GIẢI THÍCH CODE · MVP-0 TUẦN 1 · 28/09/2026</div>
+<h1>Các package trong radard</h1>
+<p class="lede">radard là một monorepo Bun. Thư mục <code>packages/</code> chứa ba thư viện nội bộ mà app daemon dùng: <span class="pkg p-core">@radard/core</span> <span class="pkg p-ad">@radard/adapters</span> <span class="pkg p-db">@radard/db</span>. Trang này giải thích từng package có gì, vì sao chia như vậy, và chúng phối hợp ra sao trong một lượt cào tin.</p>
+
+<nav class="toc">
+  <a href="#tong-quan">1. Tổng quan</a><a href="#core">2. @radard/core</a><a href="#adapters">3. @radard/adapters</a>
+  <a href="#db">4. @radard/db</a><a href="#phoi-hop">5. Một lượt cào đi qua các package</a><a href="#test">6. Test</a><a href="#luat">7. Luật và cách mở rộng</a>
+</nav>
+
+<div class="tldr"><b>Tóm tắt</b>
+<ul>
+  <li><span class="pkg p-core">core</span> là <b>các hợp đồng (interface) và tiện ích thuần</b>: nguồn là gì, kho bản thô là gì, cách băm, cách chuẩn hoá URL, cách gọi HTTP lịch sự. Không phụ thuộc package nào.</li>
+  <li><span class="pkg p-ad">adapters</span> là <b>cài đặt cụ thể</b> của các interface đó cho một nhà cung cấp; hiện có kho bản thô ghi ra đĩa, sau này có R2, Telegram…</li>
+  <li><span class="pkg p-db">db</span> là <b>schema database, kết nối và migration</b>; nơi duy nhất biết cấu trúc bảng.</li>
+  <li><span class="pkg p-app">apps/daemon</span> ghép ba thứ trên thành chương trình chạy thật: adapter nguồn, job <code>fetch</code>, scheduler, worker, CLI.</li>
+</ul></div>
+
+<!-- 1 -->
+<h2 id="tong-quan">1. Tổng quan: monorepo và cách các package nối với nhau</h2>
+<figure>
+<svg viewBox="0 0 900 330" role="img" aria-label="Sơ đồ phụ thuộc: daemon dùng core, adapters, db; adapters và db dùng core; core không dùng ai">
+  <defs><marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bp" x="300" y="20" width="300" height="70" rx="10"/>
+  <text class="tmb" x="450" y="46" text-anchor="middle">apps/daemon</text>
+  <text class="ts" x="450" y="66" text-anchor="middle">adapter HN · job fetch · scheduler · worker · CLI</text>
+  <text class="ts" x="450" y="81" text-anchor="middle">pg-boss</text>
+  <rect class="ba" x="60" y="150" width="240" height="64" rx="10"/>
+  <text class="tmb" x="180" y="176" text-anchor="middle">@radard/adapters</text>
+  <text class="ts" x="180" y="196" text-anchor="middle">fsObjectStore (sau: R2, Telegram…)</text>
+  <rect class="bd" x="600" y="150" width="240" height="64" rx="10"/>
+  <text class="tmb" x="720" y="176" text-anchor="middle">@radard/db</text>
+  <text class="ts" x="720" y="196" text-anchor="middle">schema · client · migrate · drizzle-orm</text>
+  <rect class="bc" x="330" y="250" width="240" height="64" rx="10"/>
+  <text class="tmb" x="450" y="276" text-anchor="middle">@radard/core</text>
+  <text class="ts" x="450" y="296" text-anchor="middle">interface + tiện ích · 0 dependency</text>
+  <path class="ln" d="M380,90 L220,148" marker-end="url(#m1)"/>
+  <path class="ln" d="M520,90 L680,148" marker-end="url(#m1)"/>
+  <path class="ln" d="M450,90 L450,248" marker-end="url(#m1)"/>
+  <path class="ln" d="M230,214 L380,250" marker-end="url(#m1)"/>
+  <path class="ln" d="M670,214 L520,250" marker-end="url(#m1)"/>
+  <text class="lb" x="458" y="175">dùng</text>
+  <text class="ts" x="20" y="30">Mũi tên = "import từ".</text>
+  <text class="ts" x="20" y="46">Không có mũi tên nào đi ra từ core.</text>
+</svg>
+<figcaption><b>Hình 1.</b> Phụ thuộc chỉ đi một chiều, hướng vào <code>core</code>. Nhờ vậy đổi một adapter (đĩa sang R2) hay đổi app không kéo theo sửa lõi.</figcaption>
+</figure>
+
+<div class="grid3">
+  <div class="card"><b class="h">Tên có scope</b><p><code>@radard/</code> là tiền tố theo tên dự án, gom các package nội bộ. Không publish lên npm.</p></div>
+  <div class="card"><b class="h">Liên kết bằng workspace</b><p>Khai báo <code>"@radard/core": "workspace:*"</code>; Bun liên kết thẳng tới thư mục trong repo, không tải từ mạng. Thêm package mới thì chạy lại <code>bun install</code>.</p></div>
+  <div class="card"><b class="h">Không có bước build</b><p><code>exports</code> trỏ thẳng vào file <code>.ts</code>. Bun chạy TypeScript trực tiếp nên sửa là thấy ngay.</p></div>
+</div>
+
+<pre><code>radard/
+├── packages/
+│   ├── core/          <span class="c"># @radard/core      · 7 file, ~210 dòng</span>
+│   ├── adapters/      <span class="c"># @radard/adapters  · 1 file</span>
+│   └── db/            <span class="c"># @radard/db        · schema, client, migrate + drizzle/0000_layer1.sql</span>
+└── apps/
+    └── daemon/        <span class="c"># chương trình chạy thật</span></code></pre>
+
+<!-- 2 -->
+<h2 id="core">2. <span class="pkg p-core">@radard/core</span>: hợp đồng và tiện ích</h2>
+<p>Đây là “lõi” theo kiến trúc ports &amp; adapters: nó định nghĩa <b>những gì</b> hệ thống cần (một nguồn trả về gì, một kho bản thô làm được gì) mà không quan tâm <b>ai</b> cung cấp. <code>package.json</code> của nó không có dependency nào.</p>
+<div class="tbl"><table>
+  <thead><tr><th>File</th><th>Xuất ra</th><th>Việc</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">source.ts</td><td><code>SourceAdapter</code>, <code>RawItem</code>, <code>FetchContext</code>, <code>FetchResult</code></td><td>Hợp đồng mọi nguồn phải tuân theo</td></tr>
+    <tr><td class="mono">object-store.ts</td><td><code>ObjectStore</code>, <code>rawKey()</code></td><td>Hợp đồng kho bản thô và cách đặt tên file</td></tr>
+    <tr><td class="mono">http.ts</td><td><code>HttpClient</code>, <code>createHttpClient()</code>, <code>HttpError</code></td><td>Gọi HTTP có điều kiện, giãn request theo host</td></tr>
+    <tr><td class="mono">hash.ts</td><td><code>nfc()</code>, <code>sha256()</code></td><td>Băm nội dung sau khi chuẩn hoá Unicode</td></tr>
+    <tr><td class="mono">url.ts</td><td><code>canonicalizeUrl()</code></td><td>Khoá so sánh URL</td></tr>
+    <tr><td class="mono">log.ts</td><td><code>createLogger()</code></td><td>Log một dòng mỗi sự kiện</td></tr>
+    <tr><td class="mono">index.ts</td><td>—</td><td>Gom tất cả để <code>import { … } from "@radard/core"</code></td></tr>
+  </tbody>
+</table></div>
+
+<h3>2.1 <code>SourceAdapter</code>: hợp đồng của một nguồn</h3>
+<div class="path">packages/core/src/source.ts</div>
+<pre><code>export interface RawItem {
+  externalId: string;    <span class="c">// id phía nguồn; cùng source_id là khoá chống trùng</span>
+  url: string;
+  title?: string;
+  publishedAt?: Date;
+  body: string;          <span class="c">// nội dung gốc đúng như nhận được (JSON, HTML, XML)</span>
+  contentType: string;
+  meta?: Record&lt;string, unknown&gt;;   <span class="c">// vài trường tiện tra: điểm, tác giả…</span>
+}
+
+export interface FetchContext&lt;C, S&gt; { config: C; state: S | undefined; http: HttpClient; now: Date; }
+export interface FetchResult&lt;S&gt;     { items: RawItem[]; state: S; notModified?: boolean; httpStatus?: number; }
+
+export interface SourceAdapter&lt;C = unknown, S = unknown&gt; {
+  readonly kind: string;                           <span class="c">// "hn", "arxiv"… khớp cột sources.kind</span>
+  fetch(ctx: FetchContext&lt;C, S&gt;): Promise&lt;FetchResult&lt;S&gt;&gt;;
+}</code></pre>
+<figure>
+<svg viewBox="0 0 900 180" role="img" aria-label="Job fetch đưa config và state vào adapter, adapter trả items và state mới">
+  <defs><marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bp" x="30" y="50" width="220" height="80" rx="10"/><text class="tmb" x="140" y="80" text-anchor="middle">job fetch</text><text class="ts" x="140" y="100" text-anchor="middle">đọc sources + source_state</text><text class="ts" x="140" y="116" text-anchor="middle">ghi documents + state mới</text>
+  <rect class="bx" x="560" y="50" width="220" height="80" rx="10"/><text class="tmb" x="670" y="80" text-anchor="middle">hnSource.fetch()</text><text class="ts" x="670" y="100" text-anchor="middle">gọi API Algolia qua http</text><text class="ts" x="670" y="116" text-anchor="middle">không biết database là gì</text>
+  <path class="ln" d="M250,72 L558,72" marker-end="url(#m2)"/><text class="lb" x="404" y="64" text-anchor="middle">config · state (vd {lastCreatedAt}) · http · now</text>
+  <path class="ln" d="M558,110 L252,110" marker-end="url(#m2)"/><text class="lb" x="404" y="126" text-anchor="middle">items[] · state mới · notModified?</text>
+</svg>
+<figcaption><b>Hình 2.</b> Adapter chỉ là một hàm “đưa trạng thái cũ, trả về mục mới và trạng thái mới”. Nó không ghi database, không lưu file, nên test bằng HTTP giả rất dễ.</figcaption>
+</figure>
+<div class="grid2">
+  <div class="card"><b class="h">Vì sao <code>state</code> là “hộp đen”?</b><p>Mỗi nguồn cần một kiểu con trỏ khác nhau: HN nhớ <code>lastCreatedAt</code>, GitHub sẽ nhớ ETag từng repo, RSS nhớ <code>Last-Modified</code>. Lõi chỉ cất và trả lại nguyên vẹn (cột <code>jsonb</code>), nên thêm nguồn mới không phải đổi schema.</p></div>
+  <div class="card"><b class="h">Vì sao giữ <code>body</code> nguyên văn?</b><p>Bản thô là nền của nguyên tắc “không bao giờ sửa”: khi lớp 2 đổi cách trích xuất, radard đọc lại bản thô thay vì cào lại nguồn.</p></div>
+</div>
+
+<h3>2.2 <code>ObjectStore</code> và <code>rawKey()</code></h3>
+<div class="path">packages/core/src/object-store.ts</div>
+<pre><code>export interface ObjectStore {
+  put(key: string, body: Uint8Array&lt;ArrayBuffer&gt;, contentType: string): Promise&lt;void&gt;;
+  get(key: string): Promise&lt;Uint8Array&lt;ArrayBuffer&gt; | null&gt;;
+  exists(key: string): Promise&lt;boolean&gt;;
+}
+export function rawKey(sha256: string): string {
+  return `raw/${sha256.slice(0, 2)}/${sha256}.gz`;   <span class="c">// raw/61/61d453ef…2841.gz</span>
+}</code></pre>
+<ul>
+  <li><b>Key theo hash nội dung</b> (content-addressed): cùng nội dung thì cùng key, ghi lại là vô hại; hai nguồn trả về cùng thứ chỉ tốn một chỗ.</li>
+  <li><b>Tách thư mục theo 2 ký tự đầu</b>: 256 thư mục con, để một thư mục không chứa hàng trăm nghìn file (chậm với hệ thống file). Hiện 737 file nằm trong 241 thư mục.</li>
+  <li><b>Kiểu <code>Uint8Array&lt;ArrayBuffer&gt;</code></b> chứ không phải <code>Uint8Array</code> thường: <code>Bun.gzipSync</code> chỉ nhận mảng gắn với <code>ArrayBuffer</code> (không phải <code>SharedArrayBuffer</code>). Thu hẹp kiểu ở interface thì không phải sao chép dữ liệu.</li>
+</ul>
+
+<h3>2.3 <code>hash.ts</code>: băm sau khi chuẩn hoá NFC</h3>
+<pre><code>export function sha256(input: string | Uint8Array): string {
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(typeof input === "string" ? nfc(input) : input);
+  return hasher.digest("hex");
+}</code></pre>
+<p>“ệ” có thể lưu là 1 ký tự (<code>U+1EC7</code>, NFC) hoặc 3 ký tự (<code>e</code> + dấu nặng + dấu mũ, NFD). Không chuẩn hoá thì cùng nội dung ra hai hash khác nhau và dedup hỏng. Chuỗi được chuẩn hoá ở đây; job <code>fetch</code> chuẩn hoá <code>body</code> trước khi mã hoá thành byte, nên cả hai đường đều ra NFC. Chi tiết trong lab-notebook: <code>2026-09-28-nfc-nfd-tieng-viet</code>.</p>
+
+<h3>2.4 <code>url.ts</code>: khoá so sánh URL</h3>
+<p>Cùng một bài có thể được chia sẻ với nhiều URL khác nhau. <code>canonicalizeUrl()</code> đưa chúng về một dạng để so sánh (cột <code>url_canonical</code>), còn URL gốc vẫn giữ ở cột <code>url</code>.</p>
+<div class="tbl"><table>
+  <thead><tr><th>URL vào</th><th>Kết quả</th><th>Quy tắc</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">http://www.Example.com/blog/post/?utm_source=x&amp;fbclid=y#top</td><td class="mono">https://example.com/blog/post</td><td>bỏ tham số theo dõi, fragment, <code>www.</code>, chữ hoa ở host, <code>/</code> cuối; gộp http vào https</td></tr>
+    <tr><td class="mono">https://site.com/item?page=2&amp;id=123</td><td class="mono">https://site.com/item?id=123&amp;page=2</td><td>sắp xếp tham số để thứ tự không đổi khoá</td></tr>
+    <tr><td class="mono">https://news.ycombinator.com/item?id=1</td><td class="mono">…/item?id=1</td><td><b>giữ</b> tham số chọn bài</td></tr>
+    <tr><td class="mono">https://site.com/item?id=5&amp;utm_source=nl</td><td class="mono">https://site.com/item?id=5</td><td>bỏ từng tham số theo dõi, <b>giữ phần còn lại</b>; ví dụ đầu bảng mất cả query chỉ vì mọi tham số của nó đều là tham số theo dõi</td></tr>
+    <tr><td class="mono">…/contents/README.md?ref=v2</td><td class="mono">…/README.md?ref=v2</td><td><b>giữ</b> <code>ref</code>: GitHub dùng làm tên nhánh/tag. <code>si</code> chỉ bỏ ở YouTube và Spotify</td></tr>
+  </tbody>
+</table></div>
+<div class="note"><b>Cố ý bảo thủ:</b> chỉ bỏ thứ chắc chắn không đổi nội dung. Bỏ nhầm <code>?id=123</code> là gộp hai bài khác nhau thành một, lỗi này khó phát hiện hơn nhiều so với để sót một bản trùng (bản trùng còn bị bắt ở tầng hash và vector về sau).</div>
+
+<h3>2.5 <code>http.ts</code>: gọi HTTP lịch sự</h3>
+<div class="path">packages/core/src/http.ts (rút gọn)</div>
+<pre><code>export function createHttpClient(opts: { minIntervalMs?: number } = {}): HttpClient {
+  const minInterval = opts.minIntervalMs ?? 1000;
+  const nextAllowed = new Map&lt;string, number&gt;();         <span class="c">// host → thời điểm sớm nhất được gọi tiếp</span>
+
+  async function waitTurn(host: string) {
+    const now = Date.now();
+    const at = Math.max(now, nextAllowed.get(host) ?? 0);  <span class="c">// lượt của mình</span>
+    nextAllowed.set(host, at + minInterval);             <span class="c">// giữ chỗ cho người sau</span>
+    if (at &gt; now) await Bun.sleep(at - now);
+  }
+
+  return { async get(url, o = {}) {
+    await waitTurn(new URL(url).host);
+    if (o.etag) headers["if-none-match"] = o.etag;             <span class="c">// GET có điều kiện</span>
+    if (o.lastModified) headers["if-modified-since"] = o.lastModified;
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(o.timeoutMs ?? 30_000) });
+    const body = res.status === 304 ? "" : await res.text();   <span class="c">// 304: không tải lại body</span>
+    if (res.status &gt;= 400) throw new HttpError(res.status, url, body.slice(0, 300));
+    …
+  } };
+}</code></pre>
+<div class="grid2">
+  <div class="card"><b class="h">GET có điều kiện</b><p>Gửi kèm ETag hoặc Last-Modified của lần trước. Nội dung chưa đổi thì server trả <b>304</b> không kèm body: tiết kiệm băng thông, và với GitHub một request 304 <b>có kèm token</b> (header <code>Authorization</code>) không bị trừ quota; không có token thì vẫn bị trừ. HN chưa dùng (API Algolia không trả ETag); GitHub và RSS ở tuần 2 sẽ dùng.</p></div>
+  <div class="card"><b class="h">Giãn request theo host</b><p>Mỗi host có một “vé” thời gian. Ba request tới cùng host gửi cùng lúc sẽ tự xếp hàng ở 0 giây, 1 giây, 2 giây; request tới host khác không bị ảnh hưởng. Cách này “giữ chỗ” trước khi ngủ nên đúng cả khi nhiều job chạy song song.</p></div>
+</div>
+<p>Thêm: <b>timeout 30 giây</b> để một nguồn treo không giữ worker mãi; <b>User-Agent</b> ghi rõ radard kèm link liên hệ, là phép lịch sự khi cào; <b>lỗi 4xx/5xx</b> thành <code>HttpError</code> có mã và đoạn đầu body, để <code>fetch_runs.error</code> đọc được nguyên nhân.</p>
+
+<h3>2.6 <code>log.ts</code></h3>
+<p>Một dòng mỗi sự kiện dạng <code>thời-gian phạm-vi thông-điệp khoá=giá-trị</code>, ví dụ <code>2026-09-28T00:15:23Z worker fetch xong sourceId=1 nNew=2</code>. Không dùng thư viện log vì dữ liệu cần truy vấn đã nằm trong bảng (<code>fetch_runs</code>); log chỉ để đọc bằng mắt trên terminal và Railway.</p>
+
+<!-- 3 -->
+<h2 id="adapters">3. <span class="pkg p-ad">@radard/adapters</span>: cài đặt cụ thể</h2>
+<p>Nơi <b>duy nhất</b> được import SDK hay API riêng của một nhà cung cấp. Hiện có một adapter:</p>
+<div class="path">packages/adapters/src/object-store-fs.ts</div>
+<pre><code>export function fsObjectStore(root: string): ObjectStore {
+  const pathOf = (key: string) =&gt; join(root, key);
+  return {
+    async put(key, body) {
+      await mkdir(dirname(pathOf(key)), { recursive: true });
+      await Bun.write(pathOf(key), Bun.gzipSync(body));      <span class="c">// nén trước khi ghi</span>
+    },
+    async get(key) {
+      const file = Bun.file(pathOf(key));
+      if (!(await file.exists())) return null;
+      return Bun.gunzipSync(new Uint8Array(await file.arrayBuffer()));
+    },
+    exists: (key) =&gt; Bun.file(pathOf(key)).exists(),
+  };
+}</code></pre>
+<ul>
+  <li>Khi dev ghi vào <code>./data</code> (biến <code>DATA_DIR</code>); test ghi vào thư mục tạm rồi xoá.</li>
+  <li><b>Nén nằm ở adapter, không ở lõi</b>: R2 có thể muốn nén kiểu khác hoặc để Cloudflare tự nén. Key đã có đuôi <code>.gz</code> nên hai adapter đọc được bản của nhau.</li>
+  <li>Tuần 3 thêm <code>object-store-r2.ts</code> (qua <code>Bun.s3</code>) và <code>notifier-telegram.ts</code> ngay cạnh file này; job <code>fetch</code> không đổi dòng nào.</li>
+</ul>
+<p>Vì sao adapter nguồn HN nằm ở <code>apps/daemon/src/sources/</code> chứ không ở đây? Adapter nguồn gắn với việc cào của daemon và có danh bạ theo <code>sources.kind</code>; còn <code>packages/adapters</code> dành cho hạ tầng mà nhiều app dùng chung (kho bản thô, kênh thông báo). Ranh giới này có thể xem lại khi có app thứ hai.</p>
+
+<!-- 4 -->
+<h2 id="db">4. <span class="pkg p-db">@radard/db</span>: schema, kết nối, migration</h2>
+<h3>4.1 Schema lớp 1</h3>
+<p>Viết bằng Drizzle (TypeScript), <code>drizzle-kit generate</code> sinh ra SQL trong <code>packages/db/drizzle/0000_layer1.sql</code>. Lớp 1 <b>chỉ ghi thêm</b>: không có xử lý nào phía sau sửa các bảng này.</p>
+<figure>
+<svg viewBox="0 0 900 300" role="img" aria-label="Bốn bảng lớp 1: sources, source_state, fetch_runs, documents và quan hệ với ObjectStore">
+  <defs><marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bd" x="330" y="20" width="240" height="118" rx="8"/><text class="tmb" x="344" y="42">sources</text>
+  <g class="tm"><text x="344" y="64">id · kind · name (unique)</text><text x="344" y="81">config jsonb · cadence (cron)</text><text x="344" y="98">enabled · default_role</text><text x="344" y="115">trust_score · created_at</text></g>
+  <rect class="bx" x="20" y="20" width="240" height="100" rx="8"/><text class="tmb" x="34" y="42">source_state</text>
+  <g class="tm"><text x="34" y="64">source_id (PK, 1–1)</text><text x="34" y="81">state jsonb ← adapter tự quản</text><text x="34" y="98">last_ok_at · last_error_at</text><text x="34" y="113">fail_count</text></g>
+  <rect class="bx" x="640" y="20" width="240" height="118" rx="8"/><text class="tmb" x="654" y="42">fetch_runs</text>
+  <g class="tm"><text x="654" y="64">id · source_id · started_at</text><text x="654" y="81">status: running|ok|</text><text x="654" y="98">  not_modified|error</text><text x="654" y="115">n_fetched · n_new · error</text></g>
+  <rect class="bx" x="200" y="180" width="330" height="108" rx="8"/><text class="tmb" x="214" y="202">documents</text>
+  <g class="tm"><text x="214" y="224">UNIQUE (source_id, external_id) ← chống trùng</text><text x="214" y="241">url · url_canonical · title · lang</text><text x="214" y="258">published_at · fetched_at · meta jsonb</text><text x="214" y="275">content_sha256 · raw_key · content_type</text></g>
+  <rect class="ex" x="640" y="200" width="240" height="68" rx="8"/><text class="tb" x="760" y="228" text-anchor="middle">ObjectStore</text><text class="tm" x="760" y="248" text-anchor="middle">raw/ab/&lt;sha&gt;.gz</text>
+  <path class="ln" d="M328,70 L262,70" marker-end="url(#m4)"/><text class="lb" x="295" y="62" text-anchor="middle">1–1</text>
+  <path class="ln" d="M638,70 L572,70" marker-end="url(#m4)"/><text class="lb" x="605" y="62" text-anchor="middle">n–1</text>
+  <path class="ln" d="M420,178 L440,140" marker-end="url(#m4)"/><text class="lb" x="462" y="165">n–1</text>
+  <path class="ln" d="M532,234 L638,234" marker-end="url(#m4)"/><text class="lb" x="585" y="226" text-anchor="middle">raw_key</text>
+</svg>
+<figcaption><b>Hình 3.</b> Bốn bảng lớp 1. <code>documents</code> chỉ giữ metadata; nội dung gốc nằm trong ObjectStore theo <code>raw_key</code>, nên Postgres gọn. Xoá một nguồn thì các bảng con xoá theo (<code>ON DELETE CASCADE</code>).</figcaption>
+</figure>
+<div class="tbl"><table>
+  <thead><tr><th>Bảng</th><th>Trả lời câu hỏi</th><th>Điểm cần để ý</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">sources</td><td>Cào những đâu, bao lâu một lần?</td><td>Nguồn là dữ liệu, không phải code: sửa <code>cadence</code> hay <code>enabled</code> thì scheduler tự áp dụng trong 5 phút</td></tr>
+    <tr><td class="mono">source_state</td><td>Lần trước đọc tới đâu, nguồn có khoẻ không?</td><td><code>state</code> chỉ cập nhật khi cả lượt thành công; <code>fail_count</code> tăng khi lỗi, về 0 khi lại ok</td></tr>
+    <tr><td class="mono">fetch_runs</td><td>Mỗi lượt cào ra sao?</td><td>Lịch sử lâu dài nằm ở đây, không ở pg-boss (pg-boss xoá job sau 7 ngày)</td></tr>
+    <tr><td class="mono">documents</td><td>Đã thu được những gì?</td><td>Khoá duy nhất <code>(source_id, external_id)</code> làm job idempotent; index trên <code>content_sha256</code>, <code>url_canonical</code>, <code>fetched_at</code> cho dedup và truy vấn theo thời gian</td></tr>
+  </tbody>
+</table></div>
+
+<h3>4.2 Kết nối: <code>client.ts</code></h3>
+<pre><code>export function createDatabase(url?: string, opts?: { max?: number }) {
+  const client = new SQL(url ?? databaseUrl(), opts ?? {});   <span class="c">// SQL client có sẵn của Bun</span>
+  const database = drizzle({ client, schema });
+  return Object.assign(database, { $bun: client });           <span class="c">// giữ client gốc để .close()</span>
+}</code></pre>
+<p>Dùng driver <code>bun-sql</code> của Drizzle: không kéo thêm <code>pg</code> hay <code>postgres.js</code> cho phần code của radard (pg-boss vẫn dùng <code>pg</code> riêng của nó). <code>$bun</code> để CLI và test đóng kết nối khi xong, nếu không tiến trình treo. Test đặt <code>max: 2</code> để nhiều file test không vượt giới hạn kết nối của Postgres.</p>
+
+<h3>4.3 Migration: <code>migrate.ts</code></h3>
+<pre><code>await client`select pg_advisory_lock(${LOCK_KEY})`;       <span class="c">// chỉ một tiến trình được migrate</span>
+try {
+  await database.execute(sql`create extension if not exists vector`);
+  await database.execute(sql`create extension if not exists pg_trgm`);
+  await migrate(database, { migrationsFolder: MIGRATIONS_FOLDER });
+} finally {
+  await client`select pg_advisory_unlock(${LOCK_KEY})`;
+}</code></pre>
+<div class="grid2">
+  <div class="card"><b class="h">Khoá tư vấn (advisory lock)</b><p>Trên Railway nhiều service cùng image khởi động cùng lúc và đều chạy migrate. Hai tiến trình cùng <code>CREATE TABLE</code> thì một cái chết. Khoá tư vấn của Postgres cho đúng một tiến trình làm, các tiến trình khác chờ rồi thấy đã xong.</p></div>
+  <div class="card"><b class="h">Bật extension sẵn</b><p><code>vector</code> (pgvector) và <code>pg_trgm</code> chưa dùng ở lớp 1, nhưng bật từ đầu để migration lớp 2 ở tuần 2 không hỏng trên máy hay server chưa bật.</p></div>
+</div>
+<p>Quy trình khi đổi schema: sửa file trong <code>src/schema/</code> → <code>bun run db:generate</code> sinh file SQL mới → xem lại SQL → <code>bun run cli db migrate</code> (daemon cũng tự migrate khi khởi động).</p>
+
+<!-- 5 -->
+<h2 id="phoi-hop">5. Một lượt cào đi qua các package</h2>
+<p>Hàm <code>runFetch()</code> ở <code>apps/daemon/src/jobs/fetch.ts</code> là nơi ba package gặp nhau:</p>
+<div class="steps">
+  <div class="step"><b>Đọc nguồn và trạng thái</b> <span class="pkg p-db">db</span><p><code>sources</code> id=1 (kind <code>hn</code>, config <code>{backfillHours: 24}</code>) và <code>source_state.state</code> = <code>{lastCreatedAt: 1790553374}</code>. Ghi một dòng <code>fetch_runs</code> trạng thái <code>running</code>.</p></div>
+  <div class="step"><b>Gọi adapter nguồn</b> <span class="pkg p-app">daemon</span> <span class="pkg p-core">core</span><p><code>hnSource.fetch()</code> gọi API Algolia qua <code>HttpClient</code> (giãn theo host, timeout 30 giây), trả về <code>RawItem[]</code> và state mới.</p></div>
+  <div class="step"><b>Lọc mục đã có</b> <span class="pkg p-db">db</span><p>Một câu SELECT lấy các <code>external_id</code> đã tồn tại, để không nén và ghi lại bản thô của chúng.</p></div>
+  <div class="step"><b>Lưu bản thô</b> <span class="pkg p-core">core</span> <span class="pkg p-ad">adapters</span><p>Với mỗi mục mới: chuẩn hoá NFC → <code>sha256()</code> → <code>rawKey()</code> → <code>store.put()</code> (hiện là <code>fsObjectStore</code>, nén gzip).</p></div>
+  <div class="step"><b>Ghi tài liệu</b> <span class="pkg p-db">db</span> <span class="pkg p-core">core</span><p><code>INSERT … ON CONFLICT DO NOTHING</code> vào <code>documents</code> với <code>url_canonical = canonicalizeUrl(url)</code>. Bản trùng (do khoảng lùi 60 giây) tự bị bỏ.</p></div>
+  <div class="step"><b>Chốt lượt</b> <span class="pkg p-db">db</span><p>Thành công: lưu state mới, <code>fail_count = 0</code>, <code>fetch_runs</code> → <code>ok</code> với số lấy/mới. Lỗi: <code>fetch_runs</code> → <code>error</code>, <code>fail_count + 1</code>, state <b>giữ nguyên</b>, rồi ném lỗi lại để pg-boss retry.</p></div>
+</div>
+
+<!-- 6 -->
+<h2 id="test">6. Test</h2>
+<div class="tbl"><table>
+  <thead><tr><th>File</th><th>Kiểm gì</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">core/test/url.test.ts</td><td>Bỏ tham số theo dõi, fragment, <code>www</code>, <code>/</code> cuối; thứ tự tham số không đổi khoá; giữ <code>?id=</code>; chuỗi không phải URL trả nguyên</td></tr>
+    <tr><td class="mono">core/test/hash.test.ts</td><td>Hai cách mã hoá dấu tiếng Việt cho cùng hash; hash là hex 64 ký tự</td></tr>
+    <tr><td class="mono">adapters/test/object-store-fs.test.ts</td><td>Ghi rồi đọc lại đúng nội dung; file trên đĩa nhỏ hơn bản gốc (đã nén); key chưa có trả <code>null</code></td></tr>
+    <tr><td class="mono">daemon/test/hn.test.ts</td><td>Đọc phản hồi thật đã lưu làm fixture; Ask HN dùng trang thảo luận; lấy lùi và đi hết các trang; con trỏ lùi 60 giây, không tụt khi không có gì mới</td></tr>
+    <tr><td class="mono">daemon/test/fetch.test.ts</td><td>Trên <code>radard_test</code> thật với adapter giả: chạy hai lần không trùng; bản thô đọc lại đúng; lỗi thì con trỏ giữ nguyên và <code>fail_count</code> tăng; thành công sau lỗi đặt lại <code>fail_count</code></td></tr>
+  </tbody>
+</table></div>
+<p>Chạy tất cả: <code>bun run check</code> (typecheck bằng TypeScript 7, lint bằng Biome, 15 test).</p>
+
+<!-- 7 -->
+<h2 id="luat">7. Luật giữ ranh giới và cách mở rộng</h2>
+<div class="grid3">
+  <div class="card"><b class="h">core không import ai</b><p>Không SDK, không database, không Bun API ngoài <code>Bun.CryptoHasher</code> và <code>Bun.sleep</code>. Cần gì từ bên ngoài thì định nghĩa interface ở đây, cài đặt ở chỗ khác.</p></div>
+  <div class="card"><b class="h">Chỉ adapters biết nhà cung cấp</b><p>Import <code>grammy</code>, <code>web-push</code>, SDK R2… chỉ nằm trong <code>packages/adapters</code>. Sau này có lint rule chặn import sai chỗ.</p></div>
+  <div class="card"><b class="h">Chỉ db biết cấu trúc bảng</b><p>Schema và migration một chỗ; app import bảng từ <code>@radard/db</code> để truy vấn có type.</p></div>
+</div>
+<div class="tbl"><table>
+  <thead><tr><th>Muốn thêm</th><th>Làm gì</th><th>Không phải sửa</th></tr></thead>
+  <tbody>
+    <tr><td>Một nguồn mới (arXiv)</td><td>Viết <code>apps/daemon/src/sources/arxiv.ts</code> theo <code>SourceAdapter</code>, thêm 1 dòng vào danh bạ, thêm dòng vào bảng <code>sources</code></td><td>job <code>fetch</code>, schema, scheduler</td></tr>
+    <tr><td>Kho bản thô R2</td><td>Viết <code>packages/adapters/src/object-store-r2.ts</code> theo <code>ObjectStore</code>, chọn bằng biến <code>OBJECT_STORE</code></td><td>job <code>fetch</code>, core</td></tr>
+    <tr><td>Bảng lớp 2 (<code>doc_text</code>)</td><td>Thêm file <code>packages/db/src/schema/layer2.ts</code>, generate, migrate</td><td>bảng lớp 1</td></tr>
+    <tr><td>Một tiện ích thuần (SimHash)</td><td>Thêm <code>packages/core/src/simhash.ts</code> kèm test</td><td>—</td></tr>
+  </tbody>
+</table></div>
+
+<footer>Viết theo code thật trong <code>~/Personal/radard</code> ngày 28/09/2026 (MVP-0 tuần 1). Các đoạn code đã rút gọn để dễ đọc; bản đầy đủ ở đường dẫn ghi phía trên mỗi đoạn. Tài liệu liên quan: <code>docs/radard-thiet-ke.html</code>, <code>docs/pg-boss.html</code>, <code>docs/checklist.html</code>.</footer>
+</div>
+</body>
+</html>

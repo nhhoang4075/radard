@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --violet:#5B45A8; --violet-soft:#ECE7F7;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:26px;margin-top:56px;padding-top:8px;border-top:2px solid var(--ink)}
+h3{font-size:18px;margin-top:28px}
+p{margin:12px 0 0;max-width:76ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:14px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.card b.h{font-family:var(--display);font-size:17px;display:block;margin-bottom:4px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card ul{margin:6px 0 0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.pkg{display:inline-block;font-family:var(--mono);font-size:12.5px;font-weight:500;padding:2px 9px;border-radius:99px}
+.p-core{background:var(--accent-soft);color:var(--accent)}
+.p-ad{background:var(--blue-soft);color:var(--blue)}
+.p-db{background:var(--violet-soft);color:var(--violet)}
+.p-app{background:var(--warn-soft);color:var(--warn)}
+.steps{counter-reset:s;display:grid;gap:10px;margin-top:14px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px 12px 50px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:13px;display:grid;place-items:center}
+.step p{margin:4px 0 0;font-size:14.5px;color:var(--ink-2)}
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.bc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.ba{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.bd{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.3}
+.bp{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.tmb{fill:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.ah{fill:var(--ink-2)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+
+.tabs{position:sticky;top:0;z-index:10;background:var(--ground);border-bottom:1px solid var(--line);margin:20px -20px 0;padding:0 20px}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:500;color:var(--ink-2);padding:13px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-right:6px}
+.panel{display:none;padding-top:10px}
+.panel.on{display:block}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.tile b{display:block;font-family:var(--display);font-size:26px}
+.tile span{font-size:13.5px;color:var(--ink-2)}
+.pill{font-size:11.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;margin-left:4px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--ink-2)}
+.lg{display:flex;gap:14px;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.lg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+a{color:var(--accent)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+
+.sim{margin-top:16px;padding:14px}
+.sim svg{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation}
+.sim-ctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:14px}
+.sim-ctl label{display:flex;align-items:center;gap:8px}
+.sim-ctl input[type=range]{width:130px;accent-color:var(--accent)}
+.sim-ctl select,.sim-ctl button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer}
+.sim-ctl button:hover{border-color:var(--accent);color:var(--accent)}
+.sim-ctl b{font-family:var(--mono);min-width:2ch}
+.sim-stats{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:14px;color:var(--ink-2);min-height:24px}
+.sim-stats b{color:var(--ink)}
+.sim-stats .ok{color:var(--accent);font-weight:600}
+.sim-stats .miss{color:var(--warn);font-weight:600}
+.sim-lg{flex-wrap:wrap;margin:10px 0 0}
+.lab-tiles{margin:6px 0 14px}
+.lab-tiles .tile b{font-size:22px}
+.card ul+p,.panel>ul{max-width:76ch}
+.bars{display:grid;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.bar{display:grid;grid-template-columns:190px 1fr 80px;gap:12px;align-items:center;font-size:14px}
+.bt{background:var(--ground);border-radius:4px;height:16px;overflow:hidden}
+.bt i{display:block;height:100%;background:#9FB3AC;border-radius:0 4px 4px 0;min-width:3px}
+.bt i.a{background:var(--accent)}
+.bv{font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+@media (max-width:640px){.bar{grid-template-columns:1fr 70px}.bar .bt{grid-column:1/-1;grid-row:2}}
+
+.stepper{margin-top:14px;padding:14px}
+.stepper svg{display:block;width:100%;height:auto;margin-top:6px}
+.stepper button:disabled{opacity:.4;cursor:default}
+.kbtn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.bins{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.bin{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.chip.w{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.c{border:2px solid #eb6834}
+.chip.empty{color:var(--ink-3);border-style:dashed}
+.st-title{font-weight:600;margin-top:12px}
+.st-title.ok{color:var(--accent)}
+.st-title.miss{color:var(--warn)}
+.st-notes{margin:6px 0 0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:3px;align-content:start;min-height:120px}
+@media (max-width:640px){.bins{grid-template-columns:1fr}}
+
+.dec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:760px){.dec{grid-template-columns:1fr}}
+.tg{max-width:520px;margin:16px 0 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#DCE8DF}
+.tg-head{display:flex;gap:10px;align-items:center;background:#fff;padding:10px 14px;border-bottom:1px solid var(--line)}
+.tg-head small{display:block;color:var(--ink-3);font-size:12px}
+.tg-av{width:34px;height:34px;border-radius:50%;background:#2BB3A0;color:#fff;display:grid;place-items:center;font-weight:700}
+.tg-body{padding:14px;display:grid;gap:10px}
+.tg-msg{background:#fff;border-radius:12px 12px 12px 4px;padding:9px 12px;font-size:14.5px;line-height:1.5;max-width:92%;box-shadow:0 1px 1px rgba(0,0,0,.06)}
+.tg-msg b{display:block;margin-bottom:2px}
+.tg-msg a{font-size:13px;word-break:break-all}
+.tg-msg .tg-time{display:block;text-align:right;font-size:11px;color:var(--ink-3);margin-top:2px}
+.tg-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:-6px;max-width:92%}
+.tg-btns span{background:rgba(255,255,255,.7);border-radius:8px;text-align:center;padding:6px;font-size:14px;color:#2A7A6E;font-weight:600}
+
+.formula{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:14px}
+.f-main{font-family:var(--mono);font-size:16px;line-height:1.7}
+.f-sub{font-size:14px;color:var(--ink-2);margin-top:6px}
+.cR{color:#0E6E5C}.cP{color:#9A5B00}.cC{color:#2F5DA8}.cA{color:#5B45A8}.cF{color:#3E8C7F}
+.comp{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+@media (max-width:760px){.comp{grid-template-columns:1fr}}
+.sliders{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;font-size:14px}
+.sliders label{display:grid;grid-template-columns:110px 1fr 44px;align-items:center;gap:8px}
+.sliders input{accent-color:var(--accent)}
+@media (max-width:760px){.sliders{grid-template-columns:1fr}}
+.dim td{color:var(--ink-3)}
+.stack{display:grid;gap:12px;margin-top:14px}
+.stack .card pre{margin-top:8px}
+td.mono.wrap{white-space:normal;min-width:220px}
+
+figure.big svg{min-width:1100px}
+.lgd{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13.5px;color:var(--ink-2);margin-top:12px}
+.lgd i{display:inline-block;width:26px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px}
+.st{font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.st-run{background:var(--accent-soft);color:var(--accent)}
+.st-schema{background:var(--warn-soft);color:var(--warn)}
+.st-plan{background:var(--surface);color:var(--ink-2);border:1px dashed var(--ink-3)}
+.st-later{background:var(--ground);color:var(--ink-3);border:1px dotted var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="eyebrow">RADARD · KIẾN TRÚC · 12/10/2026</div>
+<h1>Pipeline của radard tới hiện tại</h1>
+<p class="lede">Từ nguồn tin tới tin nhắn trên điện thoại: phần nào đang chạy thật, phần nào đã có bảng mà chưa có code, phần nào mới là thiết kế. Số liệu lấy từ DB radard ngày 12/10/2026.</p>
+<nav class="tabs" aria-label="Các phần"><div class="tablist" role="tablist">
+<button class="tab" role="tab" aria-controls="toan-canh"><span class="n">01</span>Toàn cảnh</button>
+<button class="tab" role="tab" aria-controls="tung-buoc"><span class="n">02</span>Từng bước</button>
+<button class="tab" role="tab" aria-controls="bang"><span class="n">03</span>Bảng dữ liệu</button>
+<button class="tab" role="tab" aria-controls="lich"><span class="n">04</span>Lịch &amp; số liệu</button>
+</div></nav>
+
+<div class="panel" role="tabpanel" id="toan-canh">
+<div class="lgd"><span><i style="background:#DDEEE9;border:1.8px solid #0E6E5C"></i>đang chạy thật</span><span><i style="background:#FBEFD9;border:1.6px solid #9A5B00"></i>có bảng, chưa có code</span><span><i style="background:#fff;border:1.4px dashed #6B7773"></i>thiết kế</span><span><i style="background:#F4F6F5;border:1.3px dotted #9FB3AC"></i>để sau</span><span>mũi tên đứt: luồng dự kiến</span></div>
+<figure class="big"><svg viewBox="0 0 1320 925" role="img" aria-label="Pipeline radard: nguồn, job fetch ghi dữ liệu thu thập, job process embed và gộp sự kiện ở bước xử lý, digest 07:00 chọn tin, gửi Telegram và nhận phản hồi"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#4A5753"/></marker></defs><rect x="10" y="10" width="1300" height="120" rx="10" fill="#F7F9F8" stroke="#E2E8E5"/><text x="24" y="31" font-size="14" font-weight="700" fill="#16201D">Nguồn<tspan font-size="11.5" font-weight="400" fill="#6B7773">   nơi radard lấy tin</tspan></text><rect x="10" y="140" width="1300" height="175" rx="10" fill="#F7F9F8" stroke="#E2E8E5"/><text x="24" y="161" font-size="14" font-weight="700" fill="#16201D">Thu thập<tspan font-size="11.5" font-weight="400" fill="#6B7773">   lưu nguyên bản thô, không sửa</tspan></text><rect x="10" y="325" width="1300" height="300" rx="10" fill="#F7F9F8" stroke="#E2E8E5"/><text x="24" y="346" font-size="14" font-weight="700" fill="#16201D">Xử lý<tspan font-size="11.5" font-weight="400" fill="#6B7773">   dẫn xuất, xoá và dựng lại được</tspan></text><rect x="10" y="635" width="1300" height="280" rx="10" fill="#F7F9F8" stroke="#E2E8E5"/><text x="24" y="656" font-size="14" font-weight="700" fill="#16201D">Digest và phản hồi<tspan font-size="11.5" font-weight="400" fill="#6B7773">   mỗi sáng 07:00</tspan></text><rect x="150" y="48" width="165" height="56" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="232.5" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Hacker News</text><text x="232.5" y="85" text-anchor="middle" font-size="11" fill="#4A5753">Algolia, 15 phút</text><rect x="330" y="48" width="165" height="56" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="412.5" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">arXiv</text><text x="412.5" y="85" text-anchor="middle" font-size="11" fill="#4A5753">cs.CL/AI/LG/MA, ngày</text><rect x="510" y="48" width="165" height="56" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="592.5" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">GitHub releases</text><text x="592.5" y="85" text-anchor="middle" font-size="11" fill="#4A5753">10 repo TẠM, giờ</text><rect x="690" y="48" width="165" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="772.5" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">GitHub Trending</text><text x="772.5" y="85" text-anchor="middle" font-size="11" fill="#4A5753">HTML, ngày</text><rect x="870" y="48" width="165" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="952.5" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">GitHub repo mới</text><text x="952.5" y="85" text-anchor="middle" font-size="11" fill="#4A5753">Search API, ngày</text><rect x="1050" y="48" width="165" height="56" rx="8" fill="#F4F6F5" stroke="#9FB3AC" stroke-width="1.3" stroke-dasharray="2 4"/><text x="1132.5" y="68" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Reddit, HF, RSS…</text><text x="1132.5" y="85" text-anchor="middle" font-size="11" fill="#4A5753">sau</text><rect x="150" y="180" width="200" height="72" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="250.0" y="198" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">pg-boss scheduler</text><text x="250.0" y="215" text-anchor="middle" font-size="11" fill="#4A5753">lịch cron trong Postgres</text><text x="250.0" y="229" text-anchor="middle" font-size="11" fill="#4A5753">HN */15 · GH 0 * · arXiv 30 1</text><rect x="410" y="175" width="270" height="90" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="545.0" y="193" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">job fetch</text><text x="545.0" y="210" text-anchor="middle" font-size="11" fill="#4A5753">cửa sổ thời gian (walkWindows),</text><text x="545.0" y="224" text-anchor="middle" font-size="11" fill="#4A5753">ETag, nhịp theo host, idempotent</text><rect x="725" y="158" width="440" height="148" rx="10" fill="none" stroke="#B8C3BF" stroke-dasharray="3 3"/><text x="945" y="172" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">job fetch ghi vào</text><rect x="740" y="180" width="200" height="54" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="840.0" y="200" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">ObjectStore</text><text x="840.0" y="217" text-anchor="middle" font-size="11" fill="#4A5753">raw/ab/&lt;sha&gt;.gz · 65 MB</text><rect x="740" y="244" width="200" height="54" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="840.0" y="264" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">documents</text><text x="840.0" y="281" text-anchor="middle" font-size="11" fill="#4A5753">16.659 tài liệu</text><rect x="955" y="180" width="195" height="54" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="1052.5" y="200" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">source_state</text><text x="1052.5" y="217" text-anchor="middle" font-size="11" fill="#4A5753">con trỏ, ETag</text><rect x="955" y="244" width="195" height="54" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="1052.5" y="264" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">fetch_runs</text><text x="1052.5" y="281" text-anchor="middle" font-size="11" fill="#4A5753">16 lượt · ok / behind</text><path d="M232,104 L545,175" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M412,104 L545,175" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M592,104 L545,175" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M772,104 L545,175" fill="none" stroke="#4A5753" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/><path d="M952,104 L545,175" fill="none" stroke="#4A5753" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/><path d="M350,214 L408,214" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><text x="379" y="207" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">tạo job</text><path d="M680,220 L723,220" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><rect x="150" y="355" width="200" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="250.0" y="375" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">job process</text><text x="250.0" y="392" text-anchor="middle" font-size="11" fill="#4A5753">mỗi 5 phút · tối đa 60 lô</text><rect x="400" y="355" width="170" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="485.0" y="375" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Rút văn bản</text><text x="485.0" y="392" text-anchor="middle" font-size="11" fill="#4A5753">toText · NFC · franc (ngôn ngữ)</text><rect x="610" y="355" width="190" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="705.0" y="375" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Embed</text><text x="705.0" y="392" text-anchor="middle" font-size="11" fill="#4A5753">AI Gateway · qwen3 · 1024 chiều</text><rect x="840" y="355" width="160" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="920.0" y="373" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">doc_text</text><text x="920.0" y="390" text-anchor="middle" font-size="11" fill="#4A5753">16.637 · relevance</text><text x="920.0" y="404" text-anchor="middle" font-size="11" fill="#4A5753">(cosine với profile)</text><rect x="1040" y="355" width="250" height="64" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="1165.0" y="375" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Chấm theo từng chủ đề</text><text x="1165.0" y="392" text-anchor="middle" font-size="11" fill="#4A5753">doc_topic_scores · chuẩn hoá</text><path d="M250,252 L250,353" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><text x="272" y="305" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">5 phút</text><path d="M350,387 L398,387" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M570,387 L608,387" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M800,387 L838,387" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M1000,387 L1038,387" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M840,298 L485,353" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><text x="650" y="330" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">tài liệu chưa xử lý</text><rect x="610" y="432" width="190" height="40" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="705.0" y="452" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">llm_calls</text><text x="705.0" y="469" text-anchor="middle" font-size="11" fill="#4A5753">146 lời gọi · $0,027 (đã đo)</text><path d="M705,419 L705,430" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><rect x="1040" y="480" width="250" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="1165.0" y="500" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Lọc liên quan</text><text x="1165.0" y="517" text-anchor="middle" font-size="11" fill="#4A5753">hiện: 1 ngưỡng 0,58 · sau: cổng z</text><path d="M1000,410 L1060,478" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><text x="1010" y="455" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">hiện tại</text><path d="M1165,419 L1165,478" fill="none" stroke="#4A5753" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/><rect x="660" y="480" width="330" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="825.0" y="498" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Gộp sự kiện</text><text x="825.0" y="515" text-anchor="middle" font-size="11" fill="#4A5753">cùng URL → tâm gần nhất trong ±7 ngày (btree)</text><text x="825.0" y="529" text-anchor="middle" font-size="11" fill="#4A5753">≥ 0,9 thì gộp, không thì mở sự kiện mới</text><rect x="360" y="480" width="250" height="64" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="485.0" y="500" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">events · event_documents</text><text x="485.0" y="517" text-anchor="middle" font-size="11" fill="#4A5753">3.709 sự kiện · 4.034 liên kết</text><path d="M1040,512 L992,512" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M660,512 L612,512" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><rect x="150" y="480" width="170" height="56" rx="8" fill="#DDEEE9" stroke="#0E6E5C" stroke-width="1.8"/><text x="235.0" y="500" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">profile</text><text x="235.0" y="517" text-anchor="middle" font-size="11" fill="#4A5753">1 mô tả TẠM</text><rect x="150" y="555" width="170" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="235.0" y="575" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">topics · profile_topics</text><text x="235.0" y="592" text-anchor="middle" font-size="11" fill="#4A5753">chủ đề của bạn</text><rect x="1040" y="560" width="250" height="48" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="1165.0" y="580" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">baselines (mỗi ngày)</text><text x="1165.0" y="597" text-anchor="middle" font-size="11" fill="#4A5753">trung vị, mốc 0,1% theo nguồn × chủ đề</text><path d="M320,583 L1036,583" fill="none" stroke="#4A5753" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/><text x="680" y="576" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">thay mô tả TẠM bằng nhiều chủ đề → chấm điểm, mặt bằng</text><path d="M1165,558 L1165,546" fill="none" stroke="#4A5753" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/><rect x="150" y="670" width="170" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="235.0" y="690" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Lịch 07:00</text><text x="235.0" y="707" text-anchor="middle" font-size="11" fill="#4A5753">giờ Việt Nam</text><rect x="360" y="670" width="170" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="445.0" y="690" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Ứng viên</text><text x="445.0" y="707" text-anchor="middle" font-size="11" fill="#4A5753">sự kiện trong 24 giờ</text><rect x="570" y="670" width="170" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="655.0" y="690" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Lấy lại điểm HN</text><text x="655.0" y="707" text-anchor="middle" font-size="11" fill="#4A5753">50 bài / request</text><rect x="780" y="670" width="220" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="890.0" y="690" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Tính điểm S</text><text x="890.0" y="707" text-anchor="middle" font-size="11" fill="#4A5753">R · P · C · A · F · N</text><rect x="1040" y="670" width="250" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="1165.0" y="690" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Chọn ≤ 7 tin</text><text x="1165.0" y="707" text-anchor="middle" font-size="11" fill="#4A5753">đa dạng · hạn mức nguồn · sàn</text><path d="M485,544 L445,668" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><text x="482" y="610" font-size="11" fill="#4A5753" text-anchor="middle" paint-order="stroke" stroke="#F7F9F8" stroke-width="4" stroke-linejoin="round">sự kiện</text><path d="M320,698 L358,698" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M530,698 L568,698" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M740,698 L778,698" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M1000,698 L1038,698" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><rect x="1040" y="775" width="250" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="1165.0" y="795" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Viết tóm tắt</text><text x="1165.0" y="812" text-anchor="middle" font-size="11" fill="#4A5753">claude-haiku-5.5 · 1 lời gọi</text><rect x="780" y="775" width="220" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="890.0" y="795" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Gửi Telegram</text><text x="890.0" y="812" text-anchor="middle" font-size="11" fill="#4A5753">@radard_bot · mỗi sự kiện 1 tin</text><rect x="570" y="775" width="170" height="56" rx="8" fill="#FBEFD9" stroke="#9A5B00" stroke-width="1.6"/><text x="655.0" y="795" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">digests · deliveries</text><text x="655.0" y="812" text-anchor="middle" font-size="11" fill="#4A5753">bảng đã có · 0 dòng</text><rect x="360" y="775" width="170" height="56" rx="8" fill="#FFFFFF" stroke="#6B7773" stroke-width="1.4" stroke-dasharray="6 4"/><text x="445.0" y="795" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">Bạn bấm 👍 / 👎</text><text x="445.0" y="812" text-anchor="middle" font-size="11" fill="#4A5753">trên điện thoại</text><rect x="150" y="775" width="170" height="56" rx="8" fill="#FBEFD9" stroke="#9A5B00" stroke-width="1.6"/><text x="235.0" y="795" text-anchor="middle" font-size="13" font-weight="600" fill="#16201D">feedback</text><text x="235.0" y="812" text-anchor="middle" font-size="11" fill="#4A5753">bảng đã có · 0 dòng</text><path d="M1165,726 L1165,773" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M1040,803 L1002,803" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M780,803 L742,803" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M570,803 L532,803" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M360,803 L322,803" fill="none" stroke="#4A5753" stroke-width="1.4" marker-end="url(#ar)"/><path d="M235,831 L235,885 L1300,885" fill="none" stroke="#9FB3AC" stroke-width="1.3" stroke-dasharray="2 4"/><text x="760" y="878" font-size="11" fill="#6B7773" text-anchor="middle">để sau: cá nhân hoá U, học lại trọng số, đề xuất sửa chủ đề (feedback → hồ sơ)</text></svg>
+<figcaption><b>Hình 1.</b> Bốn tầng từ trên xuống. Dữ liệu thu thập chỉ ghi thêm, không bao giờ sửa; dữ liệu dẫn xuất xoá đi và chạy lại được (<code>reprocess --all</code>, <code>events rebuild</code>); bảng gửi tin và phản hồi là dữ liệu của bạn, không tạo lại được, nên không có khoá ngoại vào <code>events</code>.</figcaption></figure>
+<div class="grid2">
+  <div class="card"><b class="h">Đang chạy thật</b><p>3 nguồn, job fetch (không mất dữ liệu khi daemon tắt lâu), lưu bản thô, embed, chấm mức liên quan bằng một mô tả, gộp sự kiện. 16.659 tài liệu, 3.709 sự kiện, tổng chi phí model $0,027.</p></div>
+  <div class="card"><b class="h">Tiếp theo (tuần 3)</b><p>Chủ đề của bạn thay cho mô tả TẠM, mặt bằng, rồi cả nhánh digest: chọn tin, viết tóm tắt, gửi Telegram, ghi phản hồi.</p></div>
+</div>
+</div>
+
+<div class="panel" role="tabpanel" id="tung-buoc">
+<h2>Thu thập</h2><div class="tbl"><table><thead><tr><th>Bước</th><th>Trạng thái</th><th>Làm gì</th><th>Khi nào</th><th>Code / tài liệu</th></tr></thead><tbody><tr><td>Lịch</td><td><span class="st st-run">Đang chạy</span></td><td>pg-boss lưu lịch cron trong Postgres; scheduler đồng bộ lịch từ bảng <code>sources</code>, tạo job đúng giờ</td><td>HN */15 · GitHub 0 * · arXiv 30 1</td><td>apps/daemon/src/roles/scheduler.ts, boss.ts</td></tr><tr><td>Lấy dữ liệu</td><td><span class="st st-run">Đang chạy</span></td><td>Adapter từng nguồn đi theo cửa sổ thời gian; con trỏ chỉ dời tới chỗ đã lấy đủ; GET có điều kiện (ETag), nhịp theo host</td><td>theo lịch nguồn</td><td>core/src/source.ts (walkWindows), http.ts · sources/hn.ts, arxiv.ts, github.ts</td></tr><tr><td>Lưu bản thô</td><td><span class="st st-run">Đang chạy</span></td><td>Nén gzip, key theo SHA-256 nội dung (sau NFC); không bao giờ sửa</td><td>cùng lượt fetch</td><td>adapters/src/object-store-fs.ts</td></tr><tr><td>Ghi tài liệu</td><td><span class="st st-run">Đang chạy</span></td><td>Khoá (source_id, external_id) chặn trùng; chuẩn hoá URL; trạng thái ok / behind / error vào fetch_runs</td><td>cùng lượt fetch</td><td>apps/daemon/src/jobs/fetch.ts</td></tr></tbody></table></div>
+<h2>Xử lý</h2><div class="tbl"><table><thead><tr><th>Bước</th><th>Trạng thái</th><th>Làm gì</th><th>Khi nào</th><th>Code / tài liệu</th></tr></thead><tbody><tr><td>Rút văn bản</td><td><span class="st st-run">Đang chạy</span></td><td>Adapter rút văn bản từ bản thô (tiêu đề, tóm tắt); NFC; đoán ngôn ngữ bằng franc</td><td>job process, 5 phút</td><td>jobs/process.ts · sources/*.ts (toText)</td></tr><tr><td>Embed</td><td><span class="st st-run">Đang chạy</span></td><td>qwen3-embedding-0.6b qua AI Gateway, lô 128, giãn nhịp, chờ khi rate limit; chi phí theo số Gateway báo</td><td>job process</td><td>adapters/src/ai-gateway.ts, gateway-pricing.ts</td></tr><tr><td>Mức liên quan</td><td><span class="st st-run">Đang chạy</span></td><td>Cosine với mô tả TẠM trong profile, lưu ở doc_text.relevance</td><td>job process</td><td>jobs/process.ts</td></tr><tr><td>Chấm theo chủ đề</td><td><span class="st st-plan">Thiết kế</span></td><td>Cosine với từng chủ đề của bạn → doc_topic_scores; chuẩn hoá theo baselines (nguồn × chủ đề)</td><td>job process</td><td>(chưa có) · xep-hang.html tab 03, 08</td></tr><tr><td>Lọc liên quan</td><td><span class="st st-run">Đang chạy</span></td><td>Hiện: ngưỡng 0,58 (arXiv 0,55, GitHub 0). Sau: cổng z ≥ 0,6</td><td>job process</td><td>jobs/process.ts</td></tr><tr><td>Gộp sự kiện</td><td><span class="st st-run">Đang chạy</span></td><td>Cùng URL → vào sự kiện đó; không thì tìm tâm gần nhất trong ±7 ngày (btree trên last_seen_at), ≥ 0,9 thì gộp, không thì mở mới; trung bình trực tuyến cho tâm</td><td>job process</td><td>jobs/process.ts · btree.html, hnsw.html</td></tr><tr><td>Mặt bằng</td><td><span class="st st-plan">Thiết kế</span></td><td>Trung vị, mốc 0,1% của mức liên quan, độ nổi, độ phủ trong 30 ngày, trộn với mặt bằng chung theo số tài liệu</td><td>mỗi ngày</td><td>(chưa có) · xep-hang.html tab 03</td></tr></tbody></table></div>
+<h2>Digest và phản hồi</h2><div class="tbl"><table><thead><tr><th>Bước</th><th>Trạng thái</th><th>Làm gì</th><th>Khi nào</th><th>Code / tài liệu</th></tr></thead><tbody><tr><td>Ứng viên</td><td><span class="st st-plan">Thiết kế</span></td><td>Sự kiện có hoạt động trong 24 giờ, R ≥ cổng</td><td>07:00</td><td>(chưa có)</td></tr><tr><td>Lấy lại tín hiệu</td><td><span class="st st-plan">Thiết kế</span></td><td>Điểm, bình luận HN mới nhất của mọi tài liệu (Algolia, 50 bài/request)</td><td>07:00</td><td>(chưa có)</td></tr><tr><td>Tính điểm S</td><td><span class="st st-plan">Thiết kế</span></td><td>R · P · C · A · F · N, trọng số 0,40 / 0,25 / 0,15 / 0,10 / 0,10</td><td>07:00</td><td>xep-hang.html tab 04–05</td></tr><tr><td>Chọn ≤ 7</td><td><span class="st st-plan">Thiết kế</span></td><td>Đa dạng (phạt trùng khi giống ≥ 0,85), hạn mức nguồn, sàn điểm</td><td>07:00</td><td>xep-hang.html tab 06</td></tr><tr><td>Viết tóm tắt</td><td><span class="st st-plan">Thiết kế</span></td><td>Một lời gọi claude-haiku-5.5 (đã gọi thử: $0,0012, 10 giây); kiểm JSON</td><td>07:00</td><td>runtime.ts (createLlm) · tuan-3.html tab 05</td></tr><tr><td>Gửi Telegram</td><td><span class="st st-plan">Thiết kế</span></td><td>Tin mở đầu + mỗi sự kiện một tin, nút 👍/👎; bot đã gửi thử được</td><td>07:00</td><td>(chưa có) · tuan-3.html tab 06</td></tr><tr><td>Ghi gửi tin</td><td><span class="st st-schema">Có bảng, chưa code</span></td><td>digests (một lượt), deliveries (mỗi tin, chụp document_ids)</td><td>07:00</td><td>packages/db/src/schema/delivery.ts</td></tr><tr><td>Nhận phản hồi</td><td><span class="st st-schema">Có bảng, chưa code</span></td><td>Bấm nút → feedback (chỉ ghi thêm)</td><td>khi bạn bấm</td><td>packages/db/src/schema/delivery.ts</td></tr><tr><td>Học từ phản hồi</td><td><span class="st st-later">Để sau</span></td><td>Cá nhân hoá U, học lại trọng số, đề xuất sửa chủ đề</td><td>sau 2 tuần</td><td>checklist.html · Để sau</td></tr></tbody></table></div>
+<p class="muted" style="font-size:14px">Đường dẫn code tính từ thư mục gốc repo (apps/daemon/src, packages/*/src). Tài liệu giải thích nằm trong docs/.</p>
+</div>
+
+<div class="panel" role="tabpanel" id="bang">
+<h2>Bảng dữ liệu theo tầng</h2>
+<h3>Thu thập</h3><div class="tbl"><table><thead><tr><th>Bảng</th><th>Nội dung hiện tại</th><th>Trạng thái</th></tr></thead><tbody><tr><td class="mono">sources</td><td>3 nguồn, cấu hình (cadence, minRelevance…)</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">source_state</td><td>con trỏ, ETag của từng nguồn</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">fetch_runs</td><td>16 lượt · ok / not_modified / behind / error</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">documents</td><td>16.659 tài liệu</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">ObjectStore (./data)</td><td>bản thô gzip · 65 MB</td><td><span class="st st-run">Đang chạy</span></td></tr></tbody></table></div><h3>Xử lý</h3><div class="tbl"><table><thead><tr><th>Bảng</th><th>Nội dung hiện tại</th><th>Trạng thái</th></tr></thead><tbody><tr><td class="mono">profile</td><td>1 mô tả TẠM + embedding</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">doc_text</td><td>16.637 dòng: văn bản, ngôn ngữ, embedding, relevance</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">events</td><td>3.709 sự kiện: tâm, n_docs, n_vectors, first/last_seen</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">event_documents</td><td>4.034 liên kết (seed · url · vector)</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">topics · profile_topics</td><td>thư viện chủ đề, chủ đề của bạn</td><td><span class="st st-plan">Thiết kế</span></td></tr><tr><td class="mono">doc_topic_scores</td><td>điểm tài liệu × chủ đề</td><td><span class="st st-plan">Thiết kế</span></td></tr><tr><td class="mono">baselines</td><td>mặt bằng mỗi ngày</td><td><span class="st st-plan">Thiết kế</span></td></tr></tbody></table></div><h3>Gửi tin và phản hồi</h3><div class="tbl"><table><thead><tr><th>Bảng</th><th>Nội dung hiện tại</th><th>Trạng thái</th></tr></thead><tbody><tr><td class="mono">digests</td><td>0 dòng</td><td><span class="st st-schema">Có bảng, chưa code</span></td></tr><tr><td class="mono">deliveries</td><td>0 dòng</td><td><span class="st st-schema">Có bảng, chưa code</span></td></tr><tr><td class="mono">feedback</td><td>0 dòng</td><td><span class="st st-schema">Có bảng, chưa code</span></td></tr></tbody></table></div><h3>Vận hành</h3><div class="tbl"><table><thead><tr><th>Bảng</th><th>Nội dung hiện tại</th><th>Trạng thái</th></tr></thead><tbody><tr><td class="mono">llm_calls</td><td>146 lời gọi · $0,0272 tổng · cost_source = gateway</td><td><span class="st st-run">Đang chạy</span></td></tr><tr><td class="mono">pgboss.*</td><td>hàng đợi, lịch (schema riêng của pg-boss)</td><td><span class="st st-run">Đang chạy</span></td></tr></tbody></table></div>
+<p class="muted" style="font-size:14px">7 migration (0000–0006) trong packages/db/drizzle.</p>
+</div>
+
+<div class="panel" role="tabpanel" id="lich">
+<h2>Lịch chạy (pg-boss)</h2>
+<div class="tbl"><table><thead><tr><th>Job</th><th>Lịch</th><th>Nghĩa</th><th>Trạng thái</th></tr></thead><tbody>
+<tr><td class="mono">fetch · Hacker News</td><td class="mono">*/15 * * * *</td><td>mỗi 15 phút</td><td><span class="st st-run">Đang chạy</span></td></tr>
+<tr><td class="mono">fetch · GitHub releases</td><td class="mono">0 * * * *</td><td>đầu mỗi giờ</td><td><span class="st st-run">Đang chạy</span></td></tr>
+<tr><td class="mono">fetch · arXiv</td><td class="mono">30 1 * * *</td><td>01:30 UTC mỗi ngày (sau đợt công bố của arXiv)</td><td><span class="st st-run">Đang chạy</span></td></tr>
+<tr><td class="mono">process</td><td class="mono">*/5 * * * *</td><td>mỗi 5 phút; tối đa 60 lô mỗi lượt</td><td><span class="st st-run">Đang chạy</span></td></tr>
+<tr><td class="mono">baselines</td><td class="mono">mỗi ngày, trước digest</td><td>tính lại mặt bằng 30 ngày</td><td><span class="st st-plan">Thiết kế</span></td></tr>
+<tr><td class="mono">digest</td><td class="mono">0 7 * * * (giờ VN)</td><td>07:00 mỗi sáng</td><td><span class="st st-plan">Thiết kế</span></td></tr>
+</tbody></table></div>
+<div class="note"><b>Daemon hiện đang tắt</b> (từ 06/10, sau khi sửa lỗi mất dữ liệu). Bật lại bằng <code>bun run dev</code>; lịch đã lưu sẵn trong Postgres nên không phải đăng ký lại.</div>
+
+<h2>Số liệu hiện tại</h2>
+<div class="tiles">
+  <div class="tile"><b>16.659</b><span>tài liệu (HN 9.093 · arXiv 7.426 · GitHub releases 140)</span></div>
+  <div class="tile"><b>3.709</b><span>sự kiện; 71 sự kiện có hơn một bài viết</span></div>
+  <div class="tile"><b>$0,027</b><span>tổng chi phí model từ đầu (146 lời gọi)</span></div>
+  <div class="tile"><b>65 MB</b><span>bản thô trên đĩa</span></div>
+</div>
+</div>
+<footer>radard · docs/pipeline.html · Số liệu: DB radard local, 12/10/2026. Trạng thái theo code trong repo (chưa commit).</footer>
+</div>
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls')});
+  function show(id){
+    if(ids.indexOf(id)<0) id=ids[0];
+    tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;});
+    ids.forEach(function(i){document.getElementById(i).classList.toggle('on',i===id)});
+    try{history.replaceState(null,'','#'+id)}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(ids[i]);window.scrollTo({top:0})});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var j=(i+(e.key==='ArrowRight'?1:-1)+ids.length)%ids.length;show(ids[j]);tabs[j].focus();}
+    });
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1))});
+  show(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

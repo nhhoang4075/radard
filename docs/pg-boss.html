@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pg-boss giải thích</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --bad:#A33A2B; --bad-soft:#F8E3DF;
+  --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+.wrap{max-width:980px;margin:0 auto;padding:40px 20px 80px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,42px)}
+h2{font-size:25px;margin-top:52px}
+h3{font-size:18px;margin-top:22px}
+p{margin:12px 0 0;max-width:74ch}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{font-size:18px;color:var(--ink-2)}
+code{font-family:var(--mono);font-size:13.5px;background:var(--surface);border:1px solid var(--line);padding:0 5px;border-radius:4px}
+pre{margin:14px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.55}
+pre code{border:0;padding:0;background:none}
+.c{color:var(--ink-3)}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:18px;font-size:14.5px}
+nav.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:16px}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:16px 20px;margin-top:20px}
+.tldr ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.note{background:var(--warn-soft);border-radius:10px;padding:12px 16px;margin-top:16px;font-size:15px}
+.note b{color:var(--warn)}
+figure{margin:16px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:720px;height:auto;font-family:var(--body)}
+figcaption{font-size:14px;color:var(--ink-2);margin-top:10px;max-width:86ch}
+table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--ground);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.me td{background:var(--accent-soft)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+/* svg */
+.bx{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2}
+.ok{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+.wr{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.3}
+.bd{fill:var(--bad-soft);stroke:var(--bad);stroke-width:1.3}
+.bl{fill:var(--blue-soft);stroke:var(--blue);stroke-width:1.3}
+.ex{fill:var(--ground);stroke:var(--ink-2);stroke-dasharray:4 3}
+.t{fill:var(--ink);font-size:13px}
+.tb{fill:var(--ink);font-size:14px;font-weight:600}
+.tm{fill:var(--ink-2);font-family:var(--mono);font-size:11.5px}
+.ts{fill:var(--ink-2);font-size:11.5px}
+.lb{fill:var(--ink-2);font-size:11.5px;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.lba{fill:var(--accent);font-size:11.5px;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:4px}
+.lbb{fill:var(--bad);font-size:11.5px;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:4px}
+.ln{fill:none;stroke:var(--ink-2);stroke-width:1.3}
+.lna{fill:none;stroke:var(--accent);stroke-width:2}
+.lnb{fill:none;stroke:var(--bad);stroke-width:1.5;stroke-dasharray:5 4}
+.ah{fill:var(--ink-2)} .aha{fill:var(--accent)} .ahb{fill:var(--bad)}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="eyebrow">RADARD · GIẢI THÍCH CÔNG NGHỆ · PG-BOSS 12.35</div>
+<h1>pg-boss: hàng đợi job nằm ngay trong Postgres</h1>
+<p class="lede">pg-boss là thư viện Node/Bun biến Postgres thành một hệ thống hàng đợi job: giao việc, chạy nền, thử lại khi lỗi, lập lịch cron. Không cần Redis hay message broker riêng. radard dùng nó làm “trái tim” của daemon.</p>
+
+<nav class="toc">
+  <a href="#y-tuong">1. Ý tưởng cốt lõi</a><a href="#vong-doi">2. Vòng đời job</a><a href="#nhan-job">3. Nhận job an toàn</a>
+  <a href="#retry">4. Lỗi, thử lại, hết hạn</a><a href="#policy">5. Chính sách queue</a><a href="#cron">6. Cron</a>
+  <a href="#bao-tri">7. Bảo trì</a><a href="#radard">8. radard dùng thế nào</a><a href="#xem">9. Tự xem trong database</a><a href="#gioi-han">10. Giới hạn</a>
+</nav>
+
+<div class="tldr"><b>Tóm tắt trong 30 giây</b>
+<ul>
+  <li><b>Mỗi job là một dòng</b> trong bảng <code>pgboss.job</code>, có cột <code>state</code> cho biết nó đang chờ, đang chạy, xong hay lỗi.</li>
+  <li><b>Giao việc</b> = <code>INSERT</code> một dòng. <b>Nhận việc</b> = <code>SELECT … FOR UPDATE SKIP LOCKED</code> rồi đổi <code>state</code> sang <code>active</code>, nên nhiều worker không bao giờ nhận trùng một job.</li>
+  <li><b>Lỗi thì thử lại</b> theo cấu hình; hết lượt thì chuyển sang hàng đợi “chết” (dead letter) để xem sau.</li>
+  <li><b>Chính sách queue</b> (như <code>stately</code>) được Postgres thực thi bằng <b>unique index</b>, không phải bằng code của ứng dụng.</li>
+  <li><b>Cron</b> là các dòng trong bảng <code>pgboss.schedule</code>; mỗi 30 giây đúng một tiến trình giành quyền kiểm tra lịch và tạo job đến hạn.</li>
+</ul></div>
+
+<!-- 1 -->
+<h2 id="y-tuong">1. Ý tưởng cốt lõi: job là một dòng trong bảng</h2>
+<p>Một hệ hàng đợi cần ba thứ: <b>nơi lưu việc bền vững</b> (không mất khi tắt máy), <b>cách chia việc</b> để hai worker không làm trùng, và <b>cách theo dõi trạng thái</b>. Postgres đã có sẵn cả ba: bảng, khoá dòng và transaction. pg-boss chỉ đóng gói chúng thành API.</p>
+
+<figure>
+<svg viewBox="0 0 900 250" role="img" aria-label="Producer ghi job vào bảng pgboss.job, nhiều worker nhận job từ bảng">
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker>
+    <marker id="a1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="aha" d="M0,0L10,5L0,10z"/></marker>
+  </defs>
+  <rect class="bx" x="20" y="40" width="170" height="60" rx="8"/><text class="tb" x="105" y="66" text-anchor="middle">scheduler / code</text><text class="tm" x="105" y="86" text-anchor="middle">boss.send("fetch", …)</text>
+  <rect class="bx" x="20" y="150" width="170" height="60" rx="8"/><text class="tb" x="105" y="176" text-anchor="middle">cron của pg-boss</text><text class="tm" x="105" y="196" text-anchor="middle">bảng pgboss.schedule</text>
+  <rect class="ok" x="290" y="20" width="330" height="210" rx="12"/>
+  <text class="tb" x="455" y="46" text-anchor="middle">Postgres · bảng pgboss.job</text>
+  <g font-family="IBM Plex Mono, monospace" font-size="11.5">
+    <rect x="306" y="60" width="298" height="24" rx="4" fill="#fff" stroke="#D9E0DD"/><text class="tm" x="316" y="76">id  name   state      data</text>
+    <rect x="306" y="88" width="298" height="24" rx="4" fill="#fff" stroke="#D9E0DD"/><text class="tm" x="316" y="104">a1  fetch  completed  {sourceId:1}</text>
+    <rect x="306" y="116" width="298" height="24" rx="4" fill="#fff" stroke="#0E6E5C"/><text class="tm" x="316" y="132">b2  fetch  active     {sourceId:2}</text>
+    <rect x="306" y="144" width="298" height="24" rx="4" fill="#fff" stroke="#D9E0DD"/><text class="tm" x="316" y="160">c3  fetch  created    {sourceId:1}</text>
+    <rect x="306" y="172" width="298" height="24" rx="4" fill="#fff" stroke="#D9E0DD"/><text class="tm" x="316" y="188">d4  fetch  retry      {sourceId:3}</text>
+  </g>
+  <text class="ts" x="455" y="218" text-anchor="middle">bền vững: tắt máy, deploy lại, job vẫn còn</text>
+  <rect class="bx" x="720" y="40" width="160" height="60" rx="8"/><text class="tb" x="800" y="66" text-anchor="middle">worker 1</text><text class="tm" x="800" y="86" text-anchor="middle">boss.work("fetch")</text>
+  <rect class="bx" x="720" y="150" width="160" height="60" rx="8"/><text class="tb" x="800" y="176" text-anchor="middle">worker 2</text><text class="tm" x="800" y="196" text-anchor="middle">boss.work("fetch")</text>
+  <path class="lna" d="M190,70 L288,70" marker-end="url(#a1a)"/><text class="lba" x="239" y="62" text-anchor="middle">INSERT</text>
+  <path class="lna" d="M190,180 L288,180" marker-end="url(#a1a)"/><text class="lba" x="239" y="172" text-anchor="middle">INSERT</text>
+  <path class="ln" d="M622,128 L718,72" marker-end="url(#a1)"/><text class="lb" x="672" y="92" text-anchor="middle">nhận job</text>
+  <path class="ln" d="M622,160 L718,178" marker-end="url(#a1)"/><text class="lb" x="672" y="160" text-anchor="middle">nhận job</text>
+</svg>
+<figcaption><b>Hình 1.</b> Người giao việc chỉ <code>INSERT</code>; worker lấy việc từ cùng một bảng. Mọi thứ đều là dữ liệu trong Postgres, nên xem hàng đợi đang thế nào chỉ cần một câu <code>SELECT</code>.</figcaption>
+</figure>
+
+<div class="grid2">
+  <div class="card"><b>Vì sao không dùng Redis/BullMQ?</b><p style="margin-top:6px">Với radard (vài nghìn job mỗi ngày), thêm Redis nghĩa là thêm một dịch vụ phải chạy, sao lưu và theo dõi. pg-boss dùng lại Postgres đã có, và job có thể được tạo <b>trong cùng transaction</b> với dữ liệu nghiệp vụ.</p></div>
+  <div class="card"><b>Đánh đổi</b><p style="margin-top:6px">Postgres không nhanh bằng Redis cho hàng chục nghìn job mỗi giây. Nhưng ở quy mô radard, chênh lệch đó không bao giờ chạm tới; cái lợi về vận hành lớn hơn nhiều.</p></div>
+</div>
+
+<!-- 2 -->
+<h2 id="vong-doi">2. Vòng đời của một job</h2>
+<p>Cột <code>state</code> là một kiểu enum có thứ tự: <code>created &lt; retry &lt; active &lt; completed &lt; cancelled &lt; failed</code>. Thứ tự này được dùng thẳng trong SQL: “job có thể nhận” chính là <code>state &lt; 'active'</code>, tức <code>created</code> hoặc <code>retry</code>.</p>
+
+<figure>
+<svg viewBox="0 0 900 300" role="img" aria-label="Sơ đồ trạng thái job: created, active, completed, retry, failed, cancelled, dead letter">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker>
+    <marker id="a2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="aha" d="M0,0L10,5L0,10z"/></marker>
+    <marker id="a2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ahb" d="M0,0L10,5L0,10z"/></marker>
+  </defs>
+  <rect class="bx" x="30" y="60" width="130" height="52" rx="26"/><text class="tb" x="95" y="84" text-anchor="middle">created</text><text class="ts" x="95" y="101" text-anchor="middle">đang chờ</text>
+  <rect class="bl" x="300" y="60" width="130" height="52" rx="26"/><text class="tb" x="365" y="84" text-anchor="middle">active</text><text class="ts" x="365" y="101" text-anchor="middle">worker đang làm</text>
+  <rect class="ok" x="580" y="60" width="140" height="52" rx="26"/><text class="tb" x="650" y="84" text-anchor="middle">completed</text><text class="ts" x="650" y="101" text-anchor="middle">xong</text>
+  <rect class="wr" x="300" y="200" width="130" height="52" rx="26"/><text class="tb" x="365" y="224" text-anchor="middle">retry</text><text class="ts" x="365" y="241" text-anchor="middle">chờ thử lại</text>
+  <rect class="bd" x="580" y="200" width="140" height="52" rx="26"/><text class="tb" x="650" y="224" text-anchor="middle">failed</text><text class="ts" x="650" y="241" text-anchor="middle">hết lượt thử</text>
+  <rect class="ex" x="760" y="200" width="125" height="52" rx="8"/><text class="tb" x="822" y="224" text-anchor="middle">dead letter</text><text class="ts" x="822" y="241" text-anchor="middle">queue fetch_dead</text>
+  <rect class="ex" x="30" y="200" width="130" height="52" rx="26"/><text class="tb" x="95" y="224" text-anchor="middle">cancelled</text><text class="ts" x="95" y="241" text-anchor="middle">bị huỷ tay</text>
+  <path class="lna" d="M160,86 L298,86" marker-end="url(#a2a)"/><text class="lba" x="229" y="78" text-anchor="middle">worker nhận</text>
+  <path class="lna" d="M430,86 L578,86" marker-end="url(#a2a)"/><text class="lba" x="504" y="78" text-anchor="middle">handler trả về</text>
+  <path class="ln" d="M345,112 L345,198" marker-end="url(#a2)"/><text class="lb" x="337" y="150" text-anchor="end">ném lỗi / quá hạn</text><text class="lb" x="337" y="165" text-anchor="end">còn lượt thử</text>
+  <path class="ln" d="M385,198 L385,114" marker-end="url(#a2)"/><text class="lb" x="393" y="150">sau retryDelay</text><text class="lb" x="393" y="165">(có backoff)</text>
+  <path class="lnb" d="M420,112 L585,202" marker-end="url(#a2b)"/><text class="lbb" x="520" y="150" text-anchor="middle">hết lượt thử</text>
+  <path class="lnb" d="M720,226 L758,226" marker-end="url(#a2b)"/><text class="lbb" x="739" y="218" text-anchor="middle">copy</text>
+  <path class="ln" d="M95,112 L95,198" marker-end="url(#a2)"/><text class="lb" x="103" y="160">cancel()</text>
+  <text class="ts" x="30" y="30">state &lt; 'active' ⇒ nhận được (created, retry) · job giữ ở completed/failed một thời gian rồi bị xoá (mục 7)</text>
+</svg>
+<figcaption><b>Hình 2.</b> Đường xanh là đường vui. Job lỗi (handler ném exception, hoặc chạy quá <code>expireInSeconds</code>) quay về <code>retry</code> nếu còn lượt; hết lượt thì thành <code>failed</code> và một bản sao nội dung được đưa vào queue dead letter.</figcaption>
+</figure>
+
+<!-- 3 -->
+<h2 id="nhan-job">3. Nhận job an toàn: <code>FOR UPDATE SKIP LOCKED</code></h2>
+<p>Đây là mẹo trung tâm. Khi nhiều worker cùng hỏi “có việc không?”, mỗi worker chạy một câu SQL chọn job đầu hàng và <b>khoá dòng đó</b>. <code>SKIP LOCKED</code> bảo Postgres: dòng nào đang bị worker khác khoá thì <b>bỏ qua</b>, đừng chờ. Kết quả: mỗi job chỉ một worker nhận được, và không ai phải đứng đợi ai.</p>
+<pre><code><span class="c">-- rút gọn từ fetchNextJob() trong mã nguồn pg-boss 12</span>
+WITH next AS (
+  SELECT id FROM pgboss.job
+  WHERE name = 'fetch'
+    AND state &lt; 'active'              <span class="c">-- created hoặc retry</span>
+    AND start_after &lt;= now()          <span class="c">-- đến giờ chạy (hỗ trợ hẹn giờ, chờ retry)</span>
+  ORDER BY priority DESC, created_on  <span class="c">-- ưu tiên cao trước, cũ trước</span>
+  LIMIT 1
+  FOR UPDATE SKIP LOCKED              <span class="c">-- dòng đang bị khoá thì bỏ qua</span>
+)
+UPDATE pgboss.job j
+SET state = 'active', started_on = now(),
+    retry_count = CASE WHEN started_on IS NOT NULL THEN retry_count + 1 ELSE retry_count END
+FROM next WHERE j.id = next.id
+RETURNING j.id, j.data;</code></pre>
+
+<figure>
+<svg viewBox="0 0 900 200" role="img" aria-label="Hai worker cùng lúc nhận job, SKIP LOCKED làm mỗi worker nhận một job khác nhau">
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bx" x="20" y="30" width="150" height="50" rx="8"/><text class="tb" x="95" y="60" text-anchor="middle">worker 1</text>
+  <rect class="bx" x="20" y="120" width="150" height="50" rx="8"/><text class="tb" x="95" y="150" text-anchor="middle">worker 2</text>
+  <rect class="bl" x="330" y="20" width="240" height="40" rx="6"/><text class="tm" x="345" y="45">job c3 · created → khoá bởi W1</text>
+  <rect class="bl" x="330" y="80" width="240" height="40" rx="6"/><text class="tm" x="345" y="105">job d4 · retry → W2 bỏ qua c3, lấy d4</text>
+  <rect class="bx" x="330" y="140" width="240" height="40" rx="6"/><text class="tm" x="345" y="165">job e5 · created → còn chờ</text>
+  <path class="ln" d="M170,55 L328,40" marker-end="url(#a3)"/><text class="lb" x="250" y="38" text-anchor="middle">SELECT … LIMIT 1</text>
+  <path class="ln" d="M170,145 L328,100" marker-end="url(#a3)"/><text class="lb" x="250" y="135" text-anchor="middle">cùng lúc: c3 đang khoá → SKIP</text>
+  <text class="t" x="600" y="45">W1 làm c3</text><text class="t" x="600" y="105">W2 làm d4 song song</text><text class="t" x="600" y="165">lượt nhận sau</text>
+</svg>
+<figcaption><b>Hình 3.</b> Không cần khoá toàn cục hay điều phối viên: Postgres tự chia việc. Đây cũng là lý do tăng tốc chỉ cần chạy thêm worker.</figcaption>
+</figure>
+
+<h3>Worker biết có job mới bằng cách nào?</h3>
+<p><b>Polling</b>: mỗi worker hỏi lại sau <code>pollingIntervalSeconds</code> (mặc định 2 giây). Tuỳ chọn thêm <b>LISTEN/NOTIFY</b> (<code>useListenNotify</code> + <code>notify: true</code> trên queue): tạo job xong Postgres gửi tín hiệu, worker thức dậy ngay; polling vẫn chạy làm lưới an toàn. radard chưa bật vì trễ 2 giây là không đáng kể với việc cào tin.</p>
+
+<!-- 4 -->
+<h2 id="retry">4. Lỗi, thử lại, hết hạn</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Cấu hình</th><th>Nghĩa</th><th>radard đặt</th></tr></thead>
+  <tbody>
+    <tr><td><code>retryLimit</code></td><td>Số lần được thử lại trước khi thành <code>failed</code></td><td>3</td></tr>
+    <tr><td><code>retryDelay</code></td><td>Chờ bao lâu (giây) trước khi thử lại</td><td>30</td></tr>
+    <tr><td><code>retryBackoff</code></td><td>Mỗi lần sau chờ lâu hơn theo cấp số nhân, có ngẫu nhiên: xấp xỉ <code>retryDelay × 2^lần_thử</code></td><td>bật: ~30 giây, ~1 phút, ~2 phút</td></tr>
+    <tr><td><code>expireInSeconds</code></td><td>Job <code>active</code> quá lâu (worker treo, máy chết giữa chừng) thì coi như lỗi</td><td>600 (10 phút)</td></tr>
+    <tr><td><code>deadLetter</code></td><td>Hết lượt thử thì chép nội dung job sang queue này</td><td><code>fetch_dead</code>, giữ 30 ngày</td></tr>
+  </tbody>
+</table></div>
+<p>Vì sao cần backoff: một nguồn đang sập thì thử lại dồn dập chỉ làm nó sập lâu hơn và phí tài nguyên của mình. Vì sao cần <code>expireInSeconds</code>: nếu tiến trình bị kill giữa chừng (deploy, hết RAM), job sẽ kẹt ở <code>active</code> mãi mãi; hết hạn là cách pg-boss tự “giải cứu” nó.</p>
+<div class="note"><b>Hệ quả quan trọng:</b> pg-boss đảm bảo <b>ít nhất một lần</b> (at-least-once), không phải đúng một lần. Job có thể chạy lại sau khi đã làm được một nửa. Vì thế job <code>fetch</code> của radard được viết <b>idempotent</b>: khoá <code>(source_id, external_id)</code> và con trỏ chỉ tiến khi thành công, nên chạy lại không sinh dữ liệu sai.</div>
+
+<!-- 5 -->
+<h2 id="policy">5. Chính sách queue: do Postgres thực thi bằng unique index</h2>
+<p>Mỗi queue có một <code>policy</code> quyết định có được phép tồn tại nhiều job cùng <code>singletonKey</code> hay không. Điểm hay: pg-boss không kiểm tra điều này bằng code; nó tạo <b>unique index một phần</b> (partial unique index), và Postgres từ chối <code>INSERT</code> vi phạm. Không có race condition nào lọt qua được.</p>
+<div class="tbl"><table>
+  <thead><tr><th>Policy</th><th>Luật (theo mỗi singletonKey)</th><th>Unique index trong mã nguồn</th></tr></thead>
+  <tbody>
+    <tr><td><code>standard</code></td><td>Không giới hạn</td><td>—</td></tr>
+    <tr><td><code>short</code></td><td>Tối đa 1 job đang chờ</td><td><code>(name, key) WHERE state = 'created'</code></td></tr>
+    <tr><td><code>singleton</code></td><td>Tối đa 1 job đang chạy</td><td><code>(name, key) WHERE state = 'active'</code></td></tr>
+    <tr class="me"><td><code>stately</code> ← radard</td><td>Tối đa 1 job ở <b>mỗi</b> trạng thái created, retry, active</td><td><code>(name, state, key) WHERE state &lt;= 'active'</code></td></tr>
+    <tr><td><code>exclusive</code></td><td>Tối đa 1 job tính gộp chờ + chạy</td><td><code>(name, key) WHERE state &lt;= 'active'</code></td></tr>
+    <tr><td><code>key_strict_fifo</code></td><td>Job cùng key chạy tuần tự đúng thứ tự tạo</td><td><code>(name, key) WHERE state IN ('active','retry','failed')</code></td></tr>
+  </tbody>
+</table></div>
+
+<figure>
+<svg viewBox="0 0 900 190" role="img" aria-label="Với stately, nguồn chậm không làm job chồng lên nhau">
+  <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker></defs>
+  <line x1="60" y1="150" x2="860" y2="150" stroke="#D9E0DD"/>
+  <g class="ts"><text x="80" y="170">:00</text><text x="280" y="170">:15</text><text x="480" y="170">:30</text><text x="680" y="170">:45</text></g>
+  <text class="tb" x="20" y="24">Nguồn A (key "1") chậm bất thường, mỗi lượt mất 40 phút:</text>
+  <rect class="bl" x="90" y="40" width="530" height="30" rx="6"/><text class="t" x="100" y="60">job #1 · active (chạy từ :00 đến :40)</text>
+  <rect class="wr" x="290" y="80" width="330" height="30" rx="6"/><text class="t" x="300" y="100">job #2 · created (cron :15, chờ #1 xong)</text>
+  <rect class="bd" x="490" y="118" width="140" height="24" rx="6"/><text class="t" x="500" y="135">cron :30 · bị từ chối</text>
+  <text class="ts" x="640" y="135">đã có 1 job created cho key "1" ⇒ unique index chặn, không chồng thêm</text>
+</svg>
+<figcaption><b>Hình 4.</b> Với <code>stately</code>, dù nguồn chậm đến đâu, mỗi nguồn cũng chỉ có tối đa một lượt đang chạy và một lượt đang chờ. Không có “cơn bão” job dồn lại khi nguồn hồi phục.</figcaption>
+</figure>
+<p>Các tuỳ chọn liên quan khi gửi job: <code>singletonKey</code> (khoá để áp chính sách, radard dùng id nguồn), <code>singletonSeconds</code> (chỉ nhận một job mỗi khoảng thời gian, dùng để throttle), <code>sendDebounced()</code> (dồn nhiều yêu cầu thành một; radard sẽ dùng cho <code>brief:refresh</code> ở tuần 9).</p>
+
+<!-- 6 -->
+<h2 id="cron">6. Cron: lịch chạy định kỳ</h2>
+<p><code>boss.schedule(queue, cron, data, { key })</code> không tạo timer trong bộ nhớ; nó ghi một dòng vào bảng <code>pgboss.schedule</code>. Việc biến lịch thành job do một thành phần tên <b>timekeeper</b> đảm nhận, chạy trong mọi tiến trình có <code>schedule: true</code>.</p>
+
+<figure>
+<svg viewBox="0 0 900 250" role="img" aria-label="Timekeeper mỗi 30 giây giành quyền, đọc lịch đến hạn, tạo job vào queue đích">
+  <defs>
+    <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah" d="M0,0L10,5L0,10z"/></marker>
+    <marker id="a6a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="aha" d="M0,0L10,5L0,10z"/></marker>
+  </defs>
+  <rect class="bx" x="20" y="30" width="170" height="54" rx="8"/><text class="tb" x="105" y="54" text-anchor="middle">tiến trình A</text><text class="ts" x="105" y="72" text-anchor="middle">timekeeper, mỗi 30 giây</text>
+  <rect class="bx" x="20" y="150" width="170" height="54" rx="8"/><text class="tb" x="105" y="174" text-anchor="middle">tiến trình B</text><text class="ts" x="105" y="192" text-anchor="middle">timekeeper, mỗi 30 giây</text>
+  <rect class="ok" x="270" y="80" width="190" height="80" rx="10"/><text class="tb" x="365" y="108" text-anchor="middle">① giành quyền</text><text class="ts" x="365" y="126" text-anchor="middle">UPDATE cron_on nếu đã</text><text class="ts" x="365" y="142" text-anchor="middle">qua đủ 30 giây · chỉ 1 thắng</text>
+  <rect class="bx" x="510" y="80" width="170" height="80" rx="10"/><text class="tb" x="595" y="108" text-anchor="middle">② đọc schedule</text><text class="ts" x="595" y="126" text-anchor="middle">tính mốc cron đến hạn</text><text class="ts" x="595" y="142" text-anchor="middle">từ lần trước tới giờ</text>
+  <rect class="bx" x="720" y="80" width="160" height="80" rx="10"/><text class="tb" x="800" y="108" text-anchor="middle">③ tạo job</text><text class="ts" x="800" y="126" text-anchor="middle">qua queue nội bộ</text><text class="tm" x="800" y="142" text-anchor="middle">__pgboss__send-it</text>
+  <path class="lna" d="M190,60 L268,110" marker-end="url(#a6a)"/><text class="lba" x="228" y="74" text-anchor="middle">thắng</text>
+  <path class="ln" d="M190,176 L268,138" marker-end="url(#a6)"/><text class="lb" x="228" y="176" text-anchor="middle">thua, thử lại sau</text>
+  <path class="lna" d="M460,120 L508,120" marker-end="url(#a6a)"/><path class="lna" d="M680,120 L718,120" marker-end="url(#a6a)"/>
+  <text class="ts" x="270" y="226">Job tạo ra vẫn đi qua policy của queue đích (ở radard: stately theo id nguồn), nên hai lần tạo trùng cũng bị chặn.</text>
+</svg>
+<figcaption><b>Hình 5.</b> Nhiều tiến trình chạy timekeeper cũng không tạo job trùng: mỗi chu kỳ chỉ một tiến trình “giành quyền” bằng một câu <code>UPDATE</code> có điều kiện. Lịch lưu trong database nên không mất khi deploy.</figcaption>
+</figure>
+<div class="grid2">
+  <div class="card"><b>Mốc cron bị lỡ thì sao?</b><p style="margin-top:6px">Khi daemon tắt vài giờ, tuỳ chọn <code>missed</code> quyết định: <code>skip</code> (mặc định, radard dùng) bỏ qua; <code>once</code> gửi một job cho mốc gần nhất. Với radard bỏ qua là đúng: lượt cào kế tiếp tự đọc tiếp từ con trỏ nên không mất dữ liệu.</p></div>
+  <div class="card"><b>Độ chính xác</b><p style="margin-top:6px">Timekeeper kiểm tra 30 giây một lần, nên job có thể xuất hiện trễ tới khoảng 30 giây so với mốc cron. radard đặt <code>tz: "UTC"</code> để lịch không lệch theo múi giờ của máy.</p></div>
+</div>
+
+<!-- 7 -->
+<h2 id="bao-tri">7. Bảo trì tự động</h2>
+<p>pg-boss chạy định kỳ các việc dọn dẹp để bảng không phình vô hạn:</p>
+<div class="tbl"><table>
+  <thead><tr><th>Việc</th><th>Theo cấu hình</th><th>Mặc định</th></tr></thead>
+  <tbody>
+    <tr><td>Chuyển job <code>active</code> quá hạn sang retry/failed</td><td><code>expireInSeconds</code></td><td>15 phút (radard: 10 phút)</td></tr>
+    <tr><td>Xoá job đã xong hoặc lỗi</td><td><code>deleteAfterSeconds</code></td><td>7 ngày</td></tr>
+    <tr><td>Xoá job chờ quá lâu mà không ai nhận</td><td><code>retentionSeconds</code></td><td>14 ngày</td></tr>
+    <tr><td>Thống kê số job theo trạng thái</td><td>bảng <code>queue_stats</code>, chia theo ngày</td><td>—</td></tr>
+  </tbody>
+</table></div>
+<p>Lịch sử lâu dài của radard vì thế <b>không</b> nằm trong pg-boss mà trong bảng <code>fetch_runs</code> của chính radard; pg-boss chỉ là “bàn giao việc”, không phải “sổ nhật ký”.</p>
+
+<!-- 8 -->
+<h2 id="radard">8. radard dùng pg-boss thế nào</h2>
+<figure>
+<svg viewBox="0 0 900 230" role="img" aria-label="Luồng một lượt cào: bảng sources, scheduler đăng ký lịch, timekeeper tạo job, worker chạy runFetch">
+  <defs><marker id="a8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="aha" d="M0,0L10,5L0,10z"/></marker></defs>
+  <rect class="bx" x="20" y="60" width="150" height="70" rx="8"/><text class="tb" x="95" y="86" text-anchor="middle">bảng sources</text><text class="tm" x="95" y="106" text-anchor="middle">id=1 · */15 * * * *</text><text class="ts" x="95" y="122" text-anchor="middle">bạn sửa ở đây</text>
+  <rect class="bx" x="220" y="60" width="150" height="70" rx="8"/><text class="tb" x="295" y="86" text-anchor="middle">syncSchedules()</text><text class="ts" x="295" y="106" text-anchor="middle">vai trò scheduler</text><text class="ts" x="295" y="122" text-anchor="middle">mỗi 5 phút</text>
+  <rect class="bx" x="420" y="60" width="150" height="70" rx="8"/><text class="tb" x="495" y="86" text-anchor="middle">pgboss.schedule</text><text class="tm" x="495" y="106" text-anchor="middle">key="1"</text><text class="ts" x="495" y="122" text-anchor="middle">timekeeper đọc</text>
+  <rect class="bx" x="620" y="60" width="120" height="70" rx="8"/><text class="tb" x="680" y="86" text-anchor="middle">job fetch</text><text class="tm" x="680" y="106" text-anchor="middle">{sourceId:1}</text><text class="ts" x="680" y="122" text-anchor="middle">stately</text>
+  <rect class="ok" x="770" y="60" width="115" height="70" rx="8"/><text class="tb" x="827" y="86" text-anchor="middle">worker</text><text class="tm" x="827" y="106" text-anchor="middle">runFetch(1)</text><text class="ts" x="827" y="122" text-anchor="middle">4 song song</text>
+  <path class="lna" d="M170,95 L218,95" marker-end="url(#a8)"/><path class="lna" d="M370,95 L418,95" marker-end="url(#a8)"/><path class="lna" d="M570,95 L618,95" marker-end="url(#a8)"/><path class="lna" d="M740,95 L768,95" marker-end="url(#a8)"/>
+  <text class="ts" x="20" y="175">runFetch ghi documents + fetch_runs; lỗi thì ném exception ⇒ pg-boss retry 3 lần (30s, ~1 phút, ~2 phút) ⇒ vẫn lỗi thì vào fetch_dead.</text>
+  <text class="ts" x="20" y="195">SERVICE_ROLE=worker chạy với schedule:false (không chạy timekeeper); scheduler và all chạy với schedule:true.</text>
+</svg>
+<figcaption><b>Hình 6.</b> Nguồn là dữ liệu trong bảng <code>sources</code>; scheduler của radard chỉ “chép” lịch sang pg-boss. Tắt một nguồn = đặt <code>enabled = false</code>, lần đồng bộ sau lịch tự bị gỡ.</figcaption>
+</figure>
+<pre><code><span class="c">// apps/daemon/src/boss.ts: cấu hình thật của radard</span>
+await boss.createQueue("fetch_dead", { retentionSeconds: 30 * 24 * 3600 });
+await boss.createQueue("fetch", {
+  policy: "stately",       <span class="c">// mỗi nguồn: tối đa 1 chờ + 1 chạy</span>
+  retryLimit: 3,
+  retryDelay: 30,
+  retryBackoff: true,
+  expireInSeconds: 600,
+  deadLetter: "fetch_dead",
+});
+
+<span class="c">// apps/daemon/src/roles/scheduler.ts</span>
+await boss.schedule("fetch", "*/15 * * * *", { sourceId: 1 },
+  { key: "1", singletonKey: "1", tz: "UTC" });
+
+<span class="c">// apps/daemon/src/roles/worker.ts: handler nhận một mảng job (mặc định 1 job)</span>
+await boss.work("fetch", { localConcurrency: 4 }, async (jobs) =&gt; {
+  for (const job of jobs) await runFetch(job.data.sourceId, deps);  <span class="c">// ném lỗi ⇒ retry</span>
+});</code></pre>
+
+<!-- 9 -->
+<h2 id="xem">9. Tự xem trong database</h2>
+<p>Vì mọi thứ là bảng, bạn xem được bằng <code>psql -d radard</code>:</p>
+<pre><code><span class="c">-- hàng đợi đang có gì</span>
+SELECT name, state, count(*) FROM pgboss.job GROUP BY 1, 2 ORDER BY 1, 2;
+
+<span class="c">-- lịch cron đã đăng ký</span>
+SELECT name, key, cron, timezone FROM pgboss.schedule;
+
+<span class="c">-- cấu hình từng queue</span>
+SELECT name, policy, retry_limit, retry_delay, retry_backoff, expire_seconds, dead_letter FROM pgboss.queue;
+
+<span class="c">-- job lỗi gần đây và lý do</span>
+SELECT id, retry_count, output, completed_on FROM pgboss.job
+WHERE name = 'fetch' AND state = 'failed' ORDER BY completed_on DESC LIMIT 10;</code></pre>
+
+<!-- 10 -->
+<h2 id="gioi-han">10. Giới hạn cần biết</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Giới hạn</th><th>Ảnh hưởng tới radard</th></tr></thead>
+  <tbody>
+    <tr><td>At-least-once, không phải exactly-once</td><td>Mọi job phải idempotent (đã làm cho <code>fetch</code>)</td></tr>
+    <tr><td>Thông lượng thấp hơn Redis/Kafka</td><td>Không đáng kể: vài nghìn job/ngày so với khả năng hàng nghìn job/giây</td></tr>
+    <tr><td>Mỗi job chiếm một dòng, cần dọn định kỳ</td><td>pg-boss tự dọn (mục 7); lịch sử dài hạn ghi ở <code>fetch_runs</code></td></tr>
+    <tr><td>Cron trễ tới ~30 giây</td><td>Không đáng kể với lịch 15 phút</td></tr>
+    <tr><td>LISTEN/NOTIFY không chạy qua PgBouncer ở chế độ transaction</td><td>Chưa bật LISTEN/NOTIFY; nếu bật sau thì cần kết nối trực tiếp</td></tr>
+    <tr><td>Workflow nhiều bước, chạy nhiều ngày</td><td>Không phải thế mạnh; khi cần thì xem DBOS hoặc Temporal (đã ghi ở tab Tech stack)</td></tr>
+  </tbody>
+</table></div>
+
+<footer>Viết dựa trên mã nguồn pg-boss 12.35.0 đã cài trong repo (<code>dist/index.d.ts</code>, <code>types.d.ts</code>, <code>plans.js</code>, <code>timekeeper.js</code>) và database <code>radard</code> đang chạy, ngày 28/09/2026. SQL ở mục 3 đã rút gọn để dễ đọc.</footer>
+</div>
+</body>
+</html>
