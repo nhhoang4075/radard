@@ -96,7 +96,7 @@ describe("refreshSignals", () => {
     };
     const out = await refreshSignals(db, http, [a, b, x]);
     // arXiv không có refreshSignals: không hỏi.
-    expect(out).toEqual({ asked: 2, updated: 1, missing: 1 });
+    expect(out).toEqual({ asked: 2, updated: 1, missing: 1, local: 0 });
     points = 25;
     await refreshSignals(db, http, [a]);
     const rows = await db.select().from(docSignals).orderBy(asc(docSignals.metric));

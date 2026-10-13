@@ -13,7 +13,7 @@ import {
   rawKey,
   sha256,
 } from "@radard/core";
-import { type Database, documents, fetchRuns, sourceState, sources } from "@radard/db";
+import { type Database, documents, fetchRuns, repoStats, sourceState, sources } from "@radard/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 
@@ -59,6 +59,13 @@ export async function runFetch(sourceId: number, deps: FetchDeps): Promise<Fetch
     });
 
     const nNew = result.notModified ? 0 : await storeItems(sourceId, result.items, deps);
+    if (result.repoStats?.length) {
+      await db
+        .insert(repoStats)
+        .values(
+          result.repoStats.map((r) => ({ ...r, repo: r.repo.toLowerCase(), observedAt: now })),
+        );
+    }
     const status = result.notModified ? "not_modified" : result.behind ? "behind" : "ok";
 
     await db

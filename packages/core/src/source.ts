@@ -40,6 +40,23 @@ export interface FetchResult<S> {
    * cửa sổ). `items` và `state` chỉ gồm phần đã lấy đủ; lượt sau đọc tiếp từ đó. Ghi lý do.
    */
   behind?: string;
+  /**
+   * Số đo repo GitHub đọc được trong lượt này (trang Trending có tổng sao và "N stars today" của
+   * mọi repo trên trang, kể cả repo đã là tài liệu từ trước). Job fetch ghi thẳng vào `repo_stats`
+   * (chỉ ghi thêm), vì `documents` chỉ giữ một dòng mỗi repo. Nguồn khác không khai báo.
+   */
+  repoStats?: RepoObservation[];
+}
+
+/** Một lần đo repo GitHub, xem `repo_stats` trong @radard/db. */
+export interface RepoObservation {
+  /** `owner/repo`, job fetch tự viết thường. */
+  repo: string;
+  stars: number;
+  forks: number | null;
+  source: "github_stars" | "trending_daily";
+  /** Số tăng nguồn tự báo ("N stars today"); radard tự chụp thì `null`. */
+  reportedGain: number | null;
 }
 
 /**

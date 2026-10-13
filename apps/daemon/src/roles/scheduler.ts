@@ -14,6 +14,7 @@ import {
   PAGES_CRON,
   PROCESS_CRON,
   QUEUE,
+  REPO_STATS_CRON,
   VN_TZ,
 } from "../boss.ts";
 
@@ -85,6 +86,12 @@ export async function startScheduler(boss: PgBoss, db: Database): Promise<() => 
     PAGES_CRON,
     {},
     { key: "pages", singletonKey: "pages", tz: "UTC" },
+  );
+  await boss.schedule(
+    QUEUE.repoStats,
+    REPO_STATS_CRON,
+    {},
+    { key: "repo_stats", singletonKey: "repo_stats", tz: VN_TZ },
   );
   await boss.schedule(
     QUEUE.digest,

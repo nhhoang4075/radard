@@ -11,12 +11,19 @@ export const QUEUE = {
   baselines: "baselines",
   digest: "digest",
   pages: "pages",
+  repoStats: "repo_stats",
 } as const;
 
 /** Job process chạy định kỳ và tự tìm việc còn thiếu, nên một lịch cố định là đủ. */
 export const PROCESS_CRON = "*/5 * * * *";
 /** Tải trang được link tới, cùng nhịp với process (process đợi trang tối đa 30 phút). */
 export const PAGES_CRON = "*/5 * * * *";
+
+/**
+ * Chụp số sao repo GitHub lúc 06:20 giờ Việt Nam (23:20 UTC): sau hai nguồn repo (06:00 Search,
+ * 06:10 Trending) để repo mới thấy hôm nay có lần đo đầu, trước digest 07:00.
+ */
+export const REPO_STATS_CRON = "20 6 * * *";
 
 /** Mặt bằng tính lại mỗi ngày lúc 06:30 giờ Việt Nam, trước digest 07:00. */
 export const BASELINES_CRON = "30 6 * * *";
@@ -66,6 +73,14 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
     policy: "stately",
     retryLimit: 4,
     retryDelay: 120,
+    retryBackoff: true,
+    expireInSeconds: 900,
+  });
+  await boss.createQueue(QUEUE.repoStats, {
+    // Thử lại an toàn: repo đã chụp trong 12 giờ qua thì lượt sau bỏ qua, không ghi trùng.
+    policy: "stately",
+    retryLimit: 2,
+    retryDelay: 300,
     retryBackoff: true,
     expireInSeconds: 900,
   });

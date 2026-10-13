@@ -13,7 +13,7 @@
  * (repo tạo 5 ngày trước, hôm nay mới đủ sao, vẫn là tin của hôm nay). Lần sau thấy lại cùng repo
  * thì không thêm tài liệu, nên một repo chỉ vào điểm tin một lần.
  */
-import type { HttpClient, RawItem, Signals, SourceAdapter } from "@radard/core";
+import type { HttpClient, RawItem, RepoObservation, Signals, SourceAdapter } from "@radard/core";
 import { parseHTML } from "linkedom";
 
 const API = "https://api.github.com";
@@ -147,8 +147,13 @@ export const githubNewReposSource: SourceAdapter<NewReposConfig, Record<string, 
   },
   toText: readmeText,
   refreshSignals: repoSignals,
-  /** Sao mỗi ngày kể từ khi tạo: repo mới nên tổng sao chia tuổi gần đúng tốc độ hiện tại. */
+  /**
+   * Sao tăng trong 24 giờ do radard tự đo (`repo_stats`) nếu đã có; chưa có thì sao mỗi ngày kể từ
+   * khi tạo: repo mới nên tổng sao chia tuổi gần đúng tốc độ hiện tại. Hai cách cùng đơn vị sao/ngày.
+   */
   engagement(s) {
+    const gain = measuredGain(s);
+    if (gain !== null) return gain;
     if (s.gh_stars === undefined) return null;
     return s.gh_stars / Math.max(1, s.gh_age_days ?? 1);
   },
@@ -163,6 +168,8 @@ export interface TrendingRepo {
   description: string | null;
   language: string | null;
   stars: number;
+  /** `null`: dòng không có link fork (repo chưa ai fork thì GitHub có thể ẩn). */
+  forks: number | null;
   starsToday: number;
   /** HTML gốc của dòng trên trang Trending: parser đổi thì đọc lại được. */
   html: string;
@@ -181,11 +188,13 @@ export function parseTrending(html: string): TrendingRepo[] {
   const repos = rows.map((row) => {
     const href = row.querySelector("h2 a")?.getAttribute("href") ?? "";
     const today = /([\d,]+)\s+stars?\s+today/i.exec(row.textContent ?? "")?.[1];
+    const forks = row.querySelector('a[href$="/forks"]')?.textContent;
     return {
       fullName: href.replace(/^\//, "").trim(),
       description: row.querySelector("p")?.textContent?.replace(/\s+/g, " ").trim() || null,
       language: row.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim() || null,
       stars: num(row.querySelector('a[href$="/stargazers"]')?.textContent),
+      forks: forks?.trim() ? num(forks) : null,
       starsToday: today === undefined ? Number.NaN : num(today),
       html: row.outerHTML,
     };
@@ -224,10 +233,32 @@ async function getTrending(http: HttpClient): Promise<TrendingRepo[]> {
   return parseTrending((await http.get(TRENDING_URL, { headers: { accept: "text/html" } })).body);
 }
 
+/**
+ * Một lần đo cho mỗi repo trên trang, kể cả repo đã là tài liệu từ trước (fetch không thêm tài liệu
+ * cho chúng, nhưng số đo hôm nay vẫn cần). Ghi lúc fetch chứ không ở `refreshSignals`: fetch chạy
+ * đúng một lần mỗi ngày theo lịch và thấy cả trang, còn `refreshSignals` chỉ chạy lúc xếp hạng, cho
+ * vài tài liệu ứng viên, và không có DB.
+ */
+export function trendingToStats(r: TrendingRepo): RepoObservation {
+  return {
+    repo: r.fullName,
+    stars: r.stars,
+    forks: r.forks,
+    source: "trending_daily",
+    reportedGain: r.starsToday,
+  };
+}
+
 export const githubTrendingSource: SourceAdapter<Record<string, never>, Record<string, never>> = {
   kind: "github_trending",
   async fetch({ http }) {
-    return { items: (await getTrending(http)).map(trendingToItem), state: {}, httpStatus: 200 };
+    const repos = await getTrending(http);
+    return {
+      items: repos.map(trendingToItem),
+      repoStats: repos.map(trendingToStats),
+      state: {},
+      httpStatus: 200,
+    };
   },
   toText: readmeText,
   /** Đọc lại trang Trending (1 request): repo còn trên trang thì có số sao tăng hôm nay mới nhất. */
@@ -239,6 +270,69 @@ export const githubTrendingSource: SourceAdapter<Record<string, never>, Record<s
     }
     return out;
   },
-  engagement: (s) => s.gh_stars_today ?? null,
+  /** Sao tăng 24 giờ tự đo nếu đã có, không thì số GitHub báo ("N stars today"). */
+  engagement: (s) => measuredGain(s) ?? s.gh_stars_today ?? null,
   articleUrl: (_id, url) => url,
 };
+
+// ---------------------------------------------------------------------------------------------
+// Chụp số sao (job repo_stats)
+
+/**
+ * Tín hiệu `gh_gain_24h` (và `gh_accel_24h`) không do adapter lấy mà do job signals tính từ
+ * `repo_stats` (xem `repoStatsSignals` trong jobs/repo-stats.ts): adapter không có DB. Số âm (bị bỏ
+ * sao) tính là 0, vì độ nổi phải cộng được và không âm.
+ */
+function measuredGain(s: Signals): number | null {
+  return s.gh_gain_24h === undefined ? null : Math.max(0, s.gh_gain_24h);
+}
+
+const GRAPHQL_URL = `${API}/graphql`;
+const REPO_NAME = /^([\w.-]+)\/([\w.-]+)$/;
+
+export interface StarCount {
+  stars: number;
+  forks: number;
+}
+
+/**
+ * Số sao và fork hiện tại của nhiều repo qua GraphQL API: mỗi request một truy vấn có bí danh
+ * (`r0: repository(owner:, name:) {…}`) cho tối đa `batchSize` repo, nên ~1.800 repo chỉ tốn ~18
+ * request (github-theo-doi.html tab 06). Cần `GITHUB_TOKEN`: GraphQL không cho gọi ẩn danh.
+ *
+ * Repo bị xoá hay đổi tên thì GraphQL trả `null` cho bí danh đó kèm một mục trong `errors`: vắng
+ * mặt trong kết quả, không làm hỏng cả lô. Lô không có `data` (token sai, truy vấn hỏng) thì ném lỗi.
+ */
+export async function fetchStarCounts(
+  repos: string[],
+  http: HttpClient,
+  batchSize = 100,
+): Promise<Map<string, StarCount>> {
+  const out = new Map<string, StarCount>();
+  const valid = repos.filter((r) => REPO_NAME.test(r));
+  for (let i = 0; i < valid.length; i += batchSize) {
+    const batch = valid.slice(i, i + batchSize);
+    const fields = batch.map((r, j) => {
+      const [, owner, name] = REPO_NAME.exec(r) ?? [];
+      // Chuỗi JSON cũng là chuỗi GraphQL hợp lệ, nên JSON.stringify đủ để escape.
+      return `r${j}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { stargazerCount forkCount }`;
+    });
+    const res = await http.post(GRAPHQL_URL, JSON.stringify({ query: `{ ${fields.join(" ")} }` }), {
+      headers: { ...apiHeaders(), "content-type": "application/json" },
+    });
+    const body = JSON.parse(res.body) as {
+      data?: Record<string, { stargazerCount: number; forkCount: number } | null> | null;
+      errors?: { message: string }[];
+    };
+    if (!body.data) {
+      throw new Error(
+        `GraphQL: ${body.errors?.map((e) => e.message).join("; ") ?? "không có data"}`,
+      );
+    }
+    for (const [j, r] of batch.entries()) {
+      const hit = body.data[`r${j}`];
+      if (hit) out.set(r, { stars: hit.stargazerCount, forks: hit.forkCount });
+    }
+  }
+  return out;
+}

@@ -10,6 +10,7 @@ import { runDigest, type SendDeps } from "../jobs/digest.ts";
 import { type FetchDeps, runFetch } from "../jobs/fetch.ts";
 import { fetchPages, type PagesDeps } from "../jobs/pages.ts";
 import { type ProcessDeps, runProcess } from "../jobs/process.ts";
+import { runRepoStats } from "../jobs/repo-stats.ts";
 
 const log = createLogger("worker");
 
@@ -42,6 +43,11 @@ export async function startWorker(
     await runBaselines(deps.db);
   });
   log.info("đang nhận job", { queue: QUEUE.baselines });
+
+  await boss.work(QUEUE.repoStats, { localConcurrency: 1 }, async () => {
+    await runRepoStats({ db: deps.db, http: deps.http });
+  });
+  log.info("đang nhận job", { queue: QUEUE.repoStats, token: Boolean(process.env.GITHUB_TOKEN) });
 
   const pagesDeps = opts.pages;
   await boss.work(QUEUE.pages, { localConcurrency: 1 }, async () => {
