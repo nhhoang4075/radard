@@ -233,8 +233,9 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
 </div>
 <div class="group">
   <div class="group-head"><b>Lên server và nghiệm thu</b><span>bước 8–9</span></div>
-  <div class="task"><input type="checkbox" disabled><span class="name">8 · R2, Dockerfile, Railway</span><span class="badge s-todo">Chưa làm</span>
-    <span class="desc"><code>Bun.s3</code> cùng key với bản ghi đĩa, contract test chung; một image, <code>SERVICE_ROLE=all</code>; tắt daemon trên máy trước khi bật server. Chỉ deploy khi bạn đồng ý.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">8 · R2, Dockerfile, Railway</span><span class="badge s-wip">Đang làm</span>
+    <span class="desc"><code>Bun.s3</code> cùng key với bản ghi đĩa, contract test chung; một image, <code>SERVICE_ROLE=all</code>; tắt daemon trên máy trước khi bật server. Chỉ deploy khi bạn đồng ý.</span>
+    <span class="note">13/10, phần chạy trên máy đã xong: <code>adapters/src/object-store-r2.ts</code> (nén gzip như bản ghi đĩa, cùng key), chọn bằng <code>OBJECT_STORE=fs|r2</code>, thiếu biến <code>R2_*</code> thì dừng ngay. Bộ test chung 4 ca chạy cho cả hai adapter; R2 thử trên SeaweedFS local (Docker Hub đã ngừng image MinIO), 9/9 qua. CLI <code>store check</code> (ghi, đọc lại, exists) và <code>store push</code> (chép nguyên file đã nén từ <code>data/</code> lên bucket, key đã có thì bỏ qua): thử 3.000 file, chạy lại đẩy 0, đọc lại qua adapter khớp từng byte. <code>Dockerfile</code> (oven/bun:1.3.11-slim, chỉ phụ thuộc chạy, user <code>bun</code>, 251 MB) và <code>railway.json</code> (1 bản, không chồng lấn khi deploy để không có hai bot cùng nghe, 30 giây từ SIGTERM tới SIGKILL, khởi động lại khi lỗi). Chạy thử container với DB riêng <code>radard_docker</code>: migrate, seed, <code>run 1</code> lấy 1.146 bài HN với bản thô trên S3, daemon lên đủ vai trò và dừng gọn khi SIGTERM (exit 0). Còn lại: tài khoản, biến bí mật, chuyển dữ liệu (D7), deploy.</span></div>
   <div class="task"><input type="checkbox" disabled><span class="name">Project Railway, bucket R2</span><span class="badge s-you">Cần bạn</span>
     <span class="desc">Bạn tạo tài khoản, đặt biến bí mật; trước 17/10.</span></div>
   <div class="task"><input type="checkbox" disabled><span class="name">9 · Nghiệm thu 7 ngày</span><span class="badge s-todo">Chưa làm</span>
