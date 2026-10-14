@@ -75,7 +75,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   </div>
 
   <div class="answer"><h3>1. Cảnh báo chủ đề gần giống</h3><p>Nên làm. radard đo xem chủ đề mới bắt chung bao nhiêu tin với từng chủ đề có sẵn; nếu chung nhiều thì hỏi model ra quyết định "quan hệ là gì" (trùng, hẹp hơn, rộng hơn, khác), rồi báo bạn và <b>để bạn chọn</b>. Thử 6 model ra quyết định trên AI Gateway với 7 ca có đáp án: Jev, Microsoft Decision-1 và GPT-6 Luna Decisions đúng 7/7; Jev nhanh nhất trong ba (~0,5 giây) và rẻ nhất (cùng giá Microsoft).</p></div>
-  <div class="answer"><h3>2. Gợi ý chủ đề từ lời mô tả</h3><p>Ý tưởng tốt, nhưng <b>model ra quyết định không hợp ở đây</b>: cả 6 model thử chỉ đúng 4–5/9 chủ đề bạn đã chọn, vì gần như mọi chủ đề đều được xác suất cao. LLM thường làm tốt hơn (8/9 chủ đề bạn đã chọn) và còn đề xuất được chủ đề mới ngoài thư viện, việc model quyết định không làm được.</p></div>
+  <div class="answer"><h3>2. Gợi ý chủ đề từ lời mô tả</h3><p>Dùng được: Jev xếp 17 chủ đề theo xác suất khá hợp lý với lời mô tả của bạn, đủ để chia "tích sẵn / có thể / không gợi ý"; bạn vẫn tự chọn, bỏ. LLM chỉ cần cho phần đề xuất chủ đề mới ngoài thư viện, việc model ra quyết định không làm được.</p></div>
   <div class="answer"><h3>3. Chỗ khác trong radard</h3><p>Hai chỗ đáng thử nhất: <b>hỏi "hai bài này có phải cùng một chuyện không"</b> với những cặp bài giống nhau 0,85–0,9, khoảng mà radard hiện không dám gộp; và <b>hỏi lại "tin này có thật sự thuộc chủ đề X không"</b> với những tin vừa đủ điểm vào điểm tin, nơi hay gắn nhầm chủ đề. Cả hai là câu hỏi có/không, số lượng lớn, cần nhanh và rẻ, đúng thế mạnh của Jev. Không dùng cho tóm tắt, tiêu đề hay công thức xếp hạng.</p></div>
 
   <div class="tabs" role="tablist">
@@ -176,23 +176,27 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
 
   <!-- 03 -->
   <section class="panel" id="goi-y" role="tabpanel">
-    <h2>Thử bốn cách gợi ý, trên lời mô tả thật của bạn</h2>
-    <p>Đầu vào: câu mô tả tiếng Anh trong hồ sơ (970 ký tự). Đáp án để so: 9 trong 17 chủ đề bạn đã bật. Chỉ một người, một lời mô tả, nên đây là dấu hiệu, chưa phải kết luận.</p>
+    <h2>Ý tưởng</h2>
+    <p>Khi bạn viết vài dòng mô tả về mình (nghề, đang làm gì, muốn học gì), radard gợi ý luôn nên bật chủ đề nào, thay vì để bạn tự dò 17 nút. Đây chỉ là gợi ý: bạn vẫn bật, tắt tuỳ ý.</p>
+
+    <h2>Thử với lời mô tả thật của bạn</h2>
+    <p>Hỏi Jev 17 câu có/không, mỗi chủ đề một câu: "người đọc có lời mô tả này có muốn nhận tin về chủ đề X không?". Jev trả xác suất cho từng câu:</p>
     <table>
-      <tr><th>Cách</th><th>Đúng trong top 9</th><th>Nhận xét</th></tr>
-      <tr><td>Embedding (cosine mô tả của bạn với mô tả chủ đề)</td><td class="n">5/9</td><td>Điểm dồn trong 0,48–0,63, không có ranh giới; "Agent AI" xếp thứ 13 dù bạn tự mô tả là kỹ sư xây AI agent.</td></tr>
-      <tr><td>Jev (17 câu có/không: người đọc này có muốn chủ đề X không)</td><td class="n">4/9</td><td>15/17 chủ đề được 0,69–0,95, nên xếp hạng gần như ngẫu nhiên ở đầu bảng; chỉ loại đúng 2 chủ đề cuối (đầu tư, pháp lý). 0,6 giây, chưa tới $0,0001.</td></tr>
-      <tr><td>Laya (cùng câu hỏi)</td><td class="n">5/9</td><td>Không khá hơn.</td></tr>
-      <tr><td>LLM (Haiku, một lời gọi, trả danh sách)</td><td class="n">8/9 bắt được</td><td>Chọn 14: đúng 8, sót 1 (Model ảnh, video, giọng nói), thừa 6. Sáu chủ đề thừa (benchmark, MLOps, công cụ lập trình AI…) khá hợp với lời mô tả; có thể bạn chỉ chưa bật.</td></tr>
+      <tr><th>Xác suất Jev cho</th><th>Chủ đề</th></tr>
+      <tr><td class="n">0,91–0,95</td><td>RAG &amp; tìm kiếm, MLOps &amp; vận hành LLM, Agent AI, GPU &amp; inference, Xây ứng dụng LLM, Đánh giá &amp; benchmark</td></tr>
+      <tr><td class="n">0,80–0,87</td><td>Model mã nguồn mở, Huấn luyện &amp; fine-tune, Công cụ lập trình AI, Model mới ra, Phần mềm có AI, Công cụ mã nguồn mở, Nghiên cứu ML</td></tr>
+      <tr><td class="n">0,69–0,76</td><td>An toàn &amp; nguyên lý AI; Model ảnh, video, giọng nói</td></tr>
+      <tr><td class="n">0,45–0,50</td><td>Công ty &amp; đầu tư AI; Chính sách &amp; pháp lý AI</td></tr>
     </table>
-    <p class="note">Vì sao Jev kém ở đây: câu hỏi "người này có muốn đọc về X không" với một kỹ sư AI thì gần như luôn "có"; model quyết định trả lời đúng câu hỏi đó, nhưng câu hỏi đó không giúp xếp hạng. Đây là lỗi đặt câu hỏi nhiều hơn là lỗi model; có thể thử lại bằng câu <code>score</code> (mức độ trọng tâm 1–5) hoặc hỏi so sánh, nhưng chưa thử.</p>
+    <p>Với một kỹ sư AI muốn học thêm thuật toán và ML, thứ tự này hợp lý: mảng kỹ thuật cao nhất, kinh doanh và pháp lý thấp nhất. 0,6 giây, chưa tới 1/100 xu.</p>
+    <p class="note">Bản trước của trang này chấm gợi ý bằng cách so với 9 chủ đề bạn đang bật, và kết luận Jev không hợp. Cách chấm đó sai: lời mô tả của bạn không viết ra để khớp với các chủ đề đang bật, bạn có thể quan tâm mảng mà chỉ chưa bật. Đã bỏ kết luận đó (14/10).</p>
 
     <h2>Đề xuất</h2>
     <ol class="steps">
-      <li><b>Dùng LLM</b> cho việc này: một lời gọi (~$0,002) đọc lời mô tả và trả về (a) các chủ đề thư viện nên bật, chia "chắc chắn" và "có thể", (b) <b>1–3 chủ đề mới ngoài thư viện</b> nếu lời mô tả có mảng thư viện chưa phủ. Model quyết định không làm được (b) vì nó chỉ chọn trong danh sách cho trước.</li>
-      <li><b>Hiện thành danh sách đã tích sẵn</b> trên Telegram ngay sau khi bạn viết mô tả: "Chắc chắn" tích sẵn, "Có thể" chưa tích, chủ đề mới có nút "Thêm". Bạn sửa rồi bấm Lưu.</li>
-      <li><b>Chủ đề mới đi qua cảnh báo gần giống</b> ở tab 02 trước khi lưu.</li>
-      <li><b>Đo lại sau</b>: lưu gợi ý và lựa chọn cuối của bạn; khi có thêm người dùng hoặc thêm lời mô tả mẫu, so lại LLM với Jev hỏi bằng <code>score</code>.</li>
+      <li><b>Model ra quyết định chấm từng chủ đề có sẵn</b> (một request, mỗi chủ đề một câu có/không), chia ba mức theo xác suất: tích sẵn, "có thể bạn quan tâm" (chưa tích), không gợi ý. Ngưỡng chia đặt sau khi thử thêm vài lời mô tả.</li>
+      <li><b>LLM đề xuất 1–3 chủ đề mới ngoài thư viện</b>, nếu lời mô tả có mảng thư viện chưa có. Đây là việc model ra quyết định không làm được, vì nó chỉ chọn trong danh sách cho trước.</li>
+      <li><b>Hiện trên Telegram ngay sau khi bạn viết mô tả</b>: danh sách đã tích sẵn, bạn sửa rồi bấm Lưu. Chủ đề mới đi qua bước cảnh báo gần giống (tab 02) trước khi lưu.</li>
+      <li><b>Đánh giá cho đúng</b>: soạn vài lời mô tả mẫu khác nhau (kỹ sư backend, nhà nghiên cứu, người làm sản phẩm…), hiện gợi ý của Jev và của LLM cạnh nhau, bạn chấm cái nào hợp lý hơn.</li>
     </ol>
   </section>
 
@@ -220,7 +224,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <h2>6 model ra quyết định trên Vercel AI Gateway, thử ngày 13/10</h2>
     <p>Cùng hai bài, cùng câu hỏi, gọi thật qua AI Gateway. <b>Quan hệ chủ đề</b>: 7 ca có đáp án biết trước (4 hẹp hơn, 1 trùng, 1 rộng hơn, 1 khác), mỗi ca một câu <code>choice</code>. <b>Gợi ý chủ đề</b>: 17 câu có/không trên lời mô tả của bạn, so với 9 chủ đề bạn đã bật.</p>
     <table>
-      <tr><th>Model</th><th>Giá vào / 1 triệu token</th><th>Quan hệ chủ đề</th><th>Thời gian / câu</th><th>Gợi ý chủ đề (top 9)</th><th>Ghi chú</th></tr>
+      <tr><th>Model</th><th>Giá vào / 1 triệu token</th><th>Quan hệ chủ đề</th><th>Thời gian / câu</th><th>Trùng 9 chủ đề đang bật*</th><th>Ghi chú</th></tr>
       <tr><td><code>typesafe-ai/jev</code></td><td class="n">$0,042</td><td><span class="pill p-hi">7/7</span></td><td class="n">~0,5 s</td><td class="n">4/9</td><td>Nhanh nhất trong nhóm đúng 7/7. Ca khó nhất (Bảo mật AI) vẫn 0,83.</td></tr>
       <tr><td><code>microsoft/microsoft-decision-1</code></td><td class="n">$0,042</td><td><span class="pill p-hi">7/7</span></td><td class="n">~1,2 s</td><td class="n">4/9</td><td>Đúng như Jev, chậm gấp đôi.</td></tr>
       <tr><td><code>openai/gpt-6-luna-decisions</code></td><td class="n">$0,10</td><td><span class="pill p-hi">7/7</span></td><td class="n">~0,6 s</td><td class="n">5/9</td><td>Xác suất thấp hơn ở hai ca khó (0,66 và 0,55): nói đúng hơn là "không chắc", nhưng giá gấp 2,4 lần. Ngữ cảnh 1 triệu token.</td></tr>
@@ -228,11 +232,11 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
       <tr><td><code>scaledown/scaledown-classify-1</code></td><td class="n">$0,05</td><td><span class="pill p-no">4/7</span></td><td class="n">~1,3 s</td><td class="n">5/9</td><td>Chỉ nhận trạng thái là văn bản; xác suất quanh 0,4 ở ca khó; 1 câu hết giờ; bài gợi ý mất 18,6 giây.</td></tr>
       <tr><td><code>convaiinnovations/laya</code></td><td class="n">miễn phí</td><td><span class="pill p-no">2/7</span></td><td class="n">~0,6 s</td><td class="n">5/9</td><td>Đúng như repo của nó cảnh báo: chưa tinh chỉnh thì yếu.</td></tr>
     </table>
-    <p class="note">Mẫu nhỏ (7 ca, 1 lời mô tả), câu chữ tiếng Anh; dùng để chọn model khởi đầu, không để kết luận model nào tốt nhất. Thời gian đo từ máy ở Việt Nam, gồm cả đường mạng. Tổng chi phí cả đợt thử dưới $0,005.</p>
+    <p class="note">* Không phải thước đo chất lượng gợi ý (xem tab 03): chỉ cho biết các model xếp hạng gần giống nhau. Mẫu nhỏ (7 ca, 1 lời mô tả), câu chữ tiếng Anh; dùng để chọn model khởi đầu, không để kết luận model nào tốt nhất. Thời gian đo từ máy ở Việt Nam, gồm cả đường mạng. Tổng chi phí cả đợt thử dưới $0,005.</p>
     <h2>Rút ra</h2>
     <ul>
       <li><b>Quan hệ chủ đề:</b> bốn model dẫn đầu đều làm được; chọn <b>Jev</b> làm mặc định (đúng 7/7, nhanh nhất, rẻ nhất), <b>Microsoft Decision-1</b> làm dự phòng cùng giá. Nhờ lớp <code>DecisionProvider</code> (tab 06), đổi model chỉ là đổi cấu hình.</li>
-      <li><b>Gợi ý chủ đề:</b> cả 6 model đều 4–5/9, tức vấn đề nằm ở <b>cách hỏi</b> ("người này có muốn X không" gần như luôn là có), không phải ở model nào. Giữ đề xuất dùng LLM.</li>
+      <li><b>Gợi ý chủ đề:</b> chưa so được model nào gợi ý tốt hơn, vì cần người chấm (tab 03, bước 4). Jev đủ dùng để khởi đầu.</li>
       <li><b>Model miễn phí (Laya) và ScaleDown</b> không dùng được nếu không tinh chỉnh.</li>
     </ul>
   </section>
@@ -243,7 +247,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <ol class="steps">
       <li><b>Một lớp chung <code>DecisionProvider</code></b> (giống <code>LlmProvider</code> hiện có): hỏi câu có/không và chọn đáp án, trả xác suất; adapter qua AI Gateway (cần nâng <code>ai</code> lên ≥ 7.0.139, bản có <code>experimental_decide</code>), bản giả cho test, ghi chi phí vào <code>llm_calls</code>. Đổi Jev, Laya hay model khác chỉ bằng cấu hình. Khoảng nửa ngày.</li>
       <li><b>Cảnh báo chủ đề gần giống</b> theo tab 02, trên Telegram. Cần bạn duyệt câu chữ và nút trước.</li>
-      <li><b>Gợi ý chủ đề từ lời mô tả</b> theo tab 03, dùng LLM; nối vào bước 2 cho chủ đề mới.</li>
+      <li><b>Gợi ý chủ đề từ lời mô tả</b> theo tab 03: model ra quyết định cho chủ đề có sẵn, LLM cho chủ đề mới; chủ đề mới đi qua bước 2.</li>
       <li><b>Thử Jev ở hai chỗ "rất hợp"</b> của tab 04, mỗi chỗ đo trước trên dữ liệu thật: soạn vài chục cặp bài giống 0,85–0,9 và vài chục tin quanh ngưỡng vào điểm tin, có đáp án, so ngưỡng hiện tại với Jev. Chỉ bật khi Jev tốt hơn rõ.</li>
     </ol>
     <h2>Rủi ro cần nhớ</h2>
