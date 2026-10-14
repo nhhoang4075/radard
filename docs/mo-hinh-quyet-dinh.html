@@ -65,9 +65,18 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
   <h1>Model quyết định (kiểu Jev) dùng được ở đâu trong radard</h1>
   <p class="lede">Ba câu hỏi: cảnh báo chủ đề gần giống có nên đưa model vào khi không chắc không; gợi ý chủ đề từ lời mô tả của bạn có dùng được model quyết định không; và còn chỗ nào trong radard nên dùng. Mọi kết luận dưới đây dựa trên số đo trên dữ liệu radard và các lần gọi thật 6 model ra quyết định qua Vercel AI Gateway hôm nay.</p>
 
-  <div class="answer"><h3>1. Cảnh báo chủ đề gần giống</h3><p>Nên làm, nhưng <b>số đo quyết định có cảnh báo hay không</b>, model chỉ trả lời "quan hệ là gì" (trùng, hẹp hơn, rộng hơn, khác), còn <b>bạn quyết định</b>. Thử 6 model ra quyết định trên AI Gateway với 7 ca có đáp án: Jev, Microsoft Decision-1 và GPT-6 Luna Decisions đúng 7/7; Jev nhanh nhất trong ba (~0,5 giây) và rẻ nhất (cùng giá Microsoft).</p></div>
+  <div class="card"><h3>Các từ dùng trong trang</h3>
+    <dl class="term">
+      <dt>Chủ đề</dt><dd>Mảng tin bạn theo dõi: 17 chủ đề có sẵn trong thư viện, cộng chủ đề bạn tự thêm trên Telegram.</dd>
+      <dt>Embedding, cosine</dt><dd>radard biến mỗi câu (tin, mô tả chủ đề) thành một dãy số; hai câu cùng nghĩa thì hai dãy gần nhau. Cosine là số 0–1 đo độ gần đó.</dd>
+      <dt>Sự kiện</dt><dd>Một câu chuyện; nhiều bài cùng đưa một chuyện được gộp thành một sự kiện, gửi thành một tin.</dd>
+      <dt>Model ra quyết định</dt><dd>Loại model AI chỉ chọn một đáp án trong danh sách cho trước và trả kèm xác suất, không viết văn bản. Jev là một ví dụ.</dd>
+    </dl>
+  </div>
+
+  <div class="answer"><h3>1. Cảnh báo chủ đề gần giống</h3><p>Nên làm. radard đo xem chủ đề mới bắt chung bao nhiêu tin với từng chủ đề có sẵn; nếu chung nhiều thì hỏi model ra quyết định "quan hệ là gì" (trùng, hẹp hơn, rộng hơn, khác), rồi báo bạn và <b>để bạn chọn</b>. Thử 6 model ra quyết định trên AI Gateway với 7 ca có đáp án: Jev, Microsoft Decision-1 và GPT-6 Luna Decisions đúng 7/7; Jev nhanh nhất trong ba (~0,5 giây) và rẻ nhất (cùng giá Microsoft).</p></div>
   <div class="answer"><h3>2. Gợi ý chủ đề từ lời mô tả</h3><p>Ý tưởng tốt, nhưng <b>model ra quyết định không hợp ở đây</b>: cả 6 model thử chỉ đúng 4–5/9 chủ đề bạn đã chọn, vì gần như mọi chủ đề đều được xác suất cao. LLM thường làm tốt hơn (8/9 chủ đề bạn đã chọn) và còn đề xuất được chủ đề mới ngoài thư viện, việc model quyết định không làm được.</p></div>
-  <div class="answer"><h3>3. Chỗ khác trong radard</h3><p>Hai chỗ đáng thử nhất: <b>phân xử cặp sự kiện "có phải cùng một chuyện"</b> ở vùng giống 0,85–0,9, và <b>kiểm lại tin ở sát cổng chủ đề</b> (lỗi kiểu Janas). Cả hai là câu hỏi có/không, số lượng lớn, cần nhanh và rẻ, đúng thế mạnh của Jev. Không dùng cho tóm tắt, tiêu đề hay công thức xếp hạng.</p></div>
+  <div class="answer"><h3>3. Chỗ khác trong radard</h3><p>Hai chỗ đáng thử nhất: <b>hỏi "hai bài này có phải cùng một chuyện không"</b> với những cặp bài giống nhau 0,85–0,9, khoảng mà radard hiện không dám gộp; và <b>hỏi lại "tin này có thật sự thuộc chủ đề X không"</b> với những tin vừa đủ điểm vào điểm tin, nơi hay gắn nhầm chủ đề. Cả hai là câu hỏi có/không, số lượng lớn, cần nhanh và rẻ, đúng thế mạnh của Jev. Không dùng cho tóm tắt, tiêu đề hay công thức xếp hạng.</p></div>
 
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="jev"><span>01</span>Jev là gì</button>
@@ -84,7 +93,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <dl class="term">
       <dt>LLM</dt><dd>Viết văn bản. Muốn nó chọn một đáp án thì phải dặn trả JSON rồi đọc lại; không có sẵn "mức chắc chắn" đáng tin.</dd>
       <dt>Model quyết định</dt><dd>Không viết gì. Bạn đưa một <b>trạng thái</b> (đoạn văn, JSON) và các <b>câu hỏi có kiểu</b>; nó trả đúng kiểu đó kèm xác suất: <code>boolean</code> (có/không, xác suất 0–1), <code>choice</code> (chọn 1 trong tối đa 255 phương án có mô tả), <code>score</code> (thang 2–10 mức).</dd>
-      <dt>Jev</dt><dd>Của TypeSafe AI, ra mắt 15/09/2026, tự gọi là "System One model" (theo Kahneman: nghĩ nhanh). Đóng, chạy trên dịch vụ của họ.</dd>
+      <dt>Jev</dt><dd>Của TypeSafe AI, ra mắt 15/09/2026, tự gọi là "System One model", mượn chữ của Kahneman chỉ kiểu nghĩ nhanh, theo trực giác. Đóng, chạy trên dịch vụ của họ.</dd>
       <dt>Laya</dt><dd>Bản mã nguồn mở (Apache 2.0, 322–421 triệu tham số), cùng API với Jev, chạy được trên máy; theo chính repo của nó thì chưa tinh chỉnh cho việc cụ thể thì yếu và tự tin quá mức.</dd>
     </dl>
 
@@ -105,43 +114,63 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
 
   <!-- 02 -->
   <section class="panel" id="gan-giong" role="tabpanel">
-    <h2>Vì sao một con số không đủ</h2>
-    <p>Hai cách đo "gần giống", trên 17 chủ đề thư viện và dữ liệu radard:</p>
-    <ul>
-      <li><b>Câu mô tả giống nhau (cosine):</b> hai chủ đề <i>khác hẳn</i> như "Phần mềm có AI" và "Công ty &amp; đầu tư AI" vẫn được 0,84. Trung vị của 136 cặp là 0,59. Không có ngưỡng nào tách được.</li>
-      <li><b>Chung bài khớp nhất</b> (trong 300 bài khớp nhất của mỗi chủ đề, bao nhiêu bài trùng): tốt hơn, vì đo đúng thứ bạn quan tâm, tức điểm tin sẽ nhận những tin nào. Nhưng chủ đề cố ý tách riêng cũng chung nhiều: "Model mới ra" và "Model mã nguồn mở" chung 48%.</li>
-    </ul>
-    <table>
-      <tr><th>Chủ đề tự thêm (thử)</th><th>Gần nhất trong thư viện</th><th>Cosine</th><th>Chung bài</th><th>Jev nói</th><th>Laya nói</th></tr>
-      <tr><td>Bảo mật AI</td><td>An toàn &amp; nguyên lý AI</td><td class="n">0,79</td><td class="n">45%</td><td><span class="pill p-hi">hẹp hơn 0,76</span></td><td><span class="pill p-mid">trùng 0,40</span></td></tr>
-      <tr><td>Chạy LLM trên máy</td><td>Model mã nguồn mở</td><td class="n">0,81</td><td class="n">70%</td><td><span class="pill p-hi">hẹp hơn 0,94</span></td><td><span class="pill p-mid">trùng 0,59</span></td></tr>
-      <tr><td>Agent cho lập trình</td><td>Agent AI</td><td class="n">—</td><td class="n">—</td><td><span class="pill p-hi">hẹp hơn 1,00</span></td><td><span class="pill p-no">rộng hơn 0,34</span></td></tr>
-    </table>
-    <p class="note">"Chạy LLM trên máy" chung tới 70% bài với "Model mã nguồn mở" nhưng không thừa: nó hẹp hơn, và chính là đề tài lớn đang bị rải ra 13 chủ đề (xem bertopic-trong-radard.html). Số đo cho biết <i>chồng lấn bao nhiêu</i>; muốn biết <i>quan hệ gì</i> thì cần phán đoán. Jev trả lời hợp lý cả 3 ca; Laya chưa tinh chỉnh thì không dùng được (đúng như repo của nó cảnh báo). Chỉ 3 ca, chưa đủ để kết luận chắc.</p>
+    <h2>Chuyện gì đã xảy ra</h2>
+    <p>Trên Telegram, lệnh <code>/topics</code> có nút <b>"➕ Tự thêm"</b>: bạn đặt tên một chủ đề và viết vài dòng mô tả. radard nhờ LLM viết lại lời mô tả đó thành một câu tiếng Anh, rồi dùng câu này để chấm mọi tin xem tin nào thuộc chủ đề mới.</p>
+    <p>Ngày 12/10 bạn thử thêm chủ đề <b>"Bảo mật AI"</b>. Thư viện đã có sẵn chủ đề <b>"An toàn &amp; nguyên lý AI"</b>, nói về gần như cùng mảng đó. radard không báo gì, cứ thế lưu. Hậu quả: hai chủ đề bắt cùng một loạt tin, danh sách chủ đề của bạn thừa một mục, và tin trong điểm tin có thể bị gắn nhãn chủ đề này hay chủ đề kia một cách lộn xộn. Lúc đó bạn phải tự nhận ra rồi nhờ tôi xoá.</p>
 
-    <h2>Đề xuất cách làm</h2>
+    <h2>Muốn có gì</h2>
+    <p>Lúc bạn bấm lưu một chủ đề tự thêm, nếu nó gần với một chủ đề đã có (trong thư viện, hoặc bạn đã tự thêm trước đó), radard <b>báo cho bạn biết, cho xem vì sao, và để bạn chọn</b>: vẫn thêm, bật chủ đề có sẵn thay vào, hay sửa lại lời mô tả. radard không tự chặn, không tự gộp.</p>
+
+    <h2>Làm sao biết hai chủ đề "gần nhau"</h2>
+    <p>Tôi thử hai cách đo trên dữ liệu radard (17 chủ đề thư viện, khoảng 26 nghìn tin của 30 ngày).</p>
+
+    <h3>Cách 1: so hai câu mô tả. Không dùng được.</h3>
+    <p>radard đã có sẵn cách biến một câu thành một dãy số (gọi là <b>embedding</b>), sao cho hai câu cùng nghĩa thì hai dãy số gần nhau. Độ gần đo bằng một số từ 0 tới 1 (gọi là <b>cosine</b>; càng gần 1 càng giống). Vấn đề: câu mô tả nào cũng nói về AI, nên chủ đề nào cũng ra số cao. Hai chủ đề khác hẳn nhau là "Phần mềm có AI" và "Công ty &amp; đầu tư AI" vẫn được 0,84; còn "Bảo mật AI" với "An toàn &amp; nguyên lý AI", vốn trùng thật, chỉ được 0,79. Không có ngưỡng nào tách được trùng với không trùng.</p>
+
+    <h3>Cách 2: so những tin mà hai chủ đề sẽ bắt. Dùng được.</h3>
+    <p>Điều bạn thật sự quan tâm là: thêm chủ đề này thì điểm tin của bạn có thêm tin gì mới không. Nên đo đúng điều đó: với mỗi chủ đề, lấy <b>300 tin khớp nó nhất</b> trong 30 ngày qua; rồi đếm xem trong 300 tin của chủ đề mới, có bao nhiêu tin cũng nằm trong 300 tin của chủ đề có sẵn. Tôi gọi con số này là <b>tỉ lệ trùng tin</b> (ví dụ 45% nghĩa là 135 trên 300 tin là tin chủ đề có sẵn cũng bắt).</p>
+    <table>
+      <tr><th>Chủ đề mới (thử)</th><th>Chủ đề có sẵn gần nhất</th><th>Tỉ lệ trùng tin</th></tr>
+      <tr><td>Bảo mật AI</td><td>An toàn &amp; nguyên lý AI</td><td class="n">45%</td></tr>
+      <tr><td>Chạy LLM trên máy cá nhân</td><td>Model mã nguồn mở</td><td class="n">70%</td></tr>
+    </table>
+
+    <h3>Nhưng tỉ lệ trùng tin cao chưa chắc là trùng</h3>
+    <p>"Chạy LLM trên máy cá nhân" trùng tới 70% tin với "Model mã nguồn mở", nhưng nó <b>không thừa</b>: nó là một phần hẹp hơn, chỉ gồm tin về chạy model trên laptop (llama.cpp, Ollama, MLX…). Bạn có thể muốn theo dõi riêng phần hẹp đó mà không muốn nhận mọi tin về model mã nguồn mở. Ngược lại, ngay cả hai chủ đề thư viện được soạn để tách riêng là "Model mới ra" và "Model mã nguồn mở" cũng trùng 48% tin, vì nhiều model mới ra là model mã nguồn mở.</p>
+    <p>Vậy con số chỉ cho biết <b>hai chủ đề bắt chung bao nhiêu tin</b>. Muốn báo cho bạn điều có ích thì còn phải biết <b>quan hệ giữa chúng</b>, một trong bốn loại:</p>
+    <table>
+      <tr><th>Quan hệ</th><th>Nghĩa là</th><th>Ví dụ</th><th>radard nên gợi ý</th></tr>
+      <tr><td>Trùng</td><td>Hai chủ đề bắt gần như cùng một loạt tin</td><td>"Model vừa phát hành" so với "Model mới ra"</td><td>Bật chủ đề có sẵn thay vì thêm</td></tr>
+      <tr><td>Hẹp hơn</td><td>Chủ đề mới là một phần của chủ đề có sẵn</td><td>"Chạy LLM trên máy cá nhân" so với "Model mã nguồn mở"</td><td>Thêm được, nếu bạn muốn ít tin hơn và tập trung hơn</td></tr>
+      <tr><td>Rộng hơn</td><td>Chủ đề mới bao luôn chủ đề có sẵn</td><td>"Trí tuệ nhân tạo nói chung" so với "Agent AI"</td><td>Cảnh báo: sẽ nhận rất nhiều tin</td></tr>
+      <tr><td>Khác</td><td>Chỉ chung một ít</td><td>"Làm vườn" so với "Model mới ra"</td><td>Không báo gì</td></tr>
+    </table>
+
+    <h3>Ai trả lời "quan hệ gì"</h3>
+    <p>Đây là câu hỏi chọn 1 trong 4 đáp án. Có một loại model AI mới làm đúng việc này, gọi là <b>model ra quyết định</b> (decision model): nó không viết văn bản, chỉ nhận đầu vào cùng danh sách đáp án, rồi trả về đáp án nó chọn kèm xác suất cho từng đáp án. Tab 01 nói rõ hơn, tab 05 so 6 model loại này. Tôi thử 7 cặp chủ đề đã biết đáp án: Jev chọn đúng cả 7, mỗi lần khoảng nửa giây, chưa tới 1/100 xu.</p>
+
+    <h2>Trên Telegram bạn sẽ thấy gì</h2>
     <ol class="steps">
-      <li><b>Đo, không gọi model.</b> Sau khi LLM viết câu mô tả tiếng Anh (như hiện tại), embed nó và tính "chung bài" với mọi chủ đề, bật hay chưa bật. Lấy 3 chủ đề chung nhiều nhất.</li>
-      <li><b>Chung dưới 30% thì thôi</b>, không cảnh báo, lưu như bình thường. Ngưỡng này để quyết định <i>có hỏi tiếp</i> hay không, không để kết luận trùng.</li>
-      <li><b>Từ 30% trở lên: hỏi Jev một lần</b> (mỗi chủ đề ứng viên một câu <code>choice</code>: trùng / hẹp hơn / rộng hơn / khác). Chưa tới $0,0001 mỗi lần thêm chủ đề.</li>
-      <li><b>Cho bạn thấy bằng chứng, rồi bạn quyết.</b> Không tự chặn, không tự gộp. Kèm 3 tin cả hai cùng bắt và 3 tin chỉ chủ đề mới bắt, để bạn thấy khác biệt bằng tin thật.</li>
+      <li>Bạn bấm "➕ Tự thêm", gõ tên và mô tả như hiện nay. radard viết câu tiếng Anh như hiện nay.</li>
+      <li>radard đo tỉ lệ trùng tin của chủ đề mới với mọi chủ đề có sẵn, kể cả chủ đề bạn đang tắt. Mất khoảng 1–2 giây.</li>
+      <li>Nếu không có chủ đề nào trùng từ 30% trở lên: lưu luôn như bây giờ, không hỏi gì thêm.</li>
+      <li>Nếu có: radard hỏi model ra quyết định quan hệ là gì, rồi gửi bạn một tin như dưới, kèm vài tin thật để bạn tự thấy khác nhau ở đâu. Bạn bấm nút để chọn.</li>
     </ol>
     <div class="mock">
-      <div class="t">Gần giống chủ đề có sẵn</div>
-      <div class="m">"Chạy LLM trên máy" hẹp hơn <b>Model mã nguồn mở</b> (đang tắt): 70% tin của nó chủ đề kia cũng bắt.</div>
-      <div class="m">Cùng bắt: SonicBoom: llama.cpp nhanh hơn 14% · Underdog Saluki 27B …<br>Chỉ chủ đề mới bắt: How to Choose the Best Local LLM for MacBook RAM …</div>
+      <div class="t">Chủ đề này gần với một chủ đề có sẵn</div>
+      <div class="m">"Chạy LLM trên máy cá nhân" là một phần hẹp hơn của <b>Model mã nguồn mở</b> (bạn đang tắt chủ đề này). 70% tin của chủ đề mới, chủ đề kia cũng bắt.</div>
+      <div class="m">Cả hai cùng bắt: "SonicBoom: llama.cpp nhanh hơn 14%", "Underdog Saluki 27B…"<br>Chỉ chủ đề mới bắt: "How to Choose the Best Local LLM for MacBook RAM…"</div>
       <div class="btns"><span class="go">Vẫn thêm chủ đề mới</span><span>Bật Model mã nguồn mở</span><span>Sửa mô tả</span><span>Huỷ</span></div>
     </div>
-    <p class="note">Bản phác bằng dữ liệu thật; câu chữ và nút để bạn duyệt. Với "trùng" thì nút mặc định đổi thành "Bật chủ đề có sẵn".</p>
+    <p class="note">Tin và số trong bản phác lấy từ dữ liệu thật. Câu chữ và các nút để bạn duyệt. Nếu quan hệ là "trùng", nút được đề xuất đổi thành "Bật chủ đề có sẵn".</p>
 
-    <h2>Trả lời câu "có đưa LLM vào khi không chắc không"</h2>
-    <p>Không cần LLM viết thêm gì: câu hỏi ở đây là chọn 1 trong 4, đúng kiểu model quyết định. Nhưng thành thật: việc thêm chủ đề rất hiếm (vài lần một tháng), nên tốc độ và giá của Jev không quan trọng; LLM hiện có (Haiku) cũng làm được với JSON. Lợi thật của Jev ở đây là trả xác suất cho từng quan hệ mà không phải đọc JSON. Đề xuất dùng Jev, sau một lớp chung (xem tab 05) để đổi model dễ dàng.</p>
+    <h2>Câu bạn hỏi: có đưa LLM vào khi không chắc không?</h2>
+    <p>Có đưa một model vào, nhưng là model ra quyết định chứ không phải LLM, và không chỉ khi không chắc: cứ khi tỉ lệ trùng tin từ 30% trở lên là hỏi, vì chính con số đó không nói được quan hệ gì. Lý do chọn model ra quyết định: câu hỏi là chọn 1 trong 4, nó trả thẳng đáp án và xác suất, không phải dặn LLM trả JSON rồi đọc lại. Nói thật thì LLM hiện có cũng làm được; vì việc thêm chủ đề rất hiếm nên tốc độ và giá không phải lý do chính.</p>
 
     <h2>Đề xuất thêm</h2>
     <ul>
-      <li><b>Gộp với "Xem trước kết quả khi chọn chủ đề"</b> (đang ở Để sau): bước 4 đã có sẵn tin thật, chỉ cần thêm "tuần qua chủ đề này bắt được N tin".</li>
-      <li><b>So cả với chủ đề bạn đang bật lẫn chưa bật.</b> Trùng với chủ đề đang bật thì nói rõ "bạn đã nhận các tin này rồi".</li>
-      <li><b>Dùng cùng phép đo cho cả thư viện</b>: cặp chủ đề thư viện chung trên 45% là dấu hiệu nên gộp hoặc viết lại mô tả cho rõ ranh giới ("Model mới ra" và "Model mã nguồn mở" 48%).</li>
+      <li><b>Cho xem trước</b> "tuần qua chủ đề này bắt được bao nhiêu tin, ví dụ…" ngay trong tin trên. Việc này đã nằm trong danh sách Để sau ("Xem trước kết quả khi chọn chủ đề"); làm cùng lúc thì gần như không tốn thêm.</li>
+      <li><b>Dùng cùng phép đo để soát chính thư viện</b>: cặp chủ đề thư viện trùng trên 45% tin là dấu hiệu nên viết lại mô tả cho rõ ranh giới hơn ("Model mới ra" và "Model mã nguồn mở" đang 48%).</li>
     </ul>
   </section>
 
@@ -172,8 +201,8 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <h2>Những chỗ trong luồng radard là "chọn trong danh sách cho trước"</h2>
     <table>
       <tr><th>Chỗ</th><th>Câu hỏi cho model</th><th>Hợp?</th><th>Vì sao</th></tr>
-      <tr><td>Gộp sự kiện, cặp giống 0,85–0,9</td><td>Hai bài này có phải cùng một chuyện? (có/không)</td><td><span class="pill p-hi">Rất hợp</span></td><td>Đang ở Để sau ("LLM phân xử vùng xám"). Số cặp nhiều, chạy mỗi 5 phút: cần nhanh và rẻ, đúng thế mạnh của Jev. Có sẵn ví dụ đã kiểm tay (2 sự kiện Nvidia giống 0,901 bị tách) để đo.</td></tr>
-      <tr><td>Tin sát cổng chủ đề (R 0,5–0,7)</td><td>Bài này có thật sự thuộc chủ đề X? (có/không, mỗi chủ đề đang bật một câu, một request)</td><td><span class="pill p-hi">Rất hợp</span></td><td>Sửa lỗi kiểu Janas (qua cổng nhờ "RAG" vì chữ, thật ra là GPU &amp; inference). Chỉ hỏi phần sát cổng, vài trăm bài mỗi ngày. Đo bằng 👍/👎 của bạn.</td></tr>
+      <tr><td>Gộp sự kiện: cặp bài giống nhau 0,85–0,9 (radard hiện để riêng vì không chắc)</td><td>Hai bài này có phải cùng một chuyện? (có/không)</td><td><span class="pill p-hi">Rất hợp</span></td><td>Đang ở Để sau ("LLM phân xử khi gộp sự kiện"). Số cặp nhiều, chạy mỗi 5 phút: cần nhanh và rẻ, đúng thế mạnh của Jev. Có sẵn ví dụ đã kiểm tay (2 sự kiện Nvidia giống 0,901 bị tách) để đo.</td></tr>
+      <tr><td>Tin vừa đủ điểm chủ đề để vào điểm tin (điểm liên quan R từ 0,5 tới 0,7; ngưỡng vào là 0,6)</td><td>Bài này có thật sự thuộc chủ đề X? (có/không, mỗi chủ đề đang bật một câu, một request)</td><td><span class="pill p-hi">Rất hợp</span></td><td>Sửa lỗi gắn nhầm chủ đề, ví dụ repo Janas (chạy model bằng cách đọc dữ liệu từ ổ SSD) bị xếp vào "RAG" chỉ vì vài chữ giống, trong khi nó thuộc "GPU &amp; inference". Chỉ hỏi những tin quanh ngưỡng, vài trăm tin mỗi ngày. Đo bằng 👍/👎 của bạn.</td></tr>
       <tr><td>Bản phát hành chỉ cập nhật phụ thuộc</td><td>Ghi chú phát hành này có thay đổi đáng kể với người dùng? (có/không)</td><td><span class="pill p-mid">Hợp, chưa cần</span></td><td>Đang ở Để sau. Nguồn releases chưa có repo nào.</td></tr>
       <tr><td>Trang rút chữ hỏng</td><td>Đoạn chữ này là nội dung bài, hay trang chặn/cookie/đăng nhập? (có/không)</td><td><span class="pill p-mid">Hợp</span></td><td>Tránh embed nhầm chữ của trang chặn vào điểm chủ đề. Cần đo trước xem lỗi này có nhiều không.</td></tr>
       <tr><td>Repo rác, mồi tải phần mềm độc</td><td>README này có phải mồi tải phần mềm (crack, keygen…)? (có/không)</td><td><span class="pill p-mid">Thận trọng</span></td><td>Nội dung do kẻ xấu viết, mà Jev dễ bị lừa (prompt injection). Giữ luật số liệu (dưới 10 KB, 0 fork, ≥ 300 sao) làm chính, model chỉ là lớp thêm.</td></tr>
@@ -183,7 +212,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
       <tr><td>Công thức xếp hạng (trọng số R, P, C, A, F)</td><td>—</td><td><span class="pill p-no">Không</span></td><td>Là công thức số; khi có 👍/👎 thì học lại trọng số bằng hồi quy logistic (đã ở Để sau), không cần model.</td></tr>
       <tr><td>Embedding, gộp theo vector, BERTopic</td><td>—</td><td><span class="pill p-no">Không</span></td><td>Bài toán khoảng cách và gom cụm, không phải chọn đáp án.</td></tr>
     </table>
-    <p class="note">Nguyên tắc chung rút ra: model quyết định đứng <b>sau</b> phép đo rẻ (cosine, luật), chỉ được hỏi ở <b>vùng xám</b>, và mỗi câu hỏi chỉ hỏi <b>một điều</b> (đúng lời khuyên trong tài liệu của Jev). Như vậy luôn có số để so: model có làm tốt hơn ngưỡng cũ không.</p>
+    <p class="note">Nguyên tắc chung rút ra: model ra quyết định đứng <b>sau</b> phép đo rẻ (cosine, luật), chỉ được hỏi ở <b>những ca phép đo không đủ chắc</b>, và mỗi câu hỏi chỉ hỏi <b>một điều</b> (đúng lời khuyên trong tài liệu của Jev). Như vậy luôn có số để so: model có làm tốt hơn ngưỡng cũ không.</p>
   </section>
 
   <!-- 05 -->
@@ -215,7 +244,7 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
       <li><b>Một lớp chung <code>DecisionProvider</code></b> (giống <code>LlmProvider</code> hiện có): hỏi câu có/không và chọn đáp án, trả xác suất; adapter qua AI Gateway (cần nâng <code>ai</code> lên ≥ 7.0.139, bản có <code>experimental_decide</code>), bản giả cho test, ghi chi phí vào <code>llm_calls</code>. Đổi Jev, Laya hay model khác chỉ bằng cấu hình. Khoảng nửa ngày.</li>
       <li><b>Cảnh báo chủ đề gần giống</b> theo tab 02, trên Telegram. Cần bạn duyệt câu chữ và nút trước.</li>
       <li><b>Gợi ý chủ đề từ lời mô tả</b> theo tab 03, dùng LLM; nối vào bước 2 cho chủ đề mới.</li>
-      <li><b>Thử Jev ở hai chỗ "rất hợp"</b> của tab 04, mỗi chỗ đo trước trên dữ liệu thật: soạn vài chục cặp sự kiện vùng xám và vài chục tin sát cổng có đáp án, so ngưỡng hiện tại với Jev. Chỉ bật khi Jev tốt hơn rõ.</li>
+      <li><b>Thử Jev ở hai chỗ "rất hợp"</b> của tab 04, mỗi chỗ đo trước trên dữ liệu thật: soạn vài chục cặp bài giống 0,85–0,9 và vài chục tin quanh ngưỡng vào điểm tin, có đáp án, so ngưỡng hiện tại với Jev. Chỉ bật khi Jev tốt hơn rõ.</li>
     </ol>
     <h2>Rủi ro cần nhớ</h2>
     <ul>
