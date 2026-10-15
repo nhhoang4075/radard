@@ -13,7 +13,7 @@
     "@grammyjs/auto-retry": "2.0.2",
     "@mozilla/readability": "0.6.0",
     "@radard/core": "workspace:*",
-    "ai": "7.0.118",
+    "ai": "7.0.141",
     "grammy": "1.46.0",
     "linkedom": "0.18.13",
     "robots-parser": "3.0.1"
