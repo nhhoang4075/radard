@@ -34,6 +34,7 @@ import { periodEndingAt, rankPeriod } from "./jobs/rank.ts";
 import { listRepos, runRepoStats } from "./jobs/repo-stats.ts";
 import { buildReport, formatReport, reportWindow } from "./jobs/report.ts";
 import { refreshSince } from "./jobs/signals.ts";
+import { checkTopicOverlap, type OverlapCheck, type TopicRelation } from "./jobs/topic-overlap.ts";
 import {
   addCustomTopic,
   describeTopic,
@@ -45,6 +46,7 @@ import {
   setTopicActive,
 } from "./jobs/topics.ts";
 import {
+  createDecider,
   createDeps,
   createDigestDeps,
   createEmbedder,
@@ -87,6 +89,9 @@ radard — CLI
   topics add "<tên>" "<mô tả>" [--exclude]
                              Tự thêm chủ đề: LLM viết câu mô tả tiếng Anh, rồi embed
   topics on|off <id>         Bật / tắt một chủ đề của bạn (không xoá)
+  topics check "<tên>" "<English description>"
+                             Soát chủ đề gần giống trước khi thêm: tỉ lệ trùng tin với từng chủ đề
+                             có sẵn, quan hệ do model quyết định trả lời, tin ví dụ; không lưu gì
 
   signals refresh [--since=30d]  Lấy lại điểm, bình luận mới nhất (HN) cho tài liệu từ mốc đó
   baselines                  Tính lại mặt bằng (trung vị, mốc 0,1%) ngay và in ra
@@ -300,6 +305,20 @@ const COMMANDS: Record<string, Command> = {
     const id = await addCustomTopic(db, { label, descriptionUser: text, descriptionEn, kind });
     console.log(`đã thêm chủ đề ${id}: ${label}\n  câu dùng để embed: ${descriptionEn}`);
     await embedTopicsNow(db);
+  },
+
+  "topics check": async ({ db }) => {
+    const [label, descriptionEn] = [process.argv[4], process.argv[5]];
+    if (!label || !descriptionEn)
+      throw new Error('cần tên và câu mô tả tiếng Anh: topics check "<tên>" "<description>"');
+    const embedder = createEmbedder(db);
+    if (!embedder) throw new Error("chưa có embedder: không đo được tỉ lệ trùng tin");
+    const started = Date.now();
+    const res = await checkTopicOverlap(
+      { db, embedder, decider: createDecider(db) },
+      { label, descriptionEn },
+    );
+    printOverlap(label, res, Date.now() - started);
   },
 
   "topics on": async ({ db }) => {
@@ -643,6 +662,32 @@ const COMMANDS: Record<string, Command> = {
 };
 
 /** Embed ngay chủ đề vừa chọn hoặc thêm; chưa có embedder thì để lượt process sau. */
+const RELATION_VI: Record<TopicRelation, string> = {
+  same: "trùng",
+  narrower: "hẹp hơn",
+  broader: "rộng hơn",
+  different: "khác",
+};
+
+function printOverlap(label: string, res: OverlapCheck, ms: number): void {
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  console.log(
+    `"${label}": so ${res.docs} tin, ${ms} ms, model quyết định: ${res.model ?? "không hỏi"}`,
+  );
+  if (res.candidates.length === 0) console.log("  không có chủ đề nào trùng từ 30% tin trở lên");
+  for (const c of res.candidates) {
+    const relation = c.relation
+      ? `${RELATION_VI[c.relation]} (${c.relation}, ${c.probability?.toFixed(2)})`
+      : "chưa rõ quan hệ";
+    const state = c.enabled ? "đang bật" : "chưa bật";
+    console.log(
+      `\n  ${c.label} [${c.origin} ${c.topicId}, ${state}]: trùng ${pct(c.ratio)} tin, ${relation}`,
+    );
+    for (const t of c.shared) console.log(`    cả hai: ${t.slice(0, 110)}`);
+    for (const t of c.onlyNew) console.log(`    chỉ mới: ${t.slice(0, 110)}`);
+  }
+}
+
 async function embedTopicsNow(db: FetchDeps["db"]): Promise<void> {
   const embedder = createEmbedder(db);
   if (!embedder) return console.log("chưa có embedder: chủ đề sẽ được embed ở lượt process sau");
