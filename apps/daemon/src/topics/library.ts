@@ -1,141 +1,177 @@
 /**
  * Thư viện chủ đề: các chủ đề radard soạn sẵn để người dùng bấm chọn, không phải tự viết gì.
  *
+ * Bộ 14 chủ đề từ 15/10/2026 (docs/bo-chu-de-moi.html) chia theo đúng một câu hỏi: tin này chủ
+ * yếu nói về cái gì. Bộ 17 chủ đề cũ trộn nhiều cách chia (đối tượng, hoạt động, tính chất, loại
+ * tin) nên một tin rơi vào nhiều ô cùng lúc.
+ *
  * Người dùng chỉ thấy `labelVi`. `descriptionEn` là câu dùng để embed: viết bằng tiếng Anh cho
- * khớp dữ liệu, gồm tên sản phẩm, kỹ thuật cụ thể. Thử trên 16 nghìn tài liệu ngày 12/10/2026:
- * câu chứa nhiều chữ chung chung ("AI models", "LLM") kéo về mọi tiêu đề có chữ đó (chủ đề ảnh,
- * video, giọng nói bản đầu); thay bằng tên cụ thể (Midjourney, Sora, text-to-speech) thì bắt đúng.
+ * khớp dữ liệu, chỉ gồm phần "Gồm" với tên sản phẩm, kỹ thuật cụ thể. Embedding không hiểu phủ
+ * định: viết "không gồm X" vào câu lại kéo nó gần X hơn. Các câu đã được đo trên 16.203 tin AI của
+ * 30 ngày; sửa câu nào thì đo lại.
+ *
+ * `scopeNote` là phạm vi của chủ đề (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
+ * đưa cho LLM khi nó gắn nhãn cho tin trong điểm tin; không embed.
  *
  * Sửa một câu mô tả ở đây rồi chạy `topics seed`: thư viện được cập nhật, chủ đề người dùng đã
- * chọn từ thư viện nhận câu mới và được embed lại.
+ * chọn từ thư viện nhận câu mới và được embed lại. Sửa `scopeNote` thì không phải embed lại.
  */
 export interface LibraryTopic {
   key: string;
   groupVi: string;
   labelVi: string;
   descriptionEn: string;
+  scopeNote: string;
 }
 
 export const TOPIC_LIBRARY: LibraryTopic[] = [
   {
+    key: "llm_models",
+    groupVi: "Model",
+    labelVi: "LLM: model và hành vi",
+    descriptionEn:
+      "Large language models themselves: new model releases and open-weight models, model architecture, reasoning and chain of thought, model behavior, hallucination and faithfulness, interpretability, benchmarks and evaluations of LLMs",
+    scopeNote:
+      "Language models themselves: new LLM releases from any lab, open or closed weights; architecture, reasoning, model behavior, hallucination, benchmarks and evaluations, looking inside models (interpretability). Not: how models are trained or optimized (→ Huấn luyện và tối ưu model); agents (→ Agent AI); image, video and audio models (→ Ảnh, video và âm thanh).",
+  },
+  {
+    key: "training",
+    groupVi: "Model",
+    labelVi: "Huấn luyện và tối ưu model",
+    descriptionEn:
+      "Training and optimizing models: pretraining, post-training, reinforcement learning with rewards, distillation, fine-tuning, quantization, KV cache, efficient attention, long context, making inference faster and cheaper",
+    scopeNote:
+      "Pretraining, post-training (RL, distillation), fine-tuning, quantization, KV cache, efficient attention, long context, making models faster and cheaper at the algorithm level. Not: hardware and servers that run models (→ Hạ tầng AI).",
+  },
+  {
     key: "agents",
-    groupVi: "AI ứng dụng",
+    groupVi: "Xây dựng với AI",
     labelVi: "Agent AI",
     descriptionEn:
-      "AI agents: LLM agents that use tools and take actions, planning, memory, multi-agent systems, coding agents, computer-use agents, Model Context Protocol (MCP), agent frameworks and agent evaluation",
-  },
-  {
-    key: "llm_apps",
-    groupVi: "AI ứng dụng",
-    labelVi: "Xây ứng dụng LLM",
-    descriptionEn:
-      "How developers build products on top of LLM APIs: prompt engineering, context engineering, structured JSON output, function calling, AI SDKs, LLM gateways and routers, testing and debugging AI features",
-  },
-  {
-    key: "rag_search",
-    groupVi: "AI ứng dụng",
-    labelVi: "RAG & tìm kiếm",
-    descriptionEn:
-      "Retrieval-augmented generation and semantic search: embeddings, vector databases, hybrid search, reranking, chunking documents, knowledge graphs for LLMs",
+      "AI agents: LLM agents that plan, use tools and take actions, agent memory, multi-agent systems, agent harnesses, computer-use and browser agents, Model Context Protocol servers",
+    scopeNote:
+      "Agents that plan, call tools and act; agent memory; multi-agent systems; MCP; computer-use and browser-use agents. Not: coding agents (→ Lập trình với AI); agent security (→ An toàn và bảo mật AI).",
   },
   {
     key: "ai_coding",
-    groupVi: "AI ứng dụng",
-    labelVi: "Công cụ lập trình AI",
+    groupVi: "Xây dựng với AI",
+    labelVi: "Lập trình với AI",
     descriptionEn:
-      "AI coding tools: AI code assistants and AI IDEs such as GitHub Copilot, Cursor and Claude Code, code generation with LLMs, AI code review, vibe coding",
+      "AI for software development: AI coding assistants and coding agents such as Claude Code, Codex and Cursor, AI code generation and code review, the experience of programming with AI",
+    scopeNote:
+      "AI coding assistants and coding agents (Claude Code, Codex, Cursor…), code generation, AI code review, the experience of programming with AI. Not: programming tools that do not use AI.",
   },
   {
-    key: "ai_products",
-    groupVi: "AI ứng dụng",
-    labelVi: "Phần mềm có AI",
+    key: "llm_apps",
+    groupVi: "Xây dựng với AI",
+    labelVi: "Xây ứng dụng LLM",
     descriptionEn:
-      "Software products with AI built in: new AI features in apps and developer platforms, open-source AI tools, AI product launches",
-  },
-  {
-    key: "new_models",
-    groupVi: "Model",
-    labelVi: "Model mới ra",
-    descriptionEn:
-      "New AI model releases: new large language models from OpenAI, Anthropic, Google, Meta and others, new model versions, their benchmark results, pricing and context windows",
-  },
-  {
-    key: "open_models",
-    groupVi: "Model",
-    labelVi: "Model mã nguồn mở",
-    descriptionEn:
-      "Open-weight models anyone can download: new Llama, Qwen, Mistral, DeepSeek, Gemma and Kimi releases, weights published on Hugging Face, running them locally with llama.cpp, Ollama or MLX",
+      "Building applications on LLMs: retrieval-augmented generation, embeddings and vector search, prompt and context engineering, structured output, LLM APIs and SDKs, reliability and observability of LLM apps",
+    scopeNote:
+      "RAG, embeddings and vector search, prompt and context engineering, structured JSON output, LLM APIs and SDKs, reliability and monitoring of LLM apps. Not: agent design (→ Agent AI); running and serving models (→ Hạ tầng AI).",
   },
   {
     key: "multimodal",
     groupVi: "Model",
-    labelVi: "Model ảnh, video, giọng nói",
+    labelVi: "Ảnh, video và âm thanh",
     descriptionEn:
-      "Generating and understanding images, video and audio with AI: image generators like Midjourney, Stable Diffusion and Flux, video generators like Sora and Veo, speech-to-text, text-to-speech, voice cloning",
+      "Generative and multimodal media AI: image and video generation, diffusion models, vision-language models, speech recognition, text to speech, voice cloning and music generation",
+    scopeNote:
+      "Image, video and music generation; diffusion; vision-language models; speech recognition and speech synthesis. Not: medical imaging (→ AI trong khoa học và y tế).",
   },
   {
-    key: "ml_research",
-    groupVi: "Nghiên cứu",
-    labelVi: "Nghiên cứu ML",
+    key: "robotics",
+    groupVi: "Ứng dụng",
+    labelVi: "Robot và AI vật lý",
     descriptionEn:
-      "Machine learning and deep learning research: new neural network architectures, transformers and attention, scaling laws, reasoning in language models, research papers",
+      "Robotics and embodied AI: robot learning, manipulation, humanoid robots, world models, self-driving cars and drones",
+    scopeNote:
+      "Robot learning, object manipulation, humanoid robots, world models, self-driving cars, drones.",
   },
   {
-    key: "training",
-    groupVi: "Nghiên cứu",
-    labelVi: "Huấn luyện & fine-tune",
+    key: "ai_infra",
+    groupVi: "Xây dựng với AI",
+    labelVi: "Hạ tầng AI",
     descriptionEn:
-      "Techniques for training language models: pretraining datasets, supervised fine-tuning, LoRA adapters, reinforcement learning from human feedback, RLHF, GRPO, reward models, distillation, synthetic training data",
+      "AI compute infrastructure: GPUs and AI chips, data centers, inference servers and serving engines, running models locally, AI cloud platforms, cost and energy use of AI compute",
+    scopeNote:
+      "GPUs and AI chips, data centers, inference servers (vLLM…), running models on a personal machine, AI cloud platforms, compute cost and energy use. Not: algorithm-level optimization (→ Huấn luyện và tối ưu model); financial news about chip companies (→ Kinh doanh AI).",
   },
   {
-    key: "ai_safety",
-    groupVi: "Nghiên cứu",
-    labelVi: "An toàn & nguyên lý AI",
+    key: "ai_products",
+    groupVi: "Ứng dụng",
+    labelVi: "Trợ lý và ứng dụng AI",
     descriptionEn:
-      "AI safety and interpretability: alignment, jailbreaks, prompt injection, red teaming, mechanistic interpretability, dangerous model behavior and misuse of AI",
-  },
-  {
-    key: "evals",
-    groupVi: "Nghiên cứu",
-    labelVi: "Đánh giá & benchmark",
-    descriptionEn:
-      "Evaluating AI models: LLM benchmarks, leaderboards, evaluation methods, LLM-as-a-judge, measuring hallucination and reliability of AI systems",
-  },
-  {
-    key: "inference",
-    groupVi: "Hạ tầng",
-    labelVi: "GPU & inference",
-    descriptionEn:
-      "AI infrastructure: GPUs and AI chips, LLM inference serving and optimization, quantization, vLLM, distributed training, AI data centers",
-  },
-  {
-    key: "mlops",
-    groupVi: "Hạ tầng",
-    labelVi: "MLOps & vận hành LLM",
-    descriptionEn:
-      "Running ML and LLM systems in production: MLOps, LLM observability and tracing, model deployment and monitoring, data pipelines for AI",
-  },
-  {
-    // 13/10/2026: bạn thêm sau khi thấy REA, Doory (công cụ mã nguồn mở, không hẳn AI) khớp yếu
-    // với các chủ đề AI. Tên sản phẩm ví dụ cố ý không nhắc tới chính các tin đó.
-    key: "open_source_tools",
-    groupVi: "Phần mềm",
-    labelVi: "Công cụ mã nguồn mở",
-    descriptionEn:
-      "Open-source software tools and projects: new open-source repositories on GitHub, self-hosted apps, open-source alternatives to commercial products like Notion, Figma or Firebase, developer libraries, frameworks and command-line tools, Show HN launches",
+      "Launches and new features of AI apps and chat assistants for end users, such as ChatGPT, Claude, Gemini and Copilot, and AI features added to everyday consumer software",
+    scopeNote:
+      "ChatGPT, Claude, Gemini, Copilot and other AI apps for end users; AI features in everyday software. Not: tools for developers (→ Lập trình với AI, Xây ứng dụng LLM).",
   },
   {
     key: "ai_industry",
-    groupVi: "Ngành AI",
-    labelVi: "Công ty & đầu tư AI",
+    groupVi: "Ngành và xã hội",
+    labelVi: "Kinh doanh AI",
     descriptionEn:
-      "AI industry news: AI labs and AI startups, funding rounds, acquisitions, partnerships, executives and business strategy of OpenAI, Anthropic, Google, Microsoft and Nvidia",
+      "The AI industry as a business: AI companies and startups, funding rounds, acquisitions, IPOs, revenue, valuations and competition between AI labs",
+    scopeNote:
+      "AI companies and startups, funding rounds, acquisitions, IPOs, revenue, valuations, competition between AI labs. Not: laws and policy (→ Chính sách và xã hội).",
+  },
+  {
+    key: "ai_safety",
+    groupVi: "Ngành và xã hội",
+    labelVi: "An toàn và bảo mật AI",
+    descriptionEn:
+      "AI safety and security: alignment, red teaming, jailbreaks and prompt injection, security of AI agents, misuse of AI, catastrophic and existential AI risk",
+    scopeNote:
+      "Alignment, red teaming, jailbreaks, prompt injection, security of AI agents, misuse of AI, large-scale risks from AI. Not: laws and policy (→ Chính sách và xã hội).",
   },
   {
     key: "ai_policy",
-    groupVi: "Ngành AI",
-    labelVi: "Chính sách & pháp lý AI",
+    groupVi: "Ngành và xã hội",
+    labelVi: "Chính sách và xã hội",
     descriptionEn:
-      "AI policy and regulation: AI laws, government AI policy, copyright lawsuits over AI training data, AI and jobs, societal impact of AI",
+      "AI policy and society: AI regulation and laws, government AI policy, copyright and AI, impact of AI on jobs and education, public opinion and debate about AI",
+    scopeNote:
+      "AI laws and regulation, government policy, copyright, impact of AI on jobs and education, public debate about AI.",
   },
+  {
+    key: "ml_foundations",
+    groupVi: "Nghiên cứu",
+    labelVi: "ML nền tảng",
+    descriptionEn:
+      "Core machine learning research beyond language models: optimization, learning theory, bandits, graph neural networks, time-series forecasting, theory of generative models, statistics for machine learning",
+    scopeNote:
+      "Machine learning research beyond language models: optimization, learning theory, bandits, graph neural networks (GNN), time-series forecasting, theory of generative models, statistics for ML.",
+  },
+  {
+    key: "ai_science",
+    groupVi: "Ứng dụng",
+    labelVi: "AI trong khoa học và y tế",
+    descriptionEn:
+      "AI for science and medicine: medical imaging and clinical diagnosis, healthcare AI, protein structure and drug discovery, chemistry and materials, physics, climate and weather forecasting models",
+    scopeNote:
+      "Medical imaging and diagnosis, AI in healthcare, proteins and drug discovery, chemistry and materials, physics, climate and weather forecasting.",
+  },
+];
+
+/**
+ * Chủ đề đã rút khỏi thư viện → chủ đề mới thay nó (15/10/2026: bộ 17 chủ đề cũ sang bộ 14).
+ * `topics seed` chuyển lựa chọn theo bảng này: ai đang bật chủ đề cũ thì được bật chủ đề mới, chủ
+ * đề cũ tắt đi (dòng cũ giữ lại, không mất lịch sử). Chủ đề giữ khoá cũ (`agents`, `training`…)
+ * không nằm ở đây: nó vẫn là chính nó, chỉ đổi tên và câu mô tả.
+ */
+export const TOPIC_SUCCESSORS: Record<string, string> = {
+  new_models: "llm_models",
+  open_models: "llm_models",
+  evals: "llm_models",
+  rag_search: "llm_apps",
+  mlops: "llm_apps",
+  inference: "ai_infra",
+  ml_research: "ml_foundations",
+  open_source_tools: "ai_coding",
+};
+
+/** Hai quy tắc khi một tin hợp hai chủ đề; viết vào prompt gắn nhãn của điểm tin. */
+export const TOPIC_TIE_BREAKS = [
+  'A more specific topic beats a general one: an agent that writes code belongs to the coding topic ("Lập trình với AI"), not to "Agent AI".',
+  'The application domain beats the data modality: medical imaging belongs to science and medicine ("AI trong khoa học và y tế"), not to "Ảnh, video và âm thanh".',
 ];

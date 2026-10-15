@@ -266,7 +266,7 @@ const COMMANDS: Record<string, Command> = {
         group = t.groupVi;
         console.log(`\n${group}`);
       }
-      console.log(`  ${t.chosen ? "✓" : " "} ${t.key.padEnd(12)} ${t.labelVi}`);
+      console.log(`  ${t.chosen ? "✓" : " "} ${t.key.padEnd(14)} ${t.labelVi}`);
     }
     const mine = await listProfileTopics(db);
     console.log("\nChủ đề của bạn");
@@ -285,7 +285,7 @@ const COMMANDS: Record<string, Command> = {
       .split(",")
       .map((k) => k.trim())
       .filter(Boolean);
-    if (keys.length === 0) throw new Error("thiếu key: topics pick agents,rag_search");
+    if (keys.length === 0) throw new Error("thiếu key: topics pick agents,llm_apps");
     console.log(`đã chọn ${await pickTopics(db, keys)} chủ đề`);
     await embedTopicsNow(db);
   },

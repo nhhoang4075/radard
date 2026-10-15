@@ -1,0 +1,1 @@
+ALTER TABLE "topics" ADD COLUMN "scope_note" text;

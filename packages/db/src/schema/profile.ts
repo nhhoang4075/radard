@@ -45,7 +45,7 @@ export const topics = pgTable(
   "topics",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-    /** Khoá ổn định trong code (`agents`, `rag_search`…), chỉ chủ đề thư viện có. */
+    /** Khoá ổn định trong code (`agents`, `llm_apps`…), chỉ chủ đề thư viện có. */
     key: text("key").unique(),
     /** Nhóm hiển thị trong thư viện; chủ đề tự thêm không có. */
     groupVi: text("group_vi"),
@@ -53,6 +53,12 @@ export const topics = pgTable(
     labelVi: text("label_vi").notNull(),
     /** Câu dùng để embed: tiếng Anh, có ví dụ cụ thể (tự thêm: LLM viết từ lời người dùng). */
     descriptionEn: text("description_en").notNull(),
+    /**
+     * Phạm vi chủ đề bằng tiếng Anh (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
+     * đưa cho LLM khi gắn nhãn tin trong điểm tin; không embed. Thư viện lấy từ code; chủ đề tự
+     * thêm thì trống (LLM chỉ thấy tên).
+     */
+    scopeNote: text("scope_note"),
     /** Lời của người dùng, giữ nguyên ngôn ngữ họ viết; chỉ chủ đề tự thêm có. */
     descriptionUser: text("description_user"),
     /** library | custom */

@@ -24,7 +24,7 @@ import {
   setTopicActive,
   toggleLibraryTopic,
 } from "../src/jobs/topics.ts";
-import { TOPIC_LIBRARY } from "../src/topics/library.ts";
+import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../src/topics/library.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
@@ -69,11 +69,169 @@ describe("thư viện chủ đề", () => {
     expect(agents?.embedding).toBeNull();
     expect(rows.filter((t) => t.embedding !== null)).toHaveLength(TOPIC_LIBRARY.length - 1);
   });
+
+  test("sửa phạm vi (scopeNote) thì chỉ cập nhật chữ, không phải embed lại", async () => {
+    await embedPendingTopics(db, embedder);
+    await db.update(topics).set({ scopeNote: "cũ" }).where(eq(topics.key, "agents"));
+    const r = await seedLibrary(db);
+    expect(r.refreshed).toBe(0);
+    const rows = await db.select().from(topics);
+    expect(rows.find((t) => t.key === "agents")?.scopeNote).toBe(
+      TOPIC_LIBRARY.find((t) => t.key === "agents")?.scopeNote ?? "",
+    );
+    expect(rows.every((t) => t.embedding !== null && t.scopeNote)).toBe(true);
+  });
+
+  test("bảng chuyển lựa chọn: chủ đề cũ đã rút khỏi thư viện, chủ đề mới có trong thư viện", () => {
+    const keys = TOPIC_LIBRARY.map((t) => t.key);
+    expect(new Set(keys).size).toBe(14);
+    for (const [from, to] of Object.entries(TOPIC_SUCCESSORS)) {
+      expect(keys).not.toContain(from);
+      expect(keys).toContain(to);
+    }
+  });
+});
+
+describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
+  /** Bộ thư viện trước 15/10/2026, theo thứ tự cũ. */
+  const OLD_KEYS = [
+    "agents",
+    "llm_apps",
+    "rag_search",
+    "ai_coding",
+    "ai_products",
+    "new_models",
+    "open_models",
+    "multimodal",
+    "ml_research",
+    "training",
+    "ai_safety",
+    "evals",
+    "inference",
+    "mlops",
+    "open_source_tools",
+    "ai_industry",
+    "ai_policy",
+  ];
+
+  /** Lựa chọn của hồ sơ 1: [khoá, đang bật] cho mọi dòng `profile_topics`. */
+  async function selections(): Promise<[string, boolean][]> {
+    const rows = await db
+      .select({ key: topics.key, active: profileTopics.active })
+      .from(profileTopics)
+      .innerJoin(topics, eq(topics.id, profileTopics.topicId))
+      .where(eq(profileTopics.profileId, 1));
+    return rows.map((r): [string, boolean] => [r.key ?? "", r.active]).sort();
+  }
+
+  test("lựa chọn của bạn (15/10/2026) thành đúng 8 chủ đề mới; chạy lại không đổi gì", async () => {
+    await db.execute(sql`truncate profile, topics restart identity cascade`);
+    await db.insert(profile).values({ description: "AI engineer" });
+    const old = await db
+      .insert(topics)
+      .values(
+        OLD_KEYS.map((key, position) => ({
+          key,
+          groupVi: "cũ",
+          labelVi: `cũ ${key}`,
+          descriptionEn: key,
+          position,
+        })),
+      )
+      .returning({ id: topics.id, key: topics.key });
+    const id = (key: string) => old.find((t) => t.key === key)?.id ?? 0;
+    // Đúng trạng thái DB trên máy: 9 chủ đề bật, `evals` và `mlops` đã chọn rồi tắt.
+    const on = [
+      "agents",
+      "llm_apps",
+      "rag_search",
+      "ai_products",
+      "new_models",
+      "multimodal",
+      "ml_research",
+      "training",
+      "open_source_tools",
+    ];
+    await db
+      .insert(profileTopics)
+      .values([
+        ...on.map((k) => ({ topicId: id(k) })),
+        { topicId: id("evals"), active: false },
+        { topicId: id("mlops"), active: false },
+      ]);
+
+    const first = await seedLibrary(db);
+    // Tắt 4 lựa chọn cũ: rag_search, new_models, ml_research, open_source_tools.
+    expect(first.carried).toBe(4);
+    const after = await selections();
+    const active = after.filter(([, a]) => a).map(([k]) => k);
+    expect(active.sort()).toEqual(
+      [
+        "agents",
+        "llm_apps",
+        "ai_products",
+        "llm_models",
+        "multimodal",
+        "ml_foundations",
+        "training",
+        "ai_coding",
+      ].sort(),
+    );
+    expect((await listLibrary(db)).filter((t) => t.chosen).map((t) => t.key)).toEqual([
+      "llm_models",
+      "training",
+      "agents",
+      "ai_coding",
+      "llm_apps",
+      "multimodal",
+      "ai_products",
+      "ml_foundations",
+    ]);
+    // Chủ đề cũ đã rút vẫn giữ dòng (không mất lịch sử), nhưng tắt.
+    for (const k of ["rag_search", "new_models", "ml_research", "open_source_tools", "evals"]) {
+      expect(after).toContainEqual([k, false]);
+    }
+
+    const second = await seedLibrary(db);
+    expect(second.carried).toBe(0);
+    expect(await selections()).toEqual(after);
+  });
+
+  test("lựa chọn đang tắt không được chuyển; chủ đề mới đang tắt được bật lại", async () => {
+    await db.execute(sql`truncate profile, topics restart identity cascade`);
+    await db.insert(profile).values({ description: "AI engineer" });
+    const [inference, evals] = await db
+      .insert(topics)
+      .values(
+        ["inference", "evals"].map((key) => ({
+          key,
+          groupVi: "cũ",
+          labelVi: key,
+          descriptionEn: key,
+        })),
+      )
+      .returning({ id: topics.id });
+    await seedLibrary(db);
+    const [infra] = await db.select().from(topics).where(eq(topics.key, "ai_infra"));
+    await db
+      .insert(profileTopics)
+      .values([
+        { topicId: inference?.id ?? 0 },
+        { topicId: evals?.id ?? 0, active: false },
+        { topicId: infra?.id ?? 0, active: false },
+      ]);
+    await seedLibrary(db);
+    expect(await selections()).toEqual([
+      ["ai_infra", true],
+      ["evals", false],
+      ["inference", false],
+    ]);
+  });
 });
 
 describe("chọn và bật tắt", () => {
   test("chọn lại chủ đề đã tắt thì bật dòng cũ, không thêm dòng", async () => {
-    expect(await pickTopics(db, ["agents", "rag_search"])).toBe(2);
+    expect(await pickTopics(db, ["agents", "llm_apps"])).toBe(2);
     const [first] = await listProfileTopics(db);
     await setTopicActive(db, first?.id ?? 0, false);
     await pickTopics(db, ["agents"]);
@@ -150,7 +308,7 @@ describe("tự thêm chủ đề", () => {
 
 describe("embed chủ đề", () => {
   test("embed mọi chủ đề thư viện, bật hay chưa bật, trong một request; lần hai không gọi model", async () => {
-    await pickTopics(db, ["agents", "rag_search", "evals"]);
+    await pickTopics(db, ["agents", "llm_apps", "training"]);
     const mine = await listProfileTopics(db);
     await setTopicActive(db, mine[2]?.id ?? 0, false);
     let calls = 0;

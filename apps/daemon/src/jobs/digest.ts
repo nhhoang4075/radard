@@ -29,6 +29,7 @@ import {
 } from "@radard/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
+import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
 import { type RankResult, rankPeriod } from "./rank.ts";
 
 const log = createLogger("digest");
@@ -199,13 +200,24 @@ export interface Summaries {
   items: Map<number, { title: string; summary: string; topic?: string }>;
 }
 
+/** Một chủ đề đang bật, như LLM thấy khi gắn nhãn: tên và phạm vi (chủ đề tự thêm chỉ có tên). */
+export interface TopicChoice {
+  label: string;
+  note?: string;
+}
+
 /**
- * `topics`: nhãn các chủ đề bạn đang theo dõi. Model chọn nhãn cho từng tin vì nó đọc được cả
- * trích đoạn và hiểu tiêu đề ngắn, còn embedding của tiêu đề 10 chữ hay đoán sai (Janas,
+ * `topics`: các chủ đề bạn đang theo dõi, kèm phạm vi. Model chọn nhãn cho từng tin vì nó đọc được
+ * cả trích đoạn và hiểu tiêu đề ngắn, còn embedding của tiêu đề 10 chữ hay đoán sai (Janas,
  * "streaming experts from SSD", bị gán RAG; 13/10/2026). Không đưa nhãn embedding vào prompt
- * để model không bám theo nhãn đó.
+ * để model không bám theo nhãn đó. Phạm vi (dòng "Not: …") và hai quy tắc phân xử lấy từ
+ * docs/bo-chu-de-moi.html: khoảng 30% tin nằm giữa hai chủ đề, cần luật rõ để nhãn nhất quán.
  */
-export function digestSystem(context: string, lang: string, topics: readonly string[]): string {
+export function digestSystem(
+  context: string,
+  lang: string,
+  topics: readonly TopicChoice[],
+): string {
   const language = LANG_NAMES[lang] ?? lang;
   return [
     "You write a short morning news brief for one reader.",
@@ -220,7 +232,11 @@ export function digestSystem(context: string, lang: string, topics: readonly str
     "- items: exactly one entry per input story, with the same n.",
     "- title: at most 12 words.",
     "- summary: 2-3 sentences: what happened, then why it matters to this reader.",
-    `- topic: the reader's topic this story is most about, copied exactly from this list: ${topics.map((t) => JSON.stringify(t)).join(", ")}.`,
+    "- topic: the reader's topic this story is mostly about. Copy only the quoted label, exactly as written, from this list (the text after a label says what the topic covers):",
+    ...topics.map((t) => `  - ${JSON.stringify(t.label)}${t.note ? `: ${t.note}` : ""}`),
+    "  When a story fits two topics:",
+    ...TOPIC_TIE_BREAKS.map((r) => `  - ${r}`),
+    '  - Follow the "Not:" notes. If the topic a note points to is not in the list, choose the best of the listed topics.',
   ].join("\n");
 }
 
@@ -450,13 +466,16 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
   let summaries: Summaries | null = null;
   let llmInfo: DigestPlan["llm"] = null;
   if (deps.llm) {
-    const topics = [...rank.topicLabels.values()];
+    const topics = [...rank.topicLabels].map(([id, label]): TopicChoice => {
+      const note = rank.topicNotes.get(id);
+      return note ? { label, note } : { label };
+    });
     const result = await summarize(
       deps.llm,
       digestSystem(prof?.description ?? "", prof?.displayLang ?? "vi", topics),
       digestPrompt(stories),
       stories.length,
-      topics,
+      topics.map((t) => t.label),
     );
     if ("ok" in result) {
       summaries = result.ok;

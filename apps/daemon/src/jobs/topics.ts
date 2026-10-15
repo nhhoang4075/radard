@@ -7,7 +7,7 @@
 import { createLogger, type EmbeddingProvider, type LlmProvider, nfc } from "@radard/core";
 import { type Database, docTopicScores, profileTopics, topics } from "@radard/db";
 import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
-import { TOPIC_LIBRARY } from "../topics/library.ts";
+import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../topics/library.ts";
 
 const log = createLogger("topics");
 
@@ -15,9 +15,13 @@ const PROFILE_ID = 1;
 
 /**
  * Đưa thư viện trong code vào bảng `topics`: thêm chủ đề mới, cập nhật chủ đề đã có theo `key`.
- * Chủ đề có câu mô tả mới thì xoá embedding để lượt process embed lại (điểm cũ xoá theo).
+ * Chủ đề có câu mô tả mới thì xoá embedding để lượt process embed lại (điểm cũ xoá theo); đổi
+ * `scopeNote` thì không (nó không được embed). Cuối cùng chuyển lựa chọn từ chủ đề đã rút sang chủ
+ * đề thay nó (`carrySelections`).
  */
-export async function seedLibrary(db: Database): Promise<{ topics: number; refreshed: number }> {
+export async function seedLibrary(
+  db: Database,
+): Promise<{ topics: number; refreshed: number; carried: number }> {
   const before = new Map(
     (
       await db
@@ -39,6 +43,7 @@ export async function seedLibrary(db: Database): Promise<{ topics: number; refre
           groupVi: t.groupVi,
           labelVi: t.labelVi,
           descriptionEn: t.descriptionEn,
+          scopeNote: t.scopeNote,
           position,
           active: true,
           ...(changed ? { embedding: null, embeddingModel: null } : {}),
@@ -51,7 +56,69 @@ export async function seedLibrary(db: Database): Promise<{ topics: number; refre
     .update(topics)
     .set({ active: false })
     .where(and(eq(topics.origin, "library"), notInArray(topics.key, keys)));
-  return { topics: TOPIC_LIBRARY.length, refreshed };
+  const carried = await carrySelections(db);
+  return { topics: TOPIC_LIBRARY.length, refreshed, carried };
+}
+
+/**
+ * Chuyển lựa chọn theo `TOPIC_SUCCESSORS`: với mỗi hồ sơ, chủ đề mới được chọn và bật nếu hồ sơ
+ * đang bật ít nhất một chủ đề cũ trỏ tới nó (chủ đề mới đã bật sẵn thì giữ nguyên); chưa có dòng
+ * `profile_topics` thì thêm. Sau đó tắt lựa chọn các chủ đề cũ đã rút. Lựa chọn đang tắt không
+ * được chuyển. Chạy lại không đổi gì: chủ đề cũ đã tắt hết. Trả về số lựa chọn chủ đề cũ vừa tắt.
+ */
+export async function carrySelections(db: Database): Promise<number> {
+  const libraryKeys = new Set(TOPIC_LIBRARY.map((t) => t.key));
+  // Chỉ chuyển từ chủ đề đã rút: khoá còn trong thư viện thì người dùng vẫn chọn được chính nó.
+  const pairs = Object.entries(TOPIC_SUCCESSORS).filter(
+    ([from, to]) => !libraryKeys.has(from) && libraryKeys.has(to),
+  );
+  if (pairs.length === 0) return 0;
+  const map = sql.join(
+    pairs.map(([from, to]) => sql`(${from}, ${to})`),
+    sql`, `,
+  );
+  return db.transaction(async (tx) => {
+    // Một hồ sơ có thể bật nhiều chủ đề cũ cùng trỏ tới một chủ đề mới: gom lại thành một dòng.
+    // Có chủ đề cũ "quan tâm" thì chủ đề mới là "quan tâm" ('include' > 'exclude').
+    await tx.execute(sql`
+      insert into ${profileTopics} (profile_id, topic_id, kind, active)
+      select pt.profile_id, dst.id, max(pt.kind), true
+      from ${profileTopics} pt
+      join ${topics} src on src.id = pt.topic_id and src.origin = 'library' and not src.active
+      join (values ${map}) as m(src_key, dst_key) on m.src_key = src.key
+      join ${topics} dst on dst.key = m.dst_key and dst.origin = 'library'
+      where pt.active
+      group by pt.profile_id, dst.id
+      on conflict (profile_id, topic_id) do update set active = true, updated_at = now()
+        where not ${profileTopics}.active`);
+    const off = await tx
+      .update(profileTopics)
+      .set({ active: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(profileTopics.active, true),
+          inArray(
+            profileTopics.topicId,
+            tx
+              .select({ id: topics.id })
+              .from(topics)
+              .where(
+                and(
+                  eq(topics.origin, "library"),
+                  eq(topics.active, false),
+                  inArray(
+                    topics.key,
+                    pairs.map(([from]) => from),
+                  ),
+                ),
+              ),
+          ),
+        ),
+      )
+      .returning({ id: profileTopics.id });
+    if (off.length > 0) log.info("đã chuyển lựa chọn sang chủ đề mới", { n: off.length });
+    return off.length;
+  });
 }
 
 export interface LibraryEntry {

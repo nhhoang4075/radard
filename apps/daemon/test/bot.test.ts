@@ -31,7 +31,7 @@ describe("topicHandlers", () => {
       descriptionEn: "pgvector",
     });
     const before = await h.list();
-    expect(before[0]).toMatchObject({ key: "l:1", label: "Agent AI", chosen: false });
+    expect(before[0]).toMatchObject({ key: "l:1", label: "LLM: model và hành vi", chosen: false });
     const custom = before.at(-1);
     expect(custom).toMatchObject({ label: "Postgres cho AI", chosen: true });
     expect(custom?.key).toMatch(/^c:\d+$/);

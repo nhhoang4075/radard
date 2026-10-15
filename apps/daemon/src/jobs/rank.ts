@@ -56,6 +56,8 @@ export interface RankResult extends Selection {
     n: number;
   }[];
   topicLabels: Map<number, string>;
+  /** Phạm vi của từng chủ đề đang bật (để LLM gắn nhãn); chủ đề tự thêm không có thì vắng. */
+  topicNotes: Map<number, string>;
   sourceNames: Map<number, string>;
   sourceKinds: Map<number, string>;
 }
@@ -92,7 +94,7 @@ export async function rankPeriod(
   // Chỉ chủ đề đang bật, loại "quan tâm" mới tính vào R; thứ tự theo lúc chọn, để hoà điểm ra kết quả
   // như nhau mỗi lần chạy.
   const topics = await db
-    .select({ id: topicsTable.id, label: topicsTable.labelVi })
+    .select({ id: topicsTable.id, label: topicsTable.labelVi, note: topicsTable.scopeNote })
     .from(profileTopics)
     .innerJoin(topicsTable, eq(topicsTable.id, profileTopics.topicId))
     .where(and(eq(profileTopics.active, true), eq(profileTopics.kind, "include")))
@@ -239,6 +241,7 @@ export async function rankPeriod(
         n: b.n,
       })),
     topicLabels: new Map(topics.map((t) => [t.id, t.label])),
+    topicNotes: new Map(topics.flatMap((t) => (t.note ? [[t.id, t.note] as const] : []))),
     sourceNames: new Map(srcRows.map((s) => [s.id, s.name])),
     sourceKinds: kindOf,
   };

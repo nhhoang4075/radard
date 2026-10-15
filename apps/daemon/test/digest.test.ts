@@ -17,8 +17,9 @@ import {
   profile,
   runMigrations,
   sources,
+  topics,
 } from "@radard/db";
-import { asc, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import {
   buildLinks,
   type DigestPlan,
@@ -261,13 +262,24 @@ describe("runDigest", () => {
   });
 
   test("nhãn chủ đề: lấy chủ đề LLM chọn nếu nằm trong danh sách, không thì nhãn embedding", async () => {
-    await addTopic(db, "GPU & inference", { descriptionEn: "inference" });
+    const infra = await addTopic(db, "GPU & inference", { descriptionEn: "inference" });
+    // Chủ đề thư viện có phạm vi; chủ đề tự thêm ("Agent AI" ở đây) chỉ có tên.
+    await db
+      .update(topics)
+      .set({ scopeNote: "GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI)." })
+      .where(eq(topics.id, infra));
     await addEvent();
     await addEvent();
     const notifier = fakeNotifier();
     const { llm, calls } = goodLlm((n) => (n === 1 ? "GPU & inference" : "Không có chủ đề này"));
     await runDigest({ db, llm, notifier, recipient: RECIPIENT }, SLOT);
-    expect(calls[0]?.system).toContain('"Agent AI", "GPU & inference"');
+    const system = calls[0]?.system ?? "";
+    expect(system).toContain(
+      '  - "Agent AI"\n  - "GPU & inference": GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI).\n',
+    );
+    // Hai quy tắc phân xử khi tin hợp hai chủ đề.
+    expect(system).toContain("A more specific topic beats a general one");
+    expect(system).toContain("The application domain beats the data modality");
     // Nhãn embedding không được đưa vào prompt.
     expect(calls[0]?.prompt).not.toContain("Agent AI");
     expect(notifier.sent[1]?.msg.lines.at(-1)).toBe("Chủ đề: GPU & inference · HN");
