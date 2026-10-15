@@ -3,7 +3,7 @@
  */
 
 import { fakeEmbedding } from "@radard/adapters/ai-fake";
-import { gatewayEmbedding, gatewayLlm } from "@radard/adapters/ai-gateway";
+import { gatewayDecision, gatewayEmbedding, gatewayLlm } from "@radard/adapters/ai-gateway";
 import { gatewayPriceBook } from "@radard/adapters/gateway-pricing";
 import { fsObjectStore } from "@radard/adapters/object-store-fs";
 import { r2ObjectStore } from "@radard/adapters/object-store-r2";
@@ -12,6 +12,7 @@ import { telegramChat, telegramNotifier } from "@radard/adapters/telegram";
 import {
   type ChatChannel,
   createHttpClient,
+  type DecisionProvider,
   type EmbeddingProvider,
   type LlmProvider,
   type Notifier,
@@ -73,6 +74,12 @@ export function createLlm(db: Database): LlmProvider | null {
     sink: dbUsageSink(db),
     priceBook,
   });
+}
+
+/** Model ra quyết định qua AI Gateway; `null` khi chưa có khoá (nơi dùng phải tự bỏ qua bước hỏi). */
+export function createDecider(db: Database): DecisionProvider | null {
+  if (!process.env.AI_GATEWAY_API_KEY) return null;
+  return gatewayDecision({ model: env.decisionModel, sink: dbUsageSink(db), priceBook });
 }
 
 /** `null` khi chưa cấu hình embedder: job process bỏ qua, thu thập vẫn chạy bình thường. */

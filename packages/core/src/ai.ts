@@ -50,3 +50,52 @@ export interface LlmProvider {
     maxOutputTokens?: number;
   }): Promise<string>;
 }
+
+/**
+ * Câu hỏi cho model ra quyết định (Jev và loại tương tự): model không viết văn bản, chỉ trả đúng
+ * kiểu được hỏi kèm xác suất. `boolean`: xác suất câu trả lời là "có". `choice`: chọn một tên
+ * trong `criteria` (tên → mô tả phương án), kèm xác suất cho từng phương án.
+ *
+ * Mỗi câu chỉ hỏi một điều (lời khuyên trong tài liệu Jev); nhiều câu về cùng một trạng thái thì
+ * gửi chung một lời gọi.
+ */
+export type DecisionQuestion =
+  | { readonly type: "boolean"; readonly instructions: string }
+  | {
+      readonly type: "choice";
+      readonly instructions: string;
+      readonly criteria: Readonly<Record<string, string>>;
+    };
+
+export type DecisionAnswer<Q extends DecisionQuestion> = Q extends {
+  type: "choice";
+  criteria: infer C;
+}
+  ? {
+      type: "choice";
+      choice: Extract<keyof C, string>;
+      /** Đủ mọi phương án, tổng xấp xỉ 1. */
+      probabilities: Record<Extract<keyof C, string>, number>;
+    }
+  : { type: "boolean"; probability: number };
+
+export interface DecisionResult<Qs extends Record<string, DecisionQuestion>> {
+  answers: { [K in keyof Qs]: DecisionAnswer<Qs[K]> };
+  usage: { inputTokens: number; costUsd: number };
+  /** Id model đã trả lời (provider có thể trả bản cụ thể hơn id đã cấu hình). */
+  model: string;
+}
+
+/** Trạng thái chung mà mọi câu hỏi cùng xét: văn bản, hoặc một object JSON. */
+export type DecisionState = string | { readonly [key: string]: unknown };
+
+export interface DecisionProvider {
+  readonly provider: string;
+  readonly model: string;
+  /** Một lời gọi cho mọi câu hỏi. Lỗi, hay model từ chối trả lời câu nào, thì cả lời gọi lỗi. */
+  decide<const Qs extends Record<string, DecisionQuestion>>(opts: {
+    task: AiTask;
+    state: DecisionState;
+    questions: Qs;
+  }): Promise<DecisionResult<Qs>>;
+}

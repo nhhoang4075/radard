@@ -51,6 +51,13 @@ export const env = {
    * bảng giá có bậc đọc từ Gateway (`gateway-pricing.ts`).
    */
   llmModel: process.env.LLM_MODEL ?? "anthropic/claude-haiku-5.5",
+  /**
+   * Model ra quyết định (chọn đáp án kèm xác suất, không viết văn bản), qua AI Gateway. Đo
+   * 13/10/2026 (docs/mo-hinh-quyet-dinh.html tab 05): typesafe-ai/jev đúng 7/7 ca quan hệ chủ
+   * đề, ~0,5 giây, $0,042 mỗi triệu token vào (token ra miễn phí). Dự phòng cùng giá:
+   * microsoft/microsoft-decision-1 (cũng 7/7, chậm gấp đôi).
+   */
+  decisionModel: process.env.DECISION_MODEL ?? "typesafe-ai/jev",
   /** Trần số lô (128 tài liệu) mỗi lượt job `process`, để job xong trước hạn 30 phút. */
   processMaxBatches: num(process.env.PROCESS_MAX_BATCHES, 60),
   /** Trần số tài liệu gộp mỗi lượt `process` (~85 ms mỗi tài liệu): 3.000 ≈ 4–5 phút. */

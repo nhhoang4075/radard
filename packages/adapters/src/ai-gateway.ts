@@ -8,11 +8,21 @@
 import {
   type AiTask,
   createLogger,
+  type DecisionProvider,
+  type DecisionQuestion,
+  type DecisionResult,
   type EmbeddingProvider,
   type LlmProvider,
   type UsageSink,
 } from "@radard/core";
-import { embedMany, generateText } from "ai";
+import {
+  type Experimental_DecisionModel,
+  type Experimental_DecisionQuestion,
+  type Experimental_DecisionState,
+  embedMany,
+  experimental_decide,
+  generateText,
+} from "ai";
 import type { PriceBook, TokenUsage } from "./gateway-pricing.ts";
 
 const PROVIDER = "vercel-gateway";
@@ -31,7 +41,12 @@ export function rateLimitWait(err: unknown): number | null {
   return Number(/retry after (\d+)\s*s/i.exec(msg)?.[1] ?? 60);
 }
 
-async function withRetry<T>(call: () => Promise<T>, label: string): Promise<T> {
+async function withRetry<T>(
+  call: () => Promise<T>,
+  label: string,
+  /** Số lần thử lại khi gặp lỗi không phải rate limit. */
+  otherRetries = 2,
+): Promise<T> {
   let rateLimited = 0;
   let other = 0;
   for (;;) {
@@ -39,7 +54,7 @@ async function withRetry<T>(call: () => Promise<T>, label: string): Promise<T> {
       return await call();
     } catch (err) {
       const wait = rateLimitWait(err);
-      if (wait === null ? ++other > 2 : ++rateLimited > 4) throw err;
+      if (wait === null ? ++other > otherRetries : ++rateLimited > 4) throw err;
       if (wait !== null) log.warn("chạm rate limit, chờ rồi gọi lại", { label, waitSeconds: wait });
       await Bun.sleep(wait === null ? 2000 * other : wait * 1000);
     }
@@ -178,6 +193,90 @@ export function gatewayLlm(opts: {
         return res.text;
       } catch (err) {
         await opts.sink(failure(task, opts.model, started, err));
+        throw err;
+      }
+    },
+  };
+}
+
+/** Câu trả lời thô của AI SDK, trước khi đổi sang kiểu của lõi. */
+interface RawDecisionAnswer {
+  type: string;
+  probability?: number;
+  choice?: string;
+  probabilities?: Record<string, number>;
+}
+
+/**
+ * Đổi câu trả lời của AI SDK sang kiểu của lõi. Câu `choice` luôn có đủ xác suất cho mọi phương
+ * án: provider không trả phân bố thì coi phương án được chọn là 1, còn lại 0.
+ */
+export function toDecisionAnswer(q: DecisionQuestion, a: RawDecisionAnswer | undefined) {
+  if (!a || a.type !== q.type) throw new Error(`câu trả lời sai kiểu: ${JSON.stringify(a)}`);
+  if (q.type === "boolean") return { type: "boolean" as const, probability: a.probability ?? 0 };
+  const choice = a.choice ?? "";
+  const probabilities: Record<string, number> = {};
+  for (const name of Object.keys(q.criteria)) {
+    probabilities[name] = a.probabilities?.[name] ?? (name === choice ? 1 : 0);
+  }
+  return { type: "choice" as const, choice, probabilities };
+}
+
+/**
+ * Model ra quyết định (Jev…) qua AI Gateway, bằng `experimental_decide` của AI SDK. Gateway xếp
+ * các model này loại "evaluation", chỉ tính giá token vào (token ra miễn phí). `model` là id dạng
+ * `provider/model`, hoặc một model AI SDK dựng sẵn (test dùng model giả của `ai/test`).
+ */
+export function gatewayDecision(opts: {
+  model: Experimental_DecisionModel;
+  sink: UsageSink;
+  /** Dự phòng khi Gateway không báo chi phí. */
+  priceBook?: PriceBook;
+}): DecisionProvider {
+  const modelId = typeof opts.model === "string" ? opts.model : opts.model.modelId;
+  return {
+    provider: PROVIDER,
+    model: modelId,
+    async decide({ task, state, questions }) {
+      const started = Date.now();
+      try {
+        const res = await withRetry(
+          () =>
+            experimental_decide({
+              model: opts.model,
+              state: state as Experimental_DecisionState,
+              questions: questions as Record<string, Experimental_DecisionQuestion>,
+              // Lỗi tạm thời để AI SDK tự thử lại; model từ chối hay câu trả lời sai kiểu thì
+              // thử lại cũng vô ích, nên ngoài này chỉ chờ rate limit.
+              maxRetries: 2,
+            }),
+          `decide ${modelId}`,
+          0,
+        );
+        const raw = res.answers as Record<string, RawDecisionAnswer>;
+        const answers: Record<string, unknown> = {};
+        for (const [id, q] of Object.entries(questions)) answers[id] = toDecisionAnswer(q, raw[id]);
+        const input = res.usage.inputTokens ?? 0;
+        const output = res.usage.outputTokens ?? 0;
+        const cost = await costOf(res.providerMetadata, modelId, { input, output }, opts.priceBook);
+        await opts.sink({
+          task,
+          provider: PROVIDER,
+          model: modelId,
+          inputTokens: input,
+          outputTokens: output,
+          reasoningTokens: 0,
+          ...cost,
+          latencyMs: Date.now() - started,
+          ok: true,
+        });
+        return {
+          answers: answers as DecisionResult<typeof questions>["answers"],
+          usage: { inputTokens: input, costUsd: cost.costUsd },
+          model: res.response.modelId || modelId,
+        };
+      } catch (err) {
+        await opts.sink(failure(task, modelId, started, err));
         throw err;
       }
     },
