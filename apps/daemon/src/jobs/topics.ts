@@ -11,7 +11,7 @@ import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../topics/library.ts";
 
 const log = createLogger("topics");
 
-const PROFILE_ID = 1;
+export const PROFILE_ID = 1;
 
 /**
  * Đưa thư viện trong code vào bảng `topics`: thêm chủ đề mới, cập nhật chủ đề đã có theo `key`.
