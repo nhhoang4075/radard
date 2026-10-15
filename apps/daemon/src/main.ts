@@ -10,6 +10,7 @@ import { createLogger } from "@radard/core";
 import { runMigrations } from "@radard/db";
 import { createBoss, ensureQueues } from "./boss.ts";
 import { env } from "./env.ts";
+import { seedLibrary } from "./jobs/topics.ts";
 import { startBot } from "./roles/bot.ts";
 import { startScheduler } from "./roles/scheduler.ts";
 import { startWorker } from "./roles/worker.ts";
@@ -38,7 +39,12 @@ async function main(): Promise<void> {
   await ensureQueues(boss);
 
   const stops: Array<() => void | Promise<void>> = [];
-  if (runsScheduler) stops.push(await startScheduler(boss, deps.db));
+  if (runsScheduler) {
+    // Thư viện chủ đề sống trong code: mỗi lần deploy nạp lại, khỏi chạy tay `topics seed`. Chạy lại
+    // nhiều lần không đổi gì. Chỉ vai trò scheduler (một bản duy nhất) làm, để không hai bản cùng ghi.
+    log.info("thư viện chủ đề", await seedLibrary(deps.db));
+    stops.push(await startScheduler(boss, deps.db));
+  }
   if (runsWorker) {
     await startWorker(boss, deps, {
       concurrency: env.fetchConcurrency,
