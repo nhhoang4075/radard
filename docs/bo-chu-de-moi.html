@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Bộ chủ đề mới</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.65}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.5vw,38px)} h2{font-size:21px;margin:30px 0 10px} h3{font-size:16.5px;margin:0 0 6px}
+p{margin:8px 0} ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0} a{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:76ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button span{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-right:6px}
+.panel{display:none} .panel.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+.answer{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 12px 12px 0;padding:12px 18px;margin-top:16px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px;background:var(--surface)}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--ink-3);font-weight:600;font-family:var(--mono);background:#FAFBFA}
+td.n{font-family:var(--mono);font-size:13px;white-space:nowrap}
+td.ex{font-size:13px;color:var(--ink-2)}
+.better{color:var(--accent);font-weight:600}
+.topic{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:10px}
+.topic .h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.topic .h b{font-size:16px} .topic .h span{font-family:var(--mono);font-size:12.5px;color:var(--ink-3)}
+.topic .row{display:grid;grid-template-columns:90px 1fr;gap:2px 10px;font-size:14px;margin-top:6px}
+.topic .row dt{color:var(--ink-3);font-weight:600} .topic .row dd{margin:0}
+.topic .ex{font-size:13px;color:var(--ink-2);margin-top:6px;padding-left:10px;border-left:2px solid var(--line)}
+.note{font-size:13.5px;color:var(--ink-3);margin-top:8px}
+.src{font-size:13px;color:var(--ink-2)}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:640px){.topic .row{grid-template-columns:1fr} td.n{white-space:normal}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">RADARD · ĐỀ XUẤT · 15/10/2026</div>
+  <h1>Bộ chủ đề mới: 14 chủ đề, chia theo một trục</h1>
+  <p class="lede">Bạn chỉ ra rằng 17 chủ đề hiện có na ná nhau và không tách bạch (ví dụ "Model mới ra" và "Model mã nguồn mở"). Trang này làm lại từ đầu: xem các nguồn uy tín chia tin AI thế nào, để dữ liệu radard tự cho thấy nó gồm những nhóm nào, rồi đề xuất bộ mới và đo nó với bộ cũ trên cùng dữ liệu.</p>
+
+  <div class="answer"><p><b>Tóm tắt:</b> bộ cũ lẫn lộn vì nó chia theo nhiều cách cùng lúc (theo đối tượng, theo hoạt động, theo tính chất, theo loại tin). Bộ mới chỉ chia theo một câu hỏi: <b>tin này chủ yếu nói về cái gì</b>. Đo trên 16.203 tin AI của 30 ngày: số cặp chủ đề trùng nhau nhiều giảm từ 10 xuống 7, cặp trùng nặng nhất từ 47% xuống 37%, chủ đề nhỏ nhất từ 0,7% lên 3,1% số tin, và bộ mới khớp với các nhóm tin tự nhiên tốt hơn.</p></div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="van-de"><span>01</span>Vấn đề</button>
+    <button role="tab" aria-selected="false" data-tab="nghien-cuu"><span>02</span>Nghiên cứu</button>
+    <button role="tab" aria-selected="false" data-tab="de-xuat"><span>03</span>14 chủ đề</button>
+    <button role="tab" aria-selected="false" data-tab="do-kiem"><span>04</span>Đo kiểm</button>
+    <button role="tab" aria-selected="false" data-tab="anh-huong"><span>05</span>Với bạn</button>
+  </div>
+
+  <!-- 01 -->
+  <section class="panel on" id="van-de" role="tabpanel">
+    <h2>Vì sao 17 chủ đề cũ lẫn lộn</h2>
+    <p>17 chủ đề cũ được đặt ra theo bốn cách chia khác nhau, trộn trong cùng một danh sách:</p>
+    <table>
+      <tr><th>Cách chia</th><th>Chủ đề cũ thuộc cách chia đó</th></tr>
+      <tr><td>Theo <b>đối tượng</b> tin nói tới</td><td>Agent AI, RAG &amp; tìm kiếm, Model ảnh, video, giọng nói, GPU &amp; inference</td></tr>
+      <tr><td>Theo <b>hoạt động</b></td><td>Huấn luyện &amp; fine-tune, Đánh giá &amp; benchmark, MLOps &amp; vận hành LLM, Xây ứng dụng LLM</td></tr>
+      <tr><td>Theo <b>tính chất</b></td><td>Model mã nguồn mở, Model mới ra, Công cụ mã nguồn mở</td></tr>
+      <tr><td>Theo <b>loại tin</b></td><td>Nghiên cứu ML, Phần mềm có AI (ra mắt sản phẩm), Công ty &amp; đầu tư AI</td></tr>
+    </table>
+    <p>Khi một danh sách trộn nhiều cách chia, một tin rơi vào nhiều ô cùng lúc. Một model mã nguồn mở vừa ra là "Model mới ra" (tính chất: mới) và "Model mã nguồn mở" (tính chất: mở); nếu kèm bảng điểm benchmark thì còn là "Đánh giá &amp; benchmark" (hoạt động). Đo trên dữ liệu: hai chủ đề "Model mới ra" và "Model mã nguồn mở" bắt chung 47% số tin, và có 10 cặp chủ đề cũ bắt chung trên 30% số tin.</p>
+    <p class="note">"Bắt chung bao nhiêu tin": với mỗi chủ đề, lấy 300 tin khớp nó nhất trong 30 ngày; đếm số tin có mặt ở cả hai danh sách, chia cho số tin có mặt ở ít nhất một danh sách. 47% nghĩa là gần một nửa số tin của hai chủ đề là cùng một tin.</p>
+  </section>
+
+  <!-- 02 -->
+  <section class="panel" id="nghien-cuu" role="tabpanel">
+    <h2>Các nguồn uy tín chia tin AI thế nào</h2>
+    <table>
+      <tr><th>Nguồn</th><th>Cách chia</th></tr>
+      <tr><td>Stanford AI Index 2025 (báo cáo thường niên về AI)</td><td>8 chương: Nghiên cứu &amp; phát triển; Hiệu năng kỹ thuật; AI có trách nhiệm; Kinh tế; Khoa học &amp; y tế; Chính sách &amp; quản trị; Giáo dục; Dư luận. Bản 2026 tách Khoa học và Y tế thành hai chương.</td></tr>
+      <tr><td>State of AI Report 2025</td><td>Nghiên cứu; Ngành công nghiệp; Chính trị; An toàn; Dự đoán. Bản 2026 đổi sang chủ đề theo năm (agent, robot và world model, AI cho khoa học, hạ tầng suy luận, an toàn và bảo mật…).</td></tr>
+      <tr><td>arXiv (kho bài nghiên cứu)</td><td>Theo lĩnh vực: ngôn ngữ (cs.CL), học máy (cs.LG), thị giác (cs.CV), nhiều agent (cs.MA), robot (cs.RO), bảo mật (cs.CR), tìm kiếm thông tin (cs.IR), kỹ thuật phần mềm (cs.SE), xã hội (cs.CY), âm thanh (cs.SD)…</td></tr>
+      <tr><td>Bản tin và trang tin AI (The Batch, TLDR AI, Latent Space, VentureBeat AI…)</td><td>Trộn lĩnh vực (Agents, Infrastructure, Robotics) với loại tin (ML Research, Business) và định dạng (Podcast).</td></tr>
+    </table>
+    <p><b>Rút ra:</b> các nguồn dùng ba trục khác nhau: <b>lĩnh vực</b> (model, agent, robot…), <b>loại tin</b> (nghiên cứu, ra mắt, kinh doanh, chính sách) và <b>người đọc</b> (lập trình viên, người dùng cuối). Lời khuyên chung khi thiết kế danh mục tin (Nielsen Norman Group và các tài liệu về taxonomy): một danh sách chỉ theo <b>một</b> trục; các trục khác làm thành bộ lọc riêng. Lỗi hay gặp nhất chính là lỗi của bộ cũ: trộn trục trong một danh sách. Các nhóm lĩnh vực lặp lại ở hầu hết nguồn: model và nghiên cứu; agent và công cụ cho lập trình viên; hạ tầng; an toàn; chính sách; kinh doanh; ứng dụng; robot; AI cho khoa học và y tế.</p>
+
+    <h2>Dữ liệu radard tự chia thành những nhóm nào</h2>
+    <p>Gom 26.138 tin của 30 ngày (tới 13/10) theo embedding, tức dãy số đại diện cho nghĩa của mỗi tin, mà không dùng chủ đề nào có sẵn. 38% số tin là tin không liên quan AI (phần lớn là tin HN về chủ đề khác) nên bị loại. 16.203 tin còn lại tự chia thành các nhóm sau (một nhóm là một "cụm"):</p>
+    <table>
+      <tr><th>Nhóm lớn</th><th>Các cụm bên trong (số tin)</th></tr>
+      <tr><td>Agent</td><td>Nghiên cứu agent: bộ nhớ, tự cải thiện (963) · An ninh agent (759) · Công cụ agent lập trình trên HN (1.109)</td></tr>
+      <tr><td>Model ngôn ngữ</td><td>Đánh giá, độ trung thực, thiên lệch (1.119) · Tối ưu: attention, lượng tử hoá, KV cache (910) · Huấn luyện sau: RL, chưng cất (651) · RAG, truy xuất, benchmark chuyên ngành (778)</td></tr>
+      <tr><td>Ảnh, video, âm thanh</td><td>Model thị giác-ngôn ngữ (581) · Diffusion và model sinh (544) · Giọng nói và nhiều ngôn ngữ (503)</td></tr>
+      <tr><td>Robot</td><td>Robot, world model, học tăng cường cho robot (679)</td></tr>
+      <tr><td>ML nền tảng và ứng dụng</td><td>Lý thuyết tối ưu, bandit, thống kê (896) · Lý thuyết deep learning, GNN (740) · Dự báo chuỗi thời gian (549) · Ảnh y tế, phát hiện bất thường (857)</td></tr>
+      <tr><td>Sản phẩm, kinh doanh, xã hội (gần như toàn tin HN)</td><td>Sản phẩm và công cụ AI (1.241) · Bình luận ngành, phỏng vấn (857) · Kinh doanh: chip, data center, vốn (811) · An toàn, xã hội, các hãng AI (987) · Lập trình với AI: bài viết, thảo luận (669)</td></tr>
+    </table>
+    <p class="note">Ranh giới giữa các cụm mờ (đo bằng chỉ số silhouette: khoảng 0,06 ở mọi cách chia, rất thấp), nghĩa là tin AI không tự chia thành những nhóm tách hẳn; mọi bộ chủ đề đều sẽ có một phần tin nằm giữa hai chủ đề. Một quan sát nữa: tin HN tụ theo <i>loại tin</i> (ra mắt, bình luận, kinh doanh), tin arXiv tụ theo <i>lĩnh vực</i>.</p>
+  </section>
+
+  <!-- 03 -->
+  <section class="panel" id="de-xuat" role="tabpanel">
+    <h2>14 chủ đề, theo một câu hỏi: tin này chủ yếu nói về cái gì</h2>
+    <p><b>Quy tắc khi một tin hợp hai chủ đề</b> (dùng để gắn nhãn, viết thành các dòng "Không gồm"): chủ đề cụ thể thắng chủ đề chung (agent viết code thuộc "Lập trình với AI", không thuộc "Agent AI"); lĩnh vực ứng dụng thắng loại dữ liệu (ảnh y tế thuộc "Khoa học và y tế", không thuộc "Ảnh, video và âm thanh"). Phần trăm là tỉ lệ tin AI của 30 ngày rơi vào chủ đề đó.</p>
+
+    <div class="topic"><div class="h"><b>1. LLM: model và hành vi</b><span>8% · arXiv 79%, HN 21%</span></div><dl class="row"><dt>Gồm</dt><dd>Model ngôn ngữ mới ra (mọi hãng, mã nguồn mở hay đóng), kiến trúc, khả năng lý luận, hành vi, ảo giác, benchmark, giải thích bên trong model.</dd><dt>Không gồm</dt><dd>Cách huấn luyện và tối ưu (chủ đề 2), agent (3), model ảnh, video, âm thanh (6).</dd></dl><div class="ex">"A challenging, contamination-free LLM benchmark" · "A table of 1,200 model benchmarks since 2019, updated daily"</div></div>
+
+    <div class="topic"><div class="h"><b>2. Huấn luyện và tối ưu model</b><span>14% · arXiv 93%</span></div><dl class="row"><dt>Gồm</dt><dd>Pretraining, huấn luyện sau (RL, chưng cất), fine-tune, lượng tử hoá, KV cache, attention hiệu quả, ngữ cảnh dài, làm model chạy nhanh và rẻ hơn ở mức thuật toán.</dd><dt>Không gồm</dt><dd>Phần cứng và máy chủ chạy model (8).</dd></dl><div class="ex">"KV-Lingo: Learning KV-Cache Translators with Distillation" · "Inducing Process Supervision from Outcome-Only Reinforcement Learning"</div></div>
+
+    <div class="topic"><div class="h"><b>3. Agent AI</b><span>8% · arXiv 54%, HN 45%</span></div><dl class="row"><dt>Gồm</dt><dd>Agent tự lập kế hoạch, gọi công cụ và hành động; bộ nhớ của agent; nhiều agent phối hợp; MCP; agent điều khiển máy tính, trình duyệt.</dd><dt>Không gồm</dt><dd>Agent viết code (4), bảo mật agent (11).</dd></dl><div class="ex">"Metagente, a tiny language for AI agents that speaks MCP and A2A" · "Knowing the Store: What a Memory Backend Must Write Down Before an Agent Can Read It"</div></div>
+
+    <div class="topic"><div class="h"><b>4. Lập trình với AI</b><span>8% · HN 77%, arXiv 20%</span></div><dl class="row"><dt>Gồm</dt><dd>Trợ lý và agent viết code (Claude Code, Codex, Cursor…), sinh code, review code bằng AI, kinh nghiệm lập trình cùng AI.</dd><dt>Không gồm</dt><dd>Công cụ lập trình không dùng AI.</dd></dl><div class="ex">"Run Claude Code, Codex and Cursor side by side with your team" · "Measure how engineers and teams work with AI"</div></div>
+
+    <div class="topic"><div class="h"><b>5. Xây ứng dụng LLM</b><span>3% · arXiv 58%, HN 39%</span></div><dl class="row"><dt>Gồm</dt><dd>RAG, embedding và tìm kiếm vector, viết prompt và quản lý ngữ cảnh, ép trả JSON, API và SDK của LLM, độ tin cậy và giám sát ứng dụng LLM.</dd><dt>Không gồm</dt><dd>Thiết kế agent (3), chạy và phục vụ model (8).</dd></dl><div class="ex">"MCPGen: Benchmarking LLMs on Executable MCP Workflow Development" · "Stale-Document Poisoning: When Outdated Retrieval Overrides Correct Model Answers"</div></div>
+
+    <div class="topic"><div class="h"><b>6. Ảnh, video và âm thanh</b><span>6% · arXiv 66%, HN 33%</span></div><dl class="row"><dt>Gồm</dt><dd>Sinh ảnh, video, nhạc; diffusion; model thị giác-ngôn ngữ; nhận dạng và tổng hợp giọng nói.</dd><dt>Không gồm</dt><dd>Ảnh y tế (14).</dd></dl><div class="ex">"Show HN: Kenerate – One workspace for AI image, video and music models" · "Show HN: Portable Kokoro TTS binary…"</div></div>
+
+    <div class="topic"><div class="h"><b>7. Robot và AI vật lý</b><span>7% · arXiv 80%</span></div><dl class="row"><dt>Gồm</dt><dd>Học cho robot, thao tác vật thể, robot hình người, world model, xe tự lái, drone.</dd></dl><div class="ex">"Meet Bibi: We're Building a Voice-Controlled Robot" · "Scanning While Imagining: A Scene-Graph World Model for Robotic Ultrasound Navigation"</div></div>
+
+    <div class="topic"><div class="h"><b>8. Hạ tầng AI</b><span>5% · HN 74%</span></div><dl class="row"><dt>Gồm</dt><dd>GPU và chip AI, data center, máy chủ suy luận (vLLM…), chạy model trên máy cá nhân, nền tảng cloud cho AI, chi phí và điện năng.</dd><dt>Không gồm</dt><dd>Tối ưu ở mức thuật toán (2), tin tài chính về công ty chip (10).</dd></dl><div class="ex">"Intel D270 GPU AI Accelerator – Up to 480 GB LPDDR5X" · "Decide where your AI workload should run (local/edge/cloud)"</div></div>
+
+    <div class="topic"><div class="h"><b>9. Trợ lý và ứng dụng AI</b><span>4% · HN 93%</span></div><dl class="row"><dt>Gồm</dt><dd>ChatGPT, Claude, Gemini, Copilot và các ứng dụng AI cho người dùng cuối; tính năng AI trong phần mềm thường ngày.</dd><dt>Không gồm</dt><dd>Công cụ cho lập trình viên (4, 5).</dd></dl><div class="ex">"Sign in with ChatGPT" · "Show HN: Parrot – Open-Source Smart Meeting Recorder with Co-Pilot on Mac"</div></div>
+
+    <div class="topic"><div class="h"><b>10. Kinh doanh AI</b><span>5% · HN 76%</span></div><dl class="row"><dt>Gồm</dt><dd>Công ty và startup AI, gọi vốn, thâu tóm, IPO, doanh thu, định giá, cạnh tranh giữa các hãng.</dd><dt>Không gồm</dt><dd>Luật và chính sách (12).</dd></dl><div class="ex">"The macro implications of the AI investment boom" · "How to Know When the AI Boom Is About to Go Bust"</div></div>
+
+    <div class="topic"><div class="h"><b>11. An toàn và bảo mật AI</b><span>5% · HN 50%, arXiv 50%</span></div><dl class="row"><dt>Gồm</dt><dd>Alignment, red teaming, jailbreak, prompt injection, bảo mật agent, lạm dụng AI, rủi ro lớn từ AI.</dd><dt>Không gồm</dt><dd>Luật và chính sách (12).</dd></dl><div class="ex">"Aura: A behavioral threat-intelligence framework for AI Safety" · "\"The Dangerous Myths Behind AI Agent Hacks\" – Yoshua Bengio"</div></div>
+
+    <div class="topic"><div class="h"><b>12. Chính sách và xã hội</b><span>9% · HN 80%</span></div><dl class="row"><dt>Gồm</dt><dd>Luật và quy định về AI, chính sách của chính phủ, bản quyền, ảnh hưởng tới việc làm và giáo dục, tranh luận công chúng.</dd></dl><div class="ex">"Time for an Accountability Regime for the AI Industry" · "LibreOffice says 'no AI' is now a software feature"</div></div>
+
+    <div class="topic"><div class="h"><b>13. ML nền tảng</b><span>14% · arXiv 93%</span></div><dl class="row"><dt>Gồm</dt><dd>Nghiên cứu học máy ngoài model ngôn ngữ: tối ưu hoá, lý thuyết học, bandit, mạng nơ-ron đồ thị (GNN), dự báo chuỗi thời gian, lý thuyết model sinh, thống kê cho ML.</dd></dl><div class="ex">"Can Tabular Foundation Models Amortize Statistical Inference?" · "Matching of signal, noise and hardware timescales for filtering and forecasting…"</div></div>
+
+    <div class="topic"><div class="h"><b>14. AI trong khoa học và y tế</b><span>5% · arXiv 72%</span></div><dl class="row"><dt>Gồm</dt><dd>Ảnh y tế và chẩn đoán, AI trong chăm sóc sức khoẻ, protein và thuốc, hoá học và vật liệu, vật lý, khí hậu và dự báo thời tiết.</dd></dl><div class="ex">"Healthcare AI needs a different model-development flywheel" · "Function-preserving watermarking of AI-generated proteins"</div></div>
+    <p class="note">Ví dụ là tin thật có điểm cao nhất của mỗi chủ đề. Câu mô tả tiếng Anh dùng để chấm (embed) chỉ viết phần "Gồm": embedding không hiểu phủ định, viết "không gồm X" vào câu lại làm nó gần X hơn. Phần "Không gồm" dùng khi LLM chọn nhãn cho tin.</p>
+  </section>
+
+  <!-- 04 -->
+  <section class="panel" id="do-kiem" role="tabpanel">
+    <h2>Bộ cũ và bộ mới trên cùng 16.203 tin AI</h2>
+    <table>
+      <tr><th>Thước đo</th><th>Ý nghĩa</th><th>17 cũ</th><th>14 mới</th></tr>
+      <tr><td>Cặp bắt chung trên 30% tin</td><td>Càng ít, các chủ đề càng tách bạch</td><td class="n">10</td><td class="n better">7</td></tr>
+      <tr><td>Cặp trùng nặng nhất</td><td>Cặp hai chủ đề bắt chung nhiều tin nhất</td><td class="n">47% (Model mới ra / Model mã nguồn mở)</td><td class="n better">37% (Agent AI / Trợ lý và ứng dụng AI)</td></tr>
+      <tr><td>Chủ đề nhỏ nhất / lớn nhất</td><td>Phần trăm số tin rơi vào chủ đề; chủ đề quá nhỏ thì gần như không bao giờ có tin</td><td class="n">0,7% / 16%</td><td class="n better">3,1% / 14%</td></tr>
+      <tr><td>Khớp với nhóm tin tự nhiên</td><td>Mỗi cụm ở tab 02 có bao nhiêu phần trăm tin rơi vào cùng một chủ đề (độ thuần)</td><td class="n">42,7%</td><td class="n better">47,4%</td></tr>
+      <tr><td>Tin nằm giữa hai chủ đề</td><td>Điểm của chủ đề hợp nhất và hợp nhì gần bằng nhau (chênh dưới 0,05)</td><td class="n">31,6%</td><td class="n">30,3%</td></tr>
+    </table>
+    <h2>Những gì bộ mới chưa giải quyết</h2>
+    <ul>
+      <li><b>Khoảng 30% tin vẫn nằm giữa hai chủ đề</b>, ở cả bộ cũ lẫn bộ mới. Đây là bản chất của tin tức (ranh giới cụm rất mờ, xem tab 02), không bộ nào xoá được. Ảnh hưởng: với việc chọn tin vào điểm tin thì không sao (radard lấy điểm cao nhất trong các chủ đề bạn bật); với nhãn hiện cạnh tin thì LLM chọn một chủ đề theo dòng "Không gồm".</li>
+      <li><b>"Trợ lý và ứng dụng AI" còn chồng với Agent AI</b> (37%), vì trợ lý cá nhân ngày càng là agent. Đã thử bỏ hẳn chủ đề này: số liệu đẹp hơn (chỉ còn 3 cặp trên 30%), nhưng 40% tin của nó dồn sai sang "Lập trình với AI" (ví dụ "Voice AI for personal injury intake"), nên giữ lại.</li>
+      <li><b>"Xây ứng dụng LLM" nhỏ (3%)</b> và lẫn vài tin về chạy model (vLLM) vốn thuộc "Hạ tầng AI". Có thể viết lại câu mô tả sau khi có phản hồi thật.</li>
+    </ul>
+    <h2>Một trục khác để sau: loại tin</h2>
+    <p>Các nguồn ngoài và dữ liệu đều cho thấy "loại tin" (nghiên cứu, ra mắt và phát hành, kinh doanh, bàn luận) là một trục riêng, không nên nhét vào danh sách chủ đề. Có thể làm sau thành bộ lọc: ví dụ "chỉ nhận tin ra mắt trong chủ đề Agent AI". Phần lớn suy ra được từ nguồn (arXiv là nghiên cứu, GitHub là phát hành); tin HN thì hỏi model ra quyết định. Không làm trong đợt này.</p>
+  </section>
+
+  <!-- 05 -->
+  <section class="panel" id="anh-huong" role="tabpanel">
+    <h2>Lựa chọn hiện tại của bạn chuyển sang bộ mới thế nào</h2>
+    <table>
+      <tr><th>Bạn đang bật (cũ)</th><th>Đề xuất bật (mới)</th></tr>
+      <tr><td>Agent AI</td><td>Agent AI</td></tr>
+      <tr><td>Xây ứng dụng LLM, RAG &amp; tìm kiếm</td><td>Xây ứng dụng LLM</td></tr>
+      <tr><td>Phần mềm có AI</td><td>Trợ lý và ứng dụng AI</td></tr>
+      <tr><td>Model mới ra</td><td>LLM: model và hành vi</td></tr>
+      <tr><td>Model ảnh, video, giọng nói</td><td>Ảnh, video và âm thanh</td></tr>
+      <tr><td>Nghiên cứu ML</td><td>ML nền tảng</td></tr>
+      <tr><td>Huấn luyện &amp; fine-tune</td><td>Huấn luyện và tối ưu model</td></tr>
+      <tr><td>Công cụ mã nguồn mở</td><td>Lập trình với AI</td></tr>
+    </table>
+    <p>Tức là bật 8/14 chủ đề mới; 6 chủ đề còn lại (Robot, Hạ tầng, Kinh doanh, An toàn và bảo mật, Chính sách và xã hội, Khoa học và y tế) tắt, bạn bật thêm trên Telegram nếu muốn. Chủ đề bạn tự thêm (hiện không có) giữ nguyên.</p>
+    <p class="note">Ánh xạ dựa trên ý nghĩa của từng chủ đề, có đối chiếu với số liệu (chủ đề cũ và mới bắt chung bao nhiêu tin). Riêng "Model mới ra" thì số liệu chỉ ra "Xây ứng dụng LLM" (52%): câu mô tả cũ của nó bắt nhiều tin về dùng model hơn là tin model mới, một ví dụ nữa cho thấy bộ cũ lẫn lộn.</p>
+
+    <h2>Nếu bạn đồng ý, các bước làm</h2>
+    <ol>
+      <li>Thay thư viện trong code bằng 14 chủ đề mới (tên, nhóm, câu mô tả tiếng Anh, dòng "Không gồm" cho LLM gắn nhãn). Chủ đề cũ chuyển sang "rút khỏi thư viện", vẫn giữ lại để không mất lịch sử.</li>
+      <li>Migration chuyển lựa chọn của bạn theo bảng trên.</li>
+      <li>Job process tự embed 14 câu mô tả và chấm lại khoảng 26 nghìn tin (vài giây, chưa tới 1 xu); tính lại mặt bằng.</li>
+      <li>So bản tin của vài ngày gần đây theo bộ cũ và bộ mới (chạy thử, không gửi), gửi bạn xem trước khi bật trên server.</li>
+      <li>Sau đó mới làm cảnh báo chủ đề gần giống và gợi ý chủ đề từ lời mô tả, trên bộ mới.</li>
+    </ol>
+  </section>
+
+  <h2>Nguồn</h2>
+  <ul class="src">
+    <li><a href="https://hai.stanford.edu/ai-index/2025-ai-index-report">Stanford AI Index 2025</a> · <a href="https://hai.stanford.edu/ai-index/2026-ai-index-report">AI Index 2026</a> · <a href="https://www.stateof.ai/">State of AI Report</a> · <a href="https://arxiv.org/category_taxonomy">arXiv category taxonomy</a></li>
+    <li><a href="https://www.deeplearning.ai/the-batch/">The Batch</a> · <a href="https://tldr.tech/ai">TLDR AI</a> · <a href="https://www.latent.space/">Latent Space</a> · <a href="https://venturebeat.com/category/ai/">VentureBeat AI</a></li>
+    <li><a href="https://www.nngroup.com/articles/taxonomy-101/">Nielsen Norman Group: Taxonomy 101</a> · <a href="https://www.hedden-information.com/customizing-taxonomy-facets/">Hedden: taxonomy facets</a></li>
+  </ul>
+  <footer>radard · docs/bo-chu-de-moi.html · 15/10/2026. Số liệu: DB radard trên máy, tin từ 13/09 tới 13/10/2026, 16.203 tin AI sau khi loại tin không liên quan AI (phân loại tự động, đúng khoảng 96% trên mẫu kiểm). Gom cụm: KMeans 20 cụm trên embedding. Điểm chủ đề chuẩn hoá như khi xếp hạng (trừ trung vị, chia cho khoảng tới mốc 0,1% cao nhất).</footer>
+</div>
+<script>
+const tabs = document.querySelectorAll('.tabs button');
+const show = (id) => {
+  tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
+  try { history.replaceState(null, '', '#' + id); } catch {}
+};
+tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+const start = location.hash.slice(1);
+if (start && document.getElementById(start)) show(start);
+</script>
+</body>
+</html>
