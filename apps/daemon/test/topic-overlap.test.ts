@@ -1,10 +1,11 @@
 /**
  * Soát chủ đề gần giống trên DB test: dữ liệu dựng tay để biết trước tỉ lệ trùng tin. Mỗi chủ đề
  * là một trục của không gian vector; tin nằm giữa các trục thì cả các chủ đề đó cùng bắt. Embedding
- * và model quyết định đều giả, không gọi mạng. Tập so là 10 tin thay vì 300 cho gọn.
+ * và model quyết định đều giả, không gọi mạng; model giả quyết định quan hệ theo id chủ đề. Tập so
+ * là 10 tin thay vì 300 cho gọn.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { fakeDecision } from "@radard/adapters/ai-fake";
+import { type FakeDecisionReply, fakeDecision } from "@radard/adapters/ai-fake";
 import type { DecisionState, EmbeddingProvider } from "@radard/core";
 import {
   createDatabase,
@@ -25,7 +26,8 @@ import { scoreTopics } from "../src/jobs/process.ts";
 import {
   checkTopicOverlap,
   englishName,
-  OVERLAP_ASK_RATIO,
+  HUB_MIN_TOPICS,
+  MAX_QUESTIONS_PER_CALL,
   RELATION_CRITERIA,
 } from "../src/jobs/topic-overlap.ts";
 
@@ -43,12 +45,17 @@ function vec(...axes: number[]): number[] {
   return v;
 }
 
-/** Embedder giả trả vector trục 0 cho bản nháp. */
+let embedCalls = 0;
+
+/** Embedder giả trả vector trục 0 cho bản nháp, đếm số lời gọi. */
 const embedder: EmbeddingProvider = {
   provider: "stub",
   model: MODEL,
   dimensions: EMBED_DIMENSIONS,
-  embed: async (texts) => texts.map(() => vec(0)),
+  embed: async (texts) => {
+    embedCalls++;
+    return texts.map(() => vec(0));
+  },
 };
 
 let hn = 0;
@@ -109,7 +116,8 @@ async function addTopicRow(
  * Tập so của bản nháp (trục 0) là đúng 10 tin có thành phần trục 0, theo thứ tự khớp giảm dần:
  * n1–n3 (chỉ trục 0), a1–a4 (trục 0 + 1), ab1–ab3 (trục 0 + 1 + 2). Trục 1 có thêm 3 tin riêng,
  * nên top 10 của trục 1 là 3 tin riêng + a + ab: trùng 7/10. Trục 2 có thêm 7 tin riêng: top 10 là
- * 7 tin riêng + ab: trùng 3/10, đúng ngưỡng hỏi. Một tin trục 0 cũ 40 ngày phải bị bỏ.
+ * 7 tin riêng + ab: trùng 3/10. ab nằm trong top 10 của cả trục 1 lẫn trục 2. Trục 5 không chung
+ * tin nào. Một tin trục 0 cũ 40 ngày phải bị bỏ.
  */
 async function seedDocs() {
   for (let i = 1; i <= 3; i++) await addDoc(`n${i}`, vec(0, 0, 0, 0, 0, 0, 0, 0, 0, 100 + i));
@@ -121,8 +129,31 @@ async function seedDocs() {
   await addDoc("old", vec(0), 40);
 }
 
-const check = (decider: Parameters<typeof checkTopicOverlap>[0]["decider"] = null) =>
-  checkTopicOverlap({ db, embedder, decider }, DRAFT, { topN: TOP_N, now: NOW });
+/** Model quyết định giả: quan hệ theo id chủ đề (câu hỏi `topic_<id>`), mặc định "khác". */
+function deciderFor(
+  answers: Record<number, FakeDecisionReply>,
+  seen: { id: string; state: DecisionState; instructions: string }[] = [],
+) {
+  return fakeDecision({
+    answer: (q, id, state) => {
+      seen.push({ id, state, instructions: q.instructions });
+      if (q.type === "choice") expect(q.criteria).toEqual(RELATION_CRITERIA);
+      return answers[Number(id.replace("topic_", ""))] ?? "different";
+    },
+    sink: dbUsageSink(db),
+    costUsd: 0.0000213,
+  });
+}
+
+const relation = (choice: string, p: number) => ({
+  choice,
+  probabilities: { same: 0, narrower: 0, broader: 0, different: 0, [choice]: p },
+});
+
+const check = (
+  decider: Parameters<typeof checkTopicOverlap>[0]["decider"],
+  opts: { hubMinTopics?: number } = {},
+) => checkTopicOverlap({ db, embedder, decider }, DRAFT, { topN: TOP_N, now: NOW, ...opts });
 
 beforeAll(async () => {
   await runMigrations(TEST_URL);
@@ -139,116 +170,78 @@ beforeEach(async () => {
   hn = s?.id ?? 0;
   await db.insert(profile).values({ description: "x" });
   await seedDocs();
+  embedCalls = 0;
 });
 
 afterAll(async () => {
   await db.$bun.close();
 });
 
-describe("checkTopicOverlap: tỉ lệ trùng tin", () => {
-  test("tỉ lệ đúng, ngưỡng gồm 0,3, chủ đề tự thêm đang tắt vẫn được so, chủ đề đã rút thì không", async () => {
+describe("checkTopicOverlap: model quyết định", () => {
+  test("hỏi mọi chủ đề (kể cả tự thêm đang tắt, trừ chủ đề đã rút); ứng viên là chủ đề không khác, trùng > hẹp > rộng rồi xác suất", async () => {
     const a = await addTopicRow("A", 1, { enabled: true });
-    const b = await addTopicRow("B", 2, { custom: true, enabled: false });
+    const b = await addTopicRow("B", 2);
+    const c = await addTopicRow("C", 2, { custom: true, enabled: false });
     await addTopicRow("D", 5);
     await addTopicRow("E", 1, { retired: true });
     await scoreTopics(db, MODEL);
 
-    const res = await check();
-    expect(res.docs).toBe(TOP_N);
-    expect(res.model).toBeNull();
-    expect(OVERLAP_ASK_RATIO).toBe(0.3);
+    const res = await check(
+      deciderFor({
+        [a]: relation("narrower", 0.9),
+        [b]: relation("broader", 0.8),
+        [c]: relation("narrower", 0.95),
+      }),
+    );
+    expect(res).toMatchObject({ ran: true, asked: 4, model: "fake-decision", docs: TOP_N });
     expect(res.candidates).toEqual([
+      {
+        topicId: c,
+        label: "C",
+        origin: "custom",
+        enabled: false,
+        relation: "narrower",
+        probability: 0.95,
+        ratio: 0.3,
+        shared: ["ab1", "ab2", "ab3"],
+        onlyNew: ["n1", "n2", "n3"],
+      },
       {
         topicId: a,
         label: "A",
         origin: "library",
         enabled: true,
+        relation: "narrower",
+        probability: 0.9,
         ratio: 0.7,
-        relation: null,
-        probability: null,
         shared: ["a1", "a2", "a3"],
         onlyNew: ["n1", "n2", "n3"],
       },
       {
         topicId: b,
         label: "B",
-        origin: "custom",
+        origin: "library",
         enabled: false,
+        relation: "broader",
+        probability: 0.8,
         ratio: 0.3,
-        relation: null,
-        probability: null,
         shared: ["ab1", "ab2", "ab3"],
         onlyNew: ["n1", "n2", "n3"],
       },
     ]);
   });
 
-  test("chủ đề chưa được chấm thì tính cosine, ra cùng tỉ lệ; giữ tối đa 3, tỉ lệ cao trước", async () => {
-    const a = await addTopicRow("A", 1);
-    await addTopicRow("B", 2);
-    const f = await addTopicRow("F", 1);
-    await scoreTopics(db, MODEL);
-    const c = await addTopicRow("C", 1); // thêm sau khi chấm: không có doc_topic_scores
-    const [n] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(docTopicScores)
-      .where(eq(docTopicScores.topicId, c));
-    expect(n?.n).toBe(0);
-
-    const res = await check();
-    expect(res.candidates.map((x) => [x.topicId, x.ratio])).toEqual([
-      [a, 0.7],
-      [f, 0.7],
-      [c, 0.7],
-    ]);
-    expect(res.candidates[2]?.shared).toEqual(["a1", "a2", "a3"]);
-  });
-
-  test("không chủ đề nào từ 0,3 thì không hỏi model", async () => {
-    await addTopicRow("D", 5);
-    await scoreTopics(db, MODEL);
-    let asked = 0;
-    const decider = fakeDecision({
-      answer: () => {
-        asked++;
-        return "same";
-      },
-    });
-    const res = await check(decider);
-    expect(res.candidates).toEqual([]);
-    expect(asked).toBe(0);
-  });
-});
-
-describe("checkTopicOverlap: hỏi quan hệ", () => {
-  test("một lời gọi, mỗi chủ đề một câu choice; ghi llm_calls kèm chi phí", async () => {
+  test("một lời gọi, trạng thái chung có mọi chủ đề theo khoá câu hỏi; ghi llm_calls kèm chi phí", async () => {
     const a = await addTopicRow("A", 1);
     const b = await addTopicRow("B", 2);
     await scoreTopics(db, MODEL);
-    const states: DecisionState[] = [];
-    const decider = fakeDecision({
-      answer: (q, id, state) => {
-        states.push(state);
-        expect(q.type).toBe("choice");
-        if (q.type === "choice") expect(q.criteria).toEqual(RELATION_CRITERIA);
-        return id === `topic_${a}`
-          ? {
-              choice: "narrower",
-              probabilities: { same: 0.1, narrower: 0.85, broader: 0, different: 0.05 },
-            }
-          : "different";
-      },
-      sink: dbUsageSink(db),
-      costUsd: 0.0000213,
-    });
-    const res = await check(decider);
-    expect(res.model).toBe("fake-decision");
-    expect(res.candidates.map((c) => [c.topicId, c.relation, c.probability])).toEqual([
-      [a, "narrower", 0.85],
-      [b, "different", 1],
+    const seen: { id: string; state: DecisionState; instructions: string }[] = [];
+    await check(deciderFor({ [a]: "same" }, seen));
+    expect(seen.map((s) => s.instructions)).toEqual([
+      `How does the new topic relate to the existing topic topic_${a}, in terms of which news articles each would match?`,
+      `How does the new topic relate to the existing topic topic_${b}, in terms of which news articles each would match?`,
     ]);
-    // Hai câu hỏi chung một trạng thái: chủ đề có sẵn nằm theo khoá câu hỏi.
-    expect(states[0]).toEqual({
+    expect(seen[0]?.state).toEqual({
       new_topic: { name: "Draft topic", description: DRAFT.descriptionEn },
       existing_topics: {
         [`topic_${a}`]: { name: "Topic A", description: "Topic A: axis 1" },
@@ -260,37 +253,72 @@ describe("checkTopicOverlap: hỏi quan hệ", () => {
     expect(calls[0]).toMatchObject({ task: "topic_overlap", costUsd: 0.0000213, ok: true });
   });
 
-  test("một chủ đề gần: trạng thái và câu hỏi đúng như đã thử", async () => {
+  test("mọi chủ đề đều khác thì không có ứng viên và không cần embed", async () => {
+    await addTopicRow("A", 1);
+    await addTopicRow("D", 5);
+    await scoreTopics(db, MODEL);
+    const res = await check(deciderFor({}));
+    expect(res).toEqual({ ran: true, candidates: [], asked: 2, model: "fake-decision", docs: 0 });
+    expect(embedCalls).toBe(0);
+  });
+
+  test("không có model quyết định: báo chưa soát được, không có ứng viên (không lọc bằng tỉ lệ)", async () => {
     await addTopicRow("A", 1);
     await scoreTopics(db, MODEL);
-    const seen: { state: DecisionState; instructions: string }[] = [];
-    const decider = fakeDecision({
-      answer: (q, _id, state) => {
-        seen.push({ state, instructions: q.instructions });
-        return "same";
-      },
-    });
-    await check(decider);
-    expect(seen).toEqual([
-      {
-        state: {
-          new_topic: { name: "Draft topic", description: DRAFT.descriptionEn },
-          existing_topic: { name: "Topic A", description: "Topic A: axis 1" },
-        },
-        instructions:
-          "How does the new topic relate to the existing topic, in terms of which news articles each would match?",
-      },
+    const res = await check(null);
+    expect(res).toEqual({ ran: false, candidates: [], asked: 1, model: null, docs: 0 });
+  });
+
+  test("model quyết định lỗi cũng là chưa soát được", async () => {
+    await addTopicRow("A", 1);
+    await scoreTopics(db, MODEL);
+    const res = await check(fakeDecision({ answer: () => "không-có" }));
+    expect(res.ran).toBe(false);
+    expect(res.candidates).toEqual([]);
+  });
+
+  test("quá 30 chủ đề thì chia lô ≤ 30 câu, mỗi lô một trạng thái riêng", async () => {
+    expect(MAX_QUESTIONS_PER_CALL).toBe(30);
+    const ids: number[] = [];
+    for (let i = 0; i < 65; i++) ids.push(await addTopicRow(`T${i}`, 200 + i));
+    const last = ids[64] ?? 0;
+    const seen: { id: string; state: DecisionState; instructions: string }[] = [];
+    const res = await check(deciderFor({ [last]: "same" }, seen));
+    const states = [...new Set(seen.map((s) => s.state))] as {
+      existing_topics: Record<string, unknown>;
+    }[];
+    expect(states.map((s) => Object.keys(s.existing_topics).length)).toEqual([30, 30, 5]);
+    expect(await db.select().from(llmCalls)).toHaveLength(3);
+    expect(res.asked).toBe(65);
+    expect(res.candidates.map((c) => [c.topicId, c.relation])).toEqual([[last, "same"]]);
+  });
+});
+
+describe("checkTopicOverlap: bằng chứng", () => {
+  test("tin ví dụ bỏ tin chung chung (trong top N của nhiều chủ đề thư viện); tỉ lệ giữ nguyên", async () => {
+    expect(HUB_MIN_TOPICS).toBe(6);
+    const a = await addTopicRow("A", 1);
+    const b = await addTopicRow("B", 2);
+    await scoreTopics(db, MODEL);
+    // ab1–ab3 nằm trong top 10 của cả A lẫn B: với ngưỡng 2 chủ đề thì là tin chung chung.
+    const res = await check(deciderFor({ [a]: "same", [b]: "narrower" }), { hubMinTopics: 2 });
+    expect(res.candidates.map((c) => [c.topicId, c.ratio, c.shared, c.onlyNew])).toEqual([
+      [a, 0.7, ["a1", "a2", "a3"], ["n1", "n2", "n3"]],
+      [b, 0.3, [], ["n1", "n2", "n3"]],
     ]);
   });
 
-  test("model quyết định lỗi thì vẫn trả tỉ lệ, quan hệ trống", async () => {
-    await addTopicRow("A", 1);
+  test("chủ đề chưa được chấm thì tính cosine, ra cùng tỉ lệ", async () => {
     await scoreTopics(db, MODEL);
-    const decider = fakeDecision({ answer: () => "không-có" });
-    const res = await check(decider);
-    expect(res.model).toBeNull();
-    expect(res.candidates.map((c) => [c.ratio, c.relation, c.probability])).toEqual([
-      [0.7, null, null],
+    const c = await addTopicRow("C", 1); // thêm sau khi chấm: không có doc_topic_scores
+    const [n] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(docTopicScores)
+      .where(eq(docTopicScores.topicId, c));
+    expect(n?.n).toBe(0);
+    const res = await check(deciderFor({ [c]: "same" }));
+    expect(res.candidates.map((x) => [x.topicId, x.ratio, x.shared])).toEqual([
+      [c, 0.7, ["a1", "a2", "a3"]],
     ]);
   });
 });

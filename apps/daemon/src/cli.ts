@@ -34,7 +34,7 @@ import { periodEndingAt, rankPeriod } from "./jobs/rank.ts";
 import { listRepos, runRepoStats } from "./jobs/repo-stats.ts";
 import { buildReport, formatReport, reportWindow } from "./jobs/report.ts";
 import { refreshSince } from "./jobs/signals.ts";
-import { checkTopicOverlap, type OverlapCheck, type TopicRelation } from "./jobs/topic-overlap.ts";
+import { type CloseRelation, checkTopicOverlap, type OverlapCheck } from "./jobs/topic-overlap.ts";
 import {
   addCustomTopic,
   describeTopic,
@@ -90,8 +90,9 @@ radard — CLI
                              Tự thêm chủ đề: LLM viết câu mô tả tiếng Anh, rồi embed
   topics on|off <id>         Bật / tắt một chủ đề của bạn (không xoá)
   topics check "<tên>" "<English description>"
-                             Soát chủ đề gần giống trước khi thêm: tỉ lệ trùng tin với từng chủ đề
-                             có sẵn, quan hệ do model quyết định trả lời, tin ví dụ; không lưu gì
+                             Soát chủ đề gần giống trước khi thêm: model quyết định cho biết quan hệ
+                             với mọi chủ đề có sẵn; chủ đề gần kèm tỉ lệ trùng tin và tin ví dụ.
+                             Không lưu gì
 
   signals refresh [--since=30d]  Lấy lại điểm, bình luận mới nhất (HN) cho tài liệu từ mốc đó
   baselines                  Tính lại mặt bằng (trung vị, mốc 0,1%) ngay và in ra
@@ -662,26 +663,28 @@ const COMMANDS: Record<string, Command> = {
 };
 
 /** Embed ngay chủ đề vừa chọn hoặc thêm; chưa có embedder thì để lượt process sau. */
-const RELATION_VI: Record<TopicRelation, string> = {
+const RELATION_VI: Record<CloseRelation, string> = {
   same: "trùng",
   narrower: "hẹp hơn",
   broader: "rộng hơn",
-  different: "khác",
 };
 
 function printOverlap(label: string, res: OverlapCheck, ms: number): void {
   const pct = (x: number) => `${Math.round(x * 100)}%`;
+  if (!res.ran) {
+    console.log(
+      `"${label}": chưa soát được (không có model quyết định hoặc lời gọi lỗi), ${ms} ms`,
+    );
+    return;
+  }
   console.log(
-    `"${label}": so ${res.docs} tin, ${ms} ms, model quyết định: ${res.model ?? "không hỏi"}`,
+    `"${label}": hỏi ${res.asked} chủ đề, model ${res.model}, so ${res.docs} tin, ${ms} ms`,
   );
-  if (res.candidates.length === 0) console.log("  không có chủ đề nào trùng từ 30% tin trở lên");
+  if (res.candidates.length === 0) console.log("  mọi chủ đề có sẵn đều khác");
   for (const c of res.candidates) {
-    const relation = c.relation
-      ? `${RELATION_VI[c.relation]} (${c.relation}, ${c.probability?.toFixed(2)})`
-      : "chưa rõ quan hệ";
     const state = c.enabled ? "đang bật" : "chưa bật";
     console.log(
-      `\n  ${c.label} [${c.origin} ${c.topicId}, ${state}]: trùng ${pct(c.ratio)} tin, ${relation}`,
+      `\n  ${c.label} [${c.origin} ${c.topicId}, ${state}]: ${RELATION_VI[c.relation]} (${c.relation}, ${c.probability.toFixed(2)}), trùng ${pct(c.ratio)} tin`,
     );
     for (const t of c.shared) console.log(`    cả hai: ${t.slice(0, 110)}`);
     for (const t of c.onlyNew) console.log(`    chỉ mới: ${t.slice(0, 110)}`);

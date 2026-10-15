@@ -1,12 +1,15 @@
 /**
  * Soát chủ đề gần giống, chạy TRƯỚC khi lưu một chủ đề tự thêm (docs/mo-hinh-quyet-dinh.html tab
- * 02 và 06). Chỉ đọc DB; lời gọi model duy nhất ghi `llm_calls` (embed câu mô tả, hỏi quan hệ).
+ * 02 và 06). Chỉ đọc DB; lời gọi model duy nhất ghi `llm_calls` (hỏi quan hệ, embed câu mô tả).
  *
- * So hai câu mô tả bằng cosine không dùng được (câu nào cũng nói về AI: hai chủ đề khác hẳn vẫn
- * 0,84, hai chủ đề trùng thật chỉ 0,79). Nên đo điều người dùng thật sự quan tâm: hai chủ đề bắt
- * chung bao nhiêu tin. "Tỉ lệ trùng tin" = số tin chung trong 300 tin khớp nhất của mỗi bên (30
- * ngày qua) chia 300. Con số đó không nói quan hệ gì (hẹp hơn vẫn có thể trùng 70%), nên khi đủ
- * cao thì hỏi model ra quyết định: trùng, hẹp hơn, rộng hơn hay khác.
+ * Model ra quyết định được hỏi quan hệ của chủ đề mới với MỌI chủ đề có sẵn trong một lời gọi:
+ * trùng, hẹp hơn, rộng hơn hay khác. Không lọc trước bằng "tỉ lệ trùng tin": đo trên dữ liệu thật
+ * (15/10/2026), các tin chung chung lọt vào top 300 của nhiều chủ đề cùng lúc làm tỉ lệ của mọi cặp
+ * lên ~0,3, trong khi chủ đề cha đúng ("Hạ tầng AI" với "Chạy LLM trên máy") chỉ 0,28 nên bị bỏ
+ * sót. Hỏi hết thì Jev chọn đúng cả 4 bản nháp thử, 0,6–0,9 giây, ~3.100 token cho 14 chủ đề.
+ *
+ * "Tỉ lệ trùng tin" (số tin chung trong 300 tin khớp nhất của mỗi bên, 30 ngày qua, chia 300) và
+ * tin ví dụ vẫn được tính cho các chủ đề model báo là gần, làm bằng chứng cho người dùng.
  */
 import type { DecisionProvider, EmbeddingProvider } from "@radard/core";
 import type { Database } from "@radard/db";
@@ -18,13 +21,18 @@ export const OVERLAP_TOP_N = 300;
 export const OVERLAP_WINDOW_DAYS = 30;
 
 /**
- * Từ tỉ lệ này trở lên thì HỎI model quan hệ là gì; dưới mức này hai chủ đề rõ ràng khác nhau.
- * Không phải ngưỡng "trùng": hai chủ đề thư viện được soạn để tách riêng vẫn trùng ~0,3–0,37 tin
- * (và "Model mới ra" với "Model mã nguồn mở" từng 0,48), nên con số chỉ quyết định có hỏi không.
+ * Tin nằm trong top 300 của từ chừng này chủ đề thư viện trở lên là tin "chung chung" (tiêu đề
+ * ngắn, mơ hồ như "OpenAI (2015)"): đo 15/10/2026 trên dữ liệu server, 125 tin nằm trong top 300
+ * của ≥ 6 trên 14 chủ đề. Không đưa chúng vào tin ví dụ vì chúng không cho thấy hai chủ đề khác
+ * nhau ở đâu; tỉ lệ trùng tin thì vẫn tính cả chúng.
  */
-export const OVERLAP_ASK_RATIO = 0.3;
-/** Tối đa bao nhiêu chủ đề gần nhất được báo (và hỏi model) cho một chủ đề mới. */
-export const OVERLAP_MAX_CANDIDATES = 3;
+export const HUB_MIN_TOPICS = 6;
+
+/**
+ * Tối đa số câu hỏi mỗi lời gọi: Jev nhận tối đa 32k token cho trạng thái + câu hỏi; 14 chủ đề
+ * tốn ~3.100 token, nên 30 chủ đề vẫn dư nhiều. Nhiều hơn thì chia thành nhiều lời gọi.
+ */
+export const MAX_QUESTIONS_PER_CALL = 30;
 const EXAMPLES = 3;
 
 /** Bốn quan hệ, đúng câu chữ đã thử trên 6 model ngày 13/10/2026 (tab 05). */
@@ -35,9 +43,14 @@ export const RELATION_CRITERIA = {
   different: "The topics are about different news, with only small overlap",
 } as const;
 export type TopicRelation = keyof typeof RELATION_CRITERIA;
+/** Quan hệ đáng báo cho người dùng, theo thứ tự hiển thị. */
+export type CloseRelation = Exclude<TopicRelation, "different">;
+const RELATION_ORDER: Record<CloseRelation, number> = { same: 0, narrower: 1, broader: 2 };
 
-const RELATION_INSTRUCTIONS =
-  "How does the new topic relate to the existing topic, in terms of which news articles each would match?";
+/** Câu hỏi cho chủ đề có khoá `key` trong `existing_topics` của trạng thái. */
+export function relationInstructions(key: string): string {
+  return `How does the new topic relate to the existing topic ${key}, in terms of which news articles each would match?`;
+}
 
 export interface TopicDraft {
   label: string;
@@ -51,24 +64,28 @@ export interface OverlapCandidate {
   origin: "library" | "custom";
   /** Người dùng đã chọn và đang bật chủ đề này. */
   enabled: boolean;
-  /** Tỉ lệ trùng tin, 0..1. */
-  ratio: number;
-  /** `null` khi không có model quyết định (chưa có khoá) hoặc lời gọi lỗi. */
-  relation: TopicRelation | null;
+  relation: CloseRelation;
   /** Xác suất model cho quan hệ đã chọn. */
-  probability: number | null;
-  /** Tiêu đề tin cả hai cùng bắt, khớp chủ đề mới nhất trước. */
+  probability: number;
+  /** Tỉ lệ trùng tin, 0..1 (gồm cả tin chung chung). */
+  ratio: number;
+  /** Tiêu đề tin cả hai cùng bắt, khớp chủ đề mới nhất trước, bỏ tin chung chung. */
   shared: string[];
-  /** Tiêu đề tin chỉ chủ đề mới bắt, khớp chủ đề mới nhất trước. */
+  /** Tiêu đề tin chỉ chủ đề mới bắt, khớp chủ đề mới nhất trước, bỏ tin chung chung. */
   onlyNew: string[];
 }
 
 export interface OverlapCheck {
+  /** `false`: không có model quyết định hoặc lời gọi lỗi, nên chưa soát được (không có ứng viên). */
+  ran: boolean;
+  /** Chủ đề model báo là gần: trùng, rồi hẹp hơn, rồi rộng hơn; cùng quan hệ thì chắc hơn trước. */
   candidates: OverlapCandidate[];
-  /** Số tin trong tập so của chủ đề mới (bằng `OVERLAP_TOP_N` khi đủ dữ liệu). */
-  docs: number;
-  /** Model đã trả lời quan hệ; `null` khi không hỏi. */
+  /** Số chủ đề có sẵn đã hỏi. */
+  asked: number;
+  /** Model đã trả lời; `null` khi không chạy. */
   model: string | null;
+  /** Số tin trong tập so của chủ đề mới (bằng `OVERLAP_TOP_N` khi đủ dữ liệu); 0 khi không cần đo. */
+  docs: number;
 }
 
 interface NewDoc {
@@ -86,6 +103,12 @@ type TopicRow = {
   scored: boolean;
 };
 
+interface Relation {
+  topic: TopicRow;
+  relation: CloseRelation;
+  probability: number;
+}
+
 export interface OverlapDeps {
   db: Database;
   embedder: EmbeddingProvider;
@@ -93,65 +116,87 @@ export interface OverlapDeps {
 }
 
 /**
- * Đo tỉ lệ trùng tin của bản nháp với mọi chủ đề có embedding (thư viện đang dùng và chủ đề tự
- * thêm của hồ sơ, bật hay tắt), giữ tối đa 3 chủ đề từ `OVERLAP_ASK_RATIO` trở lên, rồi hỏi quan hệ
- * trong một lời gọi model quyết định. Không ghi gì ngoài `llm_calls`.
+ * Hỏi quan hệ của bản nháp với mọi chủ đề có embedding (thư viện đang dùng và chủ đề tự thêm của
+ * hồ sơ, bật hay tắt), rồi đo tỉ lệ trùng tin và lấy tin ví dụ cho các chủ đề không "khác".
+ * Không ghi gì ngoài `llm_calls`.
  */
 export async function checkTopicOverlap(
   deps: OverlapDeps,
   draft: TopicDraft,
-  opts: { topN?: number; now?: Date } = {},
+  opts: { topN?: number; now?: Date; hubMinTopics?: number } = {},
 ): Promise<OverlapCheck> {
+  const topics = await existingTopics(deps.db, deps.embedder.model);
+  const notRun = { ran: false, candidates: [], asked: topics.length, model: null, docs: 0 };
+  if (!deps.decider) return notRun;
+  if (topics.length === 0) return { ...notRun, ran: true };
+  const asked = await askRelations(deps.decider, draft, topics);
+  if (!asked) return notRun;
+  const close = asked.relations.sort(
+    (a, b) =>
+      RELATION_ORDER[a.relation] - RELATION_ORDER[b.relation] || b.probability - a.probability,
+  );
+  const base = { ran: true, asked: topics.length, model: asked.model };
+  if (close.length === 0) return { ...base, candidates: [], docs: 0 };
+  const evidence = await measureOverlap(deps, draft, topics, close, opts);
+  return { ...base, ...evidence };
+}
+
+/** Tỉ lệ trùng tin và tin ví dụ cho các chủ đề gần, xếp như `close`. */
+async function measureOverlap(
+  deps: OverlapDeps,
+  draft: TopicDraft,
+  topics: TopicRow[],
+  close: Relation[],
+  opts: { topN?: number; now?: Date; hubMinTopics?: number },
+): Promise<{ candidates: OverlapCandidate[]; docs: number }> {
   const topN = opts.topN ?? OVERLAP_TOP_N;
   const since = new Date((opts.now ?? new Date()).getTime() - OVERLAP_WINDOW_DAYS * 86_400_000);
   const model = deps.embedder.model;
   const [vector] = await deps.embedder.embed([draft.descriptionEn], "embed_topic_draft");
   if (!vector) throw new Error("embedder không trả vector");
-
   const newTop = await topDocsForVector(deps.db, vector, model, since, topN);
-  if (newTop.length === 0) return { candidates: [], docs: 0, model: null };
-  const ids = newTop.map((d) => d.id);
-  const topics = await existingTopics(deps.db, model);
-  const sharedByTopic = await sharedDocs(deps.db, topics, ids, since, topN);
-
-  const candidates = topics
-    .map((t) => ({ t, shared: sharedByTopic.get(t.id) ?? new Set<number>() }))
-    .map((x) => ({ ...x, ratio: x.shared.size / newTop.length }))
-    .filter((x) => x.ratio >= OVERLAP_ASK_RATIO)
-    .sort((a, b) => b.ratio - a.ratio || a.t.id - b.t.id)
-    .slice(0, OVERLAP_MAX_CANDIDATES)
-    .map(({ t, shared, ratio }) => toCandidate(t, ratio, shared, newTop));
-  if (candidates.length === 0 || !deps.decider) {
-    return { candidates, docs: newTop.length, model: null };
-  }
-  const byId = new Map(topics.map((t) => [t.id, t]));
-  const asked = await askRelations(deps.decider, draft, candidates, byId);
-  return { candidates, docs: newTop.length, model: asked };
+  // Tập top N của chủ đề gần (để tính tỉ lệ) và của mọi chủ đề thư viện (để nhận ra tin chung
+  // chung), chỉ cần phần nằm trong tập của chủ đề mới.
+  const closeIds = new Set(close.map((c) => c.topic.id));
+  const wanted = topics.filter((t) => closeIds.has(t.id) || t.origin === "library");
+  const sets = await sharedDocs(
+    deps.db,
+    wanted,
+    newTop.map((d) => d.id),
+    since,
+    topN,
+  );
+  const hubs = hubDocs(topics, sets, opts.hubMinTopics ?? HUB_MIN_TOPICS);
+  const candidates = close.map((c) => {
+    const shared = sets.get(c.topic.id) ?? new Set<number>();
+    const examples = (inShared: boolean) =>
+      newTop
+        .filter((d) => !hubs.has(d.id) && shared.has(d.id) === inShared)
+        .slice(0, EXAMPLES)
+        .map((d) => d.title);
+    return {
+      topicId: c.topic.id,
+      label: c.topic.label,
+      origin: c.topic.origin,
+      enabled: c.topic.enabled,
+      relation: c.relation,
+      probability: c.probability,
+      ratio: newTop.length === 0 ? 0 : shared.size / newTop.length,
+      shared: examples(true),
+      onlyNew: examples(false),
+    };
+  });
+  return { candidates, docs: newTop.length };
 }
 
-function toCandidate(
-  t: TopicRow,
-  ratio: number,
-  shared: Set<number>,
-  newTop: NewDoc[],
-): OverlapCandidate {
-  // newTop đã xếp theo độ khớp với chủ đề mới, cao trước.
-  const pick = (inShared: boolean) =>
-    newTop
-      .filter((d) => shared.has(d.id) === inShared)
-      .slice(0, EXAMPLES)
-      .map((d) => d.title);
-  return {
-    topicId: t.id,
-    label: t.label,
-    origin: t.origin,
-    enabled: t.enabled,
-    ratio,
-    relation: null,
-    probability: null,
-    shared: pick(true),
-    onlyNew: pick(false),
-  };
+/** Tin nằm trong top N của ít nhất `min` chủ đề thư viện. */
+function hubDocs(topics: TopicRow[], sets: Map<number, Set<number>>, min: number): Set<number> {
+  const count = new Map<number, number>();
+  for (const t of topics) {
+    if (t.origin !== "library") continue;
+    for (const id of sets.get(t.id) ?? []) count.set(id, (count.get(id) ?? 0) + 1);
+  }
+  return new Set([...count].filter(([, n]) => n >= min).map(([id]) => id));
 }
 
 /** Top N tài liệu của cửa sổ theo cosine với `vector`, cao trước; chấm như `scoreTopics`. */
@@ -208,10 +253,11 @@ async function sharedDocs(
   since: Date,
   topN: number,
 ): Promise<Map<number, Set<number>>> {
+  const out = new Map<number, Set<number>>();
+  if (ids.length === 0) return out;
   const idArray = sql`${`{${ids.join(",")}}`}::bigint[]`;
   const scored = topics.filter((t) => t.scored).map((t) => t.id);
   const unscored = topics.filter((t) => !t.scored).map((t) => t.id);
-  const out = new Map<number, Set<number>>();
   const collect = (rows: Iterable<Record<string, unknown>>) => {
     for (const r of rows) {
       const set = out.get(Number(r.topic_id)) ?? new Set<number>();
@@ -261,57 +307,69 @@ export function englishName(descriptionEn: string, fallback: string): string {
   return head.length > 0 && head.length <= 80 && head !== descriptionEn.trim() ? head : fallback;
 }
 
+const keyOf = (t: TopicRow) => `topic_${t.id}`;
+
 /**
- * Một lời gọi, mỗi chủ đề gần một câu `choice`. Một chủ đề: trạng thái và câu hỏi đúng như đã thử
- * (tab 05). Nhiều chủ đề thì mọi câu hỏi chung một trạng thái, nên các chủ đề có sẵn nằm trong
- * `existing_topics` theo khoá của câu hỏi, và câu hỏi nêu khoá đó. Ghi kết quả vào `candidates`;
- * lỗi thì để quan hệ trống (vẫn báo tỉ lệ). Trả về id model đã trả lời.
+ * Mỗi chủ đề có sẵn một câu `choice`, chung một trạng thái: chủ đề mới và các chủ đề có sẵn theo
+ * khoá câu hỏi (`existing_topics.topic_<id>`). Quá `MAX_QUESTIONS_PER_CALL` chủ đề thì chia lô,
+ * các lô gọi song song. Lô nào lỗi thì `null` (lỗi đã ghi vào `llm_calls`): soát nửa vời dễ bỏ
+ * sót, nên coi như chưa soát.
  */
 async function askRelations(
   decider: DecisionProvider,
   draft: TopicDraft,
-  candidates: OverlapCandidate[],
-  topics: Map<number, TopicRow>,
-): Promise<string | null> {
-  const describe = (t: TopicRow) => ({
-    name: englishName(t.descriptionEn, t.label),
-    description: t.descriptionEn,
-  });
+  topics: TopicRow[],
+): Promise<{ relations: Relation[]; model: string } | null> {
   const newTopic = {
     name: englishName(draft.descriptionEn, draft.label),
     description: draft.descriptionEn,
   };
-  const keyOf = (c: OverlapCandidate) => `topic_${c.topicId}`;
-  const single = candidates.length === 1;
-  const existing = Object.fromEntries(
-    candidates.map((c) => [keyOf(c), describe(topics.get(c.topicId) as TopicRow)]),
-  );
-  const state = single
-    ? { new_topic: newTopic, existing_topic: Object.values(existing)[0] }
-    : { new_topic: newTopic, existing_topics: existing };
+  const batches: TopicRow[][] = [];
+  for (let i = 0; i < topics.length; i += MAX_QUESTIONS_PER_CALL) {
+    batches.push(topics.slice(i, i + MAX_QUESTIONS_PER_CALL));
+  }
+  try {
+    const results = await Promise.all(batches.map((b) => askBatch(decider, newTopic, b)));
+    return { relations: results.flatMap((r) => r.relations), model: results[0]?.model ?? "" };
+  } catch {
+    return null;
+  }
+}
+
+async function askBatch(
+  decider: DecisionProvider,
+  newTopic: { name: string; description: string },
+  batch: TopicRow[],
+): Promise<{ relations: Relation[]; model: string }> {
+  const state = {
+    new_topic: newTopic,
+    existing_topics: Object.fromEntries(
+      batch.map((t) => [
+        keyOf(t),
+        { name: englishName(t.descriptionEn, t.label), description: t.descriptionEn },
+      ]),
+    ),
+  };
   const questions = Object.fromEntries(
-    candidates.map((c) => [
-      keyOf(c),
+    batch.map((t) => [
+      keyOf(t),
       {
         type: "choice" as const,
-        instructions: single
-          ? RELATION_INSTRUCTIONS
-          : RELATION_INSTRUCTIONS.replace("the existing topic", `the existing topic ${keyOf(c)}`),
+        instructions: relationInstructions(keyOf(t)),
         criteria: RELATION_CRITERIA,
       },
     ]),
   );
-  try {
-    const res = await decider.decide({ task: "topic_overlap", state, questions });
-    for (const c of candidates) {
-      const a = res.answers[keyOf(c)];
-      if (!a) continue;
-      c.relation = a.choice as TopicRelation;
-      c.probability = a.probabilities[a.choice] ?? null;
-    }
-    return res.model;
-  } catch {
-    // Lỗi đã ghi vào llm_calls; vẫn báo tỉ lệ trùng tin, để người dùng tự xem.
-    return null;
+  const res = await decider.decide({ task: "topic_overlap", state, questions });
+  const relations: Relation[] = [];
+  for (const t of batch) {
+    const a = res.answers[keyOf(t)];
+    if (!a || a.choice === "different") continue;
+    relations.push({
+      topic: t,
+      relation: a.choice as CloseRelation,
+      probability: a.probabilities[a.choice] ?? 0,
+    });
   }
+  return { relations, model: res.model };
 }
