@@ -16,6 +16,7 @@ import { startScheduler } from "./roles/scheduler.ts";
 import { startWorker } from "./roles/worker.ts";
 import {
   createChatChannel,
+  createDecider,
   createDeps,
   createDigestDeps,
   createEmbedder,
@@ -56,7 +57,12 @@ async function main(): Promise<void> {
   if (runsBot) {
     const chat = createChatChannel();
     if (chat) {
-      const bot = { db: deps.db, embedder: createEmbedder(deps.db), llm: createLlm(deps.db) };
+      const bot = {
+        db: deps.db,
+        embedder: createEmbedder(deps.db),
+        llm: createLlm(deps.db),
+        decider: createDecider(deps.db),
+      };
       stops.push(await startBot(bot, chat));
     } else log.warn("vai trò bot tắt: chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID");
   }

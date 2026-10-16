@@ -200,6 +200,50 @@ export async function toggleLibraryTopic(db: Database, topicId: number): Promise
   return true;
 }
 
+/**
+ * Bật (chọn, hoặc bật lại dòng cũ) hoặc tắt nhiều chủ đề thư viện theo id của `topics`, trong một
+ * giao dịch. Id không thuộc thư viện đang dùng thì bỏ qua. Trả về số chủ đề được bật mới.
+ */
+export async function setLibraryTopics(db: Database, on: number[], off: number[]): Promise<number> {
+  return db.transaction(async (tx) => {
+    let enabled = 0;
+    const found =
+      on.length === 0
+        ? []
+        : await tx
+            .select({ id: topics.id })
+            .from(topics)
+            .where(
+              and(eq(topics.origin, "library"), eq(topics.active, true), inArray(topics.id, on)),
+            );
+    if (found.length > 0) {
+      const rows = await tx
+        .insert(profileTopics)
+        .values(found.map((t) => ({ profileId: PROFILE_ID, topicId: t.id })))
+        .onConflictDoUpdate({
+          target: [profileTopics.profileId, profileTopics.topicId],
+          set: { active: true, updatedAt: new Date() },
+          setWhere: eq(profileTopics.active, false),
+        })
+        .returning({ id: profileTopics.id });
+      enabled = rows.length;
+    }
+    if (off.length > 0) {
+      await tx
+        .update(profileTopics)
+        .set({ active: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(profileTopics.profileId, PROFILE_ID),
+            eq(profileTopics.active, true),
+            inArray(profileTopics.topicId, off),
+          ),
+        );
+    }
+    return enabled;
+  });
+}
+
 const DESCRIBE_SYSTEM = `You write the search description for one news interest of a reader of an AI/ML news digest.
 The description is embedded and compared with news headlines and paper abstracts, so it must name concrete things.
 Format: "<short English topic name>: <comma-separated concrete subtopics, techniques, products or organisations>".

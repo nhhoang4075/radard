@@ -3,7 +3,14 @@
  * quả giả), update giả đưa vào bằng `bot.handleUpdate`.
  */
 import { describe, expect, test } from "bun:test";
-import type { CustomTopicDraft, FeedbackEvent, TopicItem } from "@radard/core";
+import type {
+  CustomTopicDraft,
+  FeedbackEvent,
+  ProfileSuggestions,
+  ProfileView,
+  ProposedTopicItem,
+  TopicItem,
+} from "@radard/core";
 import type { Transformer } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 import {
@@ -14,6 +21,8 @@ import {
   keepPolling,
   parseTopicInput,
   render,
+  suggestKeyboard,
+  suggestText,
   telegramNotifier,
 } from "../src/telegram.ts";
 
@@ -340,6 +349,237 @@ describe("bot: chọn chủ đề", () => {
     });
     expect(parseTopicInput("Chỉ tên")).toEqual({ label: "Chỉ tên", description: "Chỉ tên" });
     expect(parseTopicInput(" \n ")).toBeNull();
+  });
+});
+
+type Kb = { inline_keyboard: { text: string; callback_data: string; style?: string }[][] };
+const keyboardOf = (c: Call | undefined) =>
+  ((c?.payload.reply_markup ?? { inline_keyboard: [] }) as Kb).inline_keyboard;
+const textsOf = (c: Call | undefined) => keyboardOf(c).map((row) => row.map((b) => b.text));
+
+describe("bot: /profile", () => {
+  const ENGLISH = "The reader builds LLM agents in TypeScript and Postgres.";
+  const SUGGESTIONS: ProfileSuggestions = {
+    topics: [
+      { key: "l:3", label: "Agent AI", tier: "preselect", checked: true },
+      { key: "l:5", label: "Xây ứng dụng LLM", tier: "preselect", checked: true },
+      { key: "l:2", label: "Huấn luyện và tối ưu model", tier: "preselect", checked: true },
+      { key: "l:11", label: "An toàn và bảo mật AI", tier: "maybe", checked: false },
+      // Đang bật từ trước: tích sẵn dù ở mức "có thể quan tâm".
+      { key: "l:13", label: "ML nền tảng", tier: "maybe", checked: true },
+    ],
+    newTopics: [
+      {
+        label: "Ngôn ngữ, runtime và cơ sở dữ liệu",
+        why: "Bạn làm với Python, TypeScript và Postgres.",
+        embedText: "Languages and runtimes: Python, TypeScript, Bun, Postgres releases",
+      },
+    ],
+  };
+
+  function setup(
+    view: ProfileView,
+    opts: { llm?: boolean; suggestions?: ProfileSuggestions | null } = {},
+  ) {
+    const api = fakeApi();
+    const saved: string[] = [];
+    const applied: { on: string[]; off: string[] }[] = [];
+    const proposed: ProposedTopicItem[] = [];
+    let suggested = 0;
+    const bot = createTelegramBot(
+      { token: "123:TEST", allowedChatId: ME, botInfo, transformer: api.t },
+      {
+        onFeedback: async () => ({ recorded: true }),
+        topics: {
+          list: async () => [{ key: "l:3", label: "Agent AI", chosen: true }],
+          toggle: async () => true,
+          describe: async () => "x",
+          addCustom: async () => {},
+        },
+        profile: {
+          get: async () => view,
+          saveDescription: async (t) => {
+            saved.push(t);
+            view.description = t;
+            if (opts.llm === false) return { rewritten: false };
+            view.promptContext = ENGLISH;
+            return { rewritten: true };
+          },
+          suggest: async () => {
+            suggested++;
+            return opts.suggestions === undefined ? structuredClone(SUGGESTIONS) : opts.suggestions;
+          },
+          apply: async (on, off) => {
+            applied.push({ on, off });
+            return on.length + 2;
+          },
+          addProposed: async (p) => {
+            proposed.push(p);
+          },
+        },
+      },
+    );
+    return { bot, calls: api.calls, saved, applied, proposed, suggested: () => suggested };
+  }
+
+  test("có mô tả: hiện lời của bạn, hai nút Sửa mô tả / Gợi ý chủ đề", async () => {
+    const { bot, calls } = setup({ description: "Mình làm agent", promptContext: ENGLISH });
+    await bot.handleUpdate(text("/profile"));
+    expect(String(calls[0]?.payload.text)).toContain("Mình làm agent");
+    expect(String(calls[0]?.payload.text)).not.toContain(ENGLISH);
+    expect(textsOf(calls[0])).toEqual([["Sửa mô tả", "Gợi ý chủ đề"]]);
+    expect(keyboardOf(calls[0])[0]?.map((b) => b.style)).toEqual(["primary", "primary"]);
+  });
+
+  test("chưa tự viết nhưng có bối cảnh cũ: nói rõ và hiện đoạn tiếng Anh", async () => {
+    const { bot, calls } = setup({ description: null, promptContext: ENGLISH });
+    await bot.handleUpdate(text("/profile"));
+    const msg = String(calls[0]?.payload.text);
+    expect(msg).toContain("cuộc trò chuyện trước");
+    expect(msg).toContain(ENGLISH);
+    expect(msg).not.toMatch(/digest|prompt|embedding|model/i);
+  });
+
+  test("sửa mô tả → lưu → gợi ý: nhóm theo mức, tích đúng; chủ đề mới có nút Thêm", async () => {
+    const { bot, calls, saved } = setup({ description: null, promptContext: ENGLISH });
+    await bot.handleUpdate(press("pf:edit"));
+    expect(calls.at(-1)?.payload.reply_markup).toMatchObject({ force_reply: true });
+    await bot.handleUpdate(text("Mình là kỹ sư AI"));
+    expect(saved).toEqual(["Mình là kỹ sư AI"]);
+    const msg = calls.filter((c) => c.method === "sendMessage").at(-1);
+    const body = String(msg?.payload.text);
+    expect(body).toContain("Nên theo dõi: Agent AI, Xây ứng dụng LLM, Huấn luyện và tối ưu model.");
+    expect(body).toContain("Có thể bạn quan tâm: An toàn và bảo mật AI, ML nền tảng.");
+    expect(body).toContain("Ngôn ngữ, runtime và cơ sở dữ liệu</b>: Bạn làm với Python");
+    expect(textsOf(msg)).toEqual([
+      ["✓ Agent AI", "✓ Xây ứng dụng LLM"],
+      ["✓ Huấn luyện và tối ưu model"],
+      ["An toàn và bảo mật AI", "✓ ML nền tảng"],
+      ['Thêm "Ngôn ngữ, runtime và cơ sở dữ liệu"'],
+      ["Lưu"],
+    ]);
+    // Mọi callback_data ≤ 64 byte.
+    for (const row of keyboardOf(msg))
+      for (const b of row) expect(Buffer.byteLength(b.callback_data)).toBeLessThanOrEqual(64);
+    expect(JSON.stringify(calls)).not.toMatch(/✅|✔️|➕|digest/);
+  });
+
+  test("bấm bật tắt rồi Lưu: chỉ áp dụng các chủ đề trong tin, báo số chủ đề đang theo dõi", async () => {
+    const { bot, calls, applied } = setup({ description: "x", promptContext: ENGLISH });
+    await bot.handleUpdate(press("pf:sug"));
+    await bot.handleUpdate(press("pf:t:l:2"));
+    expect(textsOf(calls.at(-1))[1]).toEqual(["Huấn luyện và tối ưu model"]);
+    await bot.handleUpdate(press("pf:t:l:11"));
+    await bot.handleUpdate(press("pf:save"));
+    expect(applied).toEqual([{ on: ["l:3", "l:5", "l:11", "l:13"], off: ["l:2"] }]);
+    expect(calls.at(-1)?.method).toBe("editMessageText");
+    expect(calls.at(-1)?.payload.text).toBe(
+      "Đã lưu: bạn đang theo dõi 6 chủ đề. Điểm tin lần tới sẽ dùng các chủ đề này.",
+    );
+    // Đã lưu thì tin hết hiệu lực: bấm lại không áp dụng lần nữa.
+    await bot.handleUpdate(press("pf:save"));
+    expect(applied).toHaveLength(1);
+  });
+
+  test("Thêm chủ đề mới: tạo một lần, nút đổi thành đã thêm", async () => {
+    const { bot, calls, proposed } = setup({ description: "x", promptContext: ENGLISH });
+    await bot.handleUpdate(press("pf:sug"));
+    await bot.handleUpdate(press("pf:n:0"));
+    await bot.handleUpdate(press("pf:n:0"));
+    expect(proposed).toEqual([SUGGESTIONS.newTopics[0] as ProposedTopicItem]);
+    const kb = calls.filter((c) => c.method === "editMessageReplyMarkup").at(-1);
+    expect(textsOf(kb).at(-2)).toEqual(['✓ Đã thêm "Ngôn ngữ, runtime và cơ sở dữ liệu"']);
+  });
+
+  test("tin gợi ý lạ (bot khởi động lại): báo đã cũ, không áp dụng gì", async () => {
+    const { bot, calls, applied } = setup({ description: "x", promptContext: ENGLISH });
+    await bot.handleUpdate(press("pf:save", ME, "cb-9", 77));
+    expect(applied).toHaveLength(0);
+    expect(String(calls.at(-1)?.payload.text)).toContain("/profile");
+  });
+
+  test("không viết được bối cảnh (thiếu LLM): vẫn lưu lời bạn, báo gợi ý tạm chưa dùng được", async () => {
+    const { bot, calls, saved, suggested } = setup(
+      { description: null, promptContext: ENGLISH },
+      { llm: false },
+    );
+    await bot.handleUpdate(press("pf:edit"));
+    await bot.handleUpdate(text("Mình làm agent"));
+    expect(saved).toEqual(["Mình làm agent"]);
+    expect(suggested()).toBe(0);
+    expect(calls.at(-1)?.payload.text).toBe(
+      "Đã lưu mô tả của bạn. Gợi ý chủ đề tạm thời chưa dùng được, bạn thử lại sau nhé.",
+    );
+  });
+
+  test("gợi ý không chạy được: báo một dòng, không gửi bộ nút", async () => {
+    const { bot, calls } = setup(
+      { description: "x", promptContext: ENGLISH },
+      { suggestions: null },
+    );
+    await bot.handleUpdate(press("pf:sug"));
+    expect(calls.at(-1)?.payload.text).toBe(
+      "Gợi ý chủ đề tạm thời chưa dùng được, bạn thử lại sau nhé.",
+    );
+    expect(calls.at(-1)?.payload.reply_markup).toBeUndefined();
+  });
+
+  test("/start lần đầu (chưa có mô tả nào): chào rồi hỏi mô tả; đã có thì hiện chủ đề như cũ", async () => {
+    const fresh = setup({ description: null, promptContext: "" });
+    await fresh.bot.handleUpdate(text("/start"));
+    expect(fresh.calls.map((c) => c.method)).toEqual(["sendMessage", "sendMessage"]);
+    expect(String(fresh.calls[0]?.payload.text)).toStartWith("Chào bạn!");
+    expect(fresh.calls[1]?.payload.reply_markup).toMatchObject({ force_reply: true });
+    await fresh.bot.handleUpdate(text("Mình làm agent"));
+    expect(fresh.saved).toEqual(["Mình làm agent"]);
+
+    const known = setup({ description: null, promptContext: ENGLISH });
+    await known.bot.handleUpdate(text("/start"));
+    expect(textsOf(known.calls[0])).toEqual([["✓ Agent AI"], ["Tự thêm chủ đề", "Xong"]]);
+  });
+
+  test("đang chờ mô tả mà bấm Tự thêm chủ đề: chữ gõ sau thuộc luồng chủ đề", async () => {
+    const { bot, saved } = setup({ description: null, promptContext: ENGLISH });
+    await bot.handleUpdate(press("pf:edit"));
+    await bot.handleUpdate(press("tp:add"));
+    await bot.handleUpdate(text("Postgres cho AI"));
+    expect(saved).toHaveLength(0);
+  });
+
+  test("người lạ: /profile, nút, chữ đều bị bỏ qua", async () => {
+    const { bot, calls, saved, applied } = setup({ description: "x", promptContext: ENGLISH });
+    await bot.handleUpdate(text("/profile", "999"));
+    await bot.handleUpdate(press("pf:edit", "999"));
+    await bot.handleUpdate(text("tôi là người lạ", "999"));
+    await bot.handleUpdate(press("pf:save", "999"));
+    expect(calls).toHaveLength(0);
+    expect(saved).toHaveLength(0);
+    expect(applied).toHaveLength(0);
+  });
+
+  test("bộ nút gợi ý: callback_data ≤ 64 byte kể cả id lớn", () => {
+    const kb = suggestKeyboard({
+      topics: [
+        {
+          key: `l:${Number.MAX_SAFE_INTEGER}`,
+          label: "x".repeat(60),
+          tier: "maybe",
+          checked: false,
+        },
+      ],
+      newTopics: [0, 1, 2].map((i) => ({
+        label: "y".repeat(60),
+        why: "z",
+        embedText: "e",
+        added: i === 1,
+      })),
+    });
+    for (const row of kb.inline_keyboard)
+      for (const b of row)
+        expect(
+          Buffer.byteLength((b as { callback_data: string }).callback_data),
+        ).toBeLessThanOrEqual(64);
+    expect(suggestText({ topics: [], newTopics: [] })).toContain("/topics");
   });
 });
 

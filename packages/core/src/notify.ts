@@ -78,11 +78,63 @@ export interface TopicHandlers {
   addCustom(draft: CustomTopicDraft): Promise<void>;
 }
 
+/** Mô tả về người dùng, như lệnh /profile hiện ra. */
+export interface ProfileView {
+  /** Lời người dùng tự viết về mình (giữ nguyên ngôn ngữ); `null`: chưa viết. */
+  description: string | null;
+  /** Bối cảnh tiếng Anh radard đang dùng; chuỗi rỗng: chưa có. */
+  promptContext: string;
+}
+
+/** Một chủ đề thư viện được gợi ý, kèm trạng thái tích ban đầu. */
+export interface SuggestedTopic {
+  /** Cùng dạng khoá với `TopicItem` (`l:<topics.id>`). */
+  key: string;
+  label: string;
+  /** preselect: nên theo dõi · maybe: có thể bạn quan tâm. */
+  tier: "preselect" | "maybe";
+  /** Tích sẵn: mức "nên theo dõi", hoặc người dùng đang bật chủ đề này. */
+  checked: boolean;
+}
+
+/** Chủ đề mới (chưa có trong thư viện) mà radard đề xuất. */
+export interface ProposedTopicItem {
+  label: string;
+  /** Vì sao đề xuất, một câu tiếng Việt (hiện cho người dùng). */
+  why: string;
+  /** Câu tiếng Anh để embed. */
+  embedText: string;
+}
+
+export interface ProfileSuggestions {
+  /** Nên theo dõi trước, rồi có thể bạn quan tâm; mỗi mức cao trước. */
+  topics: SuggestedTopic[];
+  newTopics: ProposedTopicItem[];
+}
+
+/** Lệnh /profile: mô tả về người dùng và gợi ý chủ đề. */
+export interface ProfileHandlers {
+  get(): Promise<ProfileView>;
+  /**
+   * Lưu lời người dùng, rồi nhờ LLM viết lại bối cảnh tiếng Anh. `rewritten = false`: không viết
+   * được (thiếu LLM hay lời gọi lỗi), lời người dùng vẫn được lưu, bối cảnh cũ giữ nguyên.
+   */
+  saveDescription(text: string): Promise<{ rewritten: boolean }>;
+  /** Gợi ý theo bối cảnh đang lưu. `null`: tạm không gợi ý được. */
+  suggest(): Promise<ProfileSuggestions | null>;
+  /** Bật các chủ đề `on`, tắt các chủ đề `off` (khoá `l:<id>`). Trả về số chủ đề đang theo dõi. */
+  apply(on: string[], off: string[]): Promise<number>;
+  /** Tạo chủ đề tự thêm từ một đề xuất (đang bật). */
+  addProposed(p: ProposedTopicItem): Promise<void>;
+}
+
 export interface ChatHandlers {
   /** Ghi phản hồi. `recorded = false`: đã ghi từ trước (lượt bấm bị giao lại). */
   onFeedback(ev: FeedbackEvent): Promise<{ recorded: boolean }>;
   /** Không có thì kênh không nhận lệnh chọn chủ đề. */
   topics?: TopicHandlers;
+  /** Không có thì kênh không nhận lệnh /profile. */
+  profile?: ProfileHandlers;
 }
 
 /** Chiều về: nhận lượt bấm (sau này: lệnh, tin nhắn) từ một kênh. */

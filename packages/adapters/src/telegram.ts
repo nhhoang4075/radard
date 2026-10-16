@@ -19,6 +19,11 @@ import {
   type Link,
   type Message,
   type Notifier,
+  type ProfileHandlers,
+  type ProfileSuggestions,
+  type ProfileView,
+  type ProposedTopicItem,
+  type SuggestedTopic,
   type TopicHandlers,
   type TopicItem,
 } from "@radard/core";
@@ -201,11 +206,16 @@ function ignoreNotModified(err: unknown): void {
     throw err;
 }
 
+/**
+ * Chat nào đang chờ người dùng gõ chữ, và chữ đó cho luồng nào: "Tự thêm chủ đề" hay "Sửa mô tả".
+ * Dùng chung một Map để bấm luồng này thì luồng kia thôi chờ (chữ gõ sau chỉ thuộc một luồng).
+ */
+type Awaiting = Map<string, "topic" | "profile">;
+
 /** Lệnh chọn chủ đề: /start, /topics, nút bật tắt, và luồng "Tự thêm chủ đề" hai bước. */
-function registerTopicCommands(bot: Bot, topics: TopicHandlers): void {
+function registerTopicCommands(bot: Bot, topics: TopicHandlers, awaiting: Awaiting): void {
   // Trạng thái hội thoại "Tự thêm chủ đề" chỉ giữ trong bộ nhớ: bot khởi động lại thì làm lại từ
   // đầu, không mất gì đã lưu. Một người dùng nên một Map là đủ.
-  const awaiting = new Set<string>();
   const drafts = new Map<string, CustomTopicDraft>();
 
   const showTopics = async (ctx: Context) => {
@@ -230,7 +240,7 @@ function registerTopicCommands(bot: Bot, topics: TopicHandlers): void {
 
   bot.callbackQuery("tp:add", async (ctx) => {
     const chat = String(ctx.chat?.id);
-    awaiting.add(chat);
+    awaiting.set(chat, "topic");
     await ctx.answerCallbackQuery();
     await ctx.reply(ADD_PROMPT, {
       reply_markup: { force_reply: true, input_field_placeholder: "Tên chủ đề, rồi mô tả" },
@@ -269,7 +279,7 @@ function registerTopicCommands(bot: Bot, topics: TopicHandlers): void {
 
   bot.on("message:text", async (ctx, next) => {
     const chat = String(ctx.chat.id);
-    if (!awaiting.has(chat)) return next();
+    if (awaiting.get(chat) !== "topic") return next();
     const input = parseTopicInput(ctx.message.text);
     if (!input) return;
     awaiting.delete(chat);
@@ -288,6 +298,251 @@ function registerTopicCommands(bot: Bot, topics: TopicHandlers): void {
         .text("Huỷ", "tp:cancel")
         .danger(),
     });
+  });
+}
+
+const PROFILE_PROMPT =
+  "Viết vài câu về bạn: bạn làm gì, dùng công nghệ gì, muốn theo dõi và tìm hiểu thêm điều gì. Tiếng Việt hay tiếng Anh đều được.";
+
+const WELCOME =
+  "Chào bạn! radard gửi điểm tin AI mỗi sáng theo các chủ đề bạn chọn. Trước hết, hãy kể một chút về bạn để radard gợi ý chủ đề.";
+
+const SUGGEST_UNAVAILABLE = "Gợi ý chủ đề tạm thời chưa dùng được, bạn thử lại sau nhé.";
+
+const SUGGEST_EXPIRED = "Gợi ý này đã cũ, gõ /profile để xem lại";
+
+/** Lời /profile hiện ra: lời người dùng; chưa có thì bối cảnh cũ (tiếng Anh) và lời mời tự viết. */
+export function profileText(p: ProfileView): string {
+  const cut = (s: string) => (s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT - 1)}…` : s);
+  if (p.description) {
+    return [
+      "<b>Mô tả của bạn</b>",
+      escapeHtml(cut(p.description)),
+      "radard dựa vào mô tả này để gợi ý chủ đề và viết vì sao mỗi tin đáng chú ý với bạn.",
+    ].join("\n\n");
+  }
+  if (p.promptContext) {
+    return [
+      "Bạn chưa tự viết mô tả. radard đang dùng đoạn mô tả viết từ một cuộc trò chuyện trước:",
+      `<i>${escapeHtml(cut(p.promptContext))}</i>`,
+      "Bấm Sửa mô tả để viết bằng lời của bạn.",
+    ].join("\n\n");
+  }
+  return "Bạn chưa có mô tả. Bấm Sửa mô tả để viết vài câu về bạn.";
+}
+
+/** [Sửa mô tả] [Gợi ý chủ đề]; chưa có bối cảnh thì chưa gợi ý được, chỉ còn nút đầu. */
+export function profileKeyboard(p: ProfileView): InlineKeyboard {
+  const kb = new InlineKeyboard().text("Sửa mô tả", "pf:edit").primary();
+  return p.promptContext ? kb.text("Gợi ý chủ đề", "pf:sug").primary() : kb;
+}
+
+/** Trạng thái một tin gợi ý: lựa chọn đang tích dở và chủ đề mới đã thêm. Chỉ giữ trong bộ nhớ. */
+export interface SuggestState {
+  topics: SuggestedTopic[];
+  newTopics: (ProposedTopicItem & { added: boolean })[];
+  expiresAt: number;
+}
+
+/** Tin gợi ý cũ quá thời gian này thì nút không dùng được nữa (gõ /profile để gợi ý lại). */
+export const SUGGEST_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Lời của tin gợi ý. Bộ nút Telegram không có tiêu đề nhóm, nên lời tin nói nhóm nào gồm chủ đề nào;
+ * bộ nút xếp đúng thứ tự đó (nên theo dõi trước, có thể quan tâm sau, mỗi nhóm bắt đầu hàng mới).
+ */
+export function suggestText(s: Pick<SuggestState, "topics" | "newTopics">): string {
+  const names = (tier: SuggestedTopic["tier"]) =>
+    s.topics
+      .filter((t) => t.tier === tier)
+      .map((t) => escapeHtml(t.label))
+      .join(", ");
+  const parts = ["<b>Gợi ý chủ đề cho bạn</b>"];
+  const lines: string[] = [];
+  const must = names("preselect");
+  const maybe = names("maybe");
+  if (must) lines.push(`Nên theo dõi: ${must}.`);
+  if (maybe) lines.push(`Có thể bạn quan tâm: ${maybe}.`);
+  if (lines.length > 0) {
+    parts.push(lines.join("\n"));
+    parts.push(
+      "Bấm để chọn hoặc bỏ (✓ là đang chọn), rồi bấm Lưu. Chủ đề không có ở đây giữ nguyên.",
+    );
+  } else {
+    parts.push("Chưa thấy chủ đề nào trong danh sách hợp với bạn. Gõ /topics để tự chọn.");
+  }
+  if (s.newTopics.length > 0) {
+    parts.push(
+      [
+        "Chủ đề mới, chưa có trong danh sách:",
+        ...s.newTopics.map((t) => `• <b>${escapeHtml(t.label)}</b>: ${escapeHtml(t.why)}`),
+      ].join("\n"),
+    );
+  }
+  return parts.join("\n\n");
+}
+
+/** Nút của tin gợi ý: chủ đề hai nút một hàng theo nhóm, mỗi chủ đề mới một hàng, cuối cùng là Lưu. */
+export function suggestKeyboard(s: Pick<SuggestState, "topics" | "newTopics">): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const tier of ["preselect", "maybe"] as const) {
+    const group = s.topics.filter((t) => t.tier === tier);
+    group.forEach((t, i) => {
+      kb.text(t.checked ? `${CHECK} ${t.label}` : t.label, `pf:t:${t.key}`);
+      if (t.checked) kb.success();
+      if (i % 2 === 1 || i === group.length - 1) kb.row();
+    });
+  }
+  s.newTopics.forEach((t, i) => {
+    if (t.added) kb.text(`${CHECK} Đã thêm "${t.label}"`, `pf:n:${i}`).success();
+    else kb.text(`Thêm "${t.label}"`, `pf:n:${i}`).primary();
+    kb.row();
+  });
+  return kb.text("Lưu", "pf:save").success();
+}
+
+/** Lệnh /profile: xem và sửa mô tả, gợi ý chủ đề; và /start của người dùng mới. */
+function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: Awaiting): void {
+  // Lựa chọn đang tích dở của từng tin gợi ý, theo message_id (mỗi lần gợi ý là một tin mới, tin cũ
+  // vẫn bấm được tới khi hết hạn). Chỉ giữ trong bộ nhớ như bản nháp "Tự thêm chủ đề": bot khởi
+  // động lại thì gợi ý lại, không mất gì đã lưu. Chỉ một chat được dùng bot nên message_id là đủ.
+  const states = new Map<number, SuggestState>();
+  const recall = (id: number | undefined) => {
+    if (id === undefined) return undefined;
+    const s = states.get(id);
+    if (s && s.expiresAt > Date.now()) return s;
+    states.delete(id);
+    return undefined;
+  };
+  const remember = (id: number, s: SuggestState) => {
+    const now = Date.now();
+    for (const [k, v] of states) if (v.expiresAt <= now) states.delete(k);
+    states.set(id, s);
+  };
+
+  const askDescription = async (ctx: Context) => {
+    awaiting.set(String(ctx.chat?.id), "profile");
+    await ctx.reply(PROFILE_PROMPT, {
+      reply_markup: { force_reply: true, input_field_placeholder: "Vài câu về bạn" },
+    });
+  };
+
+  const sendSuggestions = async (ctx: Context) => {
+    await ctx.replyWithChatAction("typing");
+    const s: ProfileSuggestions | null = await profile.suggest().catch((err) => {
+      log.error("gợi ý chủ đề lỗi", describeError(err));
+      return null;
+    });
+    if (!s) {
+      await ctx.reply(SUGGEST_UNAVAILABLE);
+      return;
+    }
+    const state: SuggestState = {
+      topics: s.topics.map((t) => ({ ...t })),
+      newTopics: s.newTopics.map((t) => ({ ...t, added: false })),
+      expiresAt: Date.now() + SUGGEST_TTL_MS,
+    };
+    const empty = state.topics.length === 0 && state.newTopics.length === 0;
+    const sent = await ctx.reply(suggestText(state), {
+      parse_mode: "HTML",
+      ...(empty ? {} : { reply_markup: suggestKeyboard(state) }),
+    });
+    if (!empty) remember(sent.message_id, state);
+  };
+
+  bot.command("start", async (ctx, next) => {
+    const p = await profile.get();
+    if (p.description || p.promptContext) return next();
+    await ctx.reply(WELCOME);
+    await askDescription(ctx);
+  });
+
+  bot.command("profile", async (ctx) => {
+    awaiting.delete(String(ctx.chat.id));
+    const p = await profile.get();
+    await ctx.reply(profileText(p), { parse_mode: "HTML", reply_markup: profileKeyboard(p) });
+  });
+
+  bot.callbackQuery("pf:edit", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await askDescription(ctx);
+  });
+
+  bot.callbackQuery("pf:sug", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await sendSuggestions(ctx);
+  });
+
+  bot.callbackQuery(/^pf:t:(l:\d+)$/, async (ctx) => {
+    const s = recall(ctx.callbackQuery.message?.message_id);
+    const t = s?.topics.find((x) => x.key === ctx.match[1]);
+    if (!s || !t) {
+      await ctx.answerCallbackQuery({ text: SUGGEST_EXPIRED });
+      return;
+    }
+    t.checked = !t.checked;
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageReplyMarkup({ reply_markup: suggestKeyboard(s) }).catch(ignoreNotModified);
+  });
+
+  bot.callbackQuery(/^pf:n:(\d)$/, async (ctx) => {
+    const s = recall(ctx.callbackQuery.message?.message_id);
+    const t = s?.newTopics[Number(ctx.match[1])];
+    if (!s || !t) {
+      await ctx.answerCallbackQuery({ text: SUGGEST_EXPIRED });
+      return;
+    }
+    if (t.added) {
+      await ctx.answerCallbackQuery({ text: "Đã thêm chủ đề này rồi" });
+      return;
+    }
+    try {
+      await profile.addProposed({ label: t.label, why: t.why, embedText: t.embedText });
+    } catch (err) {
+      log.warn("thêm chủ đề đề xuất lỗi", describeError(err));
+      const why = err instanceof Error ? err.message : "";
+      // Lời báo của nút tối đa 200 ký tự.
+      await ctx.answerCallbackQuery({ text: `Không thêm được: ${why}`.slice(0, 190) });
+      return;
+    }
+    t.added = true;
+    await ctx.answerCallbackQuery({ text: `Đã thêm: ${t.label}` });
+    await ctx.editMessageReplyMarkup({ reply_markup: suggestKeyboard(s) }).catch(ignoreNotModified);
+  });
+
+  bot.callbackQuery("pf:save", async (ctx) => {
+    const id = ctx.callbackQuery.message?.message_id;
+    const s = recall(id);
+    if (!s || id === undefined) {
+      await ctx.answerCallbackQuery({ text: SUGGEST_EXPIRED });
+      return;
+    }
+    // Chỉ đụng tới chủ đề hiện trong tin: chủ đề khác (kể cả đang bật) giữ nguyên.
+    const n = await profile.apply(
+      s.topics.filter((t) => t.checked).map((t) => t.key),
+      s.topics.filter((t) => !t.checked).map((t) => t.key),
+    );
+    states.delete(id);
+    await ctx.answerCallbackQuery({ text: "Đã lưu" });
+    await ctx.editMessageText(
+      `Đã lưu: bạn đang theo dõi ${n} chủ đề. Điểm tin lần tới sẽ dùng các chủ đề này.`,
+    );
+  });
+
+  bot.on("message:text", async (ctx, next) => {
+    const chat = String(ctx.chat.id);
+    if (awaiting.get(chat) !== "profile") return next();
+    const text = ctx.message.text.trim();
+    if (!text) return;
+    awaiting.delete(chat);
+    await ctx.replyWithChatAction("typing");
+    const { rewritten } = await profile.saveDescription(text);
+    if (!rewritten) {
+      await ctx.reply(`Đã lưu mô tả của bạn. ${SUGGEST_UNAVAILABLE}`);
+      return;
+    }
+    await ctx.reply("Đã lưu mô tả. Đang tìm chủ đề hợp với bạn…");
+    await sendSuggestions(ctx);
   });
 }
 
@@ -333,8 +588,11 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
     await ctx.editMessageReplyMarkup({ reply_markup: kb }).catch(ignoreNotModified);
   });
 
+  const awaiting: Awaiting = new Map();
+  // /profile đăng ký trước: nó bắt /start của người dùng mới, còn lại chuyển cho /topics.
+  if (handlers.profile) registerProfileCommands(bot, handlers.profile, awaiting);
   const topics = handlers.topics;
-  if (topics) registerTopicCommands(bot, topics);
+  if (topics) registerTopicCommands(bot, topics, awaiting);
 
   // Tin nhắn thường (chưa có tính năng nhận xét bằng chữ): chỉ dẫn lệnh, không ghi gì.
   bot.on("message:text", (ctx) =>
@@ -395,6 +653,9 @@ export function telegramChat(opts: TelegramChatOptions): ChatChannel {
         await b.api
           .setMyCommands([
             { command: "topics", description: "Chọn chủ đề theo dõi" },
+            ...(handlers.profile
+              ? [{ command: "profile", description: "Mô tả về bạn và nhận gợi ý chủ đề" }]
+              : []),
             { command: "start", description: "Bắt đầu" },
           ])
           .catch((err) => log.warn("không đặt được menu lệnh", describeError(err)));
