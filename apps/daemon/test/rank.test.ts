@@ -3,12 +3,14 @@
  * cổng R, và không gửi lại tin đã gửi không có gì mới. Dữ liệu dựng tay, Algolia giả.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import type { HttpClient } from "@radard/core";
+import { fakeDecision } from "@radard/adapters/ai-fake";
+import type { DecisionState, HttpClient, UsageEvent } from "@radard/core";
 import {
   baselines,
   createDatabase,
   deliveries,
   digests,
+  docText,
   docTopicScores,
   documents,
   eventDocuments,
@@ -31,7 +33,10 @@ let topic = 0;
 let seq = 0;
 
 /** Một sự kiện một tài liệu HN, điểm chủ đề `score`. */
-async function addEvent(score: number, at = IN): Promise<{ eventId: number; docId: number }> {
+async function addEvent(
+  score: number,
+  at = IN,
+): Promise<{ eventId: number; docId: number; title: string }> {
   const id = ++seq;
   const [d] = await db
     .insert(documents)
@@ -63,7 +68,14 @@ async function addEvent(score: number, at = IN): Promise<{ eventId: number; docI
     .insert(eventDocuments)
     .values({ eventId: e?.id ?? 0, documentId: d?.id ?? 0, similarity: 1, reason: "seed" });
   await db.insert(docTopicScores).values({ documentId: d?.id ?? 0, topicId: topic, score });
-  return { eventId: e?.id ?? 0, docId: d?.id ?? 0 };
+  await db.insert(docText).values({
+    documentId: d?.id ?? 0,
+    text: `story ${id}. Body of story ${id}.`,
+    lang: "eng",
+    embedding: v,
+    embeddingModel: "m",
+  });
+  return { eventId: e?.id ?? 0, docId: d?.id ?? 0, title: `story ${id}` };
 }
 
 beforeAll(async () => {
@@ -80,7 +92,16 @@ beforeEach(async () => {
     .returning({ id: sources.id });
   hn = s?.id ?? 0;
   await db.insert(profile).values({ description: "x" });
-  topic = await addTopic(db, "Agent", { descriptionEn: "agents" });
+  topic = await addTopic(db, "Agent", {
+    descriptionEn: "AI agents: LLM agents that plan and use tools",
+  });
+  await db.execute(
+    sql`update topics set scope_note = 'Agents. Not: coding agents (→ Lập trình với AI).' where id = ${topic}`,
+  );
+  await addTopic(db, "Lập trình với AI", {
+    descriptionEn: "AI for software development: coding assistants",
+    active: false,
+  });
   // Mặt bằng: cosine 0,4 là bình thường, 0,8 là hiếm. 0,64 → z = 0,6 (đúng cổng).
   await db.insert(baselines).values([
     {
@@ -171,5 +192,93 @@ describe("rankPeriod", () => {
     const r = await rankPeriod(db, periodEndingAt(END));
     expect(r.picked).toHaveLength(0);
     expect(r.rejected[0]?.reason).toBe("not_new");
+  });
+});
+
+/** R = (cosine − 0,4) / 0,4 theo mặt bằng của test. */
+const scoreForR = (R: number) => 0.4 + 0.4 * R;
+
+describe("cổng vùng xám bằng model quyết định", () => {
+  // Sàn S = 0 để chỉ cổng quyết định tin nào được chọn.
+  const config = { floorS: 0 };
+
+  test("R ≥ 0,7 qua không hỏi; vùng xám theo xác suất; R < 0,5 bị loại không hỏi", async () => {
+    const high = await addEvent(scoreForR(0.75));
+    const lowYes = await addEvent(scoreForR(0.55));
+    const midNo = await addEvent(scoreForR(0.65));
+    const below = await addEvent(scoreForR(0.45));
+    const states: DecisionState[] = [];
+    const calls: UsageEvent[] = [];
+    const decider = fakeDecision({
+      answer: (q, _id, state) => {
+        expect(q).toEqual({
+          type: "boolean",
+          instructions: "Is this news item mainly about the topic below?",
+        });
+        states.push(state);
+        const title = (state as { item: { title: string } }).item.title;
+        return title === lowYes.title ? 0.7 : 0.4;
+      },
+      sink: async (e) => {
+        calls.push(e);
+      },
+    });
+    const r = await rankPeriod(db, periodEndingAt(END), { config, decider });
+
+    expect(states).toHaveLength(2);
+    expect(calls.map((c) => c.task)).toEqual(["decide_topic_gate", "decide_topic_gate"]);
+    expect(r.picked.map((p) => p.event.eventId).sort()).toEqual(
+      [high.eventId, lowYes.eventId].sort(),
+    );
+    const reasons = Object.fromEntries(r.rejected.map((x) => [x.event.eventId, x.reason]));
+    expect(reasons).toEqual({ [midNo.eventId]: "decision_reject", [below.eventId]: "gate" });
+    expect(r.passedGate).toBe(2);
+    expect(r.gateCounts).toEqual({ inBand: 2, asked: 2, passed: 1, rejected: 1, fallback: 0 });
+    const byEvent = new Map(r.gateDecisions.map((d) => [d.eventId, d]));
+    expect(byEvent.get(lowYes.eventId)).toMatchObject({
+      topicId: topic,
+      topic: "Agent",
+      probability: 0.7,
+      pass: true,
+      fallback: false,
+    });
+    expect(byEvent.get(lowYes.eventId)?.R).toBeCloseTo(0.55, 6);
+    expect(byEvent.get(midNo.eventId)).toMatchObject({ probability: 0.4, pass: false });
+
+    // Trạng thái như lúc đo: tiêu đề + 400 ký tự đầu; tên chủ đề tiếng Anh, phạm vi không còn
+    // tên tiếng Việt của chủ đề khác.
+    expect(states[0]).toEqual({
+      item: expect.objectContaining({ title: expect.stringMatching(/^story \d+$/) }),
+      topic: {
+        name: "AI agents",
+        description: "AI agents: LLM agents that plan and use tools",
+        scope_note: "Agents. Not: coding agents (→ AI for software development).",
+      },
+    });
+    expect((states[0] as { item: { excerpt: string } }).item.excerpt).toMatch(/^story \d+\. Body/);
+  });
+
+  test("lời gọi lỗi: dùng luật R ≥ 0,6 cho sự kiện đó và đánh dấu", async () => {
+    const mid = await addEvent(scoreForR(0.65));
+    const low = await addEvent(scoreForR(0.55));
+    const decider = fakeDecision({
+      answer: () => {
+        throw new Error("model hỏng");
+      },
+    });
+    const r = await rankPeriod(db, periodEndingAt(END), { config, decider });
+    expect(r.picked.map((p) => p.event.eventId)).toEqual([mid.eventId]);
+    expect(r.rejected.map((x) => [x.event.eventId, x.reason])).toEqual([[low.eventId, "gate"]]);
+    expect(r.gateCounts).toEqual({ inBand: 2, asked: 0, passed: 0, rejected: 0, fallback: 2 });
+    expect(r.gateDecisions.every((d) => d.fallback && d.probability === null)).toBe(true);
+  });
+
+  test("không có model quyết định: luật R ≥ 0,6 như trước, vùng xám vẫn được ghi", async () => {
+    const mid = await addEvent(scoreForR(0.65));
+    await addEvent(scoreForR(0.55));
+    const r = await rankPeriod(db, periodEndingAt(END), { config });
+    expect(r.picked.map((p) => p.event.eventId)).toEqual([mid.eventId]);
+    expect(r.gateCounts.fallback).toBe(2);
+    expect(r.gateDecisions.find((d) => d.eventId === mid.eventId)?.pass).toBe(true);
   });
 });

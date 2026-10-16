@@ -108,8 +108,16 @@ export interface Baselines {
 
 export interface RankConfig {
   weights: { R: number; P: number; C: number; A: number; F: number };
-  /** Cổng: chỉ xét sự kiện có R ≥ ngưỡng này ("có thuộc chủ đề của bạn không"). */
+  /**
+   * Cổng: chỉ xét sự kiện có R ≥ ngưỡng này ("có thuộc chủ đề của bạn không"). Sự kiện có R trong
+   * vùng `decision` thì hỏi model quyết định thay cho luật này; luật chỉ còn dùng khi không hỏi được.
+   */
   gateR: number;
+  /**
+   * Vùng xám của cổng: R ∈ [low, high) thì hỏi model quyết định "tin này có chủ yếu nói về chủ đề
+   * không", xác suất ≥ `minP` thì qua. R ≥ high qua luôn, R < low bị loại luôn.
+   */
+  decision: { low: number; high: number; minP: number };
   /** Sàn: không lấy tin có S dưới mức này, kể cả khi chưa đủ số tin ("có đủ đáng đọc không"). */
   floorS: number;
   /** Độ nổi góp bởi nguồn không có tín hiệu (chốt 12/10/2026: 0,3). */
@@ -128,6 +136,9 @@ export interface RankConfig {
 export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   weights: { R: 0.4, P: 0.25, C: 0.15, A: 0.1, F: 0.1 },
   gateR: 0.6,
+  // Đo 13–16/10/2026 trên tin thật có R trong [0,5; 0,7): Jev ở ngưỡng 0,6 khớp nhãn tham chiếu
+  // 84%, luật cũ (R ≥ 0,6) chỉ 53%; bạn đã xác nhận các nhãn tham chiếu.
+  decision: { low: 0.5, high: 0.7, minP: 0.6 },
   floorS: 0.59,
   neutralP: 0.3,
   followUpF: 0.6,
@@ -148,6 +159,8 @@ export interface Components {
   topicId: number | null;
   /** Nguồn của tài liệu cho R cao nhất: dùng cho giữ chỗ và hạn mức theo nguồn. */
   sourceId: number;
+  /** Tài liệu cho R cao nhất: đưa cho model quyết định khi R nằm trong vùng xám của cổng. */
+  documentId: number | null;
 }
 
 /**
@@ -173,19 +186,26 @@ export function components(
     N: noveltyOf(ev, sentDocIds),
     topicId: r.topicId,
     sourceId: r.sourceId,
+    documentId: r.documentId,
   };
 }
 
 /** R: lớn nhất trên mọi cặp (tài liệu, chủ đề), sau chuẩn hoá theo mặt bằng của nguồn × chủ đề. */
 function relevanceOf(ev: RankEvent, base: Baselines) {
-  let best = { R: 0, topicId: null as number | null, sourceId: ev.docs[0]?.sourceId ?? 0 };
+  let best = {
+    R: 0,
+    topicId: null as number | null,
+    sourceId: ev.docs[0]?.sourceId ?? 0,
+    documentId: null as number | null,
+  };
   for (const d of ev.docs) {
     for (const [t, score] of d.topicScores) {
       const own = base.relevance(d.sourceId, t);
       const global = base.relevance(null, t);
       if (!own && !global) continue;
       const z = normalize(score, blendBaseline(own, global));
-      if (z > best.R || best.topicId === null) best = { R: z, topicId: t, sourceId: d.sourceId };
+      if (z > best.R || best.topicId === null)
+        best = { R: z, topicId: t, sourceId: d.sourceId, documentId: d.documentId };
     }
   }
   return best;
@@ -242,13 +262,19 @@ export interface Scored {
   event: RankEvent;
   c: Components;
   S: number;
+  /**
+   * Câu trả lời của model quyết định cho cổng (R trong vùng xám): `true` qua, `false` loại. Vắng
+   * khi không hỏi (R ngoài vùng xám) hoặc không hỏi được: khi đó dùng luật R ≥ `gateR`.
+   */
+  gate?: boolean;
 }
 
 export interface Rejected {
   event: RankEvent;
   c: Components;
   S: number;
-  reason: "gate" | "floor" | "not_new" | "source_cap" | "not_picked";
+  /** `decision_reject`: R trong vùng xám và model quyết định trả lời "không thuộc chủ đề". */
+  reason: "gate" | "decision_reject" | "floor" | "not_new" | "source_cap" | "not_picked";
 }
 
 export interface Selection {
@@ -309,12 +335,26 @@ export function select(
   return { picked, rejected };
 }
 
-/** Cổng R, tin đã gửi không có gì mới, sàn S; phần còn lại sắp theo S giảm dần. */
+/** R nằm trong vùng xám của cổng: cần hỏi model quyết định. */
+export function needsDecision(R: number, cfg: Pick<RankConfig, "decision">): boolean {
+  return R >= cfg.decision.low && R < cfg.decision.high;
+}
+
+/** Qua cổng: theo câu trả lời của model quyết định nếu có, không thì R ≥ `gateR`. */
+export function passesGate(
+  s: { c: Pick<Components, "R">; gate?: boolean },
+  cfg: Pick<RankConfig, "gateR">,
+): boolean {
+  return s.gate ?? s.c.R >= cfg.gateR;
+}
+
+/** Cổng (R hoặc model quyết định), tin đã gửi không có gì mới, sàn S; phần còn lại sắp theo S. */
 function screen(scored: readonly Scored[], cfg: RankConfig) {
   const rejected: Rejected[] = [];
   const pool: Scored[] = [];
   for (const s of scored) {
-    if (s.c.R < cfg.gateR) rejected.push({ ...s, reason: "gate" });
+    if (!passesGate(s, cfg))
+      rejected.push({ ...s, reason: s.gate === false ? "decision_reject" : "gate" });
     else if (s.c.N === 0) rejected.push({ ...s, reason: "not_new" });
     else if (s.S < cfg.floorS) rejected.push({ ...s, reason: "floor" });
     else pool.push(s);

@@ -2,15 +2,20 @@
  * Xếp hạng một khoảng digest trên DB: đọc ứng viên, mặt bằng, tín hiệu, rồi gọi các hàm thuần
  * trong `@radard/core` (ranking.ts). Dùng chung cho job digest và CLI `rank`.
  *
- * Thứ tự để tốn ít request nhất: cổng R tính trên điểm chủ đề đã có (không gọi mạng), rồi chỉ
- * lấy lại tín hiệu (điểm HN) cho tài liệu của các sự kiện qua cổng.
+ * Thứ tự để tốn ít request nhất: cổng R tính trên điểm chủ đề đã có (không gọi mạng); sự kiện có
+ * R trong vùng xám thì hỏi model quyết định (gate-decision.ts); rồi chỉ lấy lại tín hiệu (điểm HN)
+ * cho tài liệu của các sự kiện qua cổng.
  */
 import {
   type Baseline,
   type Baselines,
+  type Components,
   components,
   DEFAULT_RANK_CONFIG,
+  type DecisionProvider,
   type HttpClient,
+  needsDecision,
+  passesGate,
   type RankConfig,
   type RankDoc,
   type RankEvent,
@@ -34,6 +39,13 @@ import {
 } from "@radard/db";
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
+import {
+  countGate,
+  decideGate,
+  type GateCandidate,
+  type GateCounts,
+  type GateDecision,
+} from "./gate-decision.ts";
 import { refreshSignals } from "./signals.ts";
 
 export interface RankPeriod {
@@ -45,6 +57,11 @@ export interface RankResult extends Selection {
   period: RankPeriod;
   candidates: number;
   passedGate: number;
+  /** Mọi sự kiện có R trong vùng xám: đã hỏi model quyết định, hoặc dùng luật cũ (`fallback`). */
+  gateDecisions: GateDecision[];
+  gateCounts: GateCounts;
+  /** Thời gian hỏi model quyết định cho cổng, mili giây. */
+  gateMs: number;
   config: RankConfig;
   /** Mặt bằng đã dùng, để digest lưu lại và giải thích được vì sao chọn. */
   baselines: {
@@ -70,7 +87,12 @@ export function periodEndingAt(end: Date, hours = 24): RankPeriod {
 export async function rankPeriod(
   db: Database,
   period: RankPeriod,
-  opts: { http?: HttpClient; config?: Partial<RankConfig> } = {},
+  opts: {
+    http?: HttpClient;
+    config?: Partial<RankConfig>;
+    /** Model quyết định cho vùng xám của cổng; không có thì dùng luật R ≥ `gateR` (test, CLI). */
+    decider?: DecisionProvider | null;
+  } = {},
 ): Promise<RankResult> {
   const srcRows = await db.select().from(sources);
   const config: RankConfig = {
@@ -207,11 +229,23 @@ export async function rankPeriod(
     return out;
   };
 
-  // Lượt 1: cổng R (không cần tín hiệu). Lượt 2: lấy lại tín hiệu cho sự kiện qua cổng, chấm đủ.
-  const first = await build(new Map());
-  const passing = first.filter(
-    (e) => components(e, base, config, period.start, sent).R >= config.gateR,
+  // Lượt 1: cổng R (không cần tín hiệu), vùng xám hỏi model quyết định. Lượt 2: lấy lại tín hiệu
+  // cho sự kiện qua cổng, chấm đủ.
+  const first = (await build(new Map())).map((e) => ({
+    event: e,
+    c: components(e, base, config, period.start, sent),
+  }));
+  const gateStarted = Date.now();
+  const gateDecisions = await decideGate(db, grayZone(first, config), opts.decider, config);
+  const gateMs = Date.now() - gateStarted;
+  // Chỉ câu trả lời thật của model thay luật; `fallback` thì để `select` dùng R ≥ gateR.
+  const verdicts = new Map(
+    gateDecisions.filter((d) => !d.fallback).map((d) => [d.eventId, d.pass] as const),
   );
+  const gateOf = (id: number) => verdicts.get(id);
+  const passing = first
+    .filter((x) => passesGate({ c: x.c, gate: gateOf(x.event.eventId) }, config))
+    .map((x) => x.event);
   const passingDocIds = passing.flatMap((e) => e.docs.map((d) => d.documentId));
   if (opts.http) await refreshSignals(db, opts.http, passingDocIds);
   const signals = await loadSignals(passingDocIds);
@@ -219,7 +253,10 @@ export async function rankPeriod(
   // Sự kiện không qua cổng vẫn được chấm (để CLI giải thích vì sao bị loại), không có tín hiệu.
   const scored: Scored[] = full.map((e) => {
     const c = components(e, base, config, period.start, sent);
-    return { event: e, c, S: scoreOf(c, config) };
+    const gate = gateOf(e.eventId);
+    return gate === undefined
+      ? { event: e, c, S: scoreOf(c, config) }
+      : { event: e, c, S: scoreOf(c, config), gate };
   });
 
   const selection = select(scored, config);
@@ -228,6 +265,9 @@ export async function rankPeriod(
     period,
     candidates: evRows.length,
     passedGate: passing.length,
+    gateDecisions,
+    gateCounts: countGate(gateDecisions),
+    gateMs,
     config,
     // Chỉ lưu mặt bằng đã dùng: chủ đề đang bật, cùng mặt bằng tín hiệu và độ phủ.
     baselines: baseRows
@@ -245,4 +285,21 @@ export async function rankPeriod(
     sourceNames: new Map(srcRows.map((s) => [s.id, s.name])),
     sourceKinds: kindOf,
   };
+}
+
+/**
+ * Sự kiện có R trong vùng xám của cổng, kèm chủ đề và tài liệu cho R, để hỏi model quyết định. Bỏ
+ * qua tin đã gửi không có gì mới (N = 0): đằng nào cũng bị loại, hỏi chỉ tốn tiền.
+ */
+function grayZone(
+  evs: readonly { event: RankEvent; c: Components }[],
+  cfg: RankConfig,
+): GateCandidate[] {
+  const out: GateCandidate[] = [];
+  for (const { event, c } of evs) {
+    if (!needsDecision(c.R, cfg) || c.N === 0) continue;
+    if (c.topicId === null || c.documentId === null) continue;
+    out.push({ event, R: c.R, topicId: c.topicId, documentId: c.documentId });
+  }
+  return out;
 }

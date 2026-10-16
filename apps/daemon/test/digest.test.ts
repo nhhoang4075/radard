@@ -3,13 +3,14 @@
  * chừng thì gửi tiếp phần thiếu, LLM hỏng thì gửi bản không tóm tắt, ngày yên ắng vẫn có tin.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { fakeLlm } from "@radard/adapters/ai-fake";
+import { fakeDecision, fakeLlm } from "@radard/adapters/ai-fake";
 import { fakeNotifier } from "@radard/adapters/notify-fake";
 import {
   baselines,
   createDatabase,
   deliveries,
   digests,
+  docText,
   docTopicScores,
   documents,
   eventDocuments,
@@ -289,6 +290,50 @@ describe("runDigest", () => {
       ["llm", "Agent AI"],
       ["embedding", "Agent AI"],
     ]);
+  });
+
+  test("plan ghi lại cổng vùng xám: từng sự kiện đã hỏi, xác suất, qua hay loại", async () => {
+    await addEvent(); // R ≈ 0,98: qua không hỏi
+    const yes = await addEvent(0.62); // R = 0,55
+    const no = await addEvent(0.66); // R = 0,65
+    for (const d of [yes, no]) {
+      await db.insert(docText).values({
+        documentId: d.docId,
+        text: `Original title ${d.docId}. Body.`,
+        lang: "eng",
+        embedding: new Array(1024).fill(0.01),
+        embeddingModel: "m",
+      });
+    }
+    const decider = fakeDecision({
+      answer: (_q, _id, state) =>
+        (state as { item: { title: string } }).item.title === `Original title ${yes.docId}`
+          ? 0.9
+          : 0.1,
+    });
+    const notifier = fakeNotifier();
+    await runDigest({ db, llm: null, decider, notifier, recipient: RECIPIENT }, SLOT);
+    const plan = planOf((await db.select().from(digests))[0]?.meta);
+    expect(plan.ranking.decision?.model).toBe("fake-decision");
+    expect(plan.ranking.decision?.counts).toEqual({
+      inBand: 2,
+      asked: 2,
+      passed: 1,
+      rejected: 1,
+      fallback: 0,
+    });
+    expect(
+      plan.ranking.decision?.events.map((e) => [e.eventId, e.R, e.probability, e.pass, e.fallback]),
+    ).toEqual(
+      expect.arrayContaining([
+        [yes.eventId, 0.55, 0.9, true, false],
+        [no.eventId, 0.65, 0.1, false, false],
+      ]),
+    );
+    expect(plan.ranking.decision?.events[0]?.topic).toBe("Agent AI");
+    expect(plan.ranking.rejected.decision_reject).toBe(1);
+    expect(plan.ranking.passedGate).toBe(2);
+    expect(typeof plan.ranking.ms).toBe("number");
   });
 
   test("không có LLM (chưa đặt khoá) vẫn gửi bản không tóm tắt", async () => {

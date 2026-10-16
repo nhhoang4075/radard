@@ -104,11 +104,20 @@ export function createNotifier(): { notifier: Notifier; recipient: string } | nu
   };
 }
 
-/** Phụ thuộc của job digest; `null` khi chưa có kênh gửi. Không có LLM thì gửi bản không tóm tắt. */
+/**
+ * Phụ thuộc của job digest; `null` khi chưa có kênh gửi. Không có LLM thì gửi bản không tóm tắt;
+ * không có model quyết định thì cổng chủ đề dùng luật R ≥ gateR.
+ */
 export function createDigestDeps(base: FetchDeps): SendDeps | null {
   const n = createNotifier();
   if (!n) return null;
-  return { db: base.db, http: base.http, llm: createLlm(base.db), ...n };
+  return {
+    db: base.db,
+    http: base.http,
+    llm: createLlm(base.db),
+    decider: createDecider(base.db),
+    ...n,
+  };
 }
 
 export function createPagesDeps(base: FetchDeps): PagesDeps {

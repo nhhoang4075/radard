@@ -112,7 +112,8 @@ radard — CLI
 
   digest                     Các bản điểm tin gần nhất (trạng thái, số tin, có tóm tắt không)
   digest --dry-run [--at=<ISO>]  In đúng bản điểm tin sẽ gửi cho khung 07:00 gần nhất (hoặc
-                             khung chứa --at); gọi LLM thật, không gửi, không lưu plan
+                             khung chứa --at); gọi LLM và model quyết định thật (cổng vùng xám),
+                             không gửi, không lưu plan
   digest --now               Gửi ngay bản của khung 07:00 gần nhất (đã gửi thì thôi; gửi dở thì
                              gửi tiếp phần thiếu)
 `;
@@ -142,6 +143,7 @@ function printPlan(plan: DigestPlan): void {
   console.log(
     `${plan.period.start} → ${plan.period.end}: ${r.candidates} ứng viên, ${r.passedGate} qua cổng, bị loại ${JSON.stringify(r.rejected)}`,
   );
+  printGate(plan);
   console.log(
     `tóm tắt: ${plan.summarized ? "có" : "không"}${plan.llm?.error ? ` (lỗi: ${plan.llm.error})` : ""}\n`,
   );
@@ -154,6 +156,23 @@ function printPlan(plan: DigestPlan): void {
     for (const l of m.links ?? []) console.log(`   ${l.role}: ${l.label}  ${l.url}`);
     if (m.moreRelated) console.log(`   +${m.moreRelated} bài`);
     console.log();
+  }
+}
+
+/** Cổng bằng model quyết định: bao nhiêu sự kiện vùng xám, hỏi được bao nhiêu, qua/loại. */
+function printGate(plan: DigestPlan): void {
+  const d = plan.ranking.decision;
+  if (!d) return;
+  const c = d.counts;
+  console.log(
+    `cổng vùng xám (model ${d.model ?? "không có"}): ${c.inBand} sự kiện, hỏi ${c.asked}, qua ${c.passed}, loại ${c.rejected}, dùng luật cũ ${c.fallback}; hỏi ${d.ms} ms, cả bước xếp hạng ${plan.ranking.ms ?? "?"} ms`,
+  );
+  for (const e of d.events) {
+    const p = e.probability === null ? "—" : e.probability.toFixed(2);
+    const verdict = `${e.pass ? "qua" : "loại"}${e.fallback ? " (luật cũ)" : ""}`;
+    console.log(
+      `   R ${e.R.toFixed(2)} · p ${p} · ${verdict} · ${e.topic} · ${e.title.slice(0, 70)}`,
+    );
   }
 }
 
@@ -515,8 +534,8 @@ const COMMANDS: Record<string, Command> = {
       const at = flag("at", "");
       const slot = digestSlot(at ? new Date(at) : new Date());
       const llm = createLlm(db);
-      if (!llm) console.log("(chưa có AI_GATEWAY_API_KEY: bản không tóm tắt)");
-      printPlan(await buildPlan({ db, http, llm }, slot));
+      if (!llm) console.log("(chưa có AI_GATEWAY_API_KEY: bản không tóm tắt, cổng dùng luật R)");
+      printPlan(await buildPlan({ db, http, llm, decider: createDecider(db) }, slot));
       return;
     }
     if (process.argv.includes("--now")) {

@@ -5,6 +5,7 @@ import {
   components,
   DEFAULT_RANK_CONFIG,
   mmrPenalty,
+  needsDecision,
   normalize,
   percentileCont,
   type RankConfig,
@@ -190,14 +191,21 @@ describe("components", () => {
 
   test("S với trọng số mặc định", () => {
     expect(
-      scoreOf({ R: 1, P: 0.5, C: 0, A: 0.6, F: 1, N: 1, topicId: 1, sourceId: 1 }, cfg),
+      scoreOf(
+        { R: 1, P: 0.5, C: 0, A: 0.6, F: 1, N: 1, topicId: 1, sourceId: 1, documentId: null },
+        cfg,
+      ),
     ).toBeCloseTo(0.4 + 0.125 + 0.06 + 0.1, 12);
   });
 });
 
 /** Ứng viên với điểm cho sẵn, để test thuật toán chọn đúng như ví dụ trong xep-hang.html. */
 function cand(id: number, S: number, sourceId = 1, R = 0.9): Scored {
-  return { event: ev(id, []), c: { R, P: 0, C: 0, A: 0, F: 0, N: 1, topicId: 1, sourceId }, S };
+  return {
+    event: ev(id, []),
+    c: { R, P: 0, C: 0, A: 0, F: 0, N: 1, topicId: 1, sourceId, documentId: null },
+    S,
+  };
 }
 
 describe("select", () => {
@@ -256,5 +264,23 @@ describe("select", () => {
     const r = select([cand(1, 0.9, 1, 0.5), cand(2, 0.5), notNew], cfg, () => 0);
     expect(r.picked).toHaveLength(0);
     expect(r.rejected.map((x) => x.reason).sort()).toEqual(["floor", "gate", "not_new"]);
+  });
+
+  test("cổng theo model quyết định: câu trả lời thay luật R; không hỏi thì vẫn R ≥ gateR", () => {
+    const asked = (id: number, R: number, gate: boolean) => ({ ...cand(id, 0.9, 1, R), gate });
+    const r = select(
+      [asked(1, 0.55, true), asked(2, 0.65, false), cand(3, 0.9, 1, 0.65), cand(4, 0.9, 1, 0.55)],
+      { ...cfg, maxPerSource: 7 },
+      () => 0,
+    );
+    expect(r.picked.map((p) => p.event.eventId).sort()).toEqual([1, 3]);
+    const reasons = Object.fromEntries(r.rejected.map((x) => [x.event.eventId, x.reason]));
+    expect(reasons).toEqual({ 2: "decision_reject", 4: "gate" });
+    expect([0.49, 0.5, 0.69, 0.7].map((R) => needsDecision(R, cfg))).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
   });
 });

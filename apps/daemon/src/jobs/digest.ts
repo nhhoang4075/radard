@@ -11,6 +11,7 @@
  */
 import {
   createLogger,
+  type DecisionProvider,
   type HttpClient,
   type Link,
   type LlmProvider,
@@ -30,6 +31,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
+import type { GateCounts, GateDecision } from "./gate-decision.ts";
 import { type RankResult, rankPeriod } from "./rank.ts";
 
 const log = createLogger("digest");
@@ -115,6 +117,19 @@ export interface DigestPlan {
     rejected: Record<string, number>;
     config: Record<string, unknown>;
     baselines: RankResult["baselines"];
+    /** Thời gian cả bước xếp hạng, mili giây (vắng ở plan trước 16/10/2026). */
+    ms?: number;
+    /**
+     * Cổng bằng model quyết định cho các sự kiện có R trong vùng xám: số đếm, từng sự kiện đã xét
+     * (R, chủ đề, xác suất, qua hay không, có dùng luật cũ không) và thời gian hỏi. Vắng ở plan
+     * trước 16/10/2026.
+     */
+    decision?: {
+      model: string | null;
+      counts: GateCounts;
+      ms: number;
+      events: GateDecision[];
+    };
   };
 }
 
@@ -337,6 +352,8 @@ export interface DigestDeps {
   db: Database;
   http?: HttpClient;
   llm: LlmProvider | null;
+  /** Model quyết định cho vùng xám của cổng chủ đề; không có thì dùng luật R ≥ gateR. */
+  decider?: DecisionProvider | null;
 }
 
 async function loadDocs(db: Database, rank: RankResult): Promise<Map<number, ItemDoc[]>> {
@@ -415,7 +432,11 @@ function scoreOfPick(p: RankResult["picked"][number]): PlanItem["score"] {
   };
 }
 
-function rankingInfo(rank: RankResult): DigestPlan["ranking"] {
+function rankingInfo(
+  rank: RankResult,
+  ms: number,
+  decider: DecisionProvider | null | undefined,
+): DigestPlan["ranking"] {
   const rejected: Record<string, number> = {};
   for (const x of rank.rejected) rejected[x.reason] = (rejected[x.reason] ?? 0) + 1;
   const { priors, ...rest } = rank.config;
@@ -425,13 +446,26 @@ function rankingInfo(rank: RankResult): DigestPlan["ranking"] {
     rejected,
     config: { ...rest, priors: Object.fromEntries(priors) },
     baselines: rank.baselines,
+    ms,
+    decision: {
+      model: decider?.model ?? null,
+      counts: rank.gateCounts,
+      ms: rank.gateMs,
+      events: rank.gateDecisions.map((d) => ({
+        ...d,
+        R: Math.round(d.R * 1000) / 1000,
+        probability: d.probability === null ? null : Math.round(d.probability * 1000) / 1000,
+      })),
+    },
   };
 }
 
 /** Chọn tin và viết nội dung cho khoảng 24 giờ kết thúc ở `slot`. Không ghi gì vào DB. */
 export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPlan> {
   const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
-  const rank = await rankPeriod(deps.db, period, { http: deps.http });
+  const rankStarted = Date.now();
+  const rank = await rankPeriod(deps.db, period, { http: deps.http, decider: deps.decider });
+  const rankMs = Date.now() - rankStarted;
   const [prof] = await deps.db.select().from(profile);
   const docsByEvent = await loadDocs(deps.db, rank);
   const date = vnDate(slot);
@@ -439,7 +473,7 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
     version: 1 as const,
     builtAt: new Date().toISOString(),
     period: { start: period.start.toISOString(), end: period.end.toISOString() },
-    ranking: rankingInfo(rank),
+    ranking: rankingInfo(rank, rankMs, deps.decider),
   };
 
   if (rank.picked.length === 0) {

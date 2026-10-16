@@ -1,0 +1,58 @@
+/**
+ * Phần thuần của cổng bằng model quyết định: tên và phạm vi tiếng Anh của chủ đề thư viện, chạy
+ * song song có giới hạn. Phần đọc DB và hỏi model nằm trong rank.test.ts.
+ */
+import { describe, expect, test } from "bun:test";
+import { englishScopeNote, mapLimit, topicNameEn } from "../src/jobs/gate-decision.ts";
+import { TOPIC_LIBRARY } from "../src/topics/library.ts";
+
+/** Chữ có dấu tiếng Việt (như lúc đo, thử nghiệm B): còn sót là còn tên tiếng Việt. */
+const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+
+describe("tên và phạm vi tiếng Anh", () => {
+  const names = new Map(
+    TOPIC_LIBRARY.map((t) => [t.labelVi, topicNameEn({ ...t, label: t.labelVi })]),
+  );
+
+  test("mọi chủ đề thư viện có tên tiếng Anh", () => {
+    for (const [vi, en] of names) {
+      expect(VIETNAMESE.test(en), `${vi} → ${en}`).toBe(false);
+    }
+    expect(names.get("Agent AI")).toBe("AI agents");
+    expect(names.get("Trợ lý và ứng dụng AI")).toBe("AI assistants and apps");
+  });
+
+  test("phạm vi của mọi chủ đề thư viện không còn tên tiếng Việt sau khi thay", () => {
+    for (const t of TOPIC_LIBRARY) {
+      const note = englishScopeNote(t.scopeNote, names);
+      expect(VIETNAMESE.test(note), `${t.key}: ${note}`).toBe(false);
+    }
+    const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal")?.scopeNote ?? "";
+    expect(englishScopeNote(media, names)).toContain(
+      "otherwise → Large language models themselves.",
+    );
+  });
+
+  test("chỉ thay trọn tên", () => {
+    const m = new Map([["Agent", "AI agents"]]);
+    expect(englishScopeNote("Agents and agent tools (→ Agent).", m)).toBe(
+      "Agents and agent tools (→ AI agents).",
+    );
+  });
+});
+
+describe("mapLimit", () => {
+  test("giữ thứ tự, không quá giới hạn cùng lúc", async () => {
+    let running = 0;
+    let peak = 0;
+    const out = await mapLimit([5, 1, 4, 2, 3], 2, async (x) => {
+      running++;
+      peak = Math.max(peak, running);
+      await Bun.sleep(x);
+      running--;
+      return x * 10;
+    });
+    expect(out).toEqual([50, 10, 40, 20, 30]);
+    expect(peak).toBe(2);
+  });
+});
