@@ -19,7 +19,7 @@ import {
 } from "@radard/core";
 import { type Database, topics } from "@radard/db";
 import { and, asc, eq } from "drizzle-orm";
-import { checkTopicOverlap, englishName, type OverlapCandidate } from "./topic-overlap.ts";
+import { checkTopicOverlap, type OverlapCandidate, topicNameEn } from "./topic-overlap.ts";
 
 const log = createLogger("topic-suggest");
 
@@ -153,7 +153,8 @@ const keyOf = (t: LibraryTopic) => `topic_${t.id}`;
 
 /**
  * Một lời gọi cho mọi chủ đề thư viện (thư viện ~14–17 chủ đề, dưới xa giới hạn 32k token của Jev).
- * Hồ sơ lưu bằng tiếng Anh nên trạng thái đưa nguyên văn; tên chủ đề cũng tiếng Anh (`englishName`).
+ * Hồ sơ lưu bằng tiếng Anh nên trạng thái đưa nguyên văn; tên chủ đề cũng tiếng Anh, cùng bộ tên đã đo mà
+ * cổng chủ đề và kiểm trùng dùng (`topicNameEn`).
  */
 async function rateLibrary(
   decider: DecisionProvider | null,
@@ -167,7 +168,7 @@ async function rateLibrary(
       keyOf(t),
       {
         type: "boolean" as const,
-        instructions: suggestInstructions(englishName(t.descriptionEn, t.label), t.descriptionEn),
+        instructions: suggestInstructions(topicNameEn(t), t.descriptionEn),
       },
     ]),
   );
