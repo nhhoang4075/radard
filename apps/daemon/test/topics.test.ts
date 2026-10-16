@@ -82,6 +82,31 @@ describe("thư viện chủ đề", () => {
     expect(rows.every((t) => t.embedding !== null && t.scopeNote)).toBe(true);
   });
 
+  test("đổi tên llm_models (16/10/2026): nhãn mới, giữ khoá và embedding, không embed lại", async () => {
+    await pickTopics(db, ["llm_models"]);
+    await embedPendingTopics(db, embedder);
+    // Dòng như trước khi đổi tên: nhãn và phạm vi cũ, câu mô tả không đổi.
+    await db
+      .update(topics)
+      .set({ labelVi: "LLM: model và hành vi", scopeNote: "cũ" })
+      .where(eq(topics.key, "llm_models"));
+    const [before] = await db.select().from(topics).where(eq(topics.key, "llm_models"));
+    const r = await seedLibrary(db);
+    expect(r.refreshed).toBe(0);
+    const [after] = await db.select().from(topics).where(eq(topics.key, "llm_models"));
+    expect(after?.id).toBe(before?.id ?? -1);
+    expect(after?.labelVi).toBe("Model AI: phát hành và hành vi");
+    expect(after?.scopeNote).toContain("vision-language models (VLMs)");
+    expect(after?.embedding).toEqual(before?.embedding ?? []);
+    expect(after?.embeddingModel).toBe(embedder.model);
+    // Lựa chọn của bạn vẫn trỏ đúng chủ đề đó.
+    const mine = await listProfileTopics(db);
+    expect(mine.map((t) => t.label)).toContain("Model AI: phát hành và hành vi");
+    // Phạm vi của "Ảnh, video và âm thanh" trỏ sang nhãn mới.
+    const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal");
+    expect(media?.scopeNote).toContain("→ Model AI: phát hành và hành vi");
+  });
+
   test("bảng chuyển lựa chọn: chủ đề cũ đã rút khỏi thư viện, chủ đề mới có trong thư viện", () => {
     const keys = TOPIC_LIBRARY.map((t) => t.key);
     expect(new Set(keys).size).toBe(14);

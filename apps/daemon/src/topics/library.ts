@@ -28,11 +28,13 @@ export const TOPIC_LIBRARY: LibraryTopic[] = [
   {
     key: "llm_models",
     groupVi: "Model",
-    labelVi: "LLM: model và hành vi",
+    // "LLM: …" bỏ sót SLM, model chạy trên máy và VLM (16/10/2026); khoá và câu mô tả giữ nguyên:
+    // đổi câu mô tả cho rộng ra thì đo lại kém hơn.
+    labelVi: "Model AI: phát hành và hành vi",
     descriptionEn:
       "Large language models themselves: new model releases and open-weight models, model architecture, reasoning and chain of thought, model behavior, hallucination and faithfulness, interpretability, benchmarks and evaluations of LLMs",
     scopeNote:
-      "Language models themselves: new LLM releases from any lab, open or closed weights; architecture, reasoning, model behavior, hallucination, benchmarks and evaluations, looking inside models (interpretability). Not: how models are trained or optimized (→ Huấn luyện và tối ưu model); agents (→ Agent AI); image, video and audio models (→ Ảnh, video và âm thanh).",
+      "AI models themselves: new model releases from any lab, open or closed weights, including small language models (SLMs), on-device models and vision-language models (VLMs); architecture, reasoning, model behavior, hallucination, benchmarks and evaluations, looking inside models (interpretability). Not: how models are trained or optimized (→ Huấn luyện và tối ưu model); agents (→ Agent AI); models that generate images, video or audio (→ Ảnh, video và âm thanh).",
   },
   {
     key: "training",
@@ -77,7 +79,7 @@ export const TOPIC_LIBRARY: LibraryTopic[] = [
     descriptionEn:
       "Generative and multimodal media AI: image and video generation, diffusion models, vision-language models, speech recognition, text to speech, voice cloning and music generation",
     scopeNote:
-      "Image, video and music generation; diffusion; vision-language models; speech recognition and speech synthesis. Not: medical imaging (→ AI trong khoa học và y tế).",
+      "Image, video and music generation; diffusion; speech recognition and speech synthesis. Vision-language models (VLMs) belong here only when the news is about generating images, video or audio; otherwise → Model AI: phát hành và hành vi. Not: medical imaging (→ AI trong khoa học và y tế).",
   },
   {
     key: "robotics",
@@ -168,6 +170,15 @@ export const TOPIC_SUCCESSORS: Record<string, string> = {
   inference: "ai_infra",
   ml_research: "ml_foundations",
   open_source_tools: "ai_coding",
+};
+
+/**
+ * Tên tiếng Anh ngắn của chủ đề thư viện mà câu mô tả không mở đầu bằng "Tên: …" (xem
+ * `englishName` trong topic-overlap.ts). Model quyết định chỉ được hãng bảo đảm với tiếng Anh, nên
+ * không đưa tên tiếng Việt cho nó. Tên lấy từ thử nghiệm 13–16/10/2026.
+ */
+export const TOPIC_NAMES_EN: Record<string, string> = {
+  ai_products: "AI assistants and apps",
 };
 
 /** Hai quy tắc khi một tin hợp hai chủ đề; viết vào prompt gắn nhãn của điểm tin. */
