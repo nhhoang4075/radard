@@ -14,6 +14,7 @@
 import type { DecisionProvider, EmbeddingProvider } from "@radard/core";
 import type { Database } from "@radard/db";
 import { sql } from "drizzle-orm";
+import { TOPIC_NAMES_EN } from "../topics/library.ts";
 import { PROFILE_ID } from "./topics.ts";
 
 /** Số tin khớp nhất của mỗi chủ đề đem ra so (tab 02: 300 tin của 30 ngày). */
@@ -95,6 +96,8 @@ interface NewDoc {
 
 type TopicRow = {
   id: number;
+  /** Khoá thư viện; `null` với chủ đề tự thêm. */
+  key: string | null;
   label: string;
   origin: "library" | "custom";
   descriptionEn: string;
@@ -222,7 +225,7 @@ async function topDocsForVector(
 /** Chủ đề đem ra so: thư viện đang dùng và chủ đề tự thêm của hồ sơ, có embedding cùng model. */
 async function existingTopics(db: Database, model: string): Promise<TopicRow[]> {
   const rows = await db.execute(sql`
-    select t.id::int as id, t.label_vi as label, t.origin, t.description_en as "descriptionEn",
+    select t.id::int as id, t.key, t.label_vi as label, t.origin, t.description_en as "descriptionEn",
       coalesce(pt.active, false) as enabled,
       exists (select 1 from doc_topic_scores s where s.topic_id = t.id) as scored
     from topics t
@@ -233,6 +236,7 @@ async function existingTopics(db: Database, model: string): Promise<TopicRow[]> 
     order by t.id`);
   return [...rows].map((r) => ({
     id: Number(r.id),
+    key: r.key === null ? null : String(r.key),
     label: String(r.label),
     origin: r.origin === "custom" ? "custom" : "library",
     descriptionEn: String(r.descriptionEn),
@@ -307,6 +311,14 @@ export function englishName(descriptionEn: string, fallback: string): string {
   return head.length > 0 && head.length <= 80 && head !== descriptionEn.trim() ? head : fallback;
 }
 
+/**
+ * Tên tiếng Anh đưa cho model quyết định: chủ đề thư viện dùng tên soạn sẵn (`TOPIC_NAMES_EN`,
+ * đúng tên đã đo); chủ đề tự thêm dùng phần "Tên:" của câu mô tả, không có thì nhãn.
+ */
+export function topicNameEn(t: { key: string | null; label: string; descriptionEn: string }) {
+  return (t.key ? TOPIC_NAMES_EN[t.key] : undefined) ?? englishName(t.descriptionEn, t.label);
+}
+
 const keyOf = (t: TopicRow) => `topic_${t.id}`;
 
 /**
@@ -344,10 +356,7 @@ async function askBatch(
   const state = {
     new_topic: newTopic,
     existing_topics: Object.fromEntries(
-      batch.map((t) => [
-        keyOf(t),
-        { name: englishName(t.descriptionEn, t.label), description: t.descriptionEn },
-      ]),
+      batch.map((t) => [keyOf(t), { name: topicNameEn(t), description: t.descriptionEn }]),
     ),
   };
   const questions = Object.fromEntries(

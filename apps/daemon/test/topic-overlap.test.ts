@@ -29,7 +29,9 @@ import {
   HUB_MIN_TOPICS,
   MAX_QUESTIONS_PER_CALL,
   RELATION_CRITERIA,
+  topicNameEn,
 } from "../src/jobs/topic-overlap.ts";
+import { TOPIC_LIBRARY, TOPIC_NAMES_EN } from "../src/topics/library.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
@@ -253,6 +255,19 @@ describe("checkTopicOverlap: model quyết định", () => {
     expect(calls[0]).toMatchObject({ task: "topic_overlap", costUsd: 0.0000213, ok: true });
   });
 
+  test("chủ đề thư viện mang tên tiếng Anh đã đo; chủ đề tự thêm dùng phần đầu câu mô tả", async () => {
+    const lib = await addTopicRow("agents", 1);
+    const mine = await addTopicRow("Của tôi", 2, { custom: true });
+    const seen: { id: string; state: DecisionState; instructions: string }[] = [];
+    await check(deciderFor({}, seen));
+    const state = seen[0]?.state as
+      | { existing_topics: Record<string, { name: string }> }
+      | undefined;
+    const existing = state?.existing_topics ?? {};
+    expect(existing[`topic_${lib}`]?.name).toBe("AI agents");
+    expect(existing[`topic_${mine}`]?.name).toBe("Topic Của tôi");
+  });
+
   test("mọi chủ đề đều khác thì không có ứng viên và không cần embed", async () => {
     await addTopicRow("A", 1);
     await addTopicRow("D", 5);
@@ -320,6 +335,23 @@ describe("checkTopicOverlap: bằng chứng", () => {
     expect(res.candidates.map((x) => [x.topicId, x.ratio, x.shared])).toEqual([
       [c, 0.7, ["a1", "a2", "a3"]],
     ]);
+  });
+});
+
+describe("topicNameEn", () => {
+  test("thư viện: tên soạn sẵn cho đủ 14 chủ đề; tự thêm: phần trước dấu hai chấm, rồi nhãn", () => {
+    expect(TOPIC_LIBRARY.map((t) => t.key).filter((k) => !TOPIC_NAMES_EN[k])).toEqual([]);
+    expect(Object.keys(TOPIC_NAMES_EN).sort()).toEqual(TOPIC_LIBRARY.map((t) => t.key).sort());
+    const llm = TOPIC_LIBRARY.find((t) => t.key === "llm_models");
+    expect(
+      topicNameEn({ key: "llm_models", label: "x", descriptionEn: llm?.descriptionEn ?? "" }),
+    ).toBe("AI models: releases and behavior");
+    expect(
+      topicNameEn({ key: null, label: "Postgres", descriptionEn: "Postgres for AI: pgvector" }),
+    ).toBe("Postgres for AI");
+    expect(
+      topicNameEn({ key: null, label: "Postgres", descriptionEn: "pgvector and friends" }),
+    ).toBe("Postgres");
   });
 });
 

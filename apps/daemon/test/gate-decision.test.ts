@@ -3,7 +3,8 @@
  * song song có giới hạn. Phần đọc DB và hỏi model nằm trong rank.test.ts.
  */
 import { describe, expect, test } from "bun:test";
-import { englishScopeNote, mapLimit, topicNameEn } from "../src/jobs/gate-decision.ts";
+import { englishScopeNote, mapLimit } from "../src/jobs/gate-decision.ts";
+import { topicNameEn } from "../src/jobs/topic-overlap.ts";
 import { TOPIC_LIBRARY } from "../src/topics/library.ts";
 
 /** Chữ có dấu tiếng Việt (như lúc đo, thử nghiệm B): còn sót là còn tên tiếng Việt. */
@@ -20,6 +21,8 @@ describe("tên và phạm vi tiếng Anh", () => {
     }
     expect(names.get("Agent AI")).toBe("AI agents");
     expect(names.get("Trợ lý và ứng dụng AI")).toBe("AI assistants and apps");
+    expect(names.get("Lập trình với AI")).toBe("Programming with AI");
+    expect(names.get("Model AI: phát hành và hành vi")).toBe("AI models: releases and behavior");
   });
 
   test("phạm vi của mọi chủ đề thư viện không còn tên tiếng Việt sau khi thay", () => {
@@ -29,7 +32,7 @@ describe("tên và phạm vi tiếng Anh", () => {
     }
     const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal")?.scopeNote ?? "";
     expect(englishScopeNote(media, names)).toContain(
-      "otherwise → Large language models themselves.",
+      "otherwise → AI models: releases and behavior.",
     );
   });
 

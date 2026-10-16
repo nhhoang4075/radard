@@ -173,12 +173,32 @@ export const TOPIC_SUCCESSORS: Record<string, string> = {
 };
 
 /**
- * Tên tiếng Anh ngắn của chủ đề thư viện mà câu mô tả không mở đầu bằng "Tên: …" (xem
- * `englishName` trong topic-overlap.ts). Model quyết định chỉ được hãng bảo đảm với tiếng Anh, nên
- * không đưa tên tiếng Việt cho nó. Tên lấy từ thử nghiệm 13–16/10/2026.
+ * Tên tiếng Anh của từng chủ đề thư viện: đúng tên model quyết định (Jev) thấy ở mọi chỗ cần tên
+ * chủ đề (cổng chủ đề, chủ đề nhắc tới trong phạm vi, soát chủ đề gần giống). Model chỉ được hãng
+ * bảo đảm với tiếng Anh, nên không đưa tên tiếng Việt cho nó. Chủ đề tự thêm không có ở đây: dùng
+ * phần "Tên:" đầu câu mô tả (`englishName` trong topic-overlap.ts).
+ *
+ * Tám chủ đề có đánh dấu "đã đo" giữ đúng tên của thử nghiệm 13–16/10/2026 (cổng chủ đề: Jev khớp
+ * nhãn tham chiếu 84%); sáu chủ đề còn lại chưa đo, đặt tên ngắn cùng kiểu. Sửa tên đã đo thì đo
+ * lại.
  */
 export const TOPIC_NAMES_EN: Record<string, string> = {
-  ai_products: "AI assistants and apps",
+  // Đã đo với "LLMs: models and behavior"; CỐ Ý đổi theo nhãn mới "Model AI: phát hành và hành vi"
+  // (16/10/2026), để tên khớp phạm vi mới gồm cả SLM, model chạy trên máy và VLM.
+  llm_models: "AI models: releases and behavior",
+  training: "Training and optimizing models", // đã đo
+  agents: "AI agents", // đã đo
+  ai_coding: "Programming with AI", // đã đo
+  llm_apps: "Building LLM applications", // đã đo
+  multimodal: "Image, video and audio AI", // đã đo
+  robotics: "Robotics and physical AI",
+  ai_infra: "AI infrastructure",
+  ai_products: "AI assistants and apps", // đã đo
+  ai_industry: "AI business",
+  ai_safety: "AI safety and security",
+  ai_policy: "AI policy and society",
+  ml_foundations: "ML foundations", // đã đo
+  ai_science: "AI in science and medicine",
 };
 
 /** Hai quy tắc khi một tin hợp hai chủ đề; viết vào prompt gắn nhãn của điểm tin. */

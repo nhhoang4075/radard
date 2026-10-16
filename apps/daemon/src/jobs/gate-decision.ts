@@ -4,8 +4,9 @@
  *
  * Đo 13–16/10/2026 trên tin thật có điểm chủ đề trong vùng này: Jev ở ngưỡng 0,6 khớp nhãn tham
  * chiếu 84%, luật R ≥ 0,6 chỉ 53%; bạn đã xác nhận các nhãn tham chiếu. Câu hỏi và dạng trạng thái
- * giữ đúng như lúc đo. Tên chủ đề và phạm vi đưa cho model bằng tiếng Anh (tên tiếng Việt trong phạm
- * vi được thay bằng tên tiếng Anh), vì Jev yếu nhất ngoài tiếng Anh.
+ * giữ đúng như lúc đo. Tên chủ đề và phạm vi đưa cho model bằng tiếng Anh (`topicNameEn`: tên đã
+ * đo của thư viện; tên tiếng Việt trong phạm vi được thay bằng tên đó), vì Jev yếu nhất ngoài
+ * tiếng Anh.
  *
  * Không có model quyết định, hay lời gọi lỗi: sự kiện đó dùng lại luật R ≥ `gateR` và được đánh
  * dấu `fallback`. Bước xếp hạng không bao giờ hỏng vì model quyết định.
@@ -13,8 +14,7 @@
 import { createLogger, type DecisionProvider, type RankConfig, type RankEvent } from "@radard/core";
 import { type Database, docText, documents, topics as topicsTable } from "@radard/db";
 import { eq, inArray } from "drizzle-orm";
-import { TOPIC_NAMES_EN } from "../topics/library.ts";
-import { englishName } from "./topic-overlap.ts";
+import { topicNameEn } from "./topic-overlap.ts";
 
 const log = createLogger("gate");
 
@@ -143,12 +143,6 @@ async function askOne(decider: DecisionProvider, state: DecideState): Promise<nu
     questions: { q: { type: "boolean", instructions: TOPIC_GATE_QUESTION } },
   });
   return res.answers.q.probability;
-}
-
-/** Tên tiếng Anh của chủ đề: phần "Tên:" của câu mô tả, hoặc tên soạn sẵn của thư viện. */
-export function topicNameEn(t: { key: string | null; label: string; descriptionEn: string }) {
-  const fromDescription = englishName(t.descriptionEn, "");
-  return fromDescription || (t.key ? TOPIC_NAMES_EN[t.key] : undefined) || t.label;
 }
 
 /**
