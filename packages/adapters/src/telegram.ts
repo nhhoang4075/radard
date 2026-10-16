@@ -323,7 +323,7 @@ export function profileText(p: ProfileView): string {
   }
   if (p.promptContext) {
     return [
-      "Bạn chưa tự viết mô tả. radard đang dùng đoạn mô tả viết từ một cuộc trò chuyện trước:",
+      "Bạn chưa tự viết mô tả. Hiện radard đang dùng đoạn mô tả có sẵn sau:",
       `<i>${escapeHtml(cut(p.promptContext))}</i>`,
       "Bấm Sửa mô tả để viết bằng lời của bạn.",
     ].join("\n\n");
@@ -337,10 +337,13 @@ export function profileKeyboard(p: ProfileView): InlineKeyboard {
   return p.promptContext ? kb.text("Gợi ý chủ đề", "pf:sug").primary() : kb;
 }
 
-/** Trạng thái một tin gợi ý: lựa chọn đang tích dở và chủ đề mới đã thêm. Chỉ giữ trong bộ nhớ. */
+/**
+ * Trạng thái một tin gợi ý: lựa chọn đang tích dở, cả chủ đề thư viện lẫn chủ đề mới (chưa tạo gì
+ * cho tới khi bấm Lưu). Chỉ giữ trong bộ nhớ.
+ */
 export interface SuggestState {
   topics: SuggestedTopic[];
-  newTopics: (ProposedTopicItem & { added: boolean })[];
+  newTopics: (ProposedTopicItem & { checked: boolean })[];
   expiresAt: number;
 }
 
@@ -349,7 +352,7 @@ export const SUGGEST_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Lời của tin gợi ý. Bộ nút Telegram không có tiêu đề nhóm, nên lời tin nói nhóm nào gồm chủ đề nào;
- * bộ nút xếp đúng thứ tự đó (nên theo dõi trước, có thể quan tâm sau, mỗi nhóm bắt đầu hàng mới).
+ * bộ nút xếp đúng thứ tự đó (nên theo dõi, có thể quan tâm, đang theo dõi; mỗi nhóm một hàng mới).
  */
 export function suggestText(s: Pick<SuggestState, "topics" | "newTopics">): string {
   const names = (tier: SuggestedTopic["tier"]) =>
@@ -361,13 +364,13 @@ export function suggestText(s: Pick<SuggestState, "topics" | "newTopics">): stri
   const lines: string[] = [];
   const must = names("preselect");
   const maybe = names("maybe");
+  const followed = names("followed");
   if (must) lines.push(`Nên theo dõi: ${must}.`);
   if (maybe) lines.push(`Có thể bạn quan tâm: ${maybe}.`);
+  if (followed) lines.push(`Đang theo dõi: ${followed}.`);
   if (lines.length > 0) {
     parts.push(lines.join("\n"));
-    parts.push(
-      "Bấm để chọn hoặc bỏ (✓ là đang chọn), rồi bấm Lưu. Chủ đề không có ở đây giữ nguyên.",
-    );
+    parts.push("Bấm để chọn hoặc bỏ (✓ là đang chọn), rồi bấm Lưu.");
   } else {
     parts.push("Chưa thấy chủ đề nào trong danh sách hợp với bạn. Gõ /topics để tự chọn.");
   }
@@ -385,7 +388,7 @@ export function suggestText(s: Pick<SuggestState, "topics" | "newTopics">): stri
 /** Nút của tin gợi ý: chủ đề hai nút một hàng theo nhóm, mỗi chủ đề mới một hàng, cuối cùng là Lưu. */
 export function suggestKeyboard(s: Pick<SuggestState, "topics" | "newTopics">): InlineKeyboard {
   const kb = new InlineKeyboard();
-  for (const tier of ["preselect", "maybe"] as const) {
+  for (const tier of ["preselect", "maybe", "followed"] as const) {
     const group = s.topics.filter((t) => t.tier === tier);
     group.forEach((t, i) => {
       kb.text(t.checked ? `${CHECK} ${t.label}` : t.label, `pf:t:${t.key}`);
@@ -394,8 +397,9 @@ export function suggestKeyboard(s: Pick<SuggestState, "topics" | "newTopics">): 
     });
   }
   s.newTopics.forEach((t, i) => {
-    if (t.added) kb.text(`${CHECK} Đã thêm "${t.label}"`, `pf:n:${i}`).success();
-    else kb.text(`Thêm "${t.label}"`, `pf:n:${i}`).primary();
+    // Bật tắt như các chủ đề khác; chủ đề chỉ được tạo khi bấm Lưu.
+    if (t.checked) kb.text(`${CHECK} ${t.label}`, `pf:n:${i}`).success();
+    else kb.text(`Thêm "${t.label}"`, `pf:n:${i}`);
     kb.row();
   });
   return kb.text("Lưu", "pf:save").success();
@@ -439,7 +443,7 @@ function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: A
     }
     const state: SuggestState = {
       topics: s.topics.map((t) => ({ ...t })),
-      newTopics: s.newTopics.map((t) => ({ ...t, added: false })),
+      newTopics: s.newTopics.map((t) => ({ ...t, checked: false })),
       expiresAt: Date.now() + SUGGEST_TTL_MS,
     };
     const empty = state.topics.length === 0 && state.newTopics.length === 0;
@@ -492,21 +496,8 @@ function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: A
       await ctx.answerCallbackQuery({ text: SUGGEST_EXPIRED });
       return;
     }
-    if (t.added) {
-      await ctx.answerCallbackQuery({ text: "Đã thêm chủ đề này rồi" });
-      return;
-    }
-    try {
-      await profile.addProposed({ label: t.label, why: t.why, embedText: t.embedText });
-    } catch (err) {
-      log.warn("thêm chủ đề đề xuất lỗi", describeError(err));
-      const why = err instanceof Error ? err.message : "";
-      // Lời báo của nút tối đa 200 ký tự.
-      await ctx.answerCallbackQuery({ text: `Không thêm được: ${why}`.slice(0, 190) });
-      return;
-    }
-    t.added = true;
-    await ctx.answerCallbackQuery({ text: `Đã thêm: ${t.label}` });
+    t.checked = !t.checked;
+    await ctx.answerCallbackQuery();
     await ctx.editMessageReplyMarkup({ reply_markup: suggestKeyboard(s) }).catch(ignoreNotModified);
   });
 
@@ -517,12 +508,24 @@ function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: A
       await ctx.answerCallbackQuery({ text: SUGGEST_EXPIRED });
       return;
     }
-    // Chỉ đụng tới chủ đề hiện trong tin: chủ đề khác (kể cả đang bật) giữ nguyên.
-    const n = await profile.apply(
-      s.topics.filter((t) => t.checked).map((t) => t.key),
-      s.topics.filter((t) => !t.checked).map((t) => t.key),
-    );
+    // Bỏ trạng thái trước khi ghi: bấm Lưu hai lần liền nhau cũng chỉ tạo chủ đề mới một lần.
     states.delete(id);
+    let n: number;
+    try {
+      // Chỉ đụng tới chủ đề hiện trong tin: chủ đề thư viện khác (chưa theo dõi) giữ nguyên.
+      n = await profile.apply(
+        s.topics.filter((t) => t.checked).map((t) => t.key),
+        s.topics.filter((t) => !t.checked).map((t) => t.key),
+        s.newTopics
+          .filter((t) => t.checked)
+          .map((t) => ({ label: t.label, why: t.why, embedText: t.embedText })),
+      );
+    } catch (err) {
+      states.set(id, s);
+      log.error("lưu gợi ý lỗi", describeError(err));
+      await ctx.answerCallbackQuery({ text: "Chưa lưu được, bạn thử lại nhé" });
+      return;
+    }
     await ctx.answerCallbackQuery({ text: "Đã lưu" });
     await ctx.editMessageText(
       `Đã lưu: bạn đang theo dõi ${n} chủ đề. Điểm tin lần tới sẽ dùng các chủ đề này.`,

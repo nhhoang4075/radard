@@ -149,7 +149,7 @@ describe("profileHandlers", () => {
     await expect(describeReader(llm, "x")).rejects.toThrow();
   });
 
-  test("gợi ý: tích sẵn mức nên theo dõi; chủ đề đang bật luôn tích; không gợi ý thì không hiện", async () => {
+  test("gợi ý: tích sẵn mức nên theo dõi; chủ đề đang bật luôn hiện và tích; còn lại không hiện", async () => {
     const keys = await idToKey();
     // Đang bật từ trước: một chủ đề mức "có thể quan tâm" và một chủ đề không được gợi ý.
     await pickTopics(db, ["multimodal", "robotics"]);
@@ -168,6 +168,8 @@ describe("profileHandlers", () => {
       ["ai_safety", "maybe", false],
       ["ml_foundations", "maybe", false],
       ["multimodal", "maybe", true],
+      // Đang theo dõi, không được gợi ý: nhóm riêng, tích sẵn. ai_products (0,1) chưa bật thì không hiện.
+      ["robotics", "followed", true],
     ]);
     expect(s.newTopics).toEqual([
       { label: NEW_TOPIC.labelVi, why: NEW_TOPIC.why, embedText: NEW_TOPIC.descriptionEn },
@@ -193,25 +195,32 @@ describe("profileHandlers", () => {
     await pickTopics(db, ["robotics", "ai_safety"]);
     let refreshed = 0;
     const p = profileHandlers(deps(), () => refreshed++);
-    const n = await p.apply([`l:${id("agents")}`, `l:${id("llm_apps")}`], [`l:${id("ai_safety")}`]);
+    const n = await p.apply(
+      [`l:${id("agents")}`, `l:${id("llm_apps")}`],
+      [`l:${id("ai_safety")}`],
+      [],
+    );
     const chosen = (await listLibrary(db)).filter((t) => t.chosen).map((t) => t.key);
     // robotics không hiện trong gợi ý: giữ nguyên.
     expect(new Set(chosen)).toEqual(new Set(["agents", "llm_apps", "robotics"]));
     expect(n).toBe(3);
     expect(refreshed).toBe(1);
     // Lưu lại y như cũ: không bật mới gì, không làm mới.
-    await p.apply([`l:${id("agents")}`], [`l:${id("ai_safety")}`]);
+    await p.apply([`l:${id("agents")}`], [`l:${id("ai_safety")}`], []);
     expect(refreshed).toBe(1);
   });
 
-  test("Thêm chủ đề mới: chủ đề tự thêm đang bật, mô tả là câu đã hiện cho người dùng", async () => {
+  test("Lưu có chủ đề mới: tạo chủ đề tự thêm đang bật (mô tả là câu đã hiện), làm mới một lần", async () => {
+    const keys = await idToKey();
+    const id = (k: string) => [...keys].find(([, v]) => v === k)?.[0];
     let refreshed = 0;
     const p = profileHandlers(deps(), () => refreshed++);
-    await p.addProposed({
+    const proposal = {
       label: NEW_TOPIC.labelVi,
       why: NEW_TOPIC.why,
       embedText: NEW_TOPIC.descriptionEn,
-    });
+    };
+    const n = await p.apply([`l:${id("agents")}`], [], [proposal]);
     const [t] = await db.select().from(topics).where(eq(topics.origin, "custom"));
     expect(t).toMatchObject({
       name: NEW_TOPIC.labelVi,
@@ -220,10 +229,24 @@ describe("profileHandlers", () => {
     });
     const mine = (await listProfileTopics(db)).find((x) => x.topicId === t?.id);
     expect(mine?.active).toBe(true);
+    // Số đang theo dõi tính cả chủ đề vừa tạo; bật và tạo cùng lúc chỉ làm mới một lần.
+    expect(n).toBe(2);
     expect(refreshed).toBe(1);
-    expect(await p.apply([], [])).toBe(1);
-    await expect(
-      p.addProposed({ label: NEW_TOPIC.labelVi, why: "x", embedText: "y" }),
-    ).rejects.toThrow("đã có chủ đề");
+    // Trùng tên (đã tạo rồi): bỏ qua, phần còn lại vẫn lưu, không tạo bản thứ hai.
+    expect(await p.apply([], [`l:${id("agents")}`], [proposal])).toBe(1);
+    expect(await db.select().from(topics).where(eq(topics.origin, "custom"))).toHaveLength(1);
+    expect(refreshed).toBe(1);
+  });
+
+  test("Lưu chỉ có chủ đề mới: vẫn làm mới", async () => {
+    let refreshed = 0;
+    const p = profileHandlers(deps(), () => refreshed++);
+    const proposal = {
+      label: NEW_TOPIC.labelVi,
+      why: NEW_TOPIC.why,
+      embedText: NEW_TOPIC.descriptionEn,
+    };
+    expect(await p.apply([], [], [proposal])).toBe(1);
+    expect(refreshed).toBe(1);
   });
 });

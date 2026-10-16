@@ -367,6 +367,8 @@ describe("bot: /profile", () => {
       { key: "l:11", label: "An toàn và bảo mật AI", tier: "maybe", checked: false },
       // Đang bật từ trước: tích sẵn dù ở mức "có thể quan tâm".
       { key: "l:13", label: "ML nền tảng", tier: "maybe", checked: true },
+      // Đang theo dõi nhưng không được gợi ý: vẫn hiện, tích sẵn.
+      { key: "l:9", label: "Trợ lý và ứng dụng AI", tier: "followed", checked: true },
     ],
     newTopics: [
       {
@@ -383,8 +385,7 @@ describe("bot: /profile", () => {
   ) {
     const api = fakeApi();
     const saved: string[] = [];
-    const applied: { on: string[]; off: string[] }[] = [];
-    const proposed: ProposedTopicItem[] = [];
+    const applied: { on: string[]; off: string[]; add: ProposedTopicItem[] }[] = [];
     let suggested = 0;
     const bot = createTelegramBot(
       { token: "123:TEST", allowedChatId: ME, botInfo, transformer: api.t },
@@ -409,17 +410,14 @@ describe("bot: /profile", () => {
             suggested++;
             return opts.suggestions === undefined ? structuredClone(SUGGESTIONS) : opts.suggestions;
           },
-          apply: async (on, off) => {
-            applied.push({ on, off });
-            return on.length + 2;
-          },
-          addProposed: async (p) => {
-            proposed.push(p);
+          apply: async (on, off, add) => {
+            applied.push({ on, off, add });
+            return on.length + add.length + 2;
           },
         },
       },
     );
-    return { bot, calls: api.calls, saved, applied, proposed, suggested: () => suggested };
+    return { bot, calls: api.calls, saved, applied, suggested: () => suggested };
   }
 
   test("có mô tả: hiện lời của bạn, hai nút Sửa mô tả / Gợi ý chủ đề", async () => {
@@ -435,7 +433,7 @@ describe("bot: /profile", () => {
     const { bot, calls } = setup({ description: null, promptContext: ENGLISH });
     await bot.handleUpdate(text("/profile"));
     const msg = String(calls[0]?.payload.text);
-    expect(msg).toContain("cuộc trò chuyện trước");
+    expect(msg).toContain("Bạn chưa tự viết mô tả. Hiện radard đang dùng đoạn mô tả có sẵn sau:");
     expect(msg).toContain(ENGLISH);
     expect(msg).not.toMatch(/digest|prompt|embedding|model/i);
   });
@@ -450,11 +448,14 @@ describe("bot: /profile", () => {
     const body = String(msg?.payload.text);
     expect(body).toContain("Nên theo dõi: Agent AI, Xây ứng dụng LLM, Huấn luyện và tối ưu model.");
     expect(body).toContain("Có thể bạn quan tâm: An toàn và bảo mật AI, ML nền tảng.");
+    expect(body).toContain("Đang theo dõi: Trợ lý và ứng dụng AI.");
+    expect(body).not.toContain("giữ nguyên");
     expect(body).toContain("Ngôn ngữ, runtime và cơ sở dữ liệu</b>: Bạn làm với Python");
     expect(textsOf(msg)).toEqual([
       ["✓ Agent AI", "✓ Xây ứng dụng LLM"],
       ["✓ Huấn luyện và tối ưu model"],
       ["An toàn và bảo mật AI", "✓ ML nền tảng"],
+      ["✓ Trợ lý và ứng dụng AI"],
       ['Thêm "Ngôn ngữ, runtime và cơ sở dữ liệu"'],
       ["Lưu"],
     ]);
@@ -471,24 +472,43 @@ describe("bot: /profile", () => {
     expect(textsOf(calls.at(-1))[1]).toEqual(["Huấn luyện và tối ưu model"]);
     await bot.handleUpdate(press("pf:t:l:11"));
     await bot.handleUpdate(press("pf:save"));
-    expect(applied).toEqual([{ on: ["l:3", "l:5", "l:11", "l:13"], off: ["l:2"] }]);
+    expect(applied).toEqual([{ on: ["l:3", "l:5", "l:11", "l:13", "l:9"], off: ["l:2"], add: [] }]);
     expect(calls.at(-1)?.method).toBe("editMessageText");
     expect(calls.at(-1)?.payload.text).toBe(
-      "Đã lưu: bạn đang theo dõi 6 chủ đề. Điểm tin lần tới sẽ dùng các chủ đề này.",
+      "Đã lưu: bạn đang theo dõi 7 chủ đề. Điểm tin lần tới sẽ dùng các chủ đề này.",
     );
     // Đã lưu thì tin hết hiệu lực: bấm lại không áp dụng lần nữa.
     await bot.handleUpdate(press("pf:save"));
     expect(applied).toHaveLength(1);
   });
 
-  test("Thêm chủ đề mới: tạo một lần, nút đổi thành đã thêm", async () => {
-    const { bot, calls, proposed } = setup({ description: "x", promptContext: ENGLISH });
+  test("chủ đề mới: bấm Thêm chỉ tích (chưa tạo); Lưu mới tạo, một lần", async () => {
+    const { bot, calls, applied } = setup({ description: "x", promptContext: ENGLISH });
+    await bot.handleUpdate(press("pf:sug"));
+    await bot.handleUpdate(press("pf:n:0"));
+    expect(applied).toHaveLength(0);
+    const kb = calls.filter((c) => c.method === "editMessageReplyMarkup").at(-1);
+    expect(keyboardOf(kb).at(-2)).toEqual([
+      { text: "✓ Ngôn ngữ, runtime và cơ sở dữ liệu", callback_data: "pf:n:0", style: "success" },
+    ]);
+    await bot.handleUpdate(press("pf:save"));
+    await bot.handleUpdate(press("pf:save"));
+    expect(applied).toHaveLength(1);
+    expect(applied[0]?.add).toEqual([SUGGESTIONS.newTopics[0] as ProposedTopicItem]);
+    expect(calls.at(-1)?.payload.text).toContain("/profile");
+  });
+
+  test("chủ đề mới: tích rồi bỏ tích trước Lưu thì không tạo gì", async () => {
+    const { bot, calls, applied } = setup({ description: "x", promptContext: ENGLISH });
     await bot.handleUpdate(press("pf:sug"));
     await bot.handleUpdate(press("pf:n:0"));
     await bot.handleUpdate(press("pf:n:0"));
-    expect(proposed).toEqual([SUGGESTIONS.newTopics[0] as ProposedTopicItem]);
     const kb = calls.filter((c) => c.method === "editMessageReplyMarkup").at(-1);
-    expect(textsOf(kb).at(-2)).toEqual(['✓ Đã thêm "Ngôn ngữ, runtime và cơ sở dữ liệu"']);
+    expect(keyboardOf(kb).at(-2)).toEqual([
+      { text: 'Thêm "Ngôn ngữ, runtime và cơ sở dữ liệu"', callback_data: "pf:n:0" },
+    ]);
+    await bot.handleUpdate(press("pf:save"));
+    expect(applied[0]?.add).toEqual([]);
   });
 
   test("tin gợi ý lạ (bot khởi động lại): báo đã cũ, không áp dụng gì", async () => {
@@ -566,12 +586,13 @@ describe("bot: /profile", () => {
           tier: "maybe",
           checked: false,
         },
+        { key: `l:${Number.MAX_SAFE_INTEGER - 1}`, label: "w", tier: "followed", checked: true },
       ],
       newTopics: [0, 1, 2].map((i) => ({
         label: "y".repeat(60),
         why: "z",
         embedText: "e",
-        added: i === 1,
+        checked: i === 1,
       })),
     });
     for (const row of kb.inline_keyboard)

@@ -86,13 +86,16 @@ export interface ProfileView {
   promptContext: string;
 }
 
-/** Một chủ đề thư viện được gợi ý, kèm trạng thái tích ban đầu. */
+/** Một chủ đề thư viện hiện trong tin gợi ý, kèm trạng thái tích ban đầu. */
 export interface SuggestedTopic {
   /** Cùng dạng khoá với `TopicItem` (`l:<topics.id>`). */
   key: string;
   label: string;
-  /** preselect: nên theo dõi · maybe: có thể bạn quan tâm. */
-  tier: "preselect" | "maybe";
+  /**
+   * preselect: nên theo dõi · maybe: có thể bạn quan tâm · followed: không được gợi ý nhưng người
+   * dùng đang theo dõi (vẫn hiện, để tin gợi ý cho thấy đủ mọi chủ đề thư viện đang bật).
+   */
+  tier: "preselect" | "maybe" | "followed";
   /** Tích sẵn: mức "nên theo dõi", hoặc người dùng đang bật chủ đề này. */
   checked: boolean;
 }
@@ -107,7 +110,7 @@ export interface ProposedTopicItem {
 }
 
 export interface ProfileSuggestions {
-  /** Nên theo dõi trước, rồi có thể bạn quan tâm; mỗi mức cao trước. */
+  /** Nên theo dõi, rồi có thể bạn quan tâm (mỗi mức cao trước), rồi đang theo dõi. */
   topics: SuggestedTopic[];
   newTopics: ProposedTopicItem[];
 }
@@ -122,10 +125,11 @@ export interface ProfileHandlers {
   saveDescription(text: string): Promise<{ rewritten: boolean }>;
   /** Gợi ý theo bối cảnh đang lưu. `null`: tạm không gợi ý được. */
   suggest(): Promise<ProfileSuggestions | null>;
-  /** Bật các chủ đề `on`, tắt các chủ đề `off` (khoá `l:<id>`). Trả về số chủ đề đang theo dõi. */
-  apply(on: string[], off: string[]): Promise<number>;
-  /** Tạo chủ đề tự thêm từ một đề xuất (đang bật). */
-  addProposed(p: ProposedTopicItem): Promise<void>;
+  /**
+   * Lưu tin gợi ý: tạo (và bật) các chủ đề mới `add`, bật các chủ đề `on`, tắt các chủ đề `off`
+   * (khoá `l:<id>`). Trả về số chủ đề đang theo dõi, kể cả chủ đề vừa tạo.
+   */
+  apply(on: string[], off: string[], add: ProposedTopicItem[]): Promise<number>;
 }
 
 export interface ChatHandlers {

@@ -141,7 +141,8 @@ export function profileHandlers(
       );
       if (!res.ran.library) return null;
       // Chủ đề đang bật luôn tích sẵn, dù ở mức nào: Lưu không được lặng lẽ tắt nó.
-      const chosen = new Set((await listLibrary(db)).filter((t) => t.chosen).map((t) => t.id));
+      const followed = (await listLibrary(db)).filter((t) => t.chosen);
+      const chosen = new Set(followed.map((t) => t.id));
       const item =
         (tier: SuggestedTopic["tier"]) =>
         (s: { topicId: number; label: string }): SuggestedTopic => ({
@@ -150,8 +151,14 @@ export function profileHandlers(
           tier,
           checked: tier === "preselect" || chosen.has(s.topicId),
         });
+      const suggested = new Set([...res.preselect, ...res.maybe].map((t) => t.topicId));
+      // Chủ đề thư viện đang bật mà không được gợi ý vẫn hiện (nhóm "đang theo dõi"), để tin gợi ý
+      // cho thấy đủ những gì người dùng đang theo dõi. Chủ đề tự thêm thì /topics quản.
+      const kept = followed
+        .filter((t) => !suggested.has(t.id))
+        .map((t) => item("followed")({ topicId: t.id, label: t.name }));
       return {
-        topics: [...res.preselect.map(item("preselect")), ...res.maybe.map(item("maybe"))],
+        topics: [...res.preselect.map(item("preselect")), ...res.maybe.map(item("maybe")), ...kept],
         newTopics: res.newTopics.map((t) => ({
           label: t.name,
           why: t.why,
@@ -159,21 +166,27 @@ export function profileHandlers(
         })),
       };
     },
-    async apply(on, off) {
+    async apply(on, off, add) {
+      let created = 0;
+      for (const p of add) {
+        // Chủ đề tự thêm bắt buộc có lời của người dùng (`topics.description`). Đề xuất không phải
+        // lời họ viết, nên lấy đúng câu radard đã cho họ xem ("tên: vì sao") làm mô tả: họ đã đọc,
+        // tích và bấm Lưu, coi như đồng ý với câu đó. Câu tiếng Anh của đề xuất làm `embed_text`.
+        try {
+          await addCustomTopic(db, {
+            label: p.label,
+            description: `${p.label}: ${p.why}`,
+            embedText: p.embedText,
+          });
+          created++;
+        } catch (err) {
+          // Trùng tên (vừa tự thêm qua /topics chẳng hạn): bỏ qua chủ đề đó, vẫn lưu phần còn lại.
+          log.warn("không tạo được chủ đề đề xuất", { label: p.label, err: String(err) });
+        }
+      }
       const enabled = await setLibraryTopics(db, libraryIds(on), libraryIds(off));
-      if (enabled > 0) refresh();
+      if (enabled + created > 0) refresh();
       return countFollowed(db);
-    },
-    async addProposed(p) {
-      // Chủ đề tự thêm bắt buộc có lời của người dùng (`topics.description`). Đề xuất không phải lời
-      // họ viết, nên lấy đúng câu radard đã cho họ xem ("tên: vì sao") làm mô tả: họ đã đọc và bấm
-      // Thêm, coi như đồng ý với câu đó. Câu tiếng Anh của đề xuất dùng làm `embed_text`.
-      await addCustomTopic(db, {
-        label: p.label,
-        description: `${p.label}: ${p.why}`,
-        embedText: p.embedText,
-      });
-      refresh();
     },
   };
 }
