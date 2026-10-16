@@ -36,7 +36,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(sql`truncate profile, topics restart identity cascade`);
-  await db.insert(profile).values({ description: "AI engineer" });
+  await db.insert(profile).values({ promptContext: "AI engineer" });
   await seedLibrary(db);
 });
 
@@ -57,29 +57,27 @@ describe("thư viện chủ đề", () => {
   test("sửa câu mô tả trong thư viện thì chủ đề nhận câu mới và phải embed lại", async () => {
     await pickTopics(db, ["agents"]);
     await embedPendingTopics(db, embedder);
-    await db.update(topics).set({ descriptionEn: "cũ" }).where(eq(topics.key, "agents"));
+    await db.update(topics).set({ embedText: "cũ" }).where(eq(topics.key, "agents"));
     // Code giữ câu thật; seed lại đưa câu thật trở về và xoá embedding cũ của đúng chủ đề đó.
     const r = await seedLibrary(db);
     expect(r.refreshed).toBe(1);
     const rows = await db.select().from(topics);
     const agents = rows.find((t) => t.key === "agents");
-    expect(agents?.descriptionEn).toBe(
-      TOPIC_LIBRARY.find((t) => t.key === "agents")?.descriptionEn,
-    );
+    expect(agents?.embedText).toBe(TOPIC_LIBRARY.find((t) => t.key === "agents")?.embedText);
     expect(agents?.embedding).toBeNull();
     expect(rows.filter((t) => t.embedding !== null)).toHaveLength(TOPIC_LIBRARY.length - 1);
   });
 
-  test("sửa phạm vi (scopeNote) thì chỉ cập nhật chữ, không phải embed lại", async () => {
+  test("sửa phạm vi (labelGuide) thì chỉ cập nhật chữ, không phải embed lại", async () => {
     await embedPendingTopics(db, embedder);
-    await db.update(topics).set({ scopeNote: "cũ" }).where(eq(topics.key, "agents"));
+    await db.update(topics).set({ labelGuide: "cũ" }).where(eq(topics.key, "agents"));
     const r = await seedLibrary(db);
     expect(r.refreshed).toBe(0);
     const rows = await db.select().from(topics);
-    expect(rows.find((t) => t.key === "agents")?.scopeNote).toBe(
-      TOPIC_LIBRARY.find((t) => t.key === "agents")?.scopeNote ?? "",
+    expect(rows.find((t) => t.key === "agents")?.labelGuide).toBe(
+      TOPIC_LIBRARY.find((t) => t.key === "agents")?.labelGuide ?? "",
     );
-    expect(rows.every((t) => t.embedding !== null && t.scopeNote)).toBe(true);
+    expect(rows.every((t) => t.embedding !== null && t.labelGuide)).toBe(true);
   });
 
   test("đổi tên llm_models (16/10/2026): nhãn mới, giữ khoá và embedding, không embed lại", async () => {
@@ -88,15 +86,15 @@ describe("thư viện chủ đề", () => {
     // Dòng như trước khi đổi tên: nhãn và phạm vi cũ, câu mô tả không đổi.
     await db
       .update(topics)
-      .set({ labelVi: "LLM: model và hành vi", scopeNote: "cũ" })
+      .set({ name: "LLM: model và hành vi", labelGuide: "cũ" })
       .where(eq(topics.key, "llm_models"));
     const [before] = await db.select().from(topics).where(eq(topics.key, "llm_models"));
     const r = await seedLibrary(db);
     expect(r.refreshed).toBe(0);
     const [after] = await db.select().from(topics).where(eq(topics.key, "llm_models"));
     expect(after?.id).toBe(before?.id ?? -1);
-    expect(after?.labelVi).toBe("Model AI: phát hành và hành vi");
-    expect(after?.scopeNote).toContain("vision-language models (VLMs)");
+    expect(after?.name).toBe("Model AI: phát hành và hành vi");
+    expect(after?.labelGuide).toContain("vision-language models (VLMs)");
     expect(after?.embedding).toEqual(before?.embedding ?? []);
     expect(after?.embeddingModel).toBe(embedder.model);
     // Lựa chọn của bạn vẫn trỏ đúng chủ đề đó.
@@ -104,7 +102,7 @@ describe("thư viện chủ đề", () => {
     expect(mine.map((t) => t.label)).toContain("Model AI: phát hành và hành vi");
     // Phạm vi của "Ảnh, video và âm thanh" trỏ sang nhãn mới.
     const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal");
-    expect(media?.scopeNote).toContain("→ Model AI: phát hành và hành vi");
+    expect(media?.labelGuide).toContain("→ Model AI: phát hành và hành vi");
   });
 
   test("bảng chuyển lựa chọn: chủ đề cũ đã rút khỏi thư viện, chủ đề mới có trong thư viện", () => {
@@ -151,15 +149,15 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
 
   test("lựa chọn của bạn (15/10/2026) thành đúng 8 chủ đề mới; chạy lại không đổi gì", async () => {
     await db.execute(sql`truncate profile, topics restart identity cascade`);
-    await db.insert(profile).values({ description: "AI engineer" });
+    await db.insert(profile).values({ promptContext: "AI engineer" });
     const old = await db
       .insert(topics)
       .values(
         OLD_KEYS.map((key, position) => ({
           key,
-          groupVi: "cũ",
-          labelVi: `cũ ${key}`,
-          descriptionEn: key,
+          groupName: "cũ",
+          name: `cũ ${key}`,
+          embedText: key,
           position,
         })),
       )
@@ -224,15 +222,15 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
 
   test("lựa chọn đang tắt không được chuyển; chủ đề mới đang tắt được bật lại", async () => {
     await db.execute(sql`truncate profile, topics restart identity cascade`);
-    await db.insert(profile).values({ description: "AI engineer" });
+    await db.insert(profile).values({ promptContext: "AI engineer" });
     const [inference, evals] = await db
       .insert(topics)
       .values(
         ["inference", "evals"].map((key) => ({
           key,
-          groupVi: "cũ",
-          labelVi: key,
-          descriptionEn: key,
+          groupName: "cũ",
+          name: key,
+          embedText: key,
         })),
       )
       .returning({ id: topics.id });
@@ -291,8 +289,8 @@ describe("tự thêm chủ đề", () => {
     expect(en).toBe("Postgres for AI: pgvector, vector indexes, HNSW, hybrid search in Postgres");
     const id = await addCustomTopic(db, {
       label: "Postgres cho AI",
-      descriptionUser: "pgvector, index vector, tìm kiếm",
-      descriptionEn: en,
+      description: "pgvector, index vector, tìm kiếm",
+      embedText: en,
     });
     const [row] = await db
       .select({ kind: profileTopics.kind, active: profileTopics.active, topic: topics })
@@ -303,7 +301,7 @@ describe("tự thêm chủ đề", () => {
     expect(row?.topic.origin).toBe("custom");
     expect(row?.topic.ownerProfileId).toBe(1);
     expect(row?.topic.key).toBeNull();
-    expect(row?.topic.descriptionUser).toBe("pgvector, index vector, tìm kiếm");
+    expect(row?.topic.description).toBe("pgvector, index vector, tìm kiếm");
     expect(row?.kind).toBe("include");
     expect(row?.active).toBe(true);
   });
@@ -314,10 +312,10 @@ describe("tự thêm chủ đề", () => {
 
   test("trùng tên (không phân biệt hoa thường) bị chặn", async () => {
     await pickTopics(db, ["agents"]);
-    const label = TOPIC_LIBRARY.find((t) => t.key === "agents")?.labelVi.toUpperCase() ?? "";
-    await expect(
-      addCustomTopic(db, { label, descriptionUser: "a", descriptionEn: "b" }),
-    ).rejects.toThrow("đã có");
+    const label = TOPIC_LIBRARY.find((t) => t.key === "agents")?.name.toUpperCase() ?? "";
+    await expect(addCustomTopic(db, { label, description: "a", embedText: "b" })).rejects.toThrow(
+      "đã có",
+    );
   });
 
   test("DB chặn chủ đề tự thêm thiếu lời của người dùng", async () => {
@@ -325,7 +323,7 @@ describe("tự thêm chủ đề", () => {
     const insert = async () => {
       await db
         .insert(topics)
-        .values({ labelVi: "x", descriptionEn: "y", origin: "custom", ownerProfileId: 1 });
+        .values({ name: "x", embedText: "y", origin: "custom", ownerProfileId: 1 });
     };
     await expect(insert()).rejects.toThrow();
   });

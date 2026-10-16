@@ -116,7 +116,7 @@ export async function rankPeriod(
   // Chỉ chủ đề đang bật, loại "quan tâm" mới tính vào R; thứ tự theo lúc chọn, để hoà điểm ra kết quả
   // như nhau mỗi lần chạy.
   const topics = await db
-    .select({ id: topicsTable.id, label: topicsTable.labelVi, note: topicsTable.scopeNote })
+    .select({ id: topicsTable.id, label: topicsTable.name, note: topicsTable.labelGuide })
     .from(profileTopics)
     .innerJoin(topicsTable, eq(topicsTable.id, profileTopics.topicId))
     .where(and(eq(profileTopics.active, true), eq(profileTopics.kind, "include")))

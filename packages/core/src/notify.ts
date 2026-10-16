@@ -62,9 +62,9 @@ export interface TopicItem {
 export interface CustomTopicDraft {
   label: string;
   /** Lời của người dùng, giữ nguyên ngôn ngữ họ viết. */
-  descriptionUser: string;
+  description: string;
   /** Câu tiếng Anh để embed, do LLM viết từ lời người dùng. */
-  descriptionEn: string;
+  embedText: string;
 }
 
 /** Lệnh về chủ đề mà kênh chat chuyển vào lõi (bước 5, tuần 3). */

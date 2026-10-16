@@ -5,152 +5,152 @@
  * yếu nói về cái gì. Bộ 17 chủ đề cũ trộn nhiều cách chia (đối tượng, hoạt động, tính chất, loại
  * tin) nên một tin rơi vào nhiều ô cùng lúc.
  *
- * Người dùng chỉ thấy `labelVi`. `descriptionEn` là câu dùng để embed: viết bằng tiếng Anh cho
+ * Người dùng chỉ thấy `name`. `embedText` là câu dùng để embed: viết bằng tiếng Anh cho
  * khớp dữ liệu, chỉ gồm phần "Gồm" với tên sản phẩm, kỹ thuật cụ thể. Embedding không hiểu phủ
  * định: viết "không gồm X" vào câu lại kéo nó gần X hơn. Các câu đã được đo trên 16.203 tin AI của
  * 30 ngày; sửa câu nào thì đo lại.
  *
- * `scopeNote` là phạm vi của chủ đề (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
+ * `labelGuide` là phạm vi của chủ đề (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
  * đưa cho LLM khi nó gắn nhãn cho tin trong điểm tin; không embed.
  *
  * Sửa một câu mô tả ở đây rồi chạy `topics seed`: thư viện được cập nhật, chủ đề người dùng đã
- * chọn từ thư viện nhận câu mới và được embed lại. Sửa `scopeNote` thì không phải embed lại.
+ * chọn từ thư viện nhận câu mới và được embed lại. Sửa `labelGuide` thì không phải embed lại.
  */
 export interface LibraryTopic {
   key: string;
-  groupVi: string;
-  labelVi: string;
-  descriptionEn: string;
-  scopeNote: string;
+  groupName: string;
+  name: string;
+  embedText: string;
+  labelGuide: string;
 }
 
 export const TOPIC_LIBRARY: LibraryTopic[] = [
   {
     key: "llm_models",
-    groupVi: "Model",
+    groupName: "Model",
     // "LLM: …" bỏ sót SLM, model chạy trên máy và VLM (16/10/2026); khoá và câu mô tả giữ nguyên:
     // đổi câu mô tả cho rộng ra thì đo lại kém hơn.
-    labelVi: "Model AI: phát hành và hành vi",
-    descriptionEn:
+    name: "Model AI: phát hành và hành vi",
+    embedText:
       "Large language models themselves: new model releases and open-weight models, model architecture, reasoning and chain of thought, model behavior, hallucination and faithfulness, interpretability, benchmarks and evaluations of LLMs",
-    scopeNote:
+    labelGuide:
       "AI models themselves: new model releases from any lab, open or closed weights, including small language models (SLMs), on-device models and vision-language models (VLMs); architecture, reasoning, model behavior, hallucination, benchmarks and evaluations, looking inside models (interpretability). Not: how models are trained or optimized (→ Huấn luyện và tối ưu model); agents (→ Agent AI); models that generate images, video or audio (→ Ảnh, video và âm thanh).",
   },
   {
     key: "training",
-    groupVi: "Model",
-    labelVi: "Huấn luyện và tối ưu model",
-    descriptionEn:
+    groupName: "Model",
+    name: "Huấn luyện và tối ưu model",
+    embedText:
       "Training and optimizing models: pretraining, post-training, reinforcement learning with rewards, distillation, fine-tuning, quantization, KV cache, efficient attention, long context, making inference faster and cheaper",
-    scopeNote:
+    labelGuide:
       "Pretraining, post-training (RL, distillation), fine-tuning, quantization, KV cache, efficient attention, long context, making models faster and cheaper at the algorithm level. Not: hardware and servers that run models (→ Hạ tầng AI).",
   },
   {
     key: "agents",
-    groupVi: "Xây dựng với AI",
-    labelVi: "Agent AI",
-    descriptionEn:
+    groupName: "Xây dựng với AI",
+    name: "Agent AI",
+    embedText:
       "AI agents: LLM agents that plan, use tools and take actions, agent memory, multi-agent systems, agent harnesses, computer-use and browser agents, Model Context Protocol servers",
-    scopeNote:
+    labelGuide:
       "Agents that plan, call tools and act; agent memory; multi-agent systems; MCP; computer-use and browser-use agents. Not: coding agents (→ Lập trình với AI); agent security (→ An toàn và bảo mật AI).",
   },
   {
     key: "ai_coding",
-    groupVi: "Xây dựng với AI",
-    labelVi: "Lập trình với AI",
-    descriptionEn:
+    groupName: "Xây dựng với AI",
+    name: "Lập trình với AI",
+    embedText:
       "AI for software development: AI coding assistants and coding agents such as Claude Code, Codex and Cursor, AI code generation and code review, the experience of programming with AI",
-    scopeNote:
+    labelGuide:
       "AI coding assistants and coding agents (Claude Code, Codex, Cursor…), code generation, AI code review, the experience of programming with AI. Not: programming tools that do not use AI.",
   },
   {
     key: "llm_apps",
-    groupVi: "Xây dựng với AI",
-    labelVi: "Xây ứng dụng LLM",
-    descriptionEn:
+    groupName: "Xây dựng với AI",
+    name: "Xây ứng dụng LLM",
+    embedText:
       "Building applications on LLMs: retrieval-augmented generation, embeddings and vector search, prompt and context engineering, structured output, LLM APIs and SDKs, reliability and observability of LLM apps",
-    scopeNote:
+    labelGuide:
       "RAG, embeddings and vector search, prompt and context engineering, structured JSON output, LLM APIs and SDKs, reliability and monitoring of LLM apps. Not: agent design (→ Agent AI); running and serving models (→ Hạ tầng AI).",
   },
   {
     key: "multimodal",
-    groupVi: "Model",
-    labelVi: "Ảnh, video và âm thanh",
-    descriptionEn:
+    groupName: "Model",
+    name: "Ảnh, video và âm thanh",
+    embedText:
       "Generative and multimodal media AI: image and video generation, diffusion models, vision-language models, speech recognition, text to speech, voice cloning and music generation",
-    scopeNote:
+    labelGuide:
       "Image, video and music generation; diffusion; speech recognition and speech synthesis. Vision-language models (VLMs) belong here only when the news is about generating images, video or audio; otherwise → Model AI: phát hành và hành vi. Not: medical imaging (→ AI trong khoa học và y tế).",
   },
   {
     key: "robotics",
-    groupVi: "Ứng dụng",
-    labelVi: "Robot và AI vật lý",
-    descriptionEn:
+    groupName: "Ứng dụng",
+    name: "Robot và AI vật lý",
+    embedText:
       "Robotics and embodied AI: robot learning, manipulation, humanoid robots, world models, self-driving cars and drones",
-    scopeNote:
+    labelGuide:
       "Robot learning, object manipulation, humanoid robots, world models, self-driving cars, drones.",
   },
   {
     key: "ai_infra",
-    groupVi: "Xây dựng với AI",
-    labelVi: "Hạ tầng AI",
-    descriptionEn:
+    groupName: "Xây dựng với AI",
+    name: "Hạ tầng AI",
+    embedText:
       "AI compute infrastructure: GPUs and AI chips, data centers, inference servers and serving engines, running models locally, AI cloud platforms, cost and energy use of AI compute",
-    scopeNote:
+    labelGuide:
       "GPUs and AI chips, data centers, inference servers (vLLM…), running models on a personal machine, AI cloud platforms, compute cost and energy use. Not: algorithm-level optimization (→ Huấn luyện và tối ưu model); financial news about chip companies (→ Kinh doanh AI).",
   },
   {
     key: "ai_products",
-    groupVi: "Ứng dụng",
-    labelVi: "Trợ lý và ứng dụng AI",
-    descriptionEn:
+    groupName: "Ứng dụng",
+    name: "Trợ lý và ứng dụng AI",
+    embedText:
       "Launches and new features of AI apps and chat assistants for end users, such as ChatGPT, Claude, Gemini and Copilot, and AI features added to everyday consumer software",
-    scopeNote:
+    labelGuide:
       "ChatGPT, Claude, Gemini, Copilot and other AI apps for end users; AI features in everyday software. Not: tools for developers (→ Lập trình với AI, Xây ứng dụng LLM).",
   },
   {
     key: "ai_industry",
-    groupVi: "Ngành và xã hội",
-    labelVi: "Kinh doanh AI",
-    descriptionEn:
+    groupName: "Ngành và xã hội",
+    name: "Kinh doanh AI",
+    embedText:
       "The AI industry as a business: AI companies and startups, funding rounds, acquisitions, IPOs, revenue, valuations and competition between AI labs",
-    scopeNote:
+    labelGuide:
       "AI companies and startups, funding rounds, acquisitions, IPOs, revenue, valuations, competition between AI labs. Not: laws and policy (→ Chính sách và xã hội).",
   },
   {
     key: "ai_safety",
-    groupVi: "Ngành và xã hội",
-    labelVi: "An toàn và bảo mật AI",
-    descriptionEn:
+    groupName: "Ngành và xã hội",
+    name: "An toàn và bảo mật AI",
+    embedText:
       "AI safety and security: alignment, red teaming, jailbreaks and prompt injection, security of AI agents, misuse of AI, catastrophic and existential AI risk",
-    scopeNote:
+    labelGuide:
       "Alignment, red teaming, jailbreaks, prompt injection, security of AI agents, misuse of AI, large-scale risks from AI. Not: laws and policy (→ Chính sách và xã hội).",
   },
   {
     key: "ai_policy",
-    groupVi: "Ngành và xã hội",
-    labelVi: "Chính sách và xã hội",
-    descriptionEn:
+    groupName: "Ngành và xã hội",
+    name: "Chính sách và xã hội",
+    embedText:
       "AI policy and society: AI regulation and laws, government AI policy, copyright and AI, impact of AI on jobs and education, public opinion and debate about AI",
-    scopeNote:
+    labelGuide:
       "AI laws and regulation, government policy, copyright, impact of AI on jobs and education, public debate about AI.",
   },
   {
     key: "ml_foundations",
-    groupVi: "Nghiên cứu",
-    labelVi: "ML nền tảng",
-    descriptionEn:
+    groupName: "Nghiên cứu",
+    name: "ML nền tảng",
+    embedText:
       "Core machine learning research beyond language models: optimization, learning theory, bandits, graph neural networks, time-series forecasting, theory of generative models, statistics for machine learning",
-    scopeNote:
+    labelGuide:
       "Machine learning research beyond language models: optimization, learning theory, bandits, graph neural networks (GNN), time-series forecasting, theory of generative models, statistics for ML.",
   },
   {
     key: "ai_science",
-    groupVi: "Ứng dụng",
-    labelVi: "AI trong khoa học và y tế",
-    descriptionEn:
+    groupName: "Ứng dụng",
+    name: "AI trong khoa học và y tế",
+    embedText:
       "AI for science and medicine: medical imaging and clinical diagnosis, healthcare AI, protein structure and drug discovery, chemistry and materials, physics, climate and weather forecasting models",
-    scopeNote:
+    labelGuide:
       "Medical imaging and diagnosis, AI in healthcare, proteins and drug discovery, chemistry and materials, physics, climate and weather forecasting.",
   },
 ];

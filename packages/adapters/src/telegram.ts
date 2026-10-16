@@ -141,8 +141,8 @@ export function parseTopicInput(text: string): { label: string; description: str
 function draftText(d: CustomTopicDraft): string {
   return [
     `<b>${escapeHtml(d.label)}</b>`,
-    `Lời của bạn: ${escapeHtml(d.descriptionUser)}`,
-    `Câu radard dùng để tìm bài (tiếng Anh): <i>${escapeHtml(d.descriptionEn)}</i>`,
+    `Lời của bạn: ${escapeHtml(d.description)}`,
+    `Câu radard dùng để tìm bài (tiếng Anh): <i>${escapeHtml(d.embedText)}</i>`,
     "Lưu chủ đề này?",
   ].join("\n\n");
 }
@@ -276,8 +276,8 @@ function registerTopicCommands(bot: Bot, topics: TopicHandlers): void {
     await ctx.replyWithChatAction("typing");
     const draft: CustomTopicDraft = {
       label: input.label,
-      descriptionUser: input.description,
-      descriptionEn: await topics.describe(input.label, input.description),
+      description: input.description,
+      embedText: await topics.describe(input.label, input.description),
     };
     drafts.set(chat, draft);
     await ctx.reply(draftText(draft), {

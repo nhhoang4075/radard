@@ -506,7 +506,7 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
     });
     const result = await summarize(
       deps.llm,
-      digestSystem(prof?.description ?? "", prof?.displayLang ?? "vi", topics),
+      digestSystem(prof?.promptContext ?? "", prof?.displayLang ?? "vi", topics),
       digestPrompt(stories),
       stories.length,
       topics.map((t) => t.label),

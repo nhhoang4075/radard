@@ -15,7 +15,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(sql`truncate profile, topics restart identity cascade`);
-  await db.insert(profile).values({ description: "x" });
+  await db.insert(profile).values({ promptContext: "x" });
   await seedLibrary(db);
 });
 
@@ -27,8 +27,8 @@ describe("topicHandlers", () => {
   test("danh sách = thư viện (theo thứ tự) + chủ đề tự thêm; bật tắt cả hai loại", async () => {
     await addCustomTopic(db, {
       label: "Postgres cho AI",
-      descriptionUser: "pgvector",
-      descriptionEn: "pgvector",
+      description: "pgvector",
+      embedText: "pgvector",
     });
     const before = await h.list();
     expect(before[0]).toMatchObject({

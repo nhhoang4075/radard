@@ -16,7 +16,7 @@ export const PROFILE_ID = 1;
 /**
  * Đưa thư viện trong code vào bảng `topics`: thêm chủ đề mới, cập nhật chủ đề đã có theo `key`.
  * Chủ đề có câu mô tả mới thì xoá embedding để lượt process embed lại (điểm cũ xoá theo); đổi
- * `scopeNote` thì không (nó không được embed). Cuối cùng chuyển lựa chọn từ chủ đề đã rút sang chủ
+ * `labelGuide` thì không (nó không được embed). Cuối cùng chuyển lựa chọn từ chủ đề đã rút sang chủ
  * đề thay nó (`carrySelections`).
  */
 export async function seedLibrary(
@@ -25,14 +25,14 @@ export async function seedLibrary(
   const before = new Map(
     (
       await db
-        .select({ key: topics.key, descriptionEn: topics.descriptionEn })
+        .select({ key: topics.key, embedText: topics.embedText })
         .from(topics)
         .where(eq(topics.origin, "library"))
-    ).map((t) => [t.key, t.descriptionEn]),
+    ).map((t) => [t.key, t.embedText]),
   );
   let refreshed = 0;
   for (const [position, t] of TOPIC_LIBRARY.entries()) {
-    const changed = before.has(t.key) && before.get(t.key) !== t.descriptionEn;
+    const changed = before.has(t.key) && before.get(t.key) !== t.embedText;
     if (changed) refreshed++;
     await db
       .insert(topics)
@@ -40,10 +40,10 @@ export async function seedLibrary(
       .onConflictDoUpdate({
         target: topics.key,
         set: {
-          groupVi: t.groupVi,
-          labelVi: t.labelVi,
-          descriptionEn: t.descriptionEn,
-          scopeNote: t.scopeNote,
+          groupName: t.groupName,
+          name: t.name,
+          embedText: t.embedText,
+          labelGuide: t.labelGuide,
           position,
           active: true,
           ...(changed ? { embedding: null, embeddingModel: null } : {}),
@@ -124,8 +124,8 @@ export async function carrySelections(db: Database): Promise<number> {
 export interface LibraryEntry {
   id: number;
   key: string;
-  groupVi: string;
-  labelVi: string;
+  groupName: string;
+  name: string;
   /** Người dùng đã chọn và đang bật. */
   chosen: boolean;
 }
@@ -137,8 +137,8 @@ export async function listLibrary(db: Database): Promise<LibraryEntry[]> {
       id: topics.id,
       // Chủ đề thư viện luôn có khoá và nhóm (topics_source_ck).
       key: sql<string>`${topics.key}`,
-      groupVi: sql<string>`coalesce(${topics.groupVi}, '')`,
-      labelVi: topics.labelVi,
+      groupName: sql<string>`coalesce(${topics.groupName}, '')`,
+      name: topics.name,
       chosen: sql<boolean>`coalesce(${profileTopics.active}, false)`,
     })
     .from(topics)
@@ -233,8 +233,8 @@ export async function describeTopic(
 
 export interface CustomTopicInput {
   label: string;
-  descriptionUser: string;
-  descriptionEn: string;
+  description: string;
+  embedText: string;
   kind?: "include" | "exclude";
 }
 
@@ -250,7 +250,7 @@ export async function addCustomTopic(db: Database, input: CustomTopicInput): Pro
     .where(
       and(
         or(eq(topics.origin, "library"), eq(topics.ownerProfileId, PROFILE_ID)),
-        sql`lower(${topics.labelVi}) = lower(${label})`,
+        sql`lower(${topics.name}) = lower(${label})`,
       ),
     );
   if (dup) throw new Error(`đã có chủ đề tên "${label}"`);
@@ -258,9 +258,9 @@ export async function addCustomTopic(db: Database, input: CustomTopicInput): Pro
     const [topic] = await tx
       .insert(topics)
       .values({
-        labelVi: label,
-        descriptionUser: nfc(input.descriptionUser).trim(),
-        descriptionEn: input.descriptionEn,
+        name: label,
+        description: nfc(input.description).trim(),
+        embedText: input.embedText,
         origin: "custom",
         ownerProfileId: PROFILE_ID,
       })
@@ -286,7 +286,7 @@ export async function embedPendingTopics(
 ): Promise<number> {
   const picked = db.select({ id: profileTopics.topicId }).from(profileTopics);
   const pending = await db
-    .select({ id: topics.id, descriptionEn: topics.descriptionEn })
+    .select({ id: topics.id, embedText: topics.embedText })
     .from(topics)
     .where(
       and(
@@ -296,7 +296,7 @@ export async function embedPendingTopics(
     );
   if (pending.length === 0) return 0;
   const vectors = await embedder.embed(
-    pending.map((p) => p.descriptionEn),
+    pending.map((p) => p.embedText),
     "embed_topic",
   );
   for (const [i, p] of pending.entries()) {
@@ -317,12 +317,12 @@ export async function listProfileTopics(db: Database) {
     .select({
       id: profileTopics.id,
       topicId: profileTopics.topicId,
-      label: topics.labelVi,
+      label: topics.name,
       origin: topics.origin,
       kind: profileTopics.kind,
       active: profileTopics.active,
       embedded: sql<boolean>`${topics.embedding} is not null`,
-      descriptionEn: topics.descriptionEn,
+      embedText: topics.embedText,
     })
     .from(profileTopics)
     .innerJoin(topics, eq(topics.id, profileTopics.topicId))

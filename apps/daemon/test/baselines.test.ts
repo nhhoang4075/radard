@@ -67,8 +67,8 @@ beforeEach(async () => {
     .returning({ id: sources.id });
   hn = h?.id ?? 0;
   arxiv = a?.id ?? 0;
-  await db.insert(profile).values({ description: "x" });
-  topicId = await addTopic(db, "Agent", { descriptionEn: "agents" });
+  await db.insert(profile).values({ promptContext: "x" });
+  topicId = await addTopic(db, "Agent", { embedText: "agents" });
 });
 
 afterAll(async () => {

@@ -267,21 +267,21 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "profile set": async ({ db }) => {
-    const description = process.argv[4];
-    if (!description) throw new Error('thiếu mô tả: profile set "…"');
+    const promptContext = process.argv[4];
+    if (!promptContext) throw new Error('thiếu mô tả: profile set "…"');
     // Chỉ có một hồ sơ: sửa dòng đang có, chưa có thì tạo.
     const updated = await db
       .update(profile)
-      .set({ description, updatedAt: new Date() })
+      .set({ promptContext, updatedAt: new Date() })
       .returning({ id: profile.id });
-    if (updated.length === 0) await db.insert(profile).values({ description });
+    if (updated.length === 0) await db.insert(profile).values({ promptContext });
     console.log("đã lưu bối cảnh");
   },
 
   "profile seed": async ({ db }) => {
     const added = await db
       .insert(profile)
-      .values({ description: DEFAULT_PROFILE })
+      .values({ promptContext: DEFAULT_PROFILE })
       .onConflictDoNothing()
       .returning();
     console.log(added.length ? "đã đặt mô tả mặc định (TẠM)" : "đã có profile, giữ nguyên");
@@ -299,11 +299,11 @@ const COMMANDS: Record<string, Command> = {
   topics: async ({ db }) => {
     let group = "";
     for (const t of await listLibrary(db)) {
-      if (t.groupVi !== group) {
-        group = t.groupVi;
+      if (t.groupName !== group) {
+        group = t.groupName;
         console.log(`\n${group}`);
       }
-      console.log(`  ${t.chosen ? "✓" : " "} ${t.key.padEnd(14)} ${t.labelVi}`);
+      console.log(`  ${t.chosen ? "✓" : " "} ${t.key.padEnd(14)} ${t.name}`);
     }
     const mine = await listProfileTopics(db);
     console.log("\nChủ đề của bạn");
@@ -313,7 +313,7 @@ const COMMANDS: Record<string, Command> = {
       console.log(
         `  ${String(t.id).padStart(3)}  ${t.label}  (${flags.filter(Boolean).join(", ")})`,
       );
-      console.log(`       ${t.descriptionEn}`);
+      console.log(`       ${t.embedText}`);
     }
   },
 
@@ -332,23 +332,23 @@ const COMMANDS: Record<string, Command> = {
     if (!label || !text) throw new Error('cần tên và mô tả: topics add "<tên>" "<mô tả>"');
     const llm = createLlm(db);
     if (!llm) throw new Error("chưa có AI_GATEWAY_API_KEY: không viết được câu mô tả");
-    const descriptionEn = await describeTopic(llm, label, text);
+    const embedText = await describeTopic(llm, label, text);
     const kind = process.argv.includes("--exclude") ? "exclude" : "include";
-    const id = await addCustomTopic(db, { label, descriptionUser: text, descriptionEn, kind });
-    console.log(`đã thêm chủ đề ${id}: ${label}\n  câu dùng để embed: ${descriptionEn}`);
+    const id = await addCustomTopic(db, { label, description: text, embedText, kind });
+    console.log(`đã thêm chủ đề ${id}: ${label}\n  câu dùng để embed: ${embedText}`);
     await embedTopicsNow(db);
   },
 
   "topics check": async ({ db }) => {
-    const [label, descriptionEn] = [process.argv[4], process.argv[5]];
-    if (!label || !descriptionEn)
+    const [label, embedText] = [process.argv[4], process.argv[5]];
+    if (!label || !embedText)
       throw new Error('cần tên và câu mô tả tiếng Anh: topics check "<tên>" "<description>"');
     const embedder = createEmbedder(db);
     if (!embedder) throw new Error("chưa có embedder: không đo được tỉ lệ trùng tin");
     const started = Date.now();
     const res = await checkTopicOverlap(
       { db, embedder, decider: createDecider(db) },
-      { label, descriptionEn },
+      { label, embedText },
     );
     printOverlap(label, res, Date.now() - started);
   },
@@ -356,9 +356,9 @@ const COMMANDS: Record<string, Command> = {
   "topics suggest": async ({ db }) => {
     let text = flag("text", "");
     if (!text) {
-      const [p] = await db.select({ description: profile.description }).from(profile);
+      const [p] = await db.select({ promptContext: profile.promptContext }).from(profile);
       if (!p) throw new Error('chưa có bối cảnh: profile set "…" hoặc --text="…"');
-      text = p.description;
+      text = p.promptContext;
     }
     const started = Date.now();
     const res = await suggestTopics(
@@ -395,7 +395,7 @@ const COMMANDS: Record<string, Command> = {
       ]),
     );
     const topicNames = new Map(
-      (await db.select({ id: topics.id, label: topics.labelVi }).from(topics)).map((t) => [
+      (await db.select({ id: topics.id, label: topics.name }).from(topics)).map((t) => [
         t.id,
         t.label,
       ]),
@@ -762,8 +762,8 @@ function printSuggest(res: SuggestResult, ms: number): void {
     console.log("  (không có: thư viện đã đủ)");
   }
   for (const t of res.newTopics) {
-    console.log(`  ${t.labelVi}: ${t.why}`);
-    console.log(`    ${t.descriptionEn}`);
+    console.log(`  ${t.name}: ${t.why}`);
+    console.log(`    ${t.embedText}`);
     if (!t.overlapChecked) console.log("    chưa soát chủ đề gần giống");
     for (const c of t.related) {
       console.log(`    ${RELATION_VI[c.relation]} "${c.label}" (${p(c.probability)})`);
@@ -771,9 +771,7 @@ function printSuggest(res: SuggestResult, ms: number): void {
   }
   for (const d of res.dropped) {
     const r = d.relatedTo;
-    console.log(
-      `  bỏ "${d.labelVi}": ${RELATION_VI[r.relation]} "${r.label}" (${p(r.probability)})`,
-    );
+    console.log(`  bỏ "${d.name}": ${RELATION_VI[r.relation]} "${r.label}" (${p(r.probability)})`);
   }
   console.log(`\n${ms} ms`);
 }

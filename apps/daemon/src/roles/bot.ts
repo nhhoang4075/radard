@@ -59,7 +59,7 @@ export function topicHandlers(deps: BotDeps): TopicHandlers {
     async list(): Promise<TopicItem[]> {
       const library = (await listLibrary(db)).map((t) => ({
         key: `l:${t.id}`,
-        label: t.labelVi,
+        label: t.name,
         chosen: t.chosen,
       }));
       const custom = (await listProfileTopics(db))

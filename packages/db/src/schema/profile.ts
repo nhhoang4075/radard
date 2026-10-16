@@ -25,13 +25,16 @@ import { EMBED_DIMENSIONS } from "./derived.ts";
 /**
  * Một người dùng ở MVP-0 (id = 1).
  *
- * `description` là BỐI CẢNH của người dùng (nghề, stack, đang làm gì), dùng trong prompt digest
- * để viết câu "vì sao đáng chú ý với bạn". Không dùng để lọc: mức liên quan tính theo các chủ đề
- * đang bật trong `profile_topics` (từ 12/10/2026).
+ * `promptContext` là BỐI CẢNH của người dùng bằng tiếng Anh (nghề, stack, đang làm gì), dùng trong
+ * prompt digest để viết câu "vì sao đáng chú ý với bạn". Không dùng để lọc: mức liên quan tính theo
+ * các chủ đề đang bật trong `profile_topics` (từ 12/10/2026). `description` là lời người dùng tự viết
+ * về mình, giữ nguyên ngôn ngữ họ viết (trống cho tới khi họ viết).
  */
 export const profile = pgTable("profile", {
   id: integer("id").primaryKey().default(1),
-  description: text("description").notNull(),
+  promptContext: text("prompt_context").notNull(),
+  /** Lời người dùng tự viết về mình; không dùng trong prompt. */
+  description: text("description"),
   displayLang: text("display_lang").notNull().default("vi"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
@@ -48,19 +51,19 @@ export const topics = pgTable(
     /** Khoá ổn định trong code (`agents`, `llm_apps`…), chỉ chủ đề thư viện có. */
     key: text("key").unique(),
     /** Nhóm hiển thị trong thư viện; chủ đề tự thêm không có. */
-    groupVi: text("group_vi"),
+    groupName: text("group_name"),
     /** Tên hiển thị: thư viện soạn sẵn, hoặc tên người dùng đặt. */
-    labelVi: text("label_vi").notNull(),
+    name: text("name").notNull(),
     /** Câu dùng để embed: tiếng Anh, có ví dụ cụ thể (tự thêm: LLM viết từ lời người dùng). */
-    descriptionEn: text("description_en").notNull(),
+    embedText: text("embed_text").notNull(),
     /**
      * Phạm vi chủ đề bằng tiếng Anh (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
      * đưa cho LLM khi gắn nhãn tin trong điểm tin; không embed. Thư viện lấy từ code; chủ đề tự
      * thêm thì trống (LLM chỉ thấy tên).
      */
-    scopeNote: text("scope_note"),
+    labelGuide: text("label_guide"),
     /** Lời của người dùng, giữ nguyên ngôn ngữ họ viết; chỉ chủ đề tự thêm có. */
-    descriptionUser: text("description_user"),
+    description: text("description"),
     /** library | custom */
     origin: text("origin").notNull().default("library"),
     /** Hồ sơ đã tự thêm chủ đề này; chủ đề thư viện thì trống. */
@@ -82,10 +85,10 @@ export const topics = pgTable(
       "topics_source_ck",
       sql`(${t.origin} = 'library') = (${t.key} is not null)
         and (${t.origin} = 'library') = (${t.ownerProfileId} is null)
-        and (${t.origin} = 'library' or ${t.descriptionUser} is not null)`,
+        and (${t.origin} = 'library' or ${t.description} is not null)`,
     ),
     uniqueIndex("topics_custom_label_uq")
-      .on(t.ownerProfileId, sql`lower(${t.labelVi})`)
+      .on(t.ownerProfileId, sql`lower(${t.name})`)
       .where(sql`${t.origin} = 'custom'`),
   ],
 );

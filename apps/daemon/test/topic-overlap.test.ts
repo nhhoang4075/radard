@@ -38,7 +38,7 @@ const db = createDatabase(TEST_URL, { max: 2 });
 const MODEL = "test-model";
 const NOW = new Date("2026-10-15T00:00:00Z");
 const TOP_N = 10;
-const DRAFT = { label: "Bản nháp", descriptionEn: "Draft topic: zero axis" };
+const DRAFT = { label: "Bản nháp", embedText: "Draft topic: zero axis" };
 
 /** Vector có trọng số 1 ở các trục `axes`. */
 function vec(...axes: number[]): number[] {
@@ -97,11 +97,11 @@ async function addTopicRow(
   const [t] = await db
     .insert(topics)
     .values({
-      labelVi: label,
-      descriptionEn: `Topic ${label}: axis ${axis}`,
+      name: label,
+      embedText: `Topic ${label}: axis ${axis}`,
       ...(opts.custom
-        ? { origin: "custom", ownerProfileId: 1, descriptionUser: label }
-        : { origin: "library", key: label, groupVi: "g" }),
+        ? { origin: "custom", ownerProfileId: 1, description: label }
+        : { origin: "library", key: label, groupName: "g" }),
       active: !opts.retired,
       embedding: vec(axis),
       embeddingModel: MODEL,
@@ -170,7 +170,7 @@ beforeEach(async () => {
     .values({ kind: "hn", name: "HN", cadence: "*/15 * * * *", trustScore: 0.6 })
     .returning({ id: sources.id });
   hn = s?.id ?? 0;
-  await db.insert(profile).values({ description: "x" });
+  await db.insert(profile).values({ promptContext: "x" });
   await seedDocs();
   embedCalls = 0;
 });
@@ -244,7 +244,7 @@ describe("checkTopicOverlap: model quyết định", () => {
       `How does the new topic relate to the existing topic topic_${b}, in terms of which news articles each would match?`,
     ]);
     expect(seen[0]?.state).toEqual({
-      new_topic: { name: "Draft topic", description: DRAFT.descriptionEn },
+      new_topic: { name: "Draft topic", description: DRAFT.embedText },
       existing_topics: {
         [`topic_${a}`]: { name: "Topic A", description: "Topic A: axis 1" },
         [`topic_${b}`]: { name: "Topic B", description: "Topic B: axis 2" },
@@ -343,15 +343,15 @@ describe("topicNameEn", () => {
     expect(TOPIC_LIBRARY.map((t) => t.key).filter((k) => !TOPIC_NAMES_EN[k])).toEqual([]);
     expect(Object.keys(TOPIC_NAMES_EN).sort()).toEqual(TOPIC_LIBRARY.map((t) => t.key).sort());
     const llm = TOPIC_LIBRARY.find((t) => t.key === "llm_models");
+    expect(topicNameEn({ key: "llm_models", label: "x", embedText: llm?.embedText ?? "" })).toBe(
+      "AI models: releases and behavior",
+    );
     expect(
-      topicNameEn({ key: "llm_models", label: "x", descriptionEn: llm?.descriptionEn ?? "" }),
-    ).toBe("AI models: releases and behavior");
-    expect(
-      topicNameEn({ key: null, label: "Postgres", descriptionEn: "Postgres for AI: pgvector" }),
+      topicNameEn({ key: null, label: "Postgres", embedText: "Postgres for AI: pgvector" }),
     ).toBe("Postgres for AI");
-    expect(
-      topicNameEn({ key: null, label: "Postgres", descriptionEn: "pgvector and friends" }),
-    ).toBe("Postgres");
+    expect(topicNameEn({ key: null, label: "Postgres", embedText: "pgvector and friends" })).toBe(
+      "Postgres",
+    );
   });
 });
 

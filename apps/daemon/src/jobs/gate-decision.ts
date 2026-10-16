@@ -65,7 +65,7 @@ interface TopicInfo {
   label: string;
   name: string;
   description: string;
-  scopeNote: string;
+  labelGuide: string;
 }
 
 type DecideState = {
@@ -118,7 +118,7 @@ export async function decideGate(
     try {
       const probability = await askOne(decider, {
         item,
-        topic: { name: topic.name, description: topic.description, scope_note: topic.scopeNote },
+        topic: { name: topic.name, description: topic.description, scope_note: topic.labelGuide },
       });
       return {
         ...fallback(c),
@@ -168,9 +168,9 @@ async function loadTopics(db: Database): Promise<Map<number, TopicInfo>> {
     .select({
       id: topicsTable.id,
       key: topicsTable.key,
-      label: topicsTable.labelVi,
-      descriptionEn: topicsTable.descriptionEn,
-      scopeNote: topicsTable.scopeNote,
+      label: topicsTable.name,
+      embedText: topicsTable.embedText,
+      labelGuide: topicsTable.labelGuide,
     })
     .from(topicsTable);
   const names = new Map(rows.map((t) => [t.label, topicNameEn(t)]));
@@ -180,8 +180,8 @@ async function loadTopics(db: Database): Promise<Map<number, TopicInfo>> {
       {
         label: t.label,
         name: topicNameEn(t),
-        description: t.descriptionEn,
-        scopeNote: englishScopeNote(t.scopeNote ?? "", names),
+        description: t.embedText,
+        labelGuide: englishScopeNote(t.labelGuide ?? "", names),
       },
     ]),
   );

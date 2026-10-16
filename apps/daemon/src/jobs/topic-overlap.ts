@@ -56,7 +56,7 @@ export function relationInstructions(key: string): string {
 export interface TopicDraft {
   label: string;
   /** Câu mô tả tiếng Anh dùng để embed (cùng dạng `describeTopic` viết). */
-  descriptionEn: string;
+  embedText: string;
 }
 
 export interface OverlapCandidate {
@@ -100,7 +100,7 @@ type TopicRow = {
   key: string | null;
   label: string;
   origin: "library" | "custom";
-  descriptionEn: string;
+  embedText: string;
   enabled: boolean;
   /** Đã có điểm trong `doc_topic_scores`. */
   scored: boolean;
@@ -155,7 +155,7 @@ async function measureOverlap(
   const topN = opts.topN ?? OVERLAP_TOP_N;
   const since = new Date((opts.now ?? new Date()).getTime() - OVERLAP_WINDOW_DAYS * 86_400_000);
   const model = deps.embedder.model;
-  const [vector] = await deps.embedder.embed([draft.descriptionEn], "embed_topic_draft");
+  const [vector] = await deps.embedder.embed([draft.embedText], "embed_topic_draft");
   if (!vector) throw new Error("embedder không trả vector");
   const newTop = await topDocsForVector(deps.db, vector, model, since, topN);
   // Tập top N của chủ đề gần (để tính tỉ lệ) và của mọi chủ đề thư viện (để nhận ra tin chung
@@ -225,7 +225,7 @@ async function topDocsForVector(
 /** Chủ đề đem ra so: thư viện đang dùng và chủ đề tự thêm của hồ sơ, có embedding cùng model. */
 async function existingTopics(db: Database, model: string): Promise<TopicRow[]> {
   const rows = await db.execute(sql`
-    select t.id::int as id, t.key, t.label_vi as label, t.origin, t.description_en as "descriptionEn",
+    select t.id::int as id, t.key, t.name as label, t.origin, t.embed_text as "embedText",
       coalesce(pt.active, false) as enabled,
       exists (select 1 from doc_topic_scores s where s.topic_id = t.id) as scored
     from topics t
@@ -239,7 +239,7 @@ async function existingTopics(db: Database, model: string): Promise<TopicRow[]> 
     key: r.key === null ? null : String(r.key),
     label: String(r.label),
     origin: r.origin === "custom" ? "custom" : "library",
-    descriptionEn: String(r.descriptionEn),
+    embedText: String(r.embedText),
     enabled: Boolean(r.enabled),
     scored: Boolean(r.scored),
   }));
@@ -306,17 +306,17 @@ async function sharedDocs(
  * Tên tiếng Anh ngắn của chủ đề: phần trước dấu hai chấm của câu mô tả ("AI agents: …"). Model
  * quyết định chỉ được hãng bảo đảm với tiếng Anh, nên không đưa tên tiếng Việt khi tránh được.
  */
-export function englishName(descriptionEn: string, fallback: string): string {
-  const head = descriptionEn.split(":")[0]?.trim() ?? "";
-  return head.length > 0 && head.length <= 80 && head !== descriptionEn.trim() ? head : fallback;
+export function englishName(embedText: string, fallback: string): string {
+  const head = embedText.split(":")[0]?.trim() ?? "";
+  return head.length > 0 && head.length <= 80 && head !== embedText.trim() ? head : fallback;
 }
 
 /**
  * Tên tiếng Anh đưa cho model quyết định: chủ đề thư viện dùng tên soạn sẵn (`TOPIC_NAMES_EN`,
  * đúng tên đã đo); chủ đề tự thêm dùng phần "Tên:" của câu mô tả, không có thì nhãn.
  */
-export function topicNameEn(t: { key: string | null; label: string; descriptionEn: string }) {
-  return (t.key ? TOPIC_NAMES_EN[t.key] : undefined) ?? englishName(t.descriptionEn, t.label);
+export function topicNameEn(t: { key: string | null; label: string; embedText: string }) {
+  return (t.key ? TOPIC_NAMES_EN[t.key] : undefined) ?? englishName(t.embedText, t.label);
 }
 
 const keyOf = (t: TopicRow) => `topic_${t.id}`;
@@ -333,8 +333,8 @@ async function askRelations(
   topics: TopicRow[],
 ): Promise<{ relations: Relation[]; model: string } | null> {
   const newTopic = {
-    name: englishName(draft.descriptionEn, draft.label),
-    description: draft.descriptionEn,
+    name: englishName(draft.embedText, draft.label),
+    description: draft.embedText,
   };
   const batches: TopicRow[][] = [];
   for (let i = 0; i < topics.length; i += MAX_QUESTIONS_PER_CALL) {
@@ -356,7 +356,7 @@ async function askBatch(
   const state = {
     new_topic: newTopic,
     existing_topics: Object.fromEntries(
-      batch.map((t) => [keyOf(t), { name: topicNameEn(t), description: t.descriptionEn }]),
+      batch.map((t) => [keyOf(t), { name: topicNameEn(t), description: t.embedText }]),
     ),
   };
   const questions = Object.fromEntries(

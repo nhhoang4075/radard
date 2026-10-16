@@ -11,9 +11,7 @@ import { TOPIC_LIBRARY } from "../src/topics/library.ts";
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
 describe("tên và phạm vi tiếng Anh", () => {
-  const names = new Map(
-    TOPIC_LIBRARY.map((t) => [t.labelVi, topicNameEn({ ...t, label: t.labelVi })]),
-  );
+  const names = new Map(TOPIC_LIBRARY.map((t) => [t.name, topicNameEn({ ...t, label: t.name })]));
 
   test("mọi chủ đề thư viện có tên tiếng Anh", () => {
     for (const [vi, en] of names) {
@@ -27,10 +25,10 @@ describe("tên và phạm vi tiếng Anh", () => {
 
   test("phạm vi của mọi chủ đề thư viện không còn tên tiếng Việt sau khi thay", () => {
     for (const t of TOPIC_LIBRARY) {
-      const note = englishScopeNote(t.scopeNote, names);
+      const note = englishScopeNote(t.labelGuide, names);
       expect(VIETNAMESE.test(note), `${t.key}: ${note}`).toBe(false);
     }
-    const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal")?.scopeNote ?? "";
+    const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal")?.labelGuide ?? "";
     expect(englishScopeNote(media, names)).toContain(
       "otherwise → AI models: releases and behavior.",
     );

@@ -35,8 +35,8 @@ export const MAYBE_MIN = 0.58;
 export const MAX_NEW_TOPICS = 3;
 
 /** Câu hỏi có/không cho một chủ đề, sát câu chữ đã đo ngày 13/10/2026. */
-export function suggestInstructions(name: string, descriptionEn: string): string {
-  return `Would this reader want news about "${name}" in a daily AI news digest? Topic: ${descriptionEn}`;
+export function suggestInstructions(name: string, embedText: string): string {
+  return `Would this reader want news about "${name}" in a daily AI news digest? Topic: ${embedText}`;
 }
 
 export interface TopicSuggestion {
@@ -48,9 +48,9 @@ export interface TopicSuggestion {
 }
 
 export interface NewTopicSuggestion {
-  labelVi: string;
+  name: string;
   /** Câu mô tả tiếng Anh để embed, cùng dạng `describeTopic` viết. */
-  descriptionEn: string;
+  embedText: string;
   /** Vì sao đề xuất, một câu tiếng Việt. */
   why: string;
   /** `false`: chưa soát chủ đề gần giống (thiếu embedder hay model quyết định, hoặc lời gọi lỗi). */
@@ -60,8 +60,8 @@ export interface NewTopicSuggestion {
 }
 
 export interface DroppedTopic {
-  labelVi: string;
-  descriptionEn: string;
+  name: string;
+  embedText: string;
   /** Chủ đề có sẵn mà đề xuất trùng, hẹp hơn hoặc rộng hơn (quan hệ chắc nhất). */
   relatedTo: {
     topicId: number;
@@ -99,7 +99,7 @@ interface LibraryTopic {
   id: number;
   key: string;
   label: string;
-  descriptionEn: string;
+  embedText: string;
 }
 
 /** Chủ đề thư viện đang dùng (không gồm chủ đề đã rút), theo thứ tự hiển thị. */
@@ -108,8 +108,8 @@ async function activeLibrary(db: Database): Promise<LibraryTopic[]> {
     .select({
       id: topics.id,
       key: topics.key,
-      label: topics.labelVi,
-      descriptionEn: topics.descriptionEn,
+      label: topics.name,
+      embedText: topics.embedText,
     })
     .from(topics)
     .where(and(eq(topics.origin, "library"), eq(topics.active, true)))
@@ -173,7 +173,7 @@ async function rateLibrary(
       keyOf(t),
       {
         type: "boolean" as const,
-        instructions: suggestInstructions(topicNameEn(t), t.descriptionEn),
+        instructions: suggestInstructions(topicNameEn(t), t.embedText),
       },
     ]),
   );
@@ -210,15 +210,15 @@ Reply with a JSON array only, no other text. Each element:
 /** Lời nhắc: lời mô tả rồi thư viện, mỗi chủ đề một dòng "tên tiếng Việt | câu mô tả tiếng Anh". */
 export function proposePrompt(
   description: string,
-  library: { label: string; descriptionEn: string }[],
+  library: { label: string; embedText: string }[],
 ): string {
-  const lines = library.map((t) => `- ${t.label} | ${t.descriptionEn}`);
+  const lines = library.map((t) => `- ${t.label} | ${t.embedText}`);
   return `Reader's description:\n${description}\n\nTopic library (Vietnamese name | English description):\n${lines.join("\n")}`;
 }
 
 export interface ProposedTopic {
-  labelVi: string;
-  descriptionEn: string;
+  name: string;
+  embedText: string;
   why: string;
 }
 
@@ -238,17 +238,18 @@ export function parseProposals(reply: string): ProposedTopic[] {
   const out: ProposedTopic[] = [];
   for (const it of data as Record<string, unknown>[]) {
     if (!it || typeof it !== "object") continue;
+    // Khoá trên dây giữ nguyên tên cũ (`labelVi`, `descriptionEn`): đó là hợp đồng với prompt của LLM.
     const { labelVi, descriptionEn, why } = it;
     if (typeof labelVi !== "string" || typeof descriptionEn !== "string" || typeof why !== "string")
       continue;
     const p = {
-      labelVi: nfc(labelVi).trim(),
-      descriptionEn: nfc(descriptionEn).trim(),
+      name: nfc(labelVi).trim(),
+      embedText: nfc(descriptionEn).trim(),
       why: nfc(why).trim(),
     };
-    const words = wordCount(p.descriptionEn);
-    if (p.labelVi.length < 2 || p.labelVi.length > 60) continue;
-    if (words < 10 || words > 60 || !p.descriptionEn.includes(":")) continue;
+    const words = wordCount(p.embedText);
+    if (p.name.length < 2 || p.name.length > 60) continue;
+    if (words < 10 || words > 60 || !p.embedText.includes(":")) continue;
     if (p.why.length === 0) continue;
     out.push(p);
   }
@@ -275,7 +276,7 @@ async function proposeNewTopics(
       });
       // Tên trùng chủ đề thư viện thì không lưu được (`addCustomTopic`): bỏ luôn.
       const labels = new Set(library.map((t) => t.label.toLowerCase()));
-      const topics = parseProposals(reply).filter((p) => !labels.has(p.labelVi.toLowerCase()));
+      const topics = parseProposals(reply).filter((p) => !labels.has(p.name.toLowerCase()));
       return { ran: true, topics };
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -297,7 +298,7 @@ async function checkProposals(
       try {
         const res = await checkTopicOverlap(
           { db: deps.db, embedder, decider },
-          { label: p.labelVi, descriptionEn: p.descriptionEn },
+          { label: p.name, embedText: p.embedText },
         );
         return { p, ran: res.ran, candidates: res.candidates };
       } catch (err) {
@@ -315,8 +316,8 @@ async function checkProposals(
     const top = candidates[0];
     if (top) {
       dropped.push({
-        labelVi: p.labelVi,
-        descriptionEn: p.descriptionEn,
+        name: p.name,
+        embedText: p.embedText,
         relatedTo: {
           topicId: top.topicId,
           label: top.label,

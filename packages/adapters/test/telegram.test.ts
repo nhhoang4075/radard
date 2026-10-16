@@ -309,8 +309,8 @@ describe("bot: chọn chủ đề", () => {
     expect(added).toEqual([
       {
         label: "Postgres cho AI",
-        descriptionUser: "pgvector, index vector",
-        descriptionEn: "Postgres for AI: pgvector, HNSW, hybrid search",
+        description: "pgvector, index vector",
+        embedText: "Postgres for AI: pgvector, HNSW, hybrid search",
       },
     ]);
   });

@@ -4,14 +4,14 @@ import { type Database, profileTopics, topics } from "@radard/db";
 export async function addTopic(
   db: Database,
   label: string,
-  opts: { descriptionEn?: string; active?: boolean } = {},
+  opts: { embedText?: string; active?: boolean } = {},
 ): Promise<number> {
   const [t] = await db
     .insert(topics)
     .values({
-      labelVi: label,
-      descriptionEn: opts.descriptionEn ?? label,
-      descriptionUser: label,
+      name: label,
+      embedText: opts.embedText ?? label,
+      description: label,
       origin: "custom",
       ownerProfileId: 1,
     })

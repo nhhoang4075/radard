@@ -91,15 +91,15 @@ beforeEach(async () => {
     .values({ kind: "hn", name: "HN", cadence: "*/15 * * * *", trustScore: 0.6 })
     .returning({ id: sources.id });
   hn = s?.id ?? 0;
-  await db.insert(profile).values({ description: "x" });
+  await db.insert(profile).values({ promptContext: "x" });
   topic = await addTopic(db, "Agent", {
-    descriptionEn: "AI agents: LLM agents that plan and use tools",
+    embedText: "AI agents: LLM agents that plan and use tools",
   });
   await db.execute(
-    sql`update topics set scope_note = 'Agents. Not: coding agents (→ Lập trình với AI).' where id = ${topic}`,
+    sql`update topics set label_guide = 'Agents. Not: coding agents (→ Lập trình với AI).' where id = ${topic}`,
   );
   await addTopic(db, "Lập trình với AI", {
-    descriptionEn: "AI for software development: coding assistants",
+    embedText: "AI for software development: coding assistants",
     active: false,
   });
   // Mặt bằng: cosine 0,4 là bình thường, 0,8 là hiếm. 0,64 → z = 0,6 (đúng cổng).

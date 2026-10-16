@@ -91,7 +91,7 @@ beforeEach(async () => {
     .values({ kind: "hn", name: "HN giả", cadence: "*/15 * * * *" })
     .returning({ id: sources.id });
   sourceId = s?.id ?? 0;
-  await db.insert(profile).values({ description: "LLM agents and language model tooling" });
+  await db.insert(profile).values({ promptContext: "LLM agents and language model tooling" });
 });
 
 afterAll(async () => {
@@ -248,15 +248,15 @@ describe("runProcess", () => {
     await addStory("Gardening tips for growing tomatoes", "https://c.com/z");
     await db.insert(topics).values({
       key: "agents",
-      groupVi: "AI",
-      labelVi: "Agent",
-      descriptionEn: "LLM agents framework",
+      groupName: "AI",
+      name: "Agent",
+      embedText: "LLM agents framework",
     });
     await pickTopics(db, ["agents"]);
     await addCustomTopic(db, {
       label: "Làm vườn",
-      descriptionUser: "trồng cà chua",
-      descriptionEn: "gardening tomatoes",
+      description: "trồng cà chua",
+      embedText: "gardening tomatoes",
     });
     const [agents, garden] = await listProfileTopics(db);
     await setTopicActive(db, garden?.id ?? 0, false);
@@ -275,8 +275,8 @@ describe("runProcess", () => {
     expect(await runProcess(deps())).toMatchObject({ topicsEmbedded: 0, scored: 0 });
     await addCustomTopic(db, {
       label: "Ảnh",
-      descriptionUser: "ảnh",
-      descriptionEn: "image models",
+      description: "ảnh",
+      embedText: "image models",
     });
     expect(await runProcess(deps())).toMatchObject({ topicsEmbedded: 1, scored: 2 });
   });
@@ -288,8 +288,8 @@ describe("runProcess", () => {
     const before = await db.select().from(eventDocuments).orderBy(asc(eventDocuments.documentId));
     await addCustomTopic(db, {
       label: "Làm vườn",
-      descriptionUser: "trồng cà chua",
-      descriptionEn: "gardening tomatoes",
+      description: "trồng cà chua",
+      embedText: "gardening tomatoes",
     });
     const out = await runProcess(deps());
     expect([out.created, out.joinedByUrl, out.joinedByVector]).toEqual([0, 0, 0]);

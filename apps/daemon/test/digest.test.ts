@@ -111,8 +111,8 @@ beforeEach(async () => {
     .values({ kind: "hn", name: "HN", cadence: "*/15 * * * *", trustScore: 0.6 })
     .returning({ id: sources.id });
   hn = s?.id ?? 0;
-  await db.insert(profile).values({ description: "I build AI agents.", displayLang: "vi" });
-  topic = await addTopic(db, "Agent AI", { descriptionEn: "agents" });
+  await db.insert(profile).values({ promptContext: "I build AI agents.", displayLang: "vi" });
+  topic = await addTopic(db, "Agent AI", { embedText: "agents" });
   await db.insert(baselines).values([
     {
       metric: "relevance",
@@ -263,11 +263,11 @@ describe("runDigest", () => {
   });
 
   test("nhãn chủ đề: lấy chủ đề LLM chọn nếu nằm trong danh sách, không thì nhãn embedding", async () => {
-    const infra = await addTopic(db, "GPU & inference", { descriptionEn: "inference" });
+    const infra = await addTopic(db, "GPU & inference", { embedText: "inference" });
     // Chủ đề thư viện có phạm vi; chủ đề tự thêm ("Agent AI" ở đây) chỉ có tên.
     await db
       .update(topics)
-      .set({ scopeNote: "GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI)." })
+      .set({ labelGuide: "GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI)." })
       .where(eq(topics.id, infra));
     await addEvent();
     await addEvent();

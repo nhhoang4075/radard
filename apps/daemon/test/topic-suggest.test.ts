@@ -44,9 +44,9 @@ async function addLibrary(
     .insert(topics)
     .values({
       key,
-      groupVi: "g",
-      labelVi: opts.label ?? `Nhãn ${key}`,
-      descriptionEn: `Topic ${key}: things about ${key}`,
+      groupName: "g",
+      name: opts.label ?? `Nhãn ${key}`,
+      embedText: `Topic ${key}: things about ${key}`,
       origin: "library",
       active: !opts.retired,
       embedding: new Array<number>(EMBED_DIMENSIONS).fill(0.01),
@@ -97,10 +97,17 @@ const llmReplying = (...replies: string[]) => {
   return { llm, prompts };
 };
 
-const proposal = (labelVi: string, name: string) => ({
-  labelVi,
-  descriptionEn: `${name}: payment fraud detection, transaction risk scoring, anti money laundering models, credit scoring with machine learning, KYC automation`,
+const proposal = (name: string, topicName: string) => ({
+  name,
+  embedText: `${topicName}: payment fraud detection, transaction risk scoring, anti money laundering models, credit scoring with machine learning, KYC automation`,
   why: "Bạn làm ở công ty fintech.",
+});
+
+/** Dạng LLM trả về: khoá trên dây giữ nguyên `labelVi`/`descriptionEn` (chỉ cột DB đổi tên). */
+const wire = (p: ReturnType<typeof proposal>) => ({
+  labelVi: p.name,
+  descriptionEn: p.embedText,
+  why: p.why,
 });
 
 const deps = (over: Partial<SuggestDeps>): SuggestDeps => ({
@@ -117,7 +124,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(sql`truncate profile, topics, llm_calls restart identity cascade`);
-  await db.insert(profile).values({ description: READER });
+  await db.insert(profile).values({ promptContext: READER });
 });
 
 afterAll(async () => {
@@ -193,8 +200,8 @@ describe("suggestTopics: chủ đề mới", () => {
     const b = await addLibrary("b");
     const { llm, prompts } = llmReplying(
       JSON.stringify([
-        proposal("AI cho tài chính", "AI in finance"),
-        proposal("Chống gian lận", "Fraud detection"),
+        wire(proposal("AI cho tài chính", "AI in finance")),
+        wire(proposal("Chống gian lận", "Fraud detection")),
       ]),
     );
     const res = await suggestTopics(
@@ -223,13 +230,13 @@ describe("suggestTopics: chủ đề mới", () => {
     expect(res.newTopics).toHaveLength(0);
     expect(res.dropped).toEqual([
       {
-        labelVi: "AI cho tài chính",
-        descriptionEn: proposal("", "AI in finance").descriptionEn,
+        name: "AI cho tài chính",
+        embedText: proposal("", "AI in finance").embedText,
         relatedTo: { topicId: a, label: "Ứng dụng LLM", relation: "narrower", probability: 0.7 },
       },
       {
-        labelVi: "Chống gian lận",
-        descriptionEn: proposal("", "Fraud detection").descriptionEn,
+        name: "Chống gian lận",
+        embedText: proposal("", "Fraud detection").embedText,
         relatedTo: { topicId: b, label: "Nhãn b", relation: "same", probability: 1 },
       },
     ]);
@@ -240,11 +247,9 @@ describe("suggestTopics: chủ đề mới", () => {
 
   test("JSON trong khối ```json vẫn đọc được; [] là thư viện đã đủ", async () => {
     await addLibrary("a");
-    const fenced = `Here you go:\n\`\`\`json\n${JSON.stringify([proposal("AI tài chính", "AI in finance")])}\n\`\`\``;
+    const fenced = `Here you go:\n\`\`\`json\n${JSON.stringify([wire(proposal("AI tài chính", "AI in finance"))])}\n\`\`\``;
     const one = await suggestTopics(deps({ llm: llmReplying(fenced).llm }), READER);
-    expect(one.newTopics.map((t) => [t.labelVi, t.overlapChecked])).toEqual([
-      ["AI tài chính", false],
-    ]);
+    expect(one.newTopics.map((t) => [t.name, t.overlapChecked])).toEqual([["AI tài chính", false]]);
     const none = await suggestTopics(deps({ llm: llmReplying("[]").llm }), READER);
     expect(none.ran.newTopics).toBe(true);
     expect(none.newTopics).toEqual([]);
@@ -254,7 +259,7 @@ describe("suggestTopics: chủ đề mới", () => {
     await addLibrary("a");
     const { llm, prompts } = llmReplying(
       "không phải JSON",
-      JSON.stringify([proposal("AI tài chính", "AI in finance")]),
+      JSON.stringify([wire(proposal("AI tài chính", "AI in finance"))]),
     );
     const res = await suggestTopics(deps({ llm }), READER);
     expect(prompts).toHaveLength(2);
@@ -283,20 +288,18 @@ describe("suggestTopics: chủ đề mới", () => {
     const res = await suggestTopics(
       deps({
         embedder: null,
-        llm: llmReplying(JSON.stringify([proposal("AI tài chính", "AI in finance")])).llm,
+        llm: llmReplying(JSON.stringify([wire(proposal("AI tài chính", "AI in finance"))])).llm,
         decider: decider({ [a]: 0.9 }, { "AI in finance": { [a]: "same" } }),
       }),
       READER,
     );
-    expect(res.newTopics.map((t) => [t.labelVi, t.overlapChecked])).toEqual([
-      ["AI tài chính", false],
-    ]);
+    expect(res.newTopics.map((t) => [t.name, t.overlapChecked])).toEqual([["AI tài chính", false]]);
   });
 });
 
 describe("parseProposals", () => {
   test("bỏ mục thiếu trường, câu mô tả quá ngắn hay không có dấu hai chấm; tối đa 3", () => {
-    const good = (n: number) => proposal(`Chủ đề ${n}`, `Topic ${n}`);
+    const good = (n: number) => wire(proposal(`Chủ đề ${n}`, `Topic ${n}`));
     const reply = JSON.stringify([
       { labelVi: "Thiếu why", descriptionEn: good(0).descriptionEn },
       { ...good(0), descriptionEn: "Short: too few words" },
@@ -306,11 +309,7 @@ describe("parseProposals", () => {
       good(3),
       good(4),
     ]);
-    expect(parseProposals(reply).map((p) => p.labelVi)).toEqual([
-      "Chủ đề 1",
-      "Chủ đề 2",
-      "Chủ đề 3",
-    ]);
+    expect(parseProposals(reply).map((p) => p.name)).toEqual(["Chủ đề 1", "Chủ đề 2", "Chủ đề 3"]);
   });
 
   test("không có mảng thì lỗi", () => {
@@ -321,7 +320,7 @@ describe("parseProposals", () => {
   test("tên trùng chủ đề thư viện thì bỏ", async () => {
     await addLibrary("a", { label: "Agent AI" });
     const res = await suggestTopics(
-      deps({ llm: llmReplying(JSON.stringify([proposal("agent ai", "Agents")])).llm }),
+      deps({ llm: llmReplying(JSON.stringify([wire(proposal("agent ai", "Agents"))])).llm }),
       READER,
     );
     expect(res.newTopics).toEqual([]);
