@@ -60,7 +60,8 @@ export const events = pgTable(
     /** Số tài liệu thuộc sự kiện, kể cả gộp vì cùng URL: đo mức được nhắc tới, để xếp hạng. */
     nDocs: integer("n_docs").notNull().default(1),
     /**
-     * Số vector đã góp vào `centroid` (seed + gộp theo vector), là trọng số cho `runningMean`.
+     * Số vector đã góp vào `centroid` (seed + gộp theo vector hoặc theo model quyết định), là
+     * trọng số cho `runningMean`.
      * Khác `nDocs`: gộp vì cùng URL thêm tài liệu nhưng không đổi tâm.
      */
     nVectors: integer("n_vectors").notNull().default(1),
@@ -84,7 +85,10 @@ export const eventDocuments = pgTable(
       .references(() => documents.id, { onDelete: "cascade" }),
     /** Cosine tới tâm cụm lúc gộp; 1 nếu là tài liệu mở đầu, hoặc gộp vì cùng URL. */
     similarity: real("similarity").notNull(),
-    /** `seed` (mở sự kiện) · `url` (cùng url_canonical) · `vector` (gần tâm cụm). */
+    /**
+     * `seed` (mở sự kiện) · `url` (cùng url_canonical) · `vector` (gần tâm cụm) · `decision` (vùng
+     * xám dưới ngưỡng vector, model quyết định trả lời cùng một tin; góp vào tâm như `vector`).
+     */
     reason: text("reason").notNull(),
   },
   (t) => [

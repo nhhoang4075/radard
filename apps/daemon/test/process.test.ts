@@ -7,9 +7,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fakeEmbedding } from "@radard/adapters/ai-fake";
+import { fakeDecision, fakeEmbedding } from "@radard/adapters/ai-fake";
 import { fsObjectStore } from "@radard/adapters/object-store-fs";
-import { canonicalizeUrl, rawKey, sha256 } from "@radard/core";
+import {
+  canonicalizeUrl,
+  type DecisionState,
+  type EmbeddingProvider,
+  rawKey,
+  sha256,
+  type UsageEvent,
+} from "@radard/core";
 import {
   createDatabase,
   docText,
@@ -24,7 +31,13 @@ import {
   topics,
 } from "@radard/db";
 import { asc, eq, sql } from "drizzle-orm";
-import { type ProcessDeps, runProcess } from "../src/jobs/process.ts";
+import {
+  DECISION_JOIN_LOW,
+  type ProcessDeps,
+  rebuildEvents,
+  runProcess,
+  SAME_STORY_QUESTION,
+} from "../src/jobs/process.ts";
 import {
   addCustomTopic,
   listProfileTopics,
@@ -159,6 +172,10 @@ describe("runProcess", () => {
       scored: 0,
       joinedByUrl: 0,
       joinedByVector: 0,
+      joinedByDecision: 0,
+      decisionsAsked: 0,
+      decisionsFailed: 0,
+      decisionsSkipped: 0,
       created: 0,
     });
     expect((await db.select().from(docText)).length).toBe(1);
@@ -288,5 +305,145 @@ describe("runProcess", () => {
     expect(first.created).toBe(2);
     const second = await runProcess({ ...deps(), maxCluster: 10 });
     expect(second.created).toBe(3);
+  });
+});
+
+/**
+ * Embedding giả đặt được cosine chính xác: văn bản chứa `cos<x>` thành vector đơn vị có cosine
+ * đúng bằng x với vector của `cos1` (hai chiều đầu, các chiều còn lại 0).
+ */
+const angleEmbedding: EmbeddingProvider = {
+  provider: "fake",
+  model: "angle",
+  dimensions: EMBED_DIMENSIONS,
+  async embed(texts) {
+    return texts.map((t) => {
+      const c = Number(/cos([\d.]+)/.exec(t)?.[1] ?? 0);
+      const v = new Array<number>(EMBED_DIMENSIONS).fill(0);
+      v[0] = c;
+      v[1] = Math.sqrt(1 - c * c);
+      return v;
+    });
+  },
+};
+
+describe("gộp vùng xám bằng model quyết định", () => {
+  /** Hỏi bao nhiêu lần, trạng thái gì; trả `p` hoặc ném lỗi. */
+  function decider(p: number | Error) {
+    const states: DecisionState[] = [];
+    const calls: UsageEvent[] = [];
+    const d = fakeDecision({
+      answer: (q, _id, state) => {
+        expect(q).toEqual({ type: "boolean", instructions: SAME_STORY_QUESTION });
+        states.push(state);
+        if (p instanceof Error) throw p;
+        return p;
+      },
+      sink: async (e) => {
+        calls.push(e);
+      },
+    });
+    return { d, states, calls };
+  }
+  const gray = (d: ProcessDeps["decider"]): ProcessDeps => ({
+    db,
+    store,
+    embedder: angleEmbedding,
+    thresholds: { join: 0.9, windowDays: 7 },
+    decider: d,
+  });
+  const twoStories = async (cos: number) => {
+    await addStory("Seed story cos1", "https://a.com/1", "2026-09-27T10:00:00Z");
+    await addStory(`Follow-up story cos${cos}`, "https://b.com/2", "2026-09-27T12:00:00Z");
+  };
+  const reasons = async () =>
+    (
+      await db
+        .select({ reason: eventDocuments.reason, similarity: eventDocuments.similarity })
+        .from(eventDocuments)
+        .orderBy(asc(eventDocuments.documentId))
+    ).map((r) => r.reason);
+
+  test("cosine 0,87 và p ≥ 0,5: gộp, lý do 'decision', góp vào tâm; trạng thái như lúc đo", async () => {
+    await twoStories(0.87);
+    const { d, states, calls } = decider(0.7);
+    const out = await runProcess(gray(d));
+    expect(out).toMatchObject({ created: 1, joinedByDecision: 1, decisionsAsked: 1 });
+    const links = await db.select().from(eventDocuments).orderBy(asc(eventDocuments.documentId));
+    expect(links.map((l) => l.reason)).toEqual(["seed", "decision"]);
+    expect(links[1]?.similarity ?? 0).toBeCloseTo(0.87, 2);
+    const [ev] = await db.select().from(events);
+    expect([ev?.nDocs, ev?.nVectors]).toEqual([2, 2]);
+    expect(calls.map((c) => c.task)).toEqual(["decide_same_story"]);
+    expect(states[0]).toEqual({
+      item_a: {
+        title: "Follow-up story cos0.87",
+        source: "HN giả",
+        date: "2026-09-27",
+        excerpt: "Follow-up story cos0.87",
+      },
+      item_b: {
+        title: "Seed story cos1",
+        source: "HN giả",
+        date: "2026-09-27",
+        excerpt: "Seed story cos1",
+      },
+    });
+  });
+
+  test("cosine 0,87 và p < 0,5: mở sự kiện mới", async () => {
+    await twoStories(0.87);
+    const { d, states } = decider(0.3);
+    const out = await runProcess(gray(d));
+    expect(out).toMatchObject({ created: 2, joinedByDecision: 0, decisionsAsked: 1 });
+    expect(states).toHaveLength(1);
+    expect(await reasons()).toEqual(["seed", "seed"]);
+  });
+
+  test("cosine từ 0,9 gộp theo vector, không hỏi", async () => {
+    await twoStories(0.92);
+    const { d, states } = decider(0);
+    const out = await runProcess(gray(d));
+    expect(out).toMatchObject({ created: 1, joinedByVector: 1, decisionsAsked: 0 });
+    expect(states).toHaveLength(0);
+    expect(await reasons()).toEqual(["seed", "vector"]);
+  });
+
+  test("cosine dưới 0,85 không bao giờ hỏi", async () => {
+    expect(DECISION_JOIN_LOW).toBe(0.85);
+    await twoStories(0.84);
+    const { d, states } = decider(1);
+    const out = await runProcess(gray(d));
+    expect(out).toMatchObject({ created: 2, decisionsAsked: 0 });
+    expect(states).toHaveLength(0);
+  });
+
+  test("hỏi lỗi: không gộp, lượt process vẫn xong", async () => {
+    await twoStories(0.87);
+    const { d } = decider(new Error("Gateway 503"));
+    const out = await runProcess(gray(d));
+    expect(out).toMatchObject({ created: 2, joinedByDecision: 0, decisionsFailed: 1 });
+    expect(await reasons()).toEqual(["seed", "seed"]);
+  });
+
+  test("nguồn tắt gộp theo vector (vectorJoin = false) thì không hỏi", async () => {
+    await db.update(sources).set({ config: { vectorJoin: false } });
+    await twoStories(0.87);
+    const { d, states } = decider(1);
+    const out = await runProcess(gray(d));
+    expect(out.created).toBe(2);
+    expect(states).toHaveLength(0);
+  });
+
+  test("events rebuild không hỏi khi không có cờ --decide; có cờ thì hỏi", async () => {
+    await twoStories(0.87);
+    const { d, states } = decider(0.9);
+    const plain = await rebuildEvents(gray(d));
+    expect(plain).toMatchObject({ created: 2, decisionsAsked: 0, decisionsSkipped: 1 });
+    expect(states).toHaveLength(0);
+    const decided = await rebuildEvents(gray(d), { decide: true });
+    expect(decided).toMatchObject({ created: 1, joinedByDecision: 1, decisionsAsked: 1 });
+    expect(states).toHaveLength(1);
+    expect(await reasons()).toEqual(["seed", "decision"]);
   });
 });

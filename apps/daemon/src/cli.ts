@@ -29,7 +29,7 @@ import { runBaselines } from "./jobs/baselines.ts";
 import { buildPlan, type DigestPlan, digestSlot, runDigest } from "./jobs/digest.ts";
 import { type FetchDeps, runFetch } from "./jobs/fetch.ts";
 import { fetchPages } from "./jobs/pages.ts";
-import { runProcess } from "./jobs/process.ts";
+import { rebuildEvents, runProcess } from "./jobs/process.ts";
 import { periodEndingAt, rankPeriod } from "./jobs/rank.ts";
 import { listRepos, runRepoStats } from "./jobs/repo-stats.ts";
 import { buildReport, formatReport, reportWindow } from "./jobs/report.ts";
@@ -72,7 +72,9 @@ radard — CLI
   profile seed               Đặt bối cảnh mặc định TẠM nếu chưa có
   process                    Chạy phần xử lý ngay: embed, chấm điểm theo chủ đề, gộp sự kiện
   events [--since=24h] [--limit=20]  Sự kiện hoạt động gần nhất, nhiều tài liệu trước
-  events rebuild             Xoá sự kiện, gộp lại theo ngưỡng mới; giữ embedding (không tốn tiền)
+  events rebuild [--decide]  Xoá sự kiện, gộp lại theo ngưỡng mới; giữ embedding (không tốn tiền).
+                             Mặc định KHÔNG hỏi model quyết định cho vùng xám 0,85–0,9 (cả lịch sử
+                             là ~1.700 lời gọi); --decide để hỏi
   reprocess --pages          Xoá embedding và điểm chủ đề của tài liệu đã có trang được link tới
                              (job pages), để embed lại cùng nội dung trang; rồi chạy events rebuild
   reprocess --all            Xoá toàn bộ dữ liệu dẫn xuất (doc_text, events) để tính lại;
@@ -593,11 +595,12 @@ const COMMANDS: Record<string, Command> = {
     // Dừng daemon trước: một lượt process chạy song song sẽ gộp trùng tài liệu.
     const pdeps = createProcessDeps(deps);
     if (!pdeps) throw new Error("chưa cấu hình embedder");
-    await deps.db.execute(sql`truncate ${eventDocuments}, ${events}`);
+    const decide = process.argv.includes("--decide");
+    if (decide && !pdeps.decider) throw new Error("--decide cần AI_GATEWAY_API_KEY");
     const started = Date.now();
-    const out = await runProcess(pdeps);
+    const out = await rebuildEvents(pdeps, { decide });
     const seconds = (Date.now() - started) / 1000;
-    const clustered = out.joinedByUrl + out.joinedByVector + out.created;
+    const clustered = out.joinedByUrl + out.joinedByVector + out.joinedByDecision + out.created;
     console.log({
       ...out,
       seconds,

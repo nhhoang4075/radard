@@ -8,7 +8,8 @@
  *   S. Cặp (tài liệu, chủ đề đang bật) chưa có điểm → cosine, ghi `doc_topic_scores` (SQL thuần),
  *      bằng vector có nội dung trang (`content_embedding`) nếu có.
  *   B. Tài liệu chưa thuộc sự kiện nào → gộp: cùng URL trước, rồi theo vector của bản thô
- *      (`embedding`, không có nội dung trang: ngưỡng 0,9 được chỉnh trên vector này).
+ *      (`embedding`, không có nội dung trang: ngưỡng 0,9 được chỉnh trên vector này). Vùng xám
+ *      0,85–0,9 thì hỏi model quyết định "có cùng một tin không" (`DECISION_JOIN_LOW`).
  *
  * Pha A và B KHÔNG đọc hồ sơ người dùng (quyết định D4, 12/10/2026): mọi tài liệu được embed
  * và gộp. Hồ sơ chỉ dùng để chấm điểm (pha S) và để chọn tin ở digest. Trước 12/10, pha B chỉ
@@ -16,6 +17,7 @@
  */
 import {
   createLogger,
+  type DecisionProvider,
   type EmbeddingProvider,
   nfc,
   type ObjectStore,
@@ -47,6 +49,22 @@ const MAX_TEXT_CHARS = 4000;
  */
 const PAGE_TEXT_CHARS = 1500;
 
+/**
+ * Vùng xám của gộp theo vector: cosine tới tâm sự kiện gần nhất trong [0,85; `thresholds.join`)
+ * thì hỏi model quyết định "hai tin có cùng một chuyện không". Đo 13–16/10/2026 trên dữ liệu thật:
+ * 42% cặp có cosine 0,85–0,9 là cùng một tin, nên cả ngưỡng 0,9 lẫn hạ ngưỡng đều sai nhiều;
+ * trong vùng này cosine gần như không phân biệt được (AUC 0,57), Jev thì phân biệt gần hết (AUC
+ * 0,99, khớp nhãn tham chiếu 97% ở ngưỡng 0,5; bạn xác nhận 14/14 nhãn tham chiếu).
+ */
+export const DECISION_JOIN_LOW = 0.85;
+/** Xác suất "cùng một tin" tối thiểu để gộp (ngưỡng đã đo, xem `DECISION_JOIN_LOW`). */
+export const DECISION_JOIN_MIN_P = 0.5;
+/** Câu hỏi đúng như lúc đo (thử nghiệm A, 13–16/10/2026). */
+export const SAME_STORY_QUESTION =
+  "Do these two items report the same news story or announcement (not merely the same topic)?";
+/** Trích đoạn mỗi tin đưa cho model: 400 ký tự đầu của văn bản đã embed, như lúc đo. */
+const DECISION_EXCERPT_CHARS = 400;
+
 export interface Thresholds {
   /** Cosine tối thiểu tới tâm cụm để gộp vào sự kiện có sẵn: "cùng một chuyện". */
   join: number;
@@ -59,6 +77,11 @@ export interface ProcessDeps {
   store: ObjectStore;
   embedder: EmbeddingProvider;
   thresholds: Thresholds;
+  /**
+   * Model quyết định cho vùng xám của gộp theo vector. Không có (hoặc lỗi) thì gộp như trước khi
+   * có nó: dưới `thresholds.join` là mở sự kiện mới. `events rebuild` mặc định không truyền vào.
+   */
+  decider?: DecisionProvider | null;
   /** Rút chữ chính từ HTML của trang được link tới. Không có thì chỉ embed bản thô của nguồn. */
   extractPage?: PageExtractor;
   batchSize?: number;
@@ -78,6 +101,14 @@ export interface ProcessOutcome {
   scored: number;
   joinedByUrl: number;
   joinedByVector: number;
+  /** Gộp vì model quyết định trả lời "cùng một tin" (vùng xám). */
+  joinedByDecision: number;
+  /** Số lần hỏi model quyết định có câu trả lời. */
+  decisionsAsked: number;
+  /** Số lần hỏi lỗi (coi như không cùng tin). */
+  decisionsFailed: number;
+  /** Số tài liệu nằm trong vùng xám mà không hỏi vì không có model quyết định. */
+  decisionsSkipped: number;
   created: number;
 }
 
@@ -88,6 +119,10 @@ export async function runProcess(deps: ProcessDeps): Promise<ProcessOutcome> {
     scored: 0,
     joinedByUrl: 0,
     joinedByVector: 0,
+    joinedByDecision: 0,
+    decisionsAsked: 0,
+    decisionsFailed: 0,
+    decisionsSkipped: 0,
     created: 0,
   };
   // Pha A theo lô cho tới khi hết việc (hoặc hết trần số lô của lượt này).
@@ -97,8 +132,26 @@ export async function runProcess(deps: ProcessDeps): Promise<ProcessOutcome> {
   }
   out.scored = await scoreTopics(deps.db, deps.embedder.model);
   await clusterPending(deps, out);
+  if (out.decisionsSkipped > 0) {
+    log.warn("không có model quyết định: tài liệu vùng xám được mở sự kiện mới, không hỏi", {
+      n: out.decisionsSkipped,
+    });
+  }
   log.info("xong", { ...out });
   return out;
+}
+
+/**
+ * Xoá mọi sự kiện rồi gộp lại từ đầu; giữ embedding và điểm chủ đề (CLI `events rebuild`). Gộp lại
+ * cả lịch sử mà hỏi model quyết định cho mọi tài liệu vùng xám là ~1.700 lời gọi (đo 16/10/2026),
+ * nên mặc định KHÔNG hỏi: chỉ hỏi khi `decide`.
+ */
+export async function rebuildEvents(
+  deps: ProcessDeps,
+  opts: { decide?: boolean } = {},
+): Promise<ProcessOutcome> {
+  await deps.db.execute(sql`truncate ${eventDocuments}, ${events}`);
+  return runProcess({ ...deps, decider: opts.decide ? deps.decider : null });
 }
 
 /**
@@ -221,9 +274,21 @@ async function pageTextOf(
   return raw ? deps.extractPage(new TextDecoder().decode(raw), r.url) : null;
 }
 
+/** Tài liệu chờ gộp, đủ để tìm sự kiện và để hỏi model quyết định. */
+interface PendingDoc {
+  id: number;
+  title: string | null;
+  url: string;
+  at: Date;
+  embedding: number[];
+  vectorJoin: boolean;
+  source: string;
+  excerpt: string;
+}
+
 async function clusterPending(deps: ProcessDeps, out: ProcessOutcome): Promise<void> {
-  const { db, embedder, thresholds } = deps;
-  const pending = await db
+  const { db, embedder } = deps;
+  const pending: PendingDoc[] = await db
     .select({
       id: documents.id,
       title: documents.title,
@@ -235,6 +300,8 @@ async function clusterPending(deps: ProcessDeps, out: ProcessOutcome): Promise<v
       // `sources.config.vectorJoin = false`: không gộp theo vector, chỉ theo cùng URL. Dùng cho
       // GitHub releases: Bun 1.4.1 và 1.4.2 gần như trùng vector nhưng là hai lần phát hành.
       vectorJoin: sql<boolean>`coalesce((${sources.config}->>'vectorJoin')::boolean, true)`,
+      source: sources.name,
+      excerpt: sql<string>`left(${docText.text}, ${DECISION_EXCERPT_CHARS})`,
     })
     .from(docText)
     .innerJoin(documents, eq(documents.id, docText.documentId))
@@ -252,54 +319,135 @@ async function clusterPending(deps: ProcessDeps, out: ProcessOutcome): Promise<v
     .orderBy(sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt})`, asc(documents.id))
     .limit(deps.maxCluster ?? 1_000_000_000);
 
-  for (const doc of pending) {
-    // 1) Cùng một bài (url_canonical) đã nằm trong sự kiện nào đó: vào đúng sự kiện đó.
-    const [sameUrl] = await db
-      .select({ eventId: eventDocuments.eventId })
-      .from(eventDocuments)
-      .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
-      .where(eq(documents.urlCanonical, doc.url))
-      .limit(1);
-    if (sameUrl) {
-      await attach(db, sameUrl.eventId, doc, 1, "url");
-      out.joinedByUrl++;
-      continue;
-    }
+  for (const doc of pending) await clusterOne(deps, doc, out);
+}
 
-    // 2) Sự kiện gần nhất theo vector, trong cửa sổ thời gian quanh tài liệu.
-    //    Ngưỡng cao (0,9): vùng 0,8–0,9 trộn lẫn đúng và sai, chờ LLM phân xử ở MVP-1.
-    const near = doc.vectorJoin ? await nearestEvent(deps, doc) : undefined;
-    const similarity = near ? 1 - Number(near.distance) : -1;
-    if (near && similarity >= thresholds.join) {
-      await db
-        .update(events)
-        .set({
-          // Trọng số là số vector trong tâm, không phải nDocs (xem `events.nVectors`).
-          centroid: runningMean(near.centroid, near.nVectors, doc.embedding),
-          nVectors: near.nVectors + 1,
-          nDocs: sql`${events.nDocs} + 1`,
-          ...widenSpan(doc.at),
-        })
-        .where(eq(events.id, near.id));
-      await attach(db, near.id, doc, similarity, "vector");
-      out.joinedByVector++;
-      continue;
-    }
-
-    // 3) Không khớp gì: mở sự kiện mới.
-    const [created] = await db
-      .insert(events)
-      .values({
-        title: doc.title ?? doc.url,
-        firstSeenAt: doc.at,
-        lastSeenAt: doc.at,
-        centroid: doc.embedding,
-        embeddingModel: embedder.model,
-      })
-      .returning({ id: events.id });
-    if (created) await attach(db, created.id, doc, 1, "seed");
-    out.created++;
+/** Gộp một tài liệu: cùng URL, rồi sự kiện gần nhất theo vector (vùng xám thì hỏi), không thì mở mới. */
+async function clusterOne(deps: ProcessDeps, doc: PendingDoc, out: ProcessOutcome) {
+  const { db } = deps;
+  // 1) Cùng một bài (url_canonical) đã nằm trong sự kiện nào đó: vào đúng sự kiện đó.
+  const [sameUrl] = await db
+    .select({ eventId: eventDocuments.eventId })
+    .from(eventDocuments)
+    .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
+    .where(eq(documents.urlCanonical, doc.url))
+    .limit(1);
+  if (sameUrl) {
+    await attach(db, sameUrl.eventId, doc, 1, "url");
+    out.joinedByUrl++;
+    return;
   }
+
+  // 2) Sự kiện gần nhất theo vector, trong cửa sổ thời gian quanh tài liệu. Từ ngưỡng (0,9) thì
+  //    gộp; vùng xám 0,85–0,9 thì hỏi model quyết định.
+  const near = doc.vectorJoin ? await nearestEvent(deps, doc) : undefined;
+  const similarity = near ? 1 - Number(near.distance) : -1;
+  const how = near ? await joinReason(deps, doc, near.id, similarity, out) : null;
+  if (near && how) {
+    await db
+      .update(events)
+      .set({
+        // Trọng số là số vector trong tâm, không phải nDocs (xem `events.nVectors`).
+        centroid: runningMean(near.centroid, near.nVectors, doc.embedding),
+        nVectors: near.nVectors + 1,
+        nDocs: sql`${events.nDocs} + 1`,
+        ...widenSpan(doc.at),
+      })
+      .where(eq(events.id, near.id));
+    await attach(db, near.id, doc, similarity, how);
+    if (how === "vector") out.joinedByVector++;
+    else out.joinedByDecision++;
+    return;
+  }
+
+  // 3) Không khớp gì: mở sự kiện mới.
+  const [created] = await db
+    .insert(events)
+    .values({
+      title: doc.title ?? doc.url,
+      firstSeenAt: doc.at,
+      lastSeenAt: doc.at,
+      centroid: doc.embedding,
+      embeddingModel: deps.embedder.model,
+    })
+    .returning({ id: events.id });
+  if (created) await attach(db, created.id, doc, 1, "seed");
+  out.created++;
+}
+
+/**
+ * Có gộp vào sự kiện gần nhất không, và vì sao: `vector` (từ ngưỡng), `decision` (vùng xám, model
+ * quyết định trả lời cùng một tin), `null` (mở sự kiện mới). Hỏi lỗi thì coi như không gộp: không
+ * bao giờ làm hỏng lượt process.
+ */
+async function joinReason(
+  deps: ProcessDeps,
+  doc: PendingDoc,
+  eventId: number,
+  similarity: number,
+  out: ProcessOutcome,
+): Promise<"vector" | "decision" | null> {
+  if (similarity >= deps.thresholds.join) return "vector";
+  if (similarity < DECISION_JOIN_LOW) return null;
+  if (!deps.decider) {
+    out.decisionsSkipped++;
+    return null;
+  }
+  try {
+    const p = await askSameStory(deps.db, deps.decider, doc, eventId);
+    out.decisionsAsked++;
+    return p !== null && p >= DECISION_JOIN_MIN_P ? "decision" : null;
+  } catch (err) {
+    out.decisionsFailed++;
+    log.warn("hỏi cùng tin lỗi, mở sự kiện mới", {
+      documentId: doc.id,
+      eventId,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 200),
+    });
+    return null;
+  }
+}
+
+/**
+ * Hỏi "hai tin có cùng một chuyện không": `item_a` là tài liệu mới, `item_b` là tài liệu của sự
+ * kiện giống nó nhất (theo vector bản thô). Trả xác suất "có"; `null` khi sự kiện không còn tài
+ * liệu nào có văn bản.
+ */
+async function askSameStory(
+  db: Database,
+  decider: DecisionProvider,
+  doc: PendingDoc,
+  eventId: number,
+): Promise<number | null> {
+  const [member] = await db
+    .select({
+      title: documents.title,
+      source: sources.name,
+      at: sql<Date>`coalesce(${documents.publishedAt}, ${documents.fetchedAt})`.mapWith(
+        (v) => new Date(v),
+      ),
+      excerpt: sql<string>`left(${docText.text}, ${DECISION_EXCERPT_CHARS})`,
+    })
+    .from(eventDocuments)
+    .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
+    .innerJoin(sources, eq(sources.id, documents.sourceId))
+    .innerJoin(docText, eq(docText.documentId, documents.id))
+    .where(eq(eventDocuments.eventId, eventId))
+    .orderBy(cosineDistance(docText.embedding, doc.embedding))
+    .limit(1);
+  if (!member) return null;
+  const item = (x: { title: string | null; source: string; at: Date; excerpt: string }) => ({
+    title: x.title ?? "",
+    source: x.source,
+    date: x.at.toISOString().slice(0, 10),
+    excerpt: x.excerpt,
+  });
+  const res = await decider.decide({
+    task: "decide_same_story",
+    state: { item_a: item(doc), item_b: item(member) },
+    questions: { q: { type: "boolean", instructions: SAME_STORY_QUESTION } },
+  });
+  return res.answers.q.probability;
 }
 
 async function nearestEvent(
@@ -344,7 +492,7 @@ async function attach(
   eventId: number,
   doc: { id: number; at: Date },
   similarity: number,
-  reason: "seed" | "url" | "vector",
+  reason: "seed" | "url" | "vector" | "decision",
 ) {
   await db
     .insert(eventDocuments)
