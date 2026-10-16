@@ -265,6 +265,17 @@ footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
     <span class="note">13/10: bạn chưa có repo muốn theo dõi; đã xoá 10 repo mặc định, nguồn vẫn bật nhưng không lấy gì.</span></div>
 </div>
 
+<h2>Đã chốt, chờ làm</h2>
+<div class="group">
+  <div class="group-head"><b>Hồ sơ và tên cột</b><span>16/10</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">Đổi tên cột theo công dụng</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">Một migration riêng, làm sau khi hai nhánh Jev và gợi ý chủ đề đã merge. <code>topics</code>: label_vi → name, group_vi → group_name, description_user → description (lời người viết), description_en → embed_text (câu đem embed), scope_note → label_guide (hướng dẫn gắn nhãn). <code>profile</code>: thêm description (lời bạn viết), description → prompt_context (bản tiếng Anh đưa vào prompt). Quy tắc: description luôn là lời người viết; cột máy dùng thì tên nói rõ dùng vào đâu.</span>
+    <span class="note">16/10: bạn chốt bộ tên này.</span></div>
+  <div class="task"><input type="checkbox" disabled><span class="name">/profile trên Telegram</span><span class="badge s-todo">Chưa làm</span>
+    <span class="desc">Lệnh /profile (mô tả: "Mô tả về bạn và nhận gợi ý chủ đề"): hiện lời mô tả của bạn, nút [Sửa mô tả] [Gợi ý chủ đề]; sửa xong LLM viết lại prompt_context, rồi gợi ý chủ đề (tích sẵn / có thể / 0–3 chủ đề mới, mỗi chủ đề mới qua kiểm trùng). /start lần đầu đi cùng luồng. Làm sau bước đổi tên cột.</span>
+    <span class="note">16/10: chốt tên lệnh /profile. Hồ sơ hiện có chưa có lời gốc: lần đầu hiện bản tiếng Anh kèm nút sửa.</span></div>
+</div>
+
 <h2 id="de-sau">Để sau · Đã bàn, chưa làm</h2>
 <p class="lede">Những việc đã thống nhất là làm sau, ghi lại để không quên. Ngày ghi là ngày quyết định để sau.</p>
 <div class="group">
