@@ -770,7 +770,10 @@ function printSuggest(res: SuggestResult, ms: number): void {
     }
   }
   for (const d of res.dropped) {
-    console.log(`  bỏ "${d.labelVi}": trùng "${d.sameAs.label}" (${p(d.sameAs.probability)})`);
+    const r = d.relatedTo;
+    console.log(
+      `  bỏ "${d.labelVi}": ${RELATION_VI[r.relation]} "${r.label}" (${p(r.probability)})`,
+    );
   }
   console.log(`\n${ms} ms`);
 }

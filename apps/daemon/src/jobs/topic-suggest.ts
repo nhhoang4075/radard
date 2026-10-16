@@ -23,14 +23,14 @@ import { checkTopicOverlap, type OverlapCandidate, topicNameEn } from "./topic-o
 
 const log = createLogger("topic-suggest");
 
-// Ngưỡng chia mức, TẠM: đo 13/10/2026 trên lời mô tả thật của người dùng, Jev cho 15/17 chủ đề
-// 0,69–0,95 và 2 chủ đề ít liên quan nhất 0,45–0,50. Sẽ chỉnh lại sau khi người dùng chấm gợi ý
-// cho các lời mô tả mẫu (tab "Gợi ý chủ đề", bước đánh giá).
+// Ngưỡng chia mức, chỉnh 16/10/2026 theo người dùng chấm 69 cặp (5 lời mô tả × 14 chủ đề): với
+// 0,85 / 0,58, 63/69 cặp đúng mức người dùng chọn và 0 lỗi nặng (tích sẵn cái người dùng không muốn,
+// hoặc không gợi ý cái người dùng muốn bật). Ngưỡng cũ 0,85 / 0,60: 62/69 và 1 lỗi nặng.
 
 /** Từ ngưỡng này trở lên: tích sẵn. */
 export const PRESELECT_MIN = 0.85;
 /** Từ ngưỡng này tới dưới `PRESELECT_MIN`: "có thể bạn quan tâm" (chưa tích). Dưới nữa: không gợi ý. */
-export const MAYBE_MIN = 0.6;
+export const MAYBE_MIN = 0.58;
 /** Số chủ đề mới tối đa LLM được đề xuất. */
 export const MAX_NEW_TOPICS = 3;
 
@@ -55,15 +55,20 @@ export interface NewTopicSuggestion {
   why: string;
   /** `false`: chưa soát chủ đề gần giống (thiếu embedder hay model quyết định, hoặc lời gọi lỗi). */
   overlapChecked: boolean;
-  /** Chủ đề có sẵn mà đề xuất hẹp hơn hoặc rộng hơn (không có "trùng": đề xuất trùng đã bị bỏ). */
+  /** Luôn rỗng khi đã soát được: đề xuất có quan hệ với chủ đề có sẵn đều bị bỏ (xem `DroppedTopic`). */
   related: OverlapCandidate[];
 }
 
 export interface DroppedTopic {
   labelVi: string;
   descriptionEn: string;
-  /** Chủ đề có sẵn bị trùng. */
-  sameAs: { topicId: number; label: string; probability: number };
+  /** Chủ đề có sẵn mà đề xuất trùng, hẹp hơn hoặc rộng hơn (quan hệ chắc nhất). */
+  relatedTo: {
+    topicId: number;
+    label: string;
+    relation: OverlapCandidate["relation"];
+    probability: number;
+  };
 }
 
 export interface SuggestResult {
@@ -304,13 +309,20 @@ async function checkProposals(
   const kept: NewTopicSuggestion[] = [];
   const dropped: DroppedTopic[] = [];
   for (const { p, ran, candidates } of results) {
-    // Ứng viên đã xếp "trùng" trước, chắc hơn trước.
-    const same = candidates.find((c) => c.relation === "same");
-    if (same) {
+    // Chỉ giữ đề xuất khác mọi chủ đề có sẵn: người dùng chấm 16/10/2026 thấy hữu ích đúng 2 đề xuất
+    // "khác hết" và không muốn 2 đề xuất "hẹp hơn" (0,55 và 0,95). Chủ đề mới là để lấp chỗ thư viện thiếu.
+    // Ứng viên đã xếp trùng > hẹp hơn > rộng hơn, chắc hơn trước.
+    const top = candidates[0];
+    if (top) {
       dropped.push({
         labelVi: p.labelVi,
         descriptionEn: p.descriptionEn,
-        sameAs: { topicId: same.topicId, label: same.label, probability: same.probability },
+        relatedTo: {
+          topicId: top.topicId,
+          label: top.label,
+          relation: top.relation,
+          probability: top.probability,
+        },
       });
       continue;
     }

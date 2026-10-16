@@ -126,7 +126,7 @@ afterAll(async () => {
 
 describe("suggestTopics: chấm thư viện", () => {
   test("chia ba mức đúng ở ranh giới, cao trước; bỏ chủ đề đã rút; một lời gọi", async () => {
-    expect([PRESELECT_MIN, MAYBE_MIN]).toEqual([0.85, 0.6]);
+    expect([PRESELECT_MIN, MAYBE_MIN]).toEqual([0.85, 0.58]);
     const a = await addLibrary("a");
     const b = await addLibrary("b");
     const c = await addLibrary("c");
@@ -136,7 +136,7 @@ describe("suggestTopics: chấm thư viện", () => {
     const seen: Seen[] = [];
     const res = await suggestTopics(
       deps({
-        decider: decider({ [a]: 0.85, [b]: 0.849, [c]: 0.6, [d]: 0.599, [e]: 0.95 }, {}, seen),
+        decider: decider({ [a]: 0.85, [b]: 0.849, [c]: 0.58, [d]: 0.579, [e]: 0.95 }, {}, seen),
       }),
       READER,
     );
@@ -147,10 +147,10 @@ describe("suggestTopics: chấm thư viện", () => {
     ]);
     expect(res.maybe.map((s) => [s.key, s.probability])).toEqual([
       ["b", 0.849],
-      ["c", 0.6],
+      ["c", 0.58],
     ]);
     expect(res.notSuggested).toEqual([
-      { topicId: d, key: "d", label: "Nhãn d", probability: 0.599 },
+      { topicId: d, key: "d", label: "Nhãn d", probability: 0.579 },
     ]);
     expect(seen.some((s) => s.id === `topic_${retired}`)).toBe(false);
     expect(seen).toHaveLength(5);
@@ -188,7 +188,7 @@ describe("suggestTopics: chấm thư viện", () => {
 });
 
 describe("suggestTopics: chủ đề mới", () => {
-  test("đề xuất hợp lệ: lời nhắc có lời mô tả và thư viện; giữ quan hệ hẹp hơn, bỏ đề xuất trùng", async () => {
+  test("đề xuất hợp lệ: lời nhắc có lời mô tả và thư viện; bỏ đề xuất hẹp hơn hay trùng chủ đề có sẵn", async () => {
     const a = await addLibrary("a", { label: "Ứng dụng LLM" });
     const b = await addLibrary("b");
     const { llm, prompts } = llmReplying(
@@ -219,20 +219,18 @@ describe("suggestTopics: chủ đề mới", () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.prompt).toContain(READER);
     expect(prompts[0]?.prompt).toContain("- Ứng dụng LLM | Topic a: things about a");
-    expect(res.newTopics).toHaveLength(1);
-    expect(res.newTopics[0]).toMatchObject({
-      labelVi: "AI cho tài chính",
-      why: "Bạn làm ở công ty fintech.",
-      overlapChecked: true,
-    });
-    expect(res.newTopics[0]?.related.map((c) => [c.topicId, c.relation, c.probability])).toEqual([
-      [a, "narrower", 0.7],
-    ]);
+    // Đề xuất hẹp hơn hay trùng chủ đề có sẵn đều bị bỏ: chỉ giữ chủ đề khác mọi chủ đề có sẵn.
+    expect(res.newTopics).toHaveLength(0);
     expect(res.dropped).toEqual([
+      {
+        labelVi: "AI cho tài chính",
+        descriptionEn: proposal("", "AI in finance").descriptionEn,
+        relatedTo: { topicId: a, label: "Ứng dụng LLM", relation: "narrower", probability: 0.7 },
+      },
       {
         labelVi: "Chống gian lận",
         descriptionEn: proposal("", "Fraud detection").descriptionEn,
-        sameAs: { topicId: b, label: "Nhãn b", probability: 1 },
+        relatedTo: { topicId: b, label: "Nhãn b", relation: "same", probability: 1 },
       },
     ]);
     const tasks = (await db.select().from(llmCalls)).map((c) => c.task).sort();
