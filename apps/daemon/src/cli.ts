@@ -36,6 +36,12 @@ import { buildReport, formatReport, reportWindow } from "./jobs/report.ts";
 import { refreshSince } from "./jobs/signals.ts";
 import { type CloseRelation, checkTopicOverlap, type OverlapCheck } from "./jobs/topic-overlap.ts";
 import {
+  MAYBE_MIN,
+  PRESELECT_MIN,
+  type SuggestResult,
+  suggestTopics,
+} from "./jobs/topic-suggest.ts";
+import {
   addCustomTopic,
   describeTopic,
   embedPendingTopics,
@@ -94,6 +100,10 @@ radard — CLI
   topics check "<tên>" "<English description>"
                              Soát chủ đề gần giống trước khi thêm: model quyết định cho biết quan hệ
                              với mọi chủ đề có sẵn; chủ đề gần kèm tỉ lệ trùng tin và tin ví dụ.
+                             Không lưu gì
+  topics suggest [--text="<mô tả>"] [--json]
+                             Gợi ý chủ đề từ lời mô tả (mặc định: bối cảnh đã lưu): model quyết định
+                             chấm thư viện thành ba mức, LLM đề xuất chủ đề mới (đã soát gần giống).
                              Không lưu gì
 
   signals refresh [--since=30d]  Lấy lại điểm, bình luận mới nhất (HN) cho tài liệu từ mốc đó
@@ -341,6 +351,22 @@ const COMMANDS: Record<string, Command> = {
       { label, descriptionEn },
     );
     printOverlap(label, res, Date.now() - started);
+  },
+
+  "topics suggest": async ({ db }) => {
+    let text = flag("text", "");
+    if (!text) {
+      const [p] = await db.select({ description: profile.description }).from(profile);
+      if (!p) throw new Error('chưa có bối cảnh: profile set "…" hoặc --text="…"');
+      text = p.description;
+    }
+    const started = Date.now();
+    const res = await suggestTopics(
+      { db, decider: createDecider(db), llm: createLlm(db), embedder: createEmbedder(db) },
+      text,
+    );
+    if (process.argv.includes("--json")) console.log(JSON.stringify(res, null, 2));
+    else printSuggest(res, Date.now() - started);
   },
 
   "topics on": async ({ db }) => {
@@ -711,6 +737,42 @@ function printOverlap(label: string, res: OverlapCheck, ms: number): void {
     for (const t of c.shared) console.log(`    cả hai: ${t.slice(0, 110)}`);
     for (const t of c.onlyNew) console.log(`    chỉ mới: ${t.slice(0, 110)}`);
   }
+}
+
+function printSuggest(res: SuggestResult, ms: number): void {
+  const p = (x: number) => x.toFixed(2);
+  const tierLines = (title: string, list: SuggestResult["preselect"]) => {
+    console.log(`\n${title}`);
+    if (list.length === 0) console.log("  (không có)");
+    for (const s of list) console.log(`  ${p(s.probability)}  ${s.key.padEnd(14)} ${s.label}`);
+  };
+  if (res.ran.library) {
+    tierLines(`Tích sẵn (≥ ${PRESELECT_MIN})`, res.preselect);
+    tierLines(`Có thể bạn quan tâm (≥ ${MAYBE_MIN})`, res.maybe);
+    tierLines("Không gợi ý", res.notSuggested);
+  } else {
+    console.log(
+      `chưa chấm thư viện: ${res.errors.library ?? "không có model quyết định (AI_GATEWAY_API_KEY)"}`,
+    );
+  }
+  console.log("\nChủ đề mới (ngoài thư viện)");
+  if (!res.ran.newTopics) {
+    console.log(`  chưa đề xuất: ${res.errors.newTopics ?? "không có LLM (AI_GATEWAY_API_KEY)"}`);
+  } else if (res.newTopics.length === 0) {
+    console.log("  (không có: thư viện đã đủ)");
+  }
+  for (const t of res.newTopics) {
+    console.log(`  ${t.labelVi}: ${t.why}`);
+    console.log(`    ${t.descriptionEn}`);
+    if (!t.overlapChecked) console.log("    chưa soát chủ đề gần giống");
+    for (const c of t.related) {
+      console.log(`    ${RELATION_VI[c.relation]} "${c.label}" (${p(c.probability)})`);
+    }
+  }
+  for (const d of res.dropped) {
+    console.log(`  bỏ "${d.labelVi}": trùng "${d.sameAs.label}" (${p(d.sameAs.probability)})`);
+  }
+  console.log(`\n${ms} ms`);
 }
 
 async function embedTopicsNow(db: FetchDeps["db"]): Promise<void> {
