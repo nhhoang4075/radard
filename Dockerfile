@@ -1,6 +1,6 @@
 # Một image cho mọi vai trò của daemon, chọn bằng SERVICE_ROLE (mặc định all).
 # Bun chạy thẳng TypeScript nên không có bước build; chỉ cài phụ thuộc chạy, không cài devDependencies.
-FROM oven/bun:1.3.11-slim
+FROM oven/bun:1.4.3-slim
 
 WORKDIR /app
 ENV NODE_ENV=production
