@@ -68,6 +68,20 @@ async function main(): Promise<void> {
   }
   log.info("đang chạy", { role: env.role });
 
+  // Đo RAM của chính tiến trình để biết nó nằm ở heap JS hay ngoài heap (Railway tính tiền theo RAM).
+  const mb = (n: number) => Math.round(n / 1_048_576);
+  const memTimer = setInterval(() => {
+    const m = process.memoryUsage();
+    log.info("bộ nhớ", {
+      rssMb: mb(m.rss),
+      heapUsedMb: mb(m.heapUsed),
+      heapTotalMb: mb(m.heapTotal),
+      externalMb: mb(m.external),
+      arrayBuffersMb: mb(m.arrayBuffers),
+    });
+  }, 5 * 60_000);
+  memTimer.unref();
+
   let stopping = false;
   const shutdown = async (signal: string) => {
     if (stopping) return;
