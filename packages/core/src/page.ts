@@ -22,6 +22,8 @@ export interface PageFetchResult {
 
 export interface PageFetcher {
   fetch(url: string): Promise<PageFetchResult>;
+  /** Số host đang nằm trong cache robots.txt (để theo dõi bộ nhớ). */
+  robotsCacheSize?(): number;
 }
 
 /** Phần chữ chính của trang (bỏ menu, quảng cáo, chân trang); `null` khi không rút được gì đáng kể. */

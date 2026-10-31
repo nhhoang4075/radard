@@ -87,7 +87,8 @@ export async function fetchPages(
     }
   };
   await Promise.all(Array.from({ length: opts.concurrency ?? 8 }, worker));
-  if (out.considered) log.info("tải trang xong", { ...out });
+  if (out.considered)
+    log.info("tải trang xong", { ...out, robotsCache: deps.fetcher.robotsCacheSize?.() });
   return out;
 }
 

@@ -41,11 +41,15 @@ export function createPageFetcher(opts: {
     } catch {
       // Không có robots.txt (404) hay không đọc được: không có luật nào để theo.
     }
-    robots.set(origin, { at: Date.now(), allowed: check });
+    // Mục hết hạn của host không gặp lại sẽ không bao giờ bị ghi đè, nên dọn ở đây để Map không phình.
+    const now = Date.now();
+    for (const [key, entry] of robots) if (now - entry.at >= ROBOTS_TTL_MS) robots.delete(key);
+    robots.set(origin, { at: now, allowed: check });
     return check(url);
   }
 
   return {
+    robotsCacheSize: () => robots.size,
     async fetch(url) {
       try {
         if (!(await allowed(url))) return { status: "blocked", error: "robots.txt không cho phép" };

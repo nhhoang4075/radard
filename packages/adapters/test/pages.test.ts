@@ -2,7 +2,7 @@
  * Tải trang và rút chữ: robots.txt, kiểu nội dung, lỗi HTTP; Readability bỏ menu và chân trang.
  * HttpClient giả, không gọi mạng.
  */
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { type HttpClient, HttpError, type HttpResponse } from "@radard/core";
 import { createPageFetcher, extractPageText } from "../src/pages.ts";
 
@@ -82,4 +82,18 @@ describe("createPageFetcher", () => {
       httpStatus: 403,
     });
   });
+
+  test("mục robots.txt hết hạn của host không gặp lại bị xoá, Map không phình", async () => {
+    const http = fakeHttp({});
+    const f = createPageFetcher({ http });
+    setSystemTime(new Date("2026-10-30T00:00:00Z"));
+    await f.fetch("https://old1.com/x");
+    await f.fetch("https://old2.com/x");
+    expect(f.robotsCacheSize?.()).toBe(2);
+    setSystemTime(new Date("2026-10-31T01:00:00Z")); // quá 24 giờ
+    await f.fetch("https://new.com/x");
+    expect(f.robotsCacheSize?.()).toBe(1);
+  });
 });
+
+afterEach(() => setSystemTime());
