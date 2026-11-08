@@ -92,7 +92,7 @@ export const deliveries = pgTable(
 
 /**
  * Phản hồi của người dùng: bấm nút hoặc viết. Chỉ ghi thêm; bấm 👍 rồi đổi ý bấm 👎 là hai
- * dòng, dòng mới nhất là ý kiến hiện tại.
+ * dòng, dòng mới nhất là ý kiến hiện tại. Bỏ chọn là dòng `clear` (không xoá dòng nào).
  */
 export const feedback = pgTable(
   "feedback",
@@ -104,9 +104,9 @@ export const feedback = pgTable(
     }),
     channel: text("channel").notNull(),
     recipient: text("recipient").notNull(),
-    /** like | dislike | comment */
+    /** like | dislike | clear | comment. `clear` = bỏ chọn (bấm lại đúng nút đang chọn). */
     kind: text("kind").notNull(),
-    /** Nội dung nhận xét, giữ nguyên ngôn ngữ người dùng viết. Trống với like/dislike. */
+    /** Nội dung nhận xét, giữ nguyên ngôn ngữ người dùng viết. Trống với like/dislike/clear. */
     text: text("text"),
     /** Id tin của người dùng phía kênh (với nhận xét), để không ghi trùng khi nhận lại update. */
     sourceMessageId: text("source_message_id"),
@@ -117,7 +117,7 @@ export const feedback = pgTable(
     index("feedback_delivery_idx").on(t.deliveryId),
     index("feedback_created_idx").on(t.createdAt),
     uniqueIndex("feedback_source_message_uq").on(t.channel, t.recipient, t.sourceMessageId),
-    check("feedback_kind_ck", sql`${t.kind} in ('like', 'dislike', 'comment')`),
+    check("feedback_kind_ck", sql`${t.kind} in ('like', 'dislike', 'clear', 'comment')`),
     check(
       "feedback_text_ck",
       sql`(${t.kind} = 'comment') = (${t.text} is not null and length(${t.text}) > 0)`,

@@ -197,6 +197,17 @@ describe("bot: lượt bấm", () => {
     expect(JSON.stringify(calls[1]?.payload)).toContain("👍 ✓");
   });
 
+  test("bấm lại nút đang chọn: lõi trả state 'none' → báo 'Đã bỏ chọn', bàn phím về mặc định", async () => {
+    const api = fakeApi();
+    const bot = createTelegramBot(
+      { token: "123:TEST", allowedChatId: ME, botInfo, transformer: api.t },
+      { onFeedback: async () => ({ recorded: true, state: "none" }) },
+    );
+    await bot.handleUpdate(press("fb:like"));
+    expect(api.calls[0]?.payload.text).toBe("Đã bỏ chọn");
+    expect(JSON.stringify(api.calls[1]?.payload)).not.toContain("✓");
+  });
+
   test("người lạ bấm: không ghi, không gọi API nào", async () => {
     const { bot, events, calls } = setup();
     await bot.handleUpdate(press("fb:like", "999"));

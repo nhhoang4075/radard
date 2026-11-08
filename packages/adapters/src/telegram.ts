@@ -87,7 +87,10 @@ const LABELS: Record<FeedbackKind, string> = { like: "👍", dislike: "👎" };
  */
 const CHECK = "✓";
 
-/** Bộ nút 👍/👎; nút vừa bấm có dấu ✓ để bạn thấy mình đã chọn gì (vẫn bấm đổi ý được). */
+/**
+ * Bộ nút 👍/👎; nút đang chọn có dấu ✓ để bạn thấy mình đã chọn gì. Bấm nút kia để đổi ý, bấm lại
+ * đúng nút đang chọn để bỏ chọn (không truyền `chosen` thì cả hai nút đều chưa chọn).
+ */
 export function feedbackKeyboard(
   actions: NonNullable<Message["actions"]>,
   chosen?: FeedbackKind,
@@ -573,20 +576,23 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
       await ctx.answerCallbackQuery();
       return;
     }
-    await handlers.onFeedback({
+    const res = await handlers.onFeedback({
       channel: CHANNEL,
       recipient: String(message.chat.id),
       messageId: String(message.message_id),
       kind,
       sourceId: `cb:${ctx.callbackQuery.id}`,
     });
-    await ctx.answerCallbackQuery({ text: `Đã ghi nhận ${LABELS[kind]}` });
+    const state = res.state ?? kind;
+    await ctx.answerCallbackQuery({
+      text: state === "none" ? "Đã bỏ chọn" : `Đã ghi nhận ${LABELS[state]}`,
+    });
     const kb = feedbackKeyboard(
       [
         { id: "like", label: LABELS.like },
         { id: "dislike", label: LABELS.dislike },
       ],
-      kind,
+      state === "none" ? undefined : state,
     );
     await ctx.editMessageReplyMarkup({ reply_markup: kb }).catch(ignoreNotModified);
   });

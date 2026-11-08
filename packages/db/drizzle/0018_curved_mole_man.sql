@@ -1,0 +1,2 @@
+ALTER TABLE "feedback" DROP CONSTRAINT "feedback_kind_ck";--> statement-breakpoint
+ALTER TABLE "feedback" ADD CONSTRAINT "feedback_kind_ck" CHECK ("feedback"."kind" in ('like', 'dislike', 'clear', 'comment'));

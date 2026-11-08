@@ -341,12 +341,14 @@ async function feedbackReport(db: Database, w: ReportWindow): Promise<FeedbackRe
         where dl.kind = 'event' and d.period_end > ${w.start} and d.period_end <= ${w.end}
       ), latest as (
         -- feedback chỉ ghi thêm: dòng mới nhất (id lớn nhất) là ý kiến hiện tại
+        -- dòng clear (bỏ chọn) vẫn là dòng mới nhất của tin đó: tin đã bỏ chọn không tính là có phản hồi
         select distinct on (f.delivery_id) f.delivery_id, f.kind
         from feedback f join ev on ev.id = f.delivery_id
-        where f.kind in ('like', 'dislike')
+        where f.kind in ('like', 'dislike', 'clear')
         order by f.delivery_id, f.id desc
       )
-      select (select count(*)::int from ev) deliveries, count(*)::int rated,
+      select (select count(*)::int from ev) deliveries,
+        count(*) filter (where kind in ('like', 'dislike'))::int rated,
         count(*) filter (where kind = 'like')::int likes,
         count(*) filter (where kind = 'dislike')::int dislikes
       from latest`,

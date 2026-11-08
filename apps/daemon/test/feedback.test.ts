@@ -37,7 +37,11 @@ afterAll(async () => {
 
 describe("recordFeedback", () => {
   test("nối về đúng delivery theo message_id; 👍 rồi 👎 là hai dòng", async () => {
-    expect(await recordFeedback(db, ev("like", "cb:1"))).toEqual({ recorded: true, deliveryId: 1 });
+    expect(await recordFeedback(db, ev("like", "cb:1"))).toEqual({
+      recorded: true,
+      deliveryId: 1,
+      state: "like",
+    });
     await recordFeedback(db, ev("dislike", "cb:2"));
     const rows = await db.select().from(feedback).orderBy(asc(feedback.id));
     expect(rows.map((r) => [r.kind, r.deliveryId])).toEqual([
@@ -52,16 +56,41 @@ describe("recordFeedback", () => {
     expect(await db.select().from(feedback)).toHaveLength(1);
   });
 
-  test("bấm lại đúng nút vừa bấm không ghi thêm; đổi ý thì ghi, dòng mới nhất là ý kiến hiện tại", async () => {
+  // Lùi thời điểm mọi dòng phản hồi để lượt bấm kế tiếp không bị coi là bấm đúp.
+  const ageRows = () =>
+    db.execute(sql`update feedback set created_at = created_at - interval '1 minute'`);
+
+  test("bấm đúp trong 2 giây không ghi thêm và không bỏ chọn", async () => {
     await recordFeedback(db, ev("like", "cb:1"));
     expect(await recordFeedback(db, ev("like", "cb:2"))).toEqual({
       recorded: false,
       deliveryId: 1,
+      state: "like",
       reason: "unchanged",
     });
+    expect(await db.select().from(feedback)).toHaveLength(1);
+  });
+
+  test("bấm lại đúng nút đang chọn (sau 2 giây) ghi 'clear'; bấm tiếp thì chọn lại", async () => {
+    await recordFeedback(db, ev("like", "cb:1"));
+    await ageRows();
+    expect(await recordFeedback(db, ev("like", "cb:2"))).toEqual({
+      recorded: true,
+      deliveryId: 1,
+      state: "none",
+    });
+    await ageRows();
+    // Đã bỏ chọn thì bấm 👍 là chọn lại, không phải bỏ chọn lần nữa.
+    expect((await recordFeedback(db, ev("like", "cb:3"))).state).toBe("like");
+    const rows = await db.select().from(feedback).orderBy(asc(feedback.id));
+    expect(rows.map((r) => r.kind)).toEqual(["like", "clear", "like"]);
+  });
+
+  test("đổi ý ghi dòng mới; lượt bấm cũ bị giao lại vẫn chỉ là lượt cũ", async () => {
+    await recordFeedback(db, ev("like", "cb:1"));
     await recordFeedback(db, ev("dislike", "cb:3"));
+    await ageRows();
     await recordFeedback(db, ev("like", "cb:4"));
-    // Lượt bấm cũ bị giao lại sau khi đã đổi ý: vẫn chỉ là lượt cũ.
     expect((await recordFeedback(db, ev("dislike", "cb:3"))).reason).toBe("replayed");
     const rows = await db.select().from(feedback).orderBy(asc(feedback.id));
     expect(rows.map((r) => r.kind)).toEqual(["like", "dislike", "like"]);
@@ -71,6 +100,7 @@ describe("recordFeedback", () => {
     expect(await recordFeedback(db, ev("like", "cb:9", "777"))).toEqual({
       recorded: true,
       deliveryId: null,
+      state: "like",
     });
   });
 });

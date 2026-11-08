@@ -7,6 +7,9 @@
 /** Phản hồi bằng nút. Khớp `feedback.kind`; `comment` (nhận xét bằng chữ) để sau. */
 export type FeedbackKind = "like" | "dislike";
 
+/** Ý kiến hiện tại của một tin sau lượt bấm: `none` = chưa chọn hoặc đã bỏ chọn. */
+export type FeedbackState = FeedbackKind | "none";
+
 /** Một link của tin. Job quyết định có link nào, nhãn gì; adapter chỉ quyết cách trình bày. */
 export interface Link {
   url: string;
@@ -133,8 +136,12 @@ export interface ProfileHandlers {
 }
 
 export interface ChatHandlers {
-  /** Ghi phản hồi. `recorded = false`: đã ghi từ trước (lượt bấm bị giao lại). */
-  onFeedback(ev: FeedbackEvent): Promise<{ recorded: boolean }>;
+  /**
+   * Ghi phản hồi. `recorded = false`: đã ghi từ trước (lượt bấm bị giao lại). `state` = ý kiến
+   * hiện tại của tin sau lượt bấm (bấm lại đúng nút đang chọn thì là `none`); bỏ trống thì kênh
+   * coi là nút vừa bấm.
+   */
+  onFeedback(ev: FeedbackEvent): Promise<{ recorded: boolean; state?: FeedbackState }>;
   /** Không có thì kênh không nhận lệnh chọn chủ đề. */
   topics?: TopicHandlers;
   /** Không có thì kênh không nhận lệnh /profile. */

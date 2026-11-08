@@ -91,7 +91,7 @@ async function addDelivery(
   return d?.id ?? 0;
 }
 
-async function press(deliveryId: number, ...kinds: ("like" | "dislike" | "comment")[]) {
+async function press(deliveryId: number, ...kinds: ("like" | "dislike" | "clear" | "comment")[]) {
   for (const kind of kinds) {
     await db.insert(feedback).values({
       deliveryId,
@@ -335,6 +335,13 @@ describe("buildReport", () => {
     await press(ev.d2p1 ?? 0, "dislike");
     const f = (await report()).feedback;
     expect([f.rated, f.rate, f.pass, f.dislikes]).toEqual([4, 0.8, true, 2]);
+  });
+
+  test("phản hồi: tin đã bỏ chọn (clear) không tính là có phản hồi, bấm lại thì tính lại", async () => {
+    await press(ev.d2p1 ?? 0, "like", "clear");
+    expect((await report()).feedback.rated).toBe(3);
+    await press(ev.d2p1 ?? 0, "dislike");
+    expect((await report()).feedback.rated).toBe(4);
   });
 
   test("chi phí: theo ngày lịch giờ VN, theo việc, ngày vượt trần bị đánh dấu", async () => {
