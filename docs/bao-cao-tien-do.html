@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Báo cáo tiến độ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --bad:#A23A2A; --bad-soft:#F8E3DF; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.65}
+.wrap{max-width:1040px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.5vw,40px)} h2{font-size:21px;margin:32px 0 10px} h3{font-size:16.5px;margin:0 0 6px}
+p{margin:8px 0} ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0} a{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:78ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button span{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-right:6px}
+.panel{display:none} .panel.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+.answer{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 12px 12px 0;padding:12px 18px;margin-top:16px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi b{display:block;font-family:var(--display);font-size:30px;line-height:1.1}
+.kpi span{font-size:13.5px;color:var(--ink-2)}
+.kpi small{display:block;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px;background:var(--surface)}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--ink-3);font-weight:600;font-family:var(--mono);background:#FAFBFA}
+td.n{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.st{display:inline-block;font-family:var(--mono);font-size:12px;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.st.ok{background:var(--accent-soft);color:var(--accent)} .st.part{background:var(--warn-soft);color:var(--warn)} .st.no{background:var(--bad-soft);color:var(--bad)} .st.plus{background:var(--blue-soft);color:var(--blue)}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0 0}
+figcaption{font-size:13.5px;color:var(--ink-3);margin-top:8px}
+.lg{display:inline-flex;align-items:center;gap:6px;margin-right:16px;font-size:13px;color:var(--ink-2)} .lg i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.tg{background:#EEF3F8;border-radius:12px;padding:14px;margin-top:12px;font-size:14px}
+.tg .msg{background:#fff;border-radius:10px;padding:10px 12px;margin-top:8px;box-shadow:0 1px 1px rgba(0,0,0,.06);max-width:640px}
+.tg .msg b{display:block} .tg .msg p{margin:4px 0;color:var(--ink-2);font-size:13.5px}
+.tg .btns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap} .tg .btns span{font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:2px 10px;background:#fff}
+.dec{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+.dec .ba{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.dec .ba div{background:var(--ground);border-radius:8px;padding:8px 10px;font-size:14px}
+.dec .ba div.after{background:var(--accent-soft)}
+.dec .ba small{display:block;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+.dec .ev{font-size:13px;color:var(--ink-3);margin-top:6px}
+.funnel div{height:30px;border-radius:6px;margin-top:6px;display:flex;align-items:center;padding:0 10px;font-size:13.5px;color:#fff;font-family:var(--mono);white-space:nowrap}
+.risk{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline}
+.qa{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:10px}
+.qa b{display:block}
+.note{font-size:13.5px;color:var(--ink-3);margin-top:8px}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:760px){.kpis{grid-template-columns:1fr 1fr}.grid2,.grid3,.dec .ba{grid-template-columns:1fr} td.n{white-space:normal}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">RADARD · BÁO CÁO TIẾN ĐỘ · 16/10/2026</div>
+  <h1>radard sau 3 tuần: điểm tin đã chạy thật mỗi sáng</h1>
+  <p class="lede">radard là một chương trình chạy liên tục trên server (daemon), tự thu thập tin AI từ nhiều nguồn, gộp các bài cùng một chuyện, chấm mức liên quan với chủ đề người dùng chọn, và mỗi sáng 07:00 gửi một "điểm tin" tối đa 7 tin lên Telegram. Trang này tóm tắt đã làm được gì, đo được gì, so với kế hoạch ra sao, và rủi ro còn lại.</p>
+
+  <div class="answer"><p><b>Một câu:</b> giai đoạn MVP-0 (bản tối thiểu, kế hoạch tuần 1–3) đã xong phần chức năng và đang chạy trên Railway. Đạt 3/4 tiêu chí nghiệm thu. Tiêu chí còn lại là "7 sáng đúng giờ liên tiếp": mới tính được từ 14/10, 3/3 sáng đều đúng giờ, đủ 7 sáng vào 20/10. Ngoài kế hoạch đã làm thêm: lấy nội dung trang, bộ chủ đề mới, model ra quyết định. Phần chậm so với kế hoạch: web và API.</p></div>
+
+  <div class="kpis">
+    <div class="kpi"><b>3/3</b><span>sáng gửi đúng giờ trên server</span><small>14–16/10, trễ 1,6–2,4 phút</small></div>
+    <div class="kpi"><b>32.151</b><span>tin đã thu thập, gộp thành 29.758 sự kiện</span><small>HN 19.728 · arXiv 12.089 · GitHub 334</small></div>
+    <div class="kpi"><b>82%</b><span>tin được bấm thích</span><small>23 thích / 5 không thích, 28/28 tin có phản hồi</small></div>
+    <div class="kpi"><b>$0,15</b><span>tổng chi phí model từ 28/09</span><small>trần đặt ra: dưới $0,10 mỗi ngày</small></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="hanh-trinh"><span>01</span>Hành trình</button>
+    <button role="tab" aria-selected="false" data-tab="san-pham"><span>02</span>Sản phẩm</button>
+    <button role="tab" aria-selected="false" data-tab="so-lieu"><span>03</span>Số liệu</button>
+    <button role="tab" aria-selected="false" data-tab="quyet-dinh"><span>04</span>Quyết định chính</button>
+    <button role="tab" aria-selected="false" data-tab="ke-hoach"><span>05</span>So với kế hoạch</button>
+    <button role="tab" aria-selected="false" data-tab="rui-ro"><span>06</span>Rủi ro, tiếp theo</button>
+    <button role="tab" aria-selected="false" data-tab="phan-hoi"><span>07</span>Học từ phản hồi</button>
+    <button role="tab" aria-selected="false" data-tab="hoi-dap"><span>08</span>Câu hỏi có thể gặp</button>
+  </div>
+
+  <!-- 01 -->
+  <section class="panel on" id="hanh-trinh" role="tabpanel">
+    <h2>Từ 28/09 tới 16/10</h2>
+    <figure class="fig" style="margin:12px 0 0">
+      <svg viewBox="0 0 960 250" role="img" aria-label="Dòng thời gian radard: 28/09 tuần 1, 06/10 tuần 2, 12/10 sửa mất dữ liệu và xếp hạng, 13/10 lên Railway, 14/10 điểm tin tự động đầu tiên, 15/10 bộ chủ đề mới và Jev, 16/10 Jev chạy thật và lệnh profile" style="width:100%;height:auto;display:block">
+        <line x1="30" y1="120" x2="930" y2="120" stroke="#B9C3BF" stroke-width="2"/>
+        <g font-family="IBM Plex Mono,monospace" font-size="12" fill="#0E6E5C" text-anchor="middle">
+          <text x="60" y="145">28/09</text><text x="250" y="145">06/10</text><text x="470" y="145">12/10</text><text x="600" y="145">13/10</text><text x="710" y="145">14/10</text><text x="810" y="145">15/10</text><text x="905" y="145">16/10</text>
+        </g>
+        <g fill="#0E6E5C"><circle cx="60" cy="120" r="6"/><circle cx="250" cy="120" r="6"/><circle cx="470" cy="120" r="6"/><circle cx="600" cy="120" r="8"/><circle cx="710" cy="120" r="8"/><circle cx="810" cy="120" r="6"/><circle cx="905" cy="120" r="6"/></g>
+        <g font-family="Be Vietnam Pro,system-ui" font-size="12.5" fill="#16201D" text-anchor="middle">
+          <text x="60" y="40" font-weight="600">Tuần 1</text><text x="60" y="58">HN, hàng đợi</text><text x="60" y="74">737 tin đầu tiên</text>
+          <text x="250" y="40" font-weight="600">Tuần 2</text><text x="250" y="58">arXiv, GitHub, embedding</text><text x="250" y="74">gộp sự kiện</text>
+          <text x="470" y="40" font-weight="600">Chạy thật lần đầu</text><text x="470" y="58">sửa lỗi mất dữ liệu,</text><text x="470" y="74">lấy lại 13.041 tin; xếp hạng</text>
+          <text x="710" y="40" font-weight="600">Điểm tin tự động</text><text x="710" y="58">đầu tiên, 07:02</text>
+          <text x="905" y="40" font-weight="600">Jev chạy thật</text><text x="905" y="58">lệnh /profile</text>
+        </g>
+        <g font-family="Be Vietnam Pro,system-ui" font-size="12.5" fill="#16201D" text-anchor="middle">
+          <text x="600" y="180" font-weight="600">Lên Railway</text><text x="600" y="198">lấy nội dung trang</text><text x="600" y="214">điểm tin đầu tiên (tay)</text>
+          <text x="810" y="180" font-weight="600">Bộ 14 chủ đề</text><text x="810" y="198">model ra quyết định</text>
+        </g>
+        <g stroke="#D9E0DD"><line x1="60" y1="82" x2="60" y2="112"/><line x1="250" y1="82" x2="250" y2="112"/><line x1="470" y1="82" x2="470" y2="112"/><line x1="710" y1="66" x2="710" y2="112"/><line x1="905" y1="66" x2="905" y2="112"/><line x1="600" y1="128" x2="600" y2="166"/><line x1="810" y1="128" x2="810" y2="166"/></g>
+      </svg>
+      <figcaption>Nguồn: nhật ký lab notebook 28/09, 06/10, 12/10, 16/10 và lịch sử git (66 commit).</figcaption>
+    </figure>
+
+    <h2>Quy mô hiện tại</h2>
+    <div class="grid3">
+      <div class="card"><h3>Code</h3><p>~16.900 dòng TypeScript, 32 file test, 260 test qua (<code>bun run check</code>). 18 migration cơ sở dữ liệu.</p></div>
+      <div class="card"><h3>Hạ tầng</h3><p>Railway (Đông Nam Á): một service daemon + Postgres 18 có pgvector. Lưu HTML gốc ở Cloudflare R2. Deploy tự động mỗi lần push.</p></div>
+      <div class="card"><h3>Tài liệu</h3><p>25 trang HTML trong <code>docs/</code>: thiết kế, giải thích kỹ thuật (HNSW, B-tree, pg-boss), các lần đo và hai trang chấm tay.</p></div>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section class="panel" id="san-pham" role="tabpanel">
+    <h2>Người dùng nhận được gì</h2>
+    <p>Một điểm tin thật, gửi sáng 16/10 lúc 07:01 (rút gọn phần tóm tắt):</p>
+    <div class="tg">
+      <div class="msg"><b>Điểm tin 16/10</b><p>Hôm nay nổi bật nhất là đợt mở trọng số của các model lớn và nhỏ hướng tới agent chạy cục bộ. Bên cạnh đó có một nghiên cứu về sinh văn bản song song và vài công cụ cho lập trình với AI.</p><p>Chọn 7 trong 189 sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.</p></div>
+      <div class="msg"><b>1. Meta mở trọng số Muse Spark Open, model 816B tham số</b><p>Meta phát hành trọng số của Muse Spark Open, model đa phương thức 816B tham số (42B hoạt động), ngữ cảnh 1M token… <i>Với bạn, đây là một lựa chọn open-weight mạnh để tự host…</i></p><div class="btns"><span>Đọc chi tiết</span><span>👍</span><span>👎</span></div></div>
+      <div class="msg"><b>2. Nemotron 3.5 Bolt 74B-A9B chạy agent cục bộ trong 24GB</b></div>
+      <div class="msg"><b>5. ruflo: harness điều phối swarm cho Claude Code và Codex</b></div>
+      <div class="msg"><b>6. Magic Hour: nền tảng tạo video và ảnh AI kèm API sản xuất</b><p><i>…Với bạn, mức độ liên quan thấp…</i></p></div>
+    </div>
+    <p class="note">Mỗi tin có câu "Với bạn…" viết theo hồ sơ người dùng. Tin 6 tự nhận là ít liên quan: đây là dấu hiệu cổng chủ đề còn lọt tin yếu (tab 06).</p>
+
+    <h2>Đường đi của một tin</h2>
+    <figure class="fig">
+      <svg viewBox="0 0 960 170" role="img" aria-label="Pipeline: nguồn, lấy tin mỗi 15 phút, lấy nội dung trang, xử lý gồm embedding, gộp sự kiện và chấm chủ đề, điểm tin 07:00 gồm xếp hạng, hỏi Jev và LLM viết tóm tắt, rồi Telegram; phản hồi quay về" style="width:100%;height:auto;display:block">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6B7773"/></marker></defs>
+        <g font-family="Be Vietnam Pro,system-ui" font-size="12.5" text-anchor="middle" fill="#16201D">
+          <rect x="10" y="40" width="120" height="66" rx="10" fill="#fff" stroke="#D9E0DD"/><text x="70" y="64" font-weight="600">Nguồn</text><text x="70" y="82">HN, arXiv,</text><text x="70" y="97">GitHub</text>
+          <rect x="165" y="40" width="130" height="66" rx="10" fill="#fff" stroke="#D9E0DD"/><text x="230" y="64" font-weight="600">Lấy tin</text><text x="230" y="82">theo lịch, không</text><text x="230" y="97">trùng khi chạy lại</text>
+          <rect x="330" y="40" width="130" height="66" rx="10" fill="#fff" stroke="#D9E0DD"/><text x="395" y="64" font-weight="600">Nội dung trang</text><text x="395" y="82">bài HN chỉ có</text><text x="395" y="97">tiêu đề</text>
+          <rect x="495" y="40" width="140" height="66" rx="10" fill="#fff" stroke="#D9E0DD"/><text x="565" y="64" font-weight="600">Xử lý</text><text x="565" y="82">embedding, gộp</text><text x="565" y="97">sự kiện, chấm chủ đề</text>
+          <rect x="670" y="40" width="140" height="66" rx="10" fill="#DDEEE9" stroke="#0E6E5C"/><text x="740" y="64" font-weight="600">Điểm tin 07:00</text><text x="740" y="82">xếp hạng, hỏi Jev,</text><text x="740" y="97">LLM viết tóm tắt</text>
+          <rect x="845" y="40" width="105" height="66" rx="10" fill="#fff" stroke="#D9E0DD"/><text x="897" y="64" font-weight="600">Telegram</text><text x="897" y="82">7 tin, 👍/👎</text>
+        </g>
+        <g stroke="#6B7773" stroke-width="1.5" marker-end="url(#ar)"><line x1="130" y1="73" x2="163" y2="73"/><line x1="295" y1="73" x2="328" y2="73"/><line x1="460" y1="73" x2="493" y2="73"/><line x1="635" y1="73" x2="668" y2="73"/><line x1="810" y1="73" x2="843" y2="73"/></g>
+        <path d="M897 106 V140 H740 V110" fill="none" stroke="#6B7773" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+        <text x="818" y="158" font-family="Be Vietnam Pro,system-ui" font-size="12" fill="#4A5753" text-anchor="middle">phản hồi, chủ đề đã chọn</text>
+        <text x="565" y="28" font-family="IBM Plex Mono,monospace" font-size="11" fill="#6B7773" text-anchor="middle">dùng chung, tính lại được</text>
+        <text x="740" y="28" font-family="IBM Plex Mono,monospace" font-size="11" fill="#0E6E5C" text-anchor="middle">theo hồ sơ người dùng</text>
+      </svg>
+      <figcaption>Mọi bước trước "Điểm tin" không phụ thuộc người dùng (nguyên tắc D4). Hồ sơ chỉ dùng ở bước cuối, nên sau này thêm người dùng không phải tính lại dữ liệu.</figcaption>
+    </figure>
+
+    <h2>Người dùng điều khiển bằng gì</h2>
+    <table>
+      <tr><th>Trên Telegram</th><th>Làm gì</th></tr>
+      <tr><td><code>/topics</code></td><td>Chọn chủ đề từ thư viện 14 chủ đề, hoặc tự thêm chủ đề bằng lời của mình</td></tr>
+      <tr><td><code>/profile</code></td><td>Viết vài câu về mình; radard gợi ý nên theo dõi chủ đề nào (mới, 16/10)</td></tr>
+      <tr><td>👍 / 👎, trả lời tin</td><td>Phản hồi từng tin; lưu lại để đo và để cải thiện xếp hạng sau</td></tr>
+    </table>
+  </section>
+
+  <!-- 03 -->
+  <section class="panel" id="so-lieu" role="tabpanel">
+    <h2>Tiêu chí nghiệm thu MVP-0</h2>
+    <p>Lệnh <code>cli report</code> chấm thẳng từ dữ liệu trên server, cửa sổ 7 ngày 09/10 → 16/10:</p>
+    <table>
+      <tr><th>Tiêu chí</th><th>Kết quả</th><th>Dẫn chứng</th></tr>
+      <tr><td>Lấy tin thành công ≥ 95%</td><td><span class="st ok">đạt · 97,2%</span></td><td>346/356 lượt. HN 98,5%. arXiv 4/8 vì bị arXiv giới hạn tốc độ (HTTP 429)</td></tr>
+      <tr><td>Điểm tin đúng giờ (lệch &lt; 10 phút), 7 sáng</td><td><span class="st part">3/7</span></td><td>3 sáng đầu cửa sổ chưa deploy; 13/10 gửi tay buổi tối. Từ khi lên server: 3/3, lệch 1,6–2,4 phút</td></tr>
+      <tr><td>≥ 70% tin có phản hồi</td><td><span class="st ok">đạt · 100%</span></td><td>28/28 tin, tính theo lượt bấm mới nhất</td></tr>
+      <tr><td>Chi phí model &lt; $0,10/ngày</td><td><span class="st ok">đạt</span></td><td>$0,1234 cho cả 7 ngày; ngày cao nhất $0,096 (13/10, embed lại 12.936 tin một lần)</td></tr>
+    </table>
+    <p class="note">Tiêu chí phản hồi ban đầu là "≥ 50 lượt 👍/👎"; đã đổi thành "≥ 70% tin có phản hồi" (quyết định D6) vì một người dùng nhận 7 tin/ngày thì 50 lượt là quá ít ngày để đạt có nghĩa.</p>
+
+    <h2>Lượng tin mỗi ngày</h2>
+    <figure class="fig">
+      <div><span class="lg"><i style="background:#2F5DA8"></i>Hacker News</span><span class="lg"><i style="background:#0F9F7F"></i>arXiv</span><span class="lg"><i style="background:#D9622B"></i>GitHub</span></div>
+      <svg viewBox="0 0 760 300" role="img" aria-label="Số tin đăng mỗi ngày theo nguồn, 09/10 đến 15/10: khoảng 900 đến 1.900 tin mỗi ngày, Hacker News chiếm phần lớn" style="width:100%;height:auto;display:block"><line x1="48" x2="750" y1="260" y2="260" stroke="#E4E9E7" stroke-width="1"/><text x="40" y="264" text-anchor="end" font-size="11" fill="#6B7773" font-family="IBM Plex Mono,monospace">0</text><line x1="48" x2="750" y1="201" y2="201" stroke="#E4E9E7" stroke-width="1"/><text x="40" y="205" text-anchor="end" font-size="11" fill="#6B7773" font-family="IBM Plex Mono,monospace">500</text><line x1="48" x2="750" y1="142" y2="142" stroke="#E4E9E7" stroke-width="1"/><text x="40" y="146" text-anchor="end" font-size="11" fill="#6B7773" font-family="IBM Plex Mono,monospace">1.000</text><line x1="48" x2="750" y1="83" y2="83" stroke="#E4E9E7" stroke-width="1"/><text x="40" y="87" text-anchor="end" font-size="11" fill="#6B7773" font-family="IBM Plex Mono,monospace">1.500</text><line x1="48" x2="750" y1="24" y2="24" stroke="#E4E9E7" stroke-width="1"/><text x="40" y="28" text-anchor="end" font-size="11" fill="#6B7773" font-family="IBM Plex Mono,monospace">2.000</text><rect x="58" y="137.39800000000002" width="60" height="122.60199999999998" fill="#2F5DA8" ><title>09/10 · Hacker News: 1.039 tin</title></rect><rect x="58" y="79.93199999999999" width="60" height="55.46600000000004" fill="#0F9F7F" ><title>09/10 · arXiv: 487 tin</title></rect><rect x="58" y="78.75200000000001" width="60" height="1" fill="#D9622B" rx="4"><title>09/10 · GitHub: 10 tin</title></rect><text x="88" y="72.75200000000001" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">1.536</text><text x="88" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">09/10</text><rect x="163.33333333333334" y="168.43200000000002" width="60" height="91.56799999999998" fill="#2F5DA8" ><title>10/10 · Hacker News: 776 tin</title></rect><rect x="163.33333333333334" y="131.97" width="60" height="34.46200000000002" fill="#0F9F7F" ><title>10/10 · arXiv: 309 tin</title></rect><rect x="163.33333333333334" y="131.61599999999999" width="60" height="1" fill="#D9622B" rx="4"><title>10/10 · GitHub: 3 tin</title></rect><text x="193.33333333333334" y="125.61599999999999" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">1.088</text><text x="193.33333333333334" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">10/10</text><rect x="268.6666666666667" y="176.692" width="60" height="83.30799999999999" fill="#2F5DA8" ><title>11/10 · Hacker News: 706 tin</title></rect><rect x="268.6666666666667" y="151.322" width="60" height="23.370000000000005" fill="#0F9F7F" ><title>11/10 · arXiv: 215 tin</title></rect><rect x="268.6666666666667" y="151.204" width="60" height="1" fill="#D9622B" rx="4"><title>11/10 · GitHub: 1 tin</title></rect><text x="298.6666666666667" y="145.204" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">922</text><text x="298.6666666666667" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">11/10</text><rect x="374" y="150.26" width="60" height="109.74000000000001" fill="#2F5DA8" ><title>12/10 · Hacker News: 930 tin</title></rect><rect x="374" y="100.69999999999999" width="60" height="47.56" fill="#0F9F7F" rx="4"><title>12/10 · arXiv: 420 tin</title></rect><text x="404" y="94.69999999999999" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">1.350</text><text x="404" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">12/10</text><rect x="479.33333333333337" y="115.804" width="60" height="144.196" fill="#2F5DA8" ><title>13/10 · Hacker News: 1.222 tin</title></rect><rect x="479.33333333333337" y="48.426000000000016" width="60" height="65.37799999999999" fill="#0F9F7F" ><title>13/10 · arXiv: 571 tin</title></rect><rect x="479.33333333333337" y="33.676000000000016" width="60" height="12.75" fill="#D9622B" rx="4"><title>13/10 · GitHub: 125 tin</title></rect><text x="509.33333333333337" y="27.676000000000016" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">1.918</text><text x="509.33333333333337" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">13/10</text><rect x="584.6666666666667" y="121.70400000000001" width="60" height="138.296" fill="#2F5DA8" ><title>14/10 · Hacker News: 1.172 tin</title></rect><rect x="584.6666666666667" y="53.617999999999995" width="60" height="66.08600000000001" fill="#0F9F7F" ><title>14/10 · arXiv: 577 tin</title></rect><rect x="584.6666666666667" y="53.26400000000001" width="60" height="1" fill="#D9622B" rx="4"><title>14/10 · GitHub: 3 tin</title></rect><text x="614.6666666666667" y="47.26400000000001" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">1.752</text><text x="614.6666666666667" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">14/10</text><rect x="690" y="115.332" width="60" height="144.668" fill="#2F5DA8" ><title>15/10 · Hacker News: 1.226 tin</title></rect><rect x="690" y="75.684" width="60" height="37.647999999999996" fill="#0F9F7F" ><title>15/10 · arXiv: 336 tin</title></rect><rect x="690" y="71.90799999999999" width="60" height="1.7760000000000105" fill="#D9622B" rx="4"><title>15/10 · GitHub: 32 tin</title></rect><text x="720" y="65.90799999999999" text-anchor="middle" font-size="12" fill="#16201D" font-family="IBM Plex Mono,monospace">1.594</text><text x="720" y="278" text-anchor="middle" font-size="12" fill="#4A5753" font-family="IBM Plex Mono,monospace">15/10</text><line x1="48" x2="750" y1="260" y2="260" stroke="#B9C3BF"/></svg>
+      <figcaption>Tin theo ngày đăng, 09–15/10. Trung bình mỗi ngày: HN 1.010, arXiv 416, GitHub 25. GitHub tăng từ 13/10 khi có thêm nguồn "repo mới" và "Trending". Rê chuột lên cột để xem số.</figcaption>
+    </figure>
+
+    <h2>Từ 1.231 sự kiện còn 7 tin</h2>
+    <div class="fig">
+      <div class="funnel">
+        <div style="width:100%;background:#4A5753">1.231 sự kiện mới trong 24 giờ</div>
+        <div style="width:30%;background:#2F5DA8">189 qua cổng chủ đề (15,4%)</div>
+        <div style="width:9%;min-width:120px;background:#0E6E5C">7 được gửi</div>
+      </div>
+      <p class="note">Điểm tin 16/10. Bốn sáng gần nhất, tỉ lệ qua cổng 15–22%. "Cổng chủ đề": sự kiện phải đủ gần ít nhất một chủ đề người dùng đang theo dõi.</p>
+    </div>
+
+    <h2>Gộp sự kiện</h2>
+    <p>29.758 sự kiện từ 32.151 tin; 1.714 sự kiện gộp từ 2 tin trở lên. Cách gộp: cùng đường link 1.812 lần, giống nhau theo embedding 577 lần, do model ra quyết định 4 lần (bật từ 16/10).</p>
+  </section>
+
+  <!-- 04 -->
+  <section class="panel" id="quyet-dinh" role="tabpanel">
+    <h2>Năm quyết định có số đo đi kèm</h2>
+
+    <div class="dec"><h3>1. Một tin, hai vector</h3>
+      <p>Bài HN 91,5% chỉ có tiêu đề, nên radard lấy thêm nội dung trang. Nhưng thêm nội dung vào embedding thì hai bài cùng chuyện trên hai trang khác nhau không còn giống nhau, và việc gộp sự kiện hỏng.</p>
+      <div class="ba"><div><small>MỘT VECTOR</small>Gộp được 303/449 cặp cũ; 292 cặp đúng bị tách</div><div class="after"><small>HAI VECTOR</small>Một vector chỉ tiêu đề để gộp, một vector có nội dung trang để chấm chủ đề: giữ 445/449 cặp</div></div>
+      <p class="ev">Lấy nội dung: 14.817 link trong 28 phút, 79,6% lấy được, trích được chữ ở 88% số đó. Embed lại 12.936 tin hết khoảng $0,04.</p></div>
+
+    <div class="dec"><h3>2. Bộ chủ đề chia theo một trục</h3>
+      <p>17 chủ đề cũ chia theo nhiều cách cùng lúc ("Model mới ra" và "Model mã nguồn mở" cùng bắt một tin). Bộ mới 14 chủ đề dựng từ việc gom 26.138 tin theo nghĩa, chỉ trả lời "tin này chủ yếu nói về cái gì".</p>
+      <div class="ba"><div><small>BỘ CŨ</small>10 cặp chủ đề trùng &gt; 30% tin; cặp nặng nhất 47%; chủ đề nhỏ nhất 0,7%</div><div class="after"><small>BỘ MỚI</small>7 cặp; nặng nhất 37%; nhỏ nhất 3,1%; khớp nhóm tin tự nhiên 42,7% → 47,4%</div></div></div>
+
+    <div class="dec"><h3>3. Model ra quyết định (Jev) ở hai chỗ khó</h3>
+      <p>Model ra quyết định không viết văn bản: nhận câu hỏi có/không, trả về xác suất. Dùng cho (A) "hai bài giống nhau 0,85–0,9 có cùng một chuyện không" và (B) "tin vừa sát ngưỡng có thật sự thuộc chủ đề không".</p>
+      <div class="ba"><div><small>TRƯỚC</small>A: cosine gần như đoán mò (AUC 0,57). B: luật ngưỡng khớp đáp án 53%</div><div class="after"><small>JEV</small>A: khớp 97%. B: khớp 83%. 0,6–0,8 giây, $0,042 mỗi triệu token</div></div>
+      <p class="ev">Đáp án: Opus chấm 124 ca; người dùng tự chấm 30 ca, khớp Opus 29/29. So 6 model ra quyết định: Jev, Decision-1, GPT-6 Luna cùng đúng 7/7; Jev nhanh, rẻ nhất. Trên server 16/10 10:40: gộp đúng hai bài về cùng một dự án port trình biên dịch TypeScript sang Rust.</p></div>
+
+    <div class="dec"><h3>4. Không mất tin khi daemon tắt lâu</h3>
+      <p>Lần chạy thật đầu tiên lộ lỗi: tắt vài ngày thì API nguồn chỉ trả 1.000–2.000 bài mới nhất, phần giữa bị mất. Sửa bằng cách đi từng cửa sổ thời gian và nhớ "đã lấy đủ tới đâu".</p>
+      <div class="ba"><div><small>LỖI</small>Algolia (HN) trả tối đa 1.000, arXiv 2.000 kết quả mỗi truy vấn</div><div class="after"><small>SAU SỬA</small>Lấy lại 7.357 tin HN và 5.684 tin arXiv bị hụt</div></div></div>
+
+    <div class="dec"><h3>5. Chi phí đo thật, không ước tính</h3>
+      <p>Mỗi lần gọi model ghi chi phí do Gateway báo về (bảng <code>llm_calls</code>), có bảng giá dự phòng. Nhờ vậy tiêu chí "dưới $0,10/ngày" chấm được bằng số thật.</p>
+      <div class="ba"><div><small>MỖI NGÀY</small>Embedding $0,003–0,009; viết điểm tin ~$0,002</div><div class="after"><small>TỔNG TỪ 28/09</small>$0,154</div></div></div>
+  </section>
+
+  <!-- 05 -->
+  <section class="panel" id="ke-hoach" role="tabpanel">
+    <h2>MVP-0 theo bản thiết kế (tuần 1–3)</h2>
+    <table>
+      <tr><th>Hạng mục</th><th>Trạng thái</th><th>Ghi chú</th></tr>
+      <tr><td>3 nguồn khác kiểu: HN, arXiv, GitHub releases</td><td><span class="st ok">xong</span></td><td>Thêm 2 nguồn GitHub (repo mới, Trending). Danh sách repo release đang để trống theo ý người dùng</td></tr>
+      <tr><td>Lớp thu thập: hàng đợi, chạy lại không trùng, lưu bản gốc lên R2</td><td><span class="st ok">xong</span></td><td>pg-boss; fetch thành công 97,2%</td></tr>
+      <tr><td>Embedding, lọc theo chủ đề, gộp sự kiện bằng vector</td><td><span class="st ok">xong</span></td><td>Thêm hai vector, Jev cho vùng không chắc</td></tr>
+      <tr><td>Điểm tin 07:00, ≤ 7 tin, 1 lời gọi LLM</td><td><span class="st ok">xong</span></td><td>Có bản dự phòng khi LLM lỗi, chạy lại không gửi trùng</td></tr>
+      <tr><td>Telegram, 👍/👎, ghi chi phí</td><td><span class="st ok">xong</span></td><td>Thêm <code>/topics</code>, <code>/profile</code></td></tr>
+      <tr><td>CLI, deploy Railway</td><td><span class="st ok">xong</span></td><td>Thêm <code>report</code>, <code>topics check/suggest</code></td></tr>
+      <tr><td>7 ngày nghiệm thu</td><td><span class="st part">đang chạy</span></td><td>3/7 sáng trên server, đủ ngày 20/10</td></tr>
+    </table>
+
+    <h2>Làm sớm hơn kế hoạch</h2>
+    <table>
+      <tr><th>Hạng mục</th><th>Kế hoạch gốc</th></tr>
+      <tr><td><span class="st plus">thêm</span> Model ra quyết định cho vùng không chắc khi gộp tin</td><td>"LLM vùng xám": để sau MVP-0</td></tr>
+      <tr><td><span class="st plus">thêm</span> Lấy nội dung trang cho bài HN</td><td>Không có trong kế hoạch</td></tr>
+      <tr><td><span class="st plus">thêm</span> Thư viện chủ đề, gợi ý chủ đề từ lời mô tả, kiểm chủ đề trùng</td><td>Kế hoạch gốc chỉ có "đoạn mô tả hồ sơ"</td></tr>
+    </table>
+
+    <h2>Chậm hơn kế hoạch</h2>
+    <table>
+      <tr><th>Hạng mục</th><th>Kế hoạch gốc</th><th>Hiện trạng</th></tr>
+      <tr><td>API Hono, feed web</td><td>Tuần 3–4</td><td><span class="st no">chưa làm</span> Đã có kế hoạch chi tiết (nhieu-nguoi-dung-va-web.html)</td></tr>
+      <tr><td>Tìm kiếm kết hợp từ khoá và ý nghĩa</td><td>Tuần 3–7</td><td><span class="st no">chưa làm</span></td></tr>
+      <tr><td>Khử trùng gần đúng (SimHash)</td><td>Tuần 3</td><td><span class="st part">để sau</span> Gộp theo link + vector + Jev đang đủ dùng</td></tr>
+      <tr><td>Đo chất lượng gộp sự kiện (F1 trên 200 cặp)</td><td>MVP-0</td><td><span class="st part">chưa đo</span> Mới có 30 ca người dùng chấm</td></tr>
+      <tr><td>Thêm nguồn (RSS, HF Papers, Reddit)</td><td>MVP-1</td><td><span class="st part">chưa làm</span> Đang 4 nguồn lấy tin</td></tr>
+    </table>
+    <p class="note">Tri thức (thực thể, quan hệ), agent, MCP, dashboard thuộc MVP-1, MVP-2 (tuần 4–12), chưa bắt đầu đúng theo kế hoạch.</p>
+  </section>
+
+  <!-- 06 -->
+  <section class="panel" id="rui-ro" role="tabpanel">
+    <h2>Rủi ro</h2>
+    <table>
+      <tr><th>Rủi ro</th><th>Mức</th><th>Xử lý</th></tr>
+      <tr><td>arXiv giới hạn tốc độ: 4/8 lượt trong 7 ngày bị từ chối</td><td><span class="st part">vừa</span></td><td>Giãn nhịp gọi, thử lại theo thời gian arXiv yêu cầu. Chưa mất tin vì lượt sau lấy bù</td></tr>
+      <tr><td>Cổng chủ đề có Jev mới chạy lần đầu sáng 17/10</td><td><span class="st part">vừa</span></td><td>Xem plan điểm tin 17/10: số tin Jev cho qua, cho rớt</td></tr>
+      <tr><td>Tin ít liên quan vẫn lọt (tin 6 ngày 16/10)</td><td><span class="st part">vừa</span></td><td>Có phản hồi 👎 để đo; Jev ở cổng chủ đề nhắm đúng chỗ này</td></tr>
+      <tr><td>Chất lượng gộp sự kiện chưa đo trên mẫu lớn</td><td><span class="st part">vừa</span></td><td>Chấm 200 cặp, tính F1</td></tr>
+      <tr><td>Phụ thuộc một người dùng: số liệu phản hồi chỉ của một người</td><td><span class="st part">vừa</span></td><td>Kế hoạch nhiều người dùng (dưới)</td></tr>
+    </table>
+
+    <h2>Tiếp theo</h2>
+    <ol>
+      <li><b>Hết 7 sáng nghiệm thu (20/10)</b>, chạy lại <code>cli report</code>.</li>
+      <li><b>Nhiều người dùng</b>: tách dữ liệu theo hồ sơ (hồ sơ, chủ đề đã chọn, điểm tin, phản hồi, chat Telegram). Phần tin và sự kiện dùng chung, không phải đổi.</li>
+      <li><b>Web</b>: đăng nhập (Better Auth, GitHub/Google), feed, chi tiết sự kiện, tìm kiếm, trang nguồn. Đây là phần chậm nhất so với kế hoạch.</li>
+      <li><b>Học từ phản hồi</b>: hai luật sửa nhanh, bật U, tin khám phá, rồi hồi quy logistic (tab 07).</li>
+      <li><b>MVP-1</b>: thêm nguồn, thực thể và quan hệ.</li>
+    </ol>
+    <p class="note">Chi phí dự kiến khi có thêm người dùng: viết điểm tin khoảng $0,002 mỗi người mỗi ngày; 100 người khoảng $6 mỗi tháng tiền model.</p>
+  </section>
+
+  <!-- 08 -->
+  <section class="panel" id="phan-hoi" role="tabpanel">
+    <h2>Vấn đề: trọng số đang đặt tay</h2>
+    <p>Mỗi sự kiện được chấm một điểm <code>S</code> để xếp hạng:</p>
+    <div class="card" style="font-family:var(--mono);font-size:14px">S = N × (0,40·R + 0,25·P + 0,15·C + 0,10·A + 0,10·F)</div>
+    <p>R: hợp chủ đề người dùng chọn · P: độ nổi (điểm HN, sao GitHub) · C: độ phủ (bao nhiêu trang cùng đưa tin) · A: nguồn uy tín · F: độ mới · N: phạt khi trùng ý với tin đã chọn. Các con số 0,40, 0,25… là tôi đặt theo suy luận lúc chưa có phản hồi nào. Phản hồi 👍/👎 sinh ra chính để thay chúng bằng số học được.</p>
+
+    <h2>Dữ liệu thật: công thức hiện tại chưa tách được thích và không thích</h2>
+    <table>
+      <tr><th>Trung bình</th><th>R</th><th>P</th><th>C</th><th>A</th><th>F</th><th>Điểm S</th></tr>
+      <tr><td>23 tin được 👍</td><td class="n">0,92</td><td class="n">0,51</td><td class="n">0,37</td><td class="n">0,59</td><td class="n">0,81</td><td class="n"><b>0,692</b></td></tr>
+      <tr><td>5 tin bị 👎</td><td class="n">0,83</td><td class="n">0,54</td><td class="n">0,49</td><td class="n">0,68</td><td class="n">0,84</td><td class="n"><b>0,690</b></td></tr>
+    </table>
+    <p>Điểm S của hai nhóm gần như bằng nhau. Chỉ R (hợp chủ đề) cao hơn rõ ở nhóm được thích; C và A lại cao hơn ở nhóm bị 👎. Mẫu còn rất nhỏ (5 tin 👎) nên chưa kết luận được, nhưng đây là dấu hiệu trọng số hiện tại chưa phản ánh đúng ý người đọc.</p>
+    <p class="note">Tính từ 28 tin có phản hồi (lượt bấm mới nhất), ghép với điểm lưu trong kế hoạch của từng điểm tin, 13–16/10.</p>
+
+    <h2>5 tin bị 👎 là gì</h2>
+    <table>
+      <tr><th>Nhóm</th><th>Tin</th><th>Sửa thế nào</th></tr>
+      <tr><td>Cùng một chuyện gửi hai ngày liền</td><td>"Kỹ sư OpenAI bị bắt vì giấu thiết bị ghi âm…" (14/10, 15/10)</td><td>Không gửi lại sự kiện đã gửi hôm trước, trừ khi có diễn biến mới. Luật, không cần học</td></tr>
+      <tr><td>Bản phát hành chỉ cập nhật phụ thuộc</td><td>"@ai-sdk/zai 3.0.30", "Ollama v0.40.4" (13/10)</td><td>Bỏ bản phát hành chỉ đổi phiên bản phụ thuộc (đã có trong danh sách việc)</td></tr>
+      <tr><td>Không hợp</td><td>"Nhiều ứng dụng đọc chính tả bằng giọng nói…" (14/10)</td><td>Đây là phần học từ phản hồi giải quyết</td></tr>
+    </table>
+    <p>4/5 tin bị 👎 sửa được bằng luật đơn giản. Nên làm hai luật này trước, để phản hồi sau đó phản ánh đúng chất lượng chọn tin, không lẫn các lỗi đã biết.</p>
+
+    <h2>Kế hoạch học từ phản hồi, ba bước</h2>
+    <div class="dec"><h3>1. Thêm thành phần U: cá nhân hoá theo những gì bạn đã thích</h3>
+      <p>Lấy "tâm" (vector trung bình) của các tin bạn 👍 và của các tin 👎. Tin mới càng gần tâm 👍, càng xa tâm 👎 thì được cộng điểm:</p>
+      <div class="card" style="font-family:var(--mono);font-size:14px">U(e) = cos(e, tâm 👍) − cos(e, tâm 👎) &nbsp;&nbsp;→&nbsp;&nbsp; S = N × (…) + w<sub>U</sub> · U(e)</div>
+      <div class="ba"><div><small>HIỆN NAY</small>w<sub>U</sub> = 0 (tắt)</div><div class="after"><small>KHI CÓ ~30 PHẢN HỒI</small>Bật w<sub>U</sub> ≈ 0,15. Đang có 28: đủ trong vài ngày tới</div></div>
+      <p class="ev">Không cần huấn luyện gì: chỉ là phép tính trên embedding đã có. Rủi ro: tâm 👎 mới từ 5 tin nên còn nhiễu; cần theo dõi xem tin bị đẩy xuống có hợp lý không.</p></div>
+
+    <div class="dec"><h3>2. Học lại trọng số bằng hồi quy logistic</h3>
+      <p>Hồi quy logistic là mô hình dự đoán xác suất một việc có/không xảy ra. Ở đây: xác suất bạn 👍 một tin, dựa trên các thành phần điểm của tin đó:</p>
+      <div class="card" style="font-family:var(--mono);font-size:14px">P(👍) = σ(b + w<sub>R</sub>·R + w<sub>P</sub>·P + w<sub>C</sub>·C + w<sub>A</sub>·A + w<sub>F</sub>·F + w<sub>U</sub>·U)</div>
+      <p>σ là hàm biến một số bất kỳ thành xác suất 0–1. Các hệ số w học được cho biết thành phần nào thật sự làm bạn thích tin, và trở thành trọng số mới thay cho 0,40, 0,25…</p>
+      <div class="ba"><div><small>CẦN BAO NHIÊU DỮ LIỆU</small>Quy tắc kinh nghiệm thường dùng: khoảng 10 mẫu của nhóm ít hơn cho mỗi biến. 6 biến → ~60 tin bị 👎</div><div class="after"><small>BAO LÂU</small>Hiện 5 👎, tỉ lệ ~18%. Một người, 7 tin/ngày → khoảng 330 tin, ~7 tuần. Nhiều người dùng chung một bộ trọng số thì nhanh hơn nhiều lần</div></div>
+      <p class="ev">Quy tắc "10 mẫu mỗi biến" là cách ước lượng phổ biến trong thống kê, dùng để biết lúc nào đủ dữ liệu, không phải ngưỡng chính xác. Đánh giá: chia theo thời gian (học trên các tuần trước, kiểm trên tuần sau), so AUC của trọng số mới với trọng số đặt tay.</p></div>
+
+    <div class="dec"><h3>3. Tránh học lệch: thêm tin "khám phá"</h3>
+      <p>Phản hồi chỉ có trên những tin đã được chọn, tức đã điểm cao theo công thức cũ. Học từ đó thì mô hình không bao giờ biết các tin bị loại có hay không (thiên lệch chọn mẫu). Cách làm thường dùng: mỗi điểm tin dành một vị trí cho một tin ngẫu nhiên từ ngay dưới ngưỡng, ghi rõ là tin khám phá.</p>
+      <div class="ba"><div><small>KHÔNG CÓ KHÁM PHÁ</small>Chỉ học được thứ tự trong nhóm tin đã cao điểm</div><div class="after"><small>CÓ KHÁM PHÁ</small>Biết được tin dưới ngưỡng có đáng đọc không, để chỉnh cả ngưỡng</div></div></div>
+
+    <h2>Thứ tự đề xuất</h2>
+    <table>
+      <tr><th>Việc</th><th>Khi nào</th><th>Đo bằng gì</th></tr>
+      <tr><td>Không gửi lại chuyện đã gửi; bỏ bản phát hành chỉ cập nhật phụ thuộc</td><td>Ngay</td><td>Tỉ lệ 👎 các tuần sau</td></tr>
+      <tr><td>Bật U (w<sub>U</sub> ≈ 0,15)</td><td>Khi đủ 30 phản hồi (vài ngày tới)</td><td>So danh sách chọn có và không có U trên cùng một ngày</td></tr>
+      <tr><td>Một tin khám phá mỗi điểm tin</td><td>Cùng lúc bật U</td><td>Tỉ lệ 👍 của tin khám phá so với tin thường</td></tr>
+      <tr><td>Hồi quy logistic, học lại trọng số</td><td>Khi có ~60 tin bị 👎 (sớm hơn nếu có nhiều người dùng)</td><td>AUC trên tuần kiểm tra, so với trọng số đặt tay</td></tr>
+      <tr><td>Gợi ý sửa hồ sơ từ phản hồi</td><td>Sau đó</td><td>Người dùng chấp nhận bao nhiêu gợi ý</td></tr>
+    </table>
+  </section>
+
+  <!-- 07 -->
+  <section class="panel" id="hoi-dap" role="tabpanel">
+    <h2>Câu hỏi có thể gặp khi review</h2>
+    <div class="qa"><b>Sao không đưa hết cho LLM chọn tin?</b><p>Mỗi ngày có ~1.200 sự kiện mới; hỏi LLM từng cái thì chậm và tốn. radard lọc bằng embedding (rẻ, tính một lần, dùng chung), chỉ hỏi model ở vùng không chắc (Jev, rẻ hơn LLM nhiều lần), và chỉ gọi LLM một lần để viết điểm tin. Viết điểm tin tốn ~$0,002 mỗi ngày.</p></div>
+    <div class="qa"><b>Làm sao biết chọn tin đúng?</b><p>Ba lớp: phản hồi thật (82% thích trên 28 tin); chấm tay ca khó (30 ca, khớp đáp án tham khảo 29/29); và số đo bộ chủ đề trên 16.203 tin. Còn thiếu: F1 gộp sự kiện trên mẫu lớn.</p></div>
+    <div class="qa"><b>Vì sao lưu vector trong Postgres mà không dùng cơ sở dữ liệu vector riêng?</b><p>Một chỗ lưu cho mọi thứ, truy vấn kết hợp được với lọc thời gian và nguồn. Đã đo chỉ mục HNSW của pgvector trên 50.000 vector (trang <code>hnsw.html</code>). Với việc gộp sự kiện, Postgres tự chọn chỉ mục B-tree theo thời gian: chỉ ~424 sự kiện nằm trong cửa sổ 7 ngày, tính cosine chính xác hết 7 ms, đúng 100%. HNSW sẽ cần khi làm tìm kiếm trên toàn bộ kho.</p></div>
+    <div class="qa"><b>Dữ liệu lấy có hợp lệ không?</b><p>Chỉ API chính thức và trang công khai cho phép; tôn trọng robots.txt (ví dụ GitHub Trending chỉ đọc <code>/trending</code> vì robots.txt chặn các trang lọc theo thời gian). Không thu thập Facebook Group hay trang cá nhân.</p></div>
+    <div class="qa"><b>Daemon chết thì sao?</b><p>Hàng đợi lưu trong Postgres, job chạy lại không sinh bản trùng; nguồn nhớ "đã lấy đủ tới đâu" nên tắt lâu vẫn lấy bù được (đã kiểm: lấy lại 13.041 tin). Điểm tin lưu kế hoạch trước khi gửi, chạy lại chỉ gửi phần còn thiếu.</p></div>
+    <div class="qa"><b>Vì sao web chậm?</b><p>Ưu tiên cho điểm tin chạy thật mỗi sáng để dữ liệu và phản hồi bắt đầu tích luỹ, đúng mục đích MVP-0. Web đã có kế hoạch, và sẽ làm cùng việc chuyển sang nhiều người dùng để không phải sửa hai lần.</p></div>
+  </section>
+
+  <footer>Số liệu: DB server radard và lệnh <code>cli report</code> chạy ngày 16/10/2026; lịch sử git; các trang đo trong <code>docs/</code> (bo-chu-de-moi, cham-thu-jev, mo-hinh-quyet-dinh, hnsw); nhật ký lab notebook.</footer>
+</div>
+<script>
+const tabs = document.querySelectorAll('.tabs button');
+const show = (id) => {
+  tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
+  try { history.replaceState(null, '', '#' + id); } catch {}
+};
+tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+const start = location.hash.slice(1);
+if (start && document.getElementById(start)) show(start);
+</script>
+</body>
+</html>

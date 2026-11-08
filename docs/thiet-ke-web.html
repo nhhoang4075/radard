@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Thiết kế web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --page:#F2F2F2; --surface:#FFFFFF; --ink:#111111; --ink-2:#52525B; --ink-3:#71717A; --line:#E4E4E7; --line-2:#D4D4D8; --soft:#F7F7F8;
+  --ok:#16794C; --ok-soft:#E3F4EA; --warn:#9A5B00; --warn-soft:#FBEFD9; --bad:#B4321F; --bad-soft:#FBE5E1;
+  --sans:"Geist",system-ui,-apple-system,sans-serif;
+  --serif:"Source Serif 4",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --g-blue:var(--grain),radial-gradient(92% 95% at 6% 6%,#8FC1F7 0%,rgba(143,193,247,0) 66%),radial-gradient(70% 78% at 96% 2%,#CDEBF4 0%,rgba(205,235,244,0) 60%),radial-gradient(82% 76% at 92% 96%,#DDD7F8 0%,rgba(221,215,248,0) 62%),#EAF1FA;
+  --g-violet:var(--grain),radial-gradient(80% 88% at 92% 8%,#B9A5F2 0%,rgba(185,165,242,0) 60%),radial-gradient(72% 80% at 4% 4%,#C3DCF8 0%,rgba(195,220,248,0) 60%),radial-gradient(84% 80% at 6% 98%,#F6D9EC 0%,rgba(246,217,236,0) 62%),#EFEAF8;
+  --g-mint:var(--grain),radial-gradient(80% 88% at 8% 92%,#8FDCBB 0%,rgba(143,220,187,0) 60%),radial-gradient(72% 78% at 88% 4%,#E0D8F7 0%,rgba(224,216,247,0) 60%),radial-gradient(80% 80% at 96% 92%,#F8E7C8 0%,rgba(248,231,200,0) 64%),#EAF4EF;
+  --g-peach:var(--grain),radial-gradient(80% 88% at 92% 88%,#F5BE85 0%,rgba(245,190,133,0) 60%),radial-gradient(70% 74% at 4% 8%,#D6EDE1 0%,rgba(214,237,225,0) 60%),radial-gradient(80% 80% at 2% 94%,#F9D4C6 0%,rgba(249,212,198,0) 64%),#F7EEE6;
+  --g-sky:radial-gradient(36% 32% at 70% 2%,rgba(255,224,192,.8) 0%,rgba(255,224,192,0) 70%),radial-gradient(80% 42% at 50% 74%,rgba(255,240,224,.5) 0%,rgba(255,240,224,0) 72%),linear-gradient(#C8DDF6 0%,#D9E7F8 34%,#E6EDF6 66%,#EDF1F6 100%);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:1240px;margin:0 auto;padding:36px 16px 80px}
+h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em;line-height:1.15}
+h1{font-size:clamp(30px,5vw,48px);letter-spacing:-.025em}
+h2{font-size:24px;margin:34px 0 10px} h3{font-size:17px}
+p{margin:8px 0}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);display:inline-flex;align-items:center;gap:8px}
+.eyebrow::before{content:"";width:7px;height:7px;border-radius:2px;background:#8FDCBB}
+.lede{font-family:var(--serif);font-size:18px;color:var(--ink-2);max-width:72ch;margin-top:12px}
+code{font-family:var(--mono);font-size:12.5px;background:var(--soft);border:1px solid var(--line);padding:0 5px;border-radius:5px}
+.doc-tabs{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;margin-top:22px;flex-wrap:wrap}
+.doc-tabs button{font:inherit;font-size:14px;color:var(--ink-2);background:none;border:0;border-radius:10px;padding:7px 14px;cursor:pointer}
+.doc-tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+.dpanel{display:none}.dpanel.on{display:block}
+
+/* nút: đặc màu mực, trắng có viền, hoặc chữ; không dùng gradient */
+.btn{font:inherit;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border-radius:12px;border:1px solid transparent;cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.primary:hover{background:#2A2A2E}
+.btn.secondary{background:#fff;color:var(--ink);border-color:var(--line-2)}
+.btn.secondary:hover{border-color:#A1A1AA}
+.btn.ghost{background:transparent;color:var(--ink-2)} .btn.ghost:hover{background:var(--soft);color:var(--ink)}
+.btn.sm{height:30px;padding:0 10px;font-size:13px;border-radius:9px}
+.btn.lg{height:46px;padding:0 20px;font-size:15px;border-radius:14px}
+.btn svg{width:16px;height:16px}
+.chip{font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;background:#fff;border:1px solid var(--line-2);color:var(--ink-2);cursor:pointer}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.75);border:1px solid rgba(17,17,17,.08);color:var(--ink-2);white-space:nowrap}
+.kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:6px;padding:0 5px;color:var(--ink-3);background:#fff}
+
+.mesh{border-radius:22px;padding:22px;position:relative;overflow:hidden}
+.mesh.blue{background:var(--g-blue)} .mesh.violet{background:var(--g-violet)} .mesh.mint{background:var(--g-mint)} .mesh.peach{background:var(--g-peach)}
+.icon-tile{width:44px;height:44px;border-radius:12px;background:#fff;display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.icon-tile svg{width:20px;height:20px}
+
+/* hệ thống thiết kế */
+.ds-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.ds-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px}
+.sw{height:96px;border-radius:16px;margin-bottom:10px}
+.note{font-size:13.5px;color:var(--ink-3)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* khung app */
+.app{display:grid;grid-template-columns:232px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:24px;overflow:hidden;min-height:760px;margin-top:18px;box-shadow:0 30px 60px -30px rgba(17,17,17,.18)}
+.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px;background:#FBFBFB}
+.brand{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;padding:6px 8px 14px}
+.brand i{width:22px;height:22px;border-radius:50%;border:3px solid #8FC1F7;box-shadow:inset 0 0 0 3px #fff,0 0 0 1px #B9A5F2;display:inline-block}
+.nav-h{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:14px 10px 6px}
+.nav{font:inherit;font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;border:0;background:none;cursor:pointer;text-align:left;width:100%}
+.nav svg{width:17px;height:17px;flex:none}
+.nav:hover{background:#F0F0F2;color:var(--ink)}
+.nav.on{background:#fff;color:var(--ink);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.04)}
+.nav .cnt{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+.nav .soon{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:0 6px}
+.side-foot{margin-top:auto;padding:12px 10px 4px;font-size:12.5px;color:var(--ink-3);border-top:1px solid var(--line)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2FB67C;margin-right:6px}
+.main{display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.search-trigger{flex:1;max-width:520px;display:flex;align-items:center;gap:10px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:12px;color:var(--ink-3);background:var(--soft);cursor:pointer;font-size:14px}
+.search-trigger svg{width:16px;height:16px}
+.search-trigger .kbd{margin-left:auto}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--g-violet);border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.screen{display:none;padding:22px;overflow:auto}
+.screen.on{display:block}
+.screen-note{margin-top:22px;padding:14px 16px;border-radius:14px;background:var(--soft);border:1px dashed var(--line-2);font-size:13.5px;color:var(--ink-2)}
+.screen-note b{color:var(--ink)}
+
+/* feed */
+.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap}
+.hero h2{margin:8px 0 4px;font-size:28px}
+.hero p{font-family:var(--serif);font-size:16px;color:var(--ink-2);margin:0;max-width:60ch}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:rgba(255,255,255,.72);border-radius:14px;padding:8px 14px;min-width:96px}
+.stat b{display:block;font-size:22px;font-weight:500}
+.stat span{font-size:12px;color:var(--ink-2)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0 12px}
+.seg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:3px}
+.seg button{font:inherit;font-size:13px;border:0;background:none;border-radius:8px;padding:4px 10px;color:var(--ink-2);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.feed-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+.ev{display:grid;grid-template-columns:28px 1fr auto;gap:12px;padding:14px 14px;border:1px solid var(--line);border-radius:16px;background:#fff;margin-bottom:10px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.ev:hover{border-color:var(--line-2)}
+.ev.sel{border-color:var(--ink);box-shadow:0 0 0 3px rgba(17,17,17,.06)}
+.ev .n{font-family:var(--mono);font-size:12px;color:var(--ink-3);padding-top:3px}
+.ev h3{font-size:16px;font-weight:500;line-height:1.3}
+.ev .sum{font-family:var(--serif);font-size:15px;color:var(--ink-2);margin:6px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.why{display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:13.5px;color:var(--ink)}
+.why::before{content:"";flex:none;width:14px;height:14px;margin-top:3px;border-radius:5px;background:var(--g-violet)}
+.meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12.5px;color:var(--ink-3)}
+.score{font-family:var(--mono);font-size:12.5px;color:var(--ink);text-align:right}
+.score small{display:block;font-size:10.5px;color:var(--ink-3)}
+.fb{display:flex;gap:4px;margin-top:8px;justify-content:flex-end}
+.ibtn{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer;color:var(--ink-2)}
+.ibtn svg{width:15px;height:15px}
+.ibtn.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.detail{position:sticky;top:0;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+.detail .head{padding:18px}
+.detail .body{padding:4px 18px 18px}
+.detail h3{font-size:19px;line-height:1.3;margin-top:10px}
+.detail .sum{font-family:var(--serif);font-size:15.5px;color:var(--ink-2);margin-top:8px}
+.sec{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 8px}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:grid;grid-template-columns:52px 1fr;gap:8px;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--line)}
+.tl li span{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.bars{display:grid;grid-template-columns:auto 1fr 40px;gap:6px 10px;align-items:center;font-size:12.5px}
+.bars i{display:block;height:8px;border-radius:4px;background:#E9E9EC;position:relative;overflow:hidden}
+.bars i b{position:absolute;inset:0 auto 0 0;border-radius:4px;background:#5B7FD6}
+.bars em{font-style:normal;font-family:var(--mono);color:var(--ink-2);text-align:right}
+
+/* bảng lệnh ⌘K */
+.palette-bg{position:absolute;inset:0;background:rgba(17,17,17,.28);display:none;align-items:flex-start;justify-content:center;padding-top:90px;z-index:5;border-radius:24px}
+.palette-bg.on{display:flex}
+.palette{width:min(640px,92%);background:#fff;border-radius:20px;box-shadow:0 30px 80px -20px rgba(0,0,0,.35);overflow:hidden}
+.palette input{width:100%;border:0;border-bottom:1px solid var(--line);font:inherit;font-size:17px;padding:16px 18px;outline:none}
+.pal-group{padding:8px 8px 4px}
+.pal-group .sec{margin:6px 10px}
+.pal-item{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;font-size:14px;cursor:pointer}
+.pal-item:hover,.pal-item.on{background:var(--soft)}
+.pal-item small{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+.pal-foot{display:flex;gap:14px;padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3)}
+
+/* tìm kiếm */
+.sr{padding:14px 0;border-bottom:1px solid var(--line)}
+.sr h3{font-size:15.5px;font-weight:500}
+.sr mark{background:#E4DCFA;border-radius:3px;padding:0 2px}
+.sr .meta{margin-top:4px}
+.facet{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff}
+.facet label{display:flex;gap:8px;align-items:center;font-size:13.5px;padding:3px 0;color:var(--ink-2)}
+.facet label span{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+
+/* hồ sơ */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:#fff}
+.field textarea{width:100%;min-height:110px;border:0;resize:vertical;font-family:var(--serif);font-size:16px;line-height:1.55;outline:none;color:var(--ink)}
+.tier{margin-top:12px}
+.tier .sec{margin:10px 0 6px}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.topic{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;border:1px solid var(--line);background:#fff;cursor:pointer}
+.topic .box{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-2);display:grid;place-items:center;margin-top:1px}
+.topic.on{border-color:var(--ink)}
+.topic.on .box{background:var(--ink);border-color:var(--ink)}
+.topic.on .box::after{content:"";width:9px;height:5px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.topic b{font-weight:500;font-size:14px;display:block}
+.topic small{font-size:12px;color:var(--ink-3)}
+.newtopic{border-style:dashed}
+
+/* nguồn */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+td.n{font-family:var(--mono);font-size:13px}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:2px 9px;border-radius:999px}
+.st.ok{background:var(--ok-soft);color:var(--ok)} .st.warn{background:var(--warn-soft);color:var(--warn)} .st.bad{background:var(--bad-soft);color:var(--bad)} .st.off{background:var(--soft);color:var(--ink-3)}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:16px}
+
+/* đăng nhập */
+.login{min-height:700px;display:grid;place-items:center;background:var(--g-sky);border-radius:0;margin:-22px;padding:40px 16px}
+.login-card{width:min(420px,100%);background:rgba(255,255,255,.86);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.9);border-radius:24px;padding:30px;text-align:center;box-shadow:0 30px 60px -30px rgba(40,60,110,.35)}
+.login-card h2{font-size:30px;margin:14px 0 6px}
+.login-card p{font-family:var(--serif);color:var(--ink-2);font-size:16px}
+.login-card .btn{width:100%;justify-content:center;margin-top:10px}
+
+/* agent */
+.chat{max-width:760px}
+.msg-u{margin-left:auto;max-width:76%;background:var(--ink);color:#fff;border-radius:18px 18px 4px 18px;padding:10px 14px;font-size:14.5px;width:fit-content}
+.msg-a{max-width:92%;margin-top:14px;font-family:var(--serif);font-size:16px;color:var(--ink)}
+.cite{font-family:var(--mono);font-size:11px;background:#E4DCFA;border-radius:5px;padding:0 5px;margin:0 2px;vertical-align:1px;cursor:pointer}
+.composer{display:flex;gap:8px;align-items:center;margin-top:20px;border:1px solid var(--line-2);border-radius:16px;padding:8px 8px 8px 14px;background:#fff}
+.composer input{flex:1;border:0;font:inherit;font-size:15px;outline:none}
+.soonbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;font-size:13.5px;color:var(--ink-2)}
+
+/* dashboard */
+.kpi4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi4 .mesh{padding:18px;min-height:132px}
+.kpi4 b{display:block;font-size:30px;font-weight:500;margin-top:18px}
+.kpi4 span{font-size:13px;color:var(--ink-2)}
+
+/* bảng tính năng */
+.feat td:first-child{font-weight:500}
+.ph{font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.ph.mvp{background:#E3ECFB;color:#2F5DA8} .ph.p2{background:#ECE6FA;color:#5B46B5} .ph.p3{background:#E3F4EA;color:#16794C}
+
+@media (max-width:1100px){.feed-grid{grid-template-columns:1fr}.detail{position:static}.kpi4,.ds-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:820px){.app{grid-template-columns:1fr}.side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}.nav-h,.side-foot,.brand{display:none}.nav{width:auto;white-space:nowrap}.two{grid-template-columns:1fr}}
+@media (max-width:560px){.kpi4,.ds-grid{grid-template-columns:1fr}.ev{grid-template-columns:1fr}.ev .n{display:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-feed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.8 4-5.6 7.5-5.6s6.3 1.8 7.5 5.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-src" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 19a1 1 0 1 0 0-.01M5 12a7 7 0 0 1 7 7M5 5a14 14 0 0 1 14 14"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z"/></symbol>
+  <symbol id="i-brief" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M9 8.5h6M9 12h6M9 15.5h4"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 19V11M10 19V6M15 19v-5M20 19V9"/></symbol>
+  <symbol id="i-login" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l4-4-4-4M14 12H4"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 11v9H4v-9zM7 11l4-7c1.6 0 2.5 1 2.2 2.6L12.6 10H18a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 13V4H4v9zM7 13l4 7c1.6 0 2.5-1 2.2-2.6L12.6 14H18a2 2 0 0 0 2-2.3l-1.2-6A2 2 0 0 0 16.8 4H7"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 5h5v5M19 5l-8 8M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18V7.5A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 12 20 4l-4 16-4-6.5z"/></symbol>
+  <symbol id="i-tg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m3.5 11.5 16-6.5-2.8 14-5-3.8-2.6 2.5.4-4 7-6.2-8.8 5.4z"/></symbol>
+  <symbol id="i-gh" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.6-.2.6-.5v-1.7c-2.6.6-3.2-1.2-3.2-1.2-.4-1.1-1-1.4-1-1.4-.9-.6 0-.6 0-.6.9.1 1.4 1 1.4 1 .8 1.4 2.2 1 2.7.8.1-.6.3-1 .6-1.2-2.1-.2-4.3-1-4.3-4.7 0-1 .4-1.9 1-2.5-.1-.3-.4-1.2.1-2.5 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.2.1 2.5.6.6 1 1.5 1 2.5 0 3.7-2.2 4.5-4.3 4.7.3.3.6.8.6 1.6v2.4c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5Z"/></symbol>
+  <symbol id="i-g" viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3Z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.5l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.9a6 6 0 0 1 0-3.8V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#EA4335" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6 12 6Z"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="eyebrow">radard · thiết kế web · 16/10/2026</div>
+  <h1>Web radard: đọc tin, tìm, chỉnh theo ý mình</h1>
+  <p class="lede">Bản thiết kế theo phong cách cap.so mà bạn chọn: nền xám nhạt, thẻ trắng bo tròn, mảng màu loang xanh, tím, bạc hà và đào có hạt mịn; chữ không chân cho giao diện, chữ có chân cho phần đọc. Nút không dùng gradient. Dữ liệu trong bản mẫu là dữ liệu thật của radard ngày 16/10, trừ các màn hình ghi "dữ liệu minh hoạ".</p>
+
+  <div class="doc-tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-d="proto">Bản mẫu bấm được</button>
+    <button role="tab" aria-selected="false" data-d="ds">Hệ thống thiết kế</button>
+    <button role="tab" aria-selected="false" data-d="feat">Tính năng và giai đoạn</button>
+  </div>
+
+  <!-- ===== BẢN MẪU ===== -->
+  <section class="dpanel on" id="proto">
+    <p class="note" style="margin-top:14px">Bấm thanh bên để đổi màn hình. Trong Feed: bấm một tin hoặc dùng phím <span class="kbd">j</span> <span class="kbd">k</span> để chuyển, <span class="kbd">⌘K</span> (hoặc <span class="kbd">Ctrl K</span>) để mở tìm nhanh, <span class="kbd">Esc</span> để đóng.</p>
+    <div class="app" id="app" style="position:relative">
+      <aside class="side">
+        <div class="brand"><i></i>radard</div>
+        <button class="nav on" data-s="feed"><svg><use href="#i-feed"/></svg>Feed<span class="cnt">189</span></button>
+        <button class="nav" data-s="search"><svg><use href="#i-search"/></svg>Tìm kiếm</button>
+        <button class="nav" data-s="profile"><svg><use href="#i-user"/></svg>Hồ sơ và chủ đề</button>
+        <button class="nav" data-s="sources"><svg><use href="#i-src"/></svg>Nguồn<span class="cnt">5</span></button>
+        <div class="nav-h">Sắp có</div>
+        <button class="nav" data-s="agent"><svg><use href="#i-chat"/></svg>Hỏi radard<span class="soon">GĐ2</span></button>
+        <button class="nav" data-s="watch"><svg><use href="#i-eye"/></svg>Theo dõi<span class="soon">GĐ2</span></button>
+        <button class="nav" data-s="dash"><svg><use href="#i-chart"/></svg>Tổng quan<span class="soon">GĐ3</span></button>
+        <div class="nav-h">Khác</div>
+        <button class="nav" data-s="login"><svg><use href="#i-login"/></svg>Trang đăng nhập</button>
+        <div class="side-foot"><span class="dot"></span>Đang chạy · lấy tin 2 phút trước<br>Chi phí model 7 ngày $0,12</div>
+      </aside>
+
+      <div class="main">
+        <div class="top">
+          <div class="search-trigger" id="openPal"><svg><use href="#i-search"/></svg>Tìm tin, chủ đề, nguồn…<span class="kbd">⌘K</span></div>
+          <div style="margin-left:auto" class="row"><button class="btn secondary sm"><svg><use href="#i-chat"/></svg>Hỏi radard</button><div class="avatar"></div></div>
+        </div>
+
+        <!-- FEED -->
+        <div class="screen on" id="s-feed">
+          <div class="mesh blue">
+            <div class="hero">
+              <div>
+                <span class="tag">Thứ Sáu · 16/10</span>
+                <h2>Điểm tin sáng nay</h2>
+                <p>Nổi bật nhất là đợt mở trọng số của các model lớn và nhỏ hướng tới agent chạy cục bộ. Bên cạnh đó có một nghiên cứu về sinh văn bản song song và vài công cụ cho lập trình với AI.</p>
+              </div>
+              <div class="stats">
+                <div class="stat"><b>1.231</b><span>sự kiện mới</span></div>
+                <div class="stat"><b>189</b><span>thuộc chủ đề của bạn</span></div>
+                <div class="stat"><b>7</b><span>đã gửi 07:01</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="filters">
+            <div class="seg" data-seg><button class="on">24 giờ</button><button>7 ngày</button><button>30 ngày</button></div>
+            <div class="seg" data-seg><button class="on">Trong điểm tin</button><button>Tất cả của tôi</button><button>Mọi tin</button></div>
+            <button class="chip on">Tất cả chủ đề</button><button class="chip">Model AI</button><button class="chip">Lập trình với AI</button><button class="chip">Xây ứng dụng LLM</button><button class="chip">+5</button>
+          </div>
+          <div class="feed-grid">
+            <div id="evlist"></div>
+            <aside class="detail" id="detail"></aside>
+          </div>
+          <div class="screen-note"><b>Ghi chú.</b> Dải màu loang chỉ dùng cho phần "hôm nay" ở đầu trang; thẻ tin là nền trắng để dễ đọc. Dòng có ô tím là "vì sao với bạn", tách khỏi tóm tắt. Cột phải mở chi tiết mà không rời Feed: các bài đã gộp theo giờ, vì sao được chọn (năm thành phần điểm thật của tin), và nút đọc bài gốc. Bộ lọc nằm trên URL, chia sẻ link là thấy đúng góc nhìn.</div>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="screen" id="s-search">
+          <div class="row" style="gap:12px">
+            <div class="search-trigger" style="max-width:none;background:#fff;color:var(--ink)"><svg><use href="#i-search"/></svg>MCP<span class="kbd">Enter</span></div>
+            <div class="seg" data-seg><button class="on">Kết hợp</button><button>Từ khoá</button><button>Theo ý nghĩa</button></div>
+          </div>
+          <p class="note" style="margin-top:10px">167 tin có "MCP" trong tiêu đề, 30 ngày qua. Đang xem 7 ngày.</p>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:16px;margin-top:6px">
+            <div>
+              <div class="sr"><h3>Show HN: I built 7 B2B APIs and 5 <mark>MCP</mark> servers for compliance and trade</h3><div class="meta"><span>Hacker News</span>·<span>16/10</span>·<span>Xây ứng dụng LLM</span></div></div>
+              <div class="sr"><h3>PostHog <mark>MCP</mark> Leaderboard</h3><div class="meta"><span>Hacker News</span>·<span>16/10</span>·<span>Agent AI</span></div></div>
+              <div class="sr"><h3>Visual Nerve, Free workflow visualization and simulation with <mark>MCP</mark></h3><div class="meta"><span>Hacker News</span>·<span>16/10</span>·<span>Agent AI</span></div></div>
+              <div class="sr"><h3>OpenTodo, a Todoist killer with <mark>MCP</mark> integration</h3><div class="meta"><span>Hacker News</span>·<span>16/10</span>·<span>Trợ lý và ứng dụng AI</span></div></div>
+              <div class="sr"><h3>bbylw/rea-cn: REA, reverse engineer anything through one <mark>MCP</mark> server</h3><div class="meta"><span>GitHub repo mới</span>·<span>16/10</span>·<span>Agent AI</span></div></div>
+            </div>
+            <div class="facet">
+              <div class="sec" style="margin-top:0">Nguồn</div>
+              <label><input type="checkbox" checked>Hacker News<span>4</span></label>
+              <label><input type="checkbox" checked>GitHub repo mới<span>2</span></label>
+              <label><input type="checkbox" checked>arXiv<span>0</span></label>
+              <div class="sec">Thời gian</div>
+              <div class="seg" data-seg><button>24h</button><button class="on">7 ngày</button><button>30 ngày</button></div>
+              <div class="sec">Chỉ chủ đề của tôi</div>
+              <label><input type="checkbox">Ẩn tin ngoài 8 chủ đề</label>
+            </div>
+          </div>
+          <div class="screen-note"><b>Ghi chú.</b> "Kết hợp" trộn tìm theo từ khoá (full-text Postgres, chịu gõ sai nhờ <code>pg_trgm</code>) với tìm theo ý nghĩa (embedding đã có), nên gõ "chạy model trên laptop" vẫn ra tin về llama.cpp. Các tiêu đề ở đây là tiêu đề thật; nhãn chủ đề là minh hoạ. Tìm nhanh <span class="kbd">⌘K</span> mở từ bất cứ đâu.</div>
+        </div>
+
+        <!-- PROFILE -->
+        <div class="screen" id="s-profile">
+          <div class="two">
+            <div class="mesh violet">
+              <span class="tag">Về bạn</span>
+              <h2 style="margin:10px 0 4px;font-size:24px">Mô tả của bạn</h2>
+              <p style="font-family:var(--serif);color:var(--ink-2);margin:0 0 12px">radard dùng đoạn này để gợi ý chủ đề và viết câu "vì sao với bạn".</p>
+              <div class="field"><textarea>Mình là kỹ sư phần mềm AI, làm hệ thống tích hợp LLM và agent bằng Python, TypeScript, Postgres; thích học thêm thuật toán và ML như xếp hạng, truy hồi, gom cụm.</textarea></div>
+              <div class="row" style="margin-top:12px"><button class="btn primary">Lưu và gợi ý chủ đề</button><button class="btn ghost">Xem bản tiếng Anh radard dùng</button></div>
+            </div>
+            <div class="mesh mint">
+              <span class="tag">Kênh nhận tin</span>
+              <h2 style="margin:10px 0 4px;font-size:24px">Điểm tin mỗi sáng</h2>
+              <p style="font-family:var(--serif);color:var(--ink-2);margin:0 0 12px">Gửi lúc 07:00 giờ Việt Nam, tối đa 7 tin.</p>
+              <div class="card" style="display:flex;gap:12px;align-items:center">
+                <div class="icon-tile" style="box-shadow:none;background:var(--soft)"><svg><use href="#i-tg"/></svg></div>
+                <div><b style="font-weight:500">Telegram</b><br><span class="note">Đã nối · @radard_bot</span></div>
+                <span class="st ok" style="margin-left:auto">Đang nhận</span>
+              </div>
+              <div class="card" style="display:flex;gap:12px;align-items:center;margin-top:10px">
+                <div class="icon-tile" style="box-shadow:none;background:var(--soft)"><svg><use href="#i-chat"/></svg></div>
+                <div><b style="font-weight:500">Discord, thông báo trình duyệt</b><br><span class="note">Giai đoạn 3</span></div>
+                <button class="btn secondary sm" style="margin-left:auto" disabled>Sắp có</button>
+              </div>
+            </div>
+          </div>
+
+          <h2>Chủ đề theo dõi</h2>
+          <p class="note">Bấm để chọn hoặc bỏ, rồi Lưu. Gợi ý dựa trên mô tả của bạn; chủ đề đang theo dõi luôn hiện.</p>
+          <div class="tier"><div class="sec">Nên theo dõi</div><div class="tgrid" data-topics="Xây ứng dụng LLM|RAG, embedding, prompt, API;Huấn luyện và tối ưu model|fine-tune, lượng tử hoá, KV cache;Agent AI|lập kế hoạch, gọi công cụ, MCP;Model AI: phát hành và hành vi|model mới, benchmark, hành vi;Lập trình với AI|Claude Code, Codex, Cursor" data-on="1"></div></div>
+          <div class="tier"><div class="sec">Có thể bạn quan tâm</div><div class="tgrid" data-topics="ML nền tảng|tối ưu hoá, lý thuyết học, GNN;An toàn và bảo mật AI|jailbreak, prompt injection;Hạ tầng AI|GPU, máy chủ suy luận, chạy local" data-on="0" data-first-on="1"></div></div>
+          <div class="tier"><div class="sec">Đang theo dõi</div><div class="tgrid" data-topics="Ảnh, video và âm thanh|diffusion, giọng nói, thị giác;Trợ lý và ứng dụng AI|ChatGPT, Claude, Gemini" data-on="1"></div></div>
+          <div class="tier"><div class="sec">Chủ đề mới, chưa có trong thư viện</div><div class="tgrid"><div class="topic newtopic"><span class="box"></span><div><b>Ngôn ngữ, runtime và cơ sở dữ liệu</b><small>Bạn làm hằng ngày với Python, TypeScript và Postgres; thư viện chưa có chủ đề nào theo dõi chính các công cụ này.</small></div></div></div></div>
+          <div class="row" style="margin-top:16px"><button class="btn primary" id="saveTopics">Lưu 8 chủ đề</button><button class="btn secondary">Thêm chủ đề bằng lời của bạn</button><span class="note" id="tcount"></span></div>
+          <div class="screen-note"><b>Ghi chú.</b> Cùng logic với <code>/profile</code> trên Telegram (một service dùng chung): ba nhóm, chủ đề mới tạo khi bấm Lưu. Hai mảng màu loang phân biệt "về bạn" (tím) và "kênh nhận tin" (bạc hà). Ô tích chung một kiểu cho mọi chủ đề, kể cả chủ đề mới (viền nét đứt).</div>
+        </div>
+
+        <!-- SOURCES -->
+        <div class="screen" id="s-sources">
+          <div class="row" style="justify-content:space-between"><div><h2 style="margin:0">Nguồn</h2><p class="note">Tỉ lệ lấy tin thành công 7 ngày (09–16/10), từ <code>fetch_runs</code>.</p></div><button class="btn secondary">Thêm nguồn</button></div>
+          <div class="card" style="padding:0;margin-top:12px;overflow:auto">
+            <table>
+              <tr><th>Nguồn</th><th>Tình trạng</th><th>Thành công 7 ngày</th><th>Lần gần nhất</th><th>Tin đã lưu</th><th></th></tr>
+              <tr><td>Hacker News</td><td><span class="st ok">Tốt</span></td><td class="n">98,5% · 266/270</td><td class="n">16/10 15:45</td><td class="n">19.728</td><td><button class="btn ghost sm">Chạy thử</button></td></tr>
+              <tr><td>arXiv cs.CL/AI/LG/MA</td><td><span class="st warn">Bị giới hạn tốc độ</span></td><td class="n">50,0% · 4/8</td><td class="n">16/10 08:30</td><td class="n">12.089</td><td><button class="btn ghost sm">Chạy thử</button></td></tr>
+              <tr><td>GitHub releases</td><td><span class="st off">Chưa có repo</span></td><td class="n">97,1% · 68/70</td><td class="n">16/10 15:00</td><td class="n">156</td><td><button class="btn ghost sm">Thêm repo</button></td></tr>
+              <tr><td>GitHub repo mới</td><td><span class="st ok">Tốt</span></td><td class="n">100% · 4/4</td><td class="n">16/10 06:00</td><td class="n">154</td><td><button class="btn ghost sm">Chạy thử</button></td></tr>
+              <tr><td>GitHub Trending</td><td><span class="st ok">Tốt</span></td><td class="n">100% · 4/4</td><td class="n">16/10 06:10</td><td class="n">24</td><td><button class="btn ghost sm">Chạy thử</button></td></tr>
+            </table>
+          </div>
+          <div class="card" style="margin-top:12px;border-color:#EBD3A8;background:var(--warn-soft)"><b style="font-weight:500">arXiv · lỗi gần nhất 14/10 08:35</b><p style="font-family:var(--mono);font-size:12.5px;margin:6px 0 0;color:var(--warn)">HTTP 429 https://export.arxiv.org/api/query?search_query=…</p><p class="note" style="margin-bottom:0">Chưa mất tin: lượt sau lấy bù. Nên giãn nhịp gọi.</p></div>
+          <div class="screen-note"><b>Ghi chú.</b> Chỉ chủ sở hữu thấy trang này. Lỗi hiện nguyên văn kèm nút chạy thử, đúng như bản thiết kế gốc. Số liệu là số thật từ lệnh <code>report</code> ngày 16/10.</div>
+        </div>
+
+        <!-- AGENT -->
+        <div class="screen" id="s-agent">
+          <div class="soonbar"><span class="tag">Giai đoạn 2</span>Hỏi đáp có trích dẫn từ kho tin. Câu hỏi và câu trả lời là minh hoạ; các tin được trích là tin thật.</div>
+          <div class="chat">
+            <div class="msg-u">Tuần này có model nào mở trọng số đáng thử cho agent chạy cục bộ không?</div>
+            <div class="msg-a">Có hai cái nổi bật. <b>Nemotron 3.5 Bolt 74B-A9B</b> của NVIDIA dùng lượng tử hoá 2-bit gốc để chạy trong 24GB, hợp nhất với máy của bạn<span class="cite" title="Nemotron 3.5 Bolt 74B-A9B chạy agent cục bộ trong 24GB">2</span>. <b>Muse Spark Open</b> của Meta mạnh hơn nhưng 816B tham số, cần phần cứng lớn<span class="cite" title="Meta mở trọng số Muse Spark Open">1</span>. Nếu chỉ cần điều phối nhiều agent lập trình, xem thêm ruflo<span class="cite" title="ruflo: harness điều phối swarm">5</span>.</div>
+            <div class="row" style="margin-top:12px"><span class="chip">[1] Muse Spark Open · HN</span><span class="chip">[2] Nemotron 3.5 Bolt · HN, Hugging Face</span><span class="chip">[5] ruflo · GitHub</span></div>
+            <div class="composer"><input placeholder="Hỏi về tin trong kho…"><button class="btn primary sm"><svg><use href="#i-send"/></svg>Gửi</button></div>
+          </div>
+          <div class="screen-note"><b>Ghi chú.</b> Câu trả lời hiện dần từng chữ (Server-Sent Events). Mỗi ý có số trích dẫn, bấm mở chi tiết sự kiện ở cột phải như Feed. Cùng bộ công cụ sẽ dùng cho <code>/ask</code> trên Telegram và MCP server.</div>
+        </div>
+
+        <!-- WATCH -->
+        <div class="screen" id="s-watch">
+          <div class="soonbar"><span class="tag">Giai đoạn 2</span>Theo dõi một điều cụ thể và nhận báo ngay, không đợi điểm tin sáng. Dữ liệu minh hoạ.</div>
+          <div class="two">
+            <div class="mesh peach"><span class="tag">Đang bật</span><h3 style="margin-top:12px;font-size:19px">Model mở chạy được trong 24GB</h3><p style="font-family:var(--serif);color:var(--ink-2)">Báo khi có model mở trọng số nhắm tới máy cá nhân.</p><div class="row"><span class="chip">Báo ngay</span><span class="chip">Telegram</span><span class="note">3 lần trong 7 ngày</span></div></div>
+            <div class="mesh blue"><span class="tag">Đang bật</span><h3 style="margin-top:12px;font-size:19px">Bảo mật MCP</h3><p style="font-family:var(--serif);color:var(--ink-2)">Lỗ hổng, công cụ quét, cách ghim mô tả tool.</p><div class="row"><span class="chip">Gộp vào điểm tin</span><span class="note">1 lần trong 7 ngày</span></div></div>
+          </div>
+          <div class="row" style="margin-top:14px"><button class="btn primary">Theo dõi điều mới</button><button class="btn secondary">Tạo từ một tin trong Feed</button></div>
+        </div>
+
+        <!-- DASH -->
+        <div class="screen" id="s-dash">
+          <div class="soonbar"><span class="tag">Giai đoạn 3</span>Số trên bốn thẻ là số thật 7 ngày qua.</div>
+          <div class="kpi4">
+            <div class="mesh blue"><span class="tag">Tin mỗi ngày</span><b>1.451</b><span>HN 1.010 · arXiv 416 · GitHub 25</span></div>
+            <div class="mesh violet"><span class="tag">Qua cổng chủ đề</span><b>15–22%</b><span>189–274 sự kiện mỗi sáng</span></div>
+            <div class="mesh mint"><span class="tag">Tin được thích</span><b>82%</b><span>23 / 28 tin có phản hồi</span></div>
+            <div class="mesh peach"><span class="tag">Chi phí model</span><b>$0,12</b><span>cả 7 ngày · trần $0,10 mỗi ngày</span></div>
+          </div>
+          <div class="card" style="margin-top:12px"><div class="sec" style="margin-top:0">Sắp có</div><p style="margin:0;font-family:var(--serif);color:var(--ink-2)">Chủ đề đang nóng lên theo tuần, thực thể được nhắc nhiều, sức khoẻ hệ thống. Biểu đồ dùng chung một bộ màu đã kiểm cho người mù màu.</p></div>
+        </div>
+
+        <!-- LOGIN -->
+        <div class="screen" id="s-login">
+          <div class="login">
+            <div class="login-card">
+              <div class="brand" style="justify-content:center;padding:0"><i></i>radard</div>
+              <h2>Tin AI đáng đọc, mỗi sáng</h2>
+              <p>radard đọc hàng nghìn tin mỗi ngày và chọn ra vài tin hợp với việc bạn đang làm.</p>
+              <button class="btn primary lg"><svg><use href="#i-gh"/></svg>Tiếp tục với GitHub</button>
+              <button class="btn secondary lg"><svg><use href="#i-g"/></svg>Tiếp tục với Google</button>
+              <p class="note" style="margin-top:16px;font-family:var(--sans)">Hiện chỉ dành cho người được mời.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ⌘K -->
+        <div class="palette-bg" id="pal">
+          <div class="palette" role="dialog" aria-label="Tìm nhanh">
+            <input id="palInput" placeholder="Tìm tin, chủ đề, nguồn, hoặc gõ lệnh…" value="">
+            <div class="pal-group"><div class="sec">Tin</div>
+              <div class="pal-item on">Nemotron 3.5 Bolt 74B-A9B chạy agent cục bộ trong 24GB<small>16/10</small></div>
+              <div class="pal-item">Meta mở trọng số Muse Spark Open, model 816B tham số<small>16/10</small></div>
+              <div class="pal-item">ruflo: harness điều phối swarm cho Claude Code và Codex<small>16/10</small></div>
+            </div>
+            <div class="pal-group"><div class="sec">Chủ đề</div>
+              <div class="pal-item">Agent AI<small>đang theo dõi</small></div>
+              <div class="pal-item">Hạ tầng AI<small>chưa theo dõi</small></div>
+            </div>
+            <div class="pal-group"><div class="sec">Lệnh</div>
+              <div class="pal-item">Tìm "agent cục bộ" trong 30 ngày<small>Enter</small></div>
+              <div class="pal-item">Hỏi radard về câu này<small>⌘Enter</small></div>
+            </div>
+            <div class="pal-foot"><span><span class="kbd">↑</span> <span class="kbd">↓</span> chọn</span><span><span class="kbd">Enter</span> mở</span><span><span class="kbd">Esc</span> đóng</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== HỆ THỐNG THIẾT KẾ ===== -->
+  <section class="dpanel" id="ds">
+    <h2>Mảng màu loang</h2>
+    <p class="note">Lấy đúng công thức của cap.so: ba vệt màu loang (radial gradient) ở ba góc trên nền nhạt, phủ một lớp hạt mịn. Mỗi mảng gắn với một loại nội dung, để người dùng quen mắt.</p>
+    <div class="ds-grid" style="margin-top:12px">
+      <div class="ds-card"><div class="sw mesh blue"></div><b style="font-weight:500">Xanh</b><p class="note">Hôm nay, Feed, tin mới</p></div>
+      <div class="ds-card"><div class="sw mesh violet"></div><b style="font-weight:500">Tím</b><p class="note">Về bạn: hồ sơ, "vì sao với bạn"</p></div>
+      <div class="ds-card"><div class="sw mesh mint"></div><b style="font-weight:500">Bạc hà</b><p class="note">Kênh nhận tin, trạng thái tốt</p></div>
+      <div class="ds-card"><div class="sw mesh peach"></div><b style="font-weight:500">Đào</b><p class="note">Theo dõi, cảnh báo</p></div>
+    </div>
+    <p class="note" style="margin-top:10px">Chỉ dùng mảng màu cho thẻ đầu trang, thẻ nhóm và thẻ số liệu. Danh sách tin, bảng, ô nhập luôn nền trắng: chữ trên nền loang khó đọc khi dài.</p>
+
+    <h2>Nút</h2>
+    <div class="ds-card">
+      <div class="row"><button class="btn primary">Lưu 8 chủ đề</button><button class="btn secondary">Thêm nguồn</button><button class="btn ghost">Huỷ</button><button class="btn primary sm">Gửi</button><button class="chip on">Đang chọn</button><button class="chip">Chưa chọn</button></div>
+      <p class="note" style="margin-top:12px">Ba loại: đặc màu mực (việc chính, một nút mỗi vùng), trắng có viền (việc phụ), chữ (huỷ, việc nhẹ). Không có nút gradient xanh như nút "Download free for macOS" của cap.so. Bo góc 12px, cao 38px; nút lớn ở trang đăng nhập 46px.</p>
+    </div>
+
+    <h2>Chữ</h2>
+    <div class="two">
+      <div class="ds-card"><div style="font-size:40px;letter-spacing:-.025em;line-height:1.1">Điểm tin sáng nay</div><p class="note">Geist · giao diện, tiêu đề, nút. Cùng họ với Instrument Sans mà cap.so dùng; Instrument Sans không có dấu tiếng Việt, Geist có.</p></div>
+      <div class="ds-card"><div style="font-family:var(--serif);font-size:19px;color:var(--ink-2)">NVIDIA phát hành Nemotron 3.5 Bolt 74B-A9B, một model vision-language dùng lượng tử hoá 2-bit gốc để chạy trong 24GB.</div><p class="note">Source Serif 4 · phần đọc: tóm tắt, mô tả, câu trả lời. Giống cap.so.</p></div>
+    </div>
+    <div class="ds-card" style="margin-top:12px"><span class="eyebrow">Nhãn nhỏ · IBM Plex Mono</span><p class="note">Nhãn nhóm, số liệu, phím tắt. cap.so dùng DM Mono, nhưng DM Mono không có dấu tiếng Việt.</p></div>
+
+    <h2>Màu chữ và trạng thái</h2>
+    <div class="ds-card"><div class="row"><span class="st ok">Tốt</span><span class="st warn">Bị giới hạn tốc độ</span><span class="st bad">Lỗi</span><span class="st off">Tắt</span><span class="tag">Giai đoạn 2</span><span class="kbd">⌘K</span></div><p class="note" style="margin-top:12px">Trạng thái luôn có chữ đi kèm chấm màu, không dựa vào màu riêng. Mực #111, chữ phụ #52525B, chữ mờ #71717A, đường kẻ #E4E4E7, nền trang #F2F2F2.</p></div>
+  </section>
+
+  <!-- ===== TÍNH NĂNG ===== -->
+  <section class="dpanel" id="feat">
+    <h2>Tính năng trên web</h2>
+    <p class="note">Theo bản thiết kế gốc (<code>radard-thiet-ke.html</code>) và kế hoạch nhiều người dùng. MVP là phần làm ngay sau bước chuyển nhiều người dùng.</p>
+    <div class="ds-card" style="padding:0;overflow:auto;margin-top:12px">
+      <table class="feat">
+        <tr><th>Tính năng</th><th>Giai đoạn</th><th>Màn hình</th><th>Tương tác chính</th></tr>
+        <tr><td>Đăng nhập, mời người dùng</td><td><span class="ph mvp">MVP</span></td><td>Trang đăng nhập</td><td>GitHub, Google; chỉ email được mời</td></tr>
+        <tr><td>Feed sự kiện</td><td><span class="ph mvp">MVP</span></td><td>Feed</td><td>Lọc thời gian, chủ đề, phạm vi; j/k; cột chi tiết; thích/không thích</td></tr>
+        <tr><td>Chi tiết sự kiện</td><td><span class="ph mvp">MVP</span></td><td>Cột phải của Feed, có link riêng</td><td>Bài đã gộp theo giờ, vì sao được chọn, đọc bài gốc</td></tr>
+        <tr><td>Link từ điểm tin sang web</td><td><span class="ph mvp">MVP</span></td><td>Telegram → chi tiết</td><td>"Xem trên radard" mở đúng sự kiện</td></tr>
+        <tr><td>Tìm kiếm</td><td><span class="ph mvp">MVP</span></td><td>Tìm kiếm, ⌘K</td><td>Từ khoá + ý nghĩa; lọc nguồn, thời gian</td></tr>
+        <tr><td>Hồ sơ, chủ đề, kênh</td><td><span class="ph mvp">MVP</span></td><td>Hồ sơ và chủ đề</td><td>Viết mô tả, gợi ý ba nhóm, nối Telegram</td></tr>
+        <tr><td>Quản lý nguồn</td><td><span class="ph mvp">MVP</span></td><td>Nguồn</td><td>Sức khoẻ, lỗi nguyên văn, chạy thử</td></tr>
+        <tr><td>Hỏi đáp có trích dẫn</td><td><span class="ph p2">GĐ2</span></td><td>Hỏi radard</td><td>Trả lời dần, trích dẫn bấm được</td></tr>
+        <tr><td>Theo dõi và báo ngay</td><td><span class="ph p2">GĐ2</span></td><td>Theo dõi</td><td>Tạo từ một tin; chọn báo ngay hay gộp vào điểm tin</td></tr>
+        <tr><td>Brief sống</td><td><span class="ph p2">GĐ2</span></td><td>Chưa vẽ</td><td>Nhận định có phiên bản, so với bản trước</td></tr>
+        <tr><td>Trang thực thể</td><td><span class="ph p2">GĐ2</span></td><td>Chưa vẽ</td><td>Thuộc tính có nguồn, dòng thời gian</td></tr>
+        <tr><td>Nguồn thủ công</td><td><span class="ph p2">GĐ2</span></td><td>Chưa vẽ (một ô dán link trong ⌘K)</td><td>Dán link hoặc bài, xử lý như mọi tin</td></tr>
+        <tr><td>Tổng quan, đồ thị, dòng thời gian</td><td><span class="ph p3">GĐ3</span></td><td>Tổng quan</td><td>Chủ đề nóng lên, thực thể theo tuần, chi phí</td></tr>
+        <tr><td>Nhiều kênh thông báo</td><td><span class="ph p3">GĐ3</span></td><td>Hồ sơ và chủ đề</td><td>Discord, thông báo trình duyệt</td></tr>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const EV = [
+  {t:"Meta mở trọng số Muse Spark Open, model 816B tham số",s:"Meta phát hành trọng số của Muse Spark Open, một model đa phương thức gốc với 816B tham số tổng (42B hoạt động) và cửa sổ ngữ cảnh 1M token, được định hướng cho lập trình và công việc agent.",w:"Một lựa chọn open-weight mạnh để tự host cho các hệ thống agent, nhưng 816B đòi hỏi phần cứng lớn, nên cần đánh giá chi phí chạy trước khi thay model đang dùng.",topic:"Model AI: phát hành và hành vi",src:"research.meta.ai, Hacker News",n:2,S:.685,R:.735,P:.925,C:0,A:.6,F:1,tl:[["23:58","Hacker News · Muse Spark Open, the Most Capable US Open‑Weight Model to Date"],["00:47","Hacker News · Muse Spark Open"]]},
+  {t:"Nemotron 3.5 Bolt 74B-A9B chạy agent cục bộ trong 24GB",s:"NVIDIA phát hành Nemotron 3.5 Bolt 74B-A9B, một model vision-language kiến trúc Mixture-of-Experts lai Mamba-Transformer, dùng quantization 2-bit gốc để chạy trong 24GB bộ nhớ cùng các ứng dụng khác.",w:"Ứng viên đáng thử cho agent chạy local trên RTX hoặc DGX Spark, cần so sánh tốc độ và chất lượng với các model đang dùng.",topic:"Model AI: phát hành và hành vi",src:"huggingface.co, research.nvidia.com, Hacker News",n:3,S:.674,R:.885,P:.187,C:.756,A:.6,F:1,tl:[["04:01","Hacker News"],["22:05","Hacker News"],["22:17","Hacker News"]]},
+  {t:"Next-Concept Modeling: sinh văn bản thô-đến-mịn, song song",s:"Nghiên cứu đề xuất Next-Concept Modeling, khung hai giai đoạn thô-đến-mịn: một VQ-VAE residual đa tỉ lệ mã hoá văn bản thành hệ phân cấp, rồi model sinh các khái niệm.",w:"Hướng nghiên cứu về tăng tốc sinh văn bản, chưa có tác động trực tiếp đến sản phẩm hiện tại.",topic:"Huấn luyện và tối ưu model",src:"arxiv.org, Hacker News",n:2,S:.663,R:.966,P:.3,C:.546,A:.6,F:.6,tl:[["00:49","arXiv"],["11:00","Hacker News"]]},
+  {t:"Danh sách API AI miễn phí cho lập trình viên năm 2026",s:"Nhiều bài tổng hợp và danh sách trên GitHub liệt kê các API LLM có gói miễn phí, công cụ RAG và agent. Một hướng dẫn cho biết các giới hạn miễn phí được kiểm tra vào tháng 9 năm 2026.",w:"Hữu ích để làm prototype và benchmark nhanh, nhưng nên tự kiểm tra giới hạn và điều khoản trước khi phụ thuộc vào chúng trong production.",topic:"Xây ứng dụng LLM",src:"github.com, freeapihub.com, thetechboom.com, Hacker News",n:3,S:.653,R:1,P:.077,C:.756,A:.6,F:.6,tl:[["01:05","Hacker News"],["06:39","Hacker News"],["15:30","Hacker News"]]},
+  {t:"ruflo: harness điều phối swarm cho Claude Code và Codex",s:"ruflo là một meta-harness viết bằng TypeScript để điều phối nhiều agent trên Claude Code và Codex, với bộ nhớ thích ứng, tích hợp vector RAG và các workflow tự động. Dự án nhận khoảng 147 sao trong ngày.",w:"Cách tiếp cận điều phối nhiều agent lập trình bằng TypeScript, đáng xem nếu cần so sánh với cách tự xây orchestration hiện tại.",topic:"Lập trình với AI",src:"github.com",n:1,S:.635,R:1,P:.3,C:0,A:.6,F:1,tl:[["06:10","GitHub Trending"]]},
+  {t:"Magic Hour: nền tảng tạo video và ảnh AI kèm API sản xuất",s:"Magic Hour cung cấp công cụ tạo video AI, tạo ảnh, chỉnh sửa và API sản xuất trong một quy trình. Trang giới thiệu chủ yếu là quảng bá, không có chi tiết kỹ thuật về model hay hiệu năng.",w:"Mức độ liên quan thấp, trừ khi cần thêm tính năng tạo video vào sản phẩm.",topic:"Ảnh, video và âm thanh",src:"magichour.ai, Hacker News",n:1,S:.635,R:1,P:.3,C:0,A:.6,F:1,tl:[["09:52","Hacker News"]]},
+  {t:"gpt-with-taste: bộ system prompt điều chỉnh hành vi GPT trong Codex",s:"Repo mới gần 3 ngày tuổi, đạt khoảng 225 sao, cung cấp system instructions để điều hướng hành vi GPT trong Codex trên nhiều harness lập trình.",w:"Ví dụ về prompt engineering ở cấp system prompt cho coding agent, có thể học cách cấu trúc chỉ dẫn cho các agent của bạn.",topic:"Lập trình với AI",src:"github.com",n:1,S:.625,R:1,P:.3,C:0,A:.5,F:1,tl:[["06:00","GitHub repo mới"]]},
+];
+const fmt = (x) => x.toFixed(2).replace(".", ",");
+const list = document.getElementById("evlist"), det = document.getElementById("detail");
+let sel = 0;
+const thumbs = (i) => `<div class="fb"><button class="ibtn" data-fb="up${i}" aria-label="Thích"><svg><use href="#i-up"/></svg></button><button class="ibtn" data-fb="down${i}" aria-label="Không thích"><svg><use href="#i-down"/></svg></button></div>`;
+list.innerHTML = EV.map((e, i) => `<article class="ev" data-i="${i}"><div class="n">${String(i + 1).padStart(2, "0")}</div><div><h3>${e.t}</h3><p class="sum">${e.s}</p><div class="why">${e.w}</div><div class="meta"><span>${e.topic}</span>·<span>${e.n} bài · ${e.src}</span></div></div><div><div class="score">${fmt(e.S)}<small>điểm</small></div>${thumbs(i)}</div></article>`).join("");
+const parts = [["R","Hợp chủ đề"],["P","Độ nổi"],["C","Độ phủ"],["A","Nguồn uy tín"],["F","Độ mới"]];
+function show(i) {
+  sel = (i + EV.length) % EV.length;
+  const e = EV[sel];
+  list.querySelectorAll(".ev").forEach((el) => el.classList.toggle("sel", +el.dataset.i === sel));
+  det.innerHTML = `<div class="head mesh blue" style="border-radius:0"><div class="row" style="justify-content:space-between"><span class="tag">${e.topic}</span><span class="tag">điểm ${fmt(e.S)}</span></div><h3>${e.t}</h3></div><div class="body"><p class="sum">${e.s}</p><div class="why">${e.w}</div><div class="sec">Các bài đã gộp · ${e.n}</div><ul class="tl">${e.tl.map(([h, x]) => `<li><span>${h}</span>${x}</li>`).join("")}</ul><div class="sec">Vì sao được chọn</div><div class="bars">${parts.map(([k, l]) => `<span>${l}</span><i><b style="width:${Math.round(e[k] * 100)}%"></b></i><em>${fmt(e[k])}</em>`).join("")}</div><div class="row" style="margin-top:16px"><button class="btn primary sm"><svg><use href="#i-ext"/></svg>Đọc chi tiết</button><button class="btn secondary sm"><svg><use href="#i-chat"/></svg>Hỏi về tin này</button><button class="btn ghost sm"><svg><use href="#i-eye"/></svg>Theo dõi</button></div></div>`;
+}
+list.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-fb]");
+  if (b) { const other = b.dataset.fb.startsWith("up") ? b.nextElementSibling : b.previousElementSibling; b.classList.toggle("on"); other.classList.remove("on"); ev.stopPropagation(); return; }
+  const a = ev.target.closest(".ev"); if (a) show(+a.dataset.i);
+});
+show(0);
+
+// màn hình
+const navs = document.querySelectorAll(".nav[data-s]");
+function go(s) { navs.forEach((n) => n.classList.toggle("on", n.dataset.s === s)); document.querySelectorAll(".screen").forEach((x) => x.classList.toggle("on", x.id === "s-" + s)); }
+navs.forEach((n) => n.addEventListener("click", () => go(n.dataset.s)));
+
+// nhóm nút chọn một
+document.querySelectorAll("[data-seg]").forEach((g) => g.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; g.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); }));
+document.querySelectorAll(".filters .chip").forEach((c) => c.addEventListener("click", () => c.classList.toggle("on")));
+
+// chủ đề
+document.querySelectorAll("[data-topics]").forEach((g) => {
+  const on = g.dataset.on === "1";
+  g.innerHTML = g.dataset.topics.split(";").map((x, k) => { const [n, d] = x.split("|"); const c = on || (g.dataset.firstOn === "1" && k === 0); return `<div class="topic${c ? " on" : ""}"><span class="box"></span><div><b>${n}</b><small>${d}</small></div></div>`; }).join("");
+});
+const tc = document.getElementById("tcount");
+const count = () => { const n = document.querySelectorAll("#s-profile .topic.on").length; tc.textContent = ""; document.getElementById("saveTopics").textContent = `Lưu ${n} chủ đề`; };
+document.querySelectorAll("#s-profile .tgrid").forEach((g) => g.addEventListener("click", (e) => { const t = e.target.closest(".topic"); if (t) t.classList.toggle("on"); setTimeout(count); }));
+count();
+
+// ⌘K
+const pal = document.getElementById("pal"), pin = document.getElementById("palInput");
+const openPal = () => { pal.classList.add("on"); pin.focus(); };
+const closePal = () => pal.classList.remove("on");
+document.getElementById("openPal").addEventListener("click", openPal);
+pal.addEventListener("click", (e) => { if (e.target === pal) closePal(); });
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.getElementById("proto").classList.contains("on") && (pal.classList.contains("on") ? closePal() : openPal()); return; }
+  if (e.key === "Escape") return closePal();
+  const typing = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+  if (typing || pal.classList.contains("on")) return;
+  if (!document.getElementById("s-feed").classList.contains("on")) return;
+  if (e.key === "j") show(sel + 1);
+  if (e.key === "k") show(sel - 1);
+});
+
+// tab tài liệu
+const dt = document.querySelectorAll(".doc-tabs button");
+dt.forEach((b) => b.addEventListener("click", () => { dt.forEach((x) => x.setAttribute("aria-selected", String(x === b))); document.querySelectorAll(".dpanel").forEach((p) => p.classList.toggle("on", p.id === b.dataset.d)); }));
+</script>
+</body>
+</html>

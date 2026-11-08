@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>radard · Nhiều người dùng và web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap&subset=vietnamese">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#F4F6F5; --surface:#FFFFFF; --ink:#16201D; --ink-2:#4A5753; --ink-3:#6B7773; --line:#D9E0DD;
+  --accent:#0E6E5C; --accent-soft:#DDEEE9; --warn:#9A5B00; --warn-soft:#FBEFD9; --blue:#2F5DA8; --blue-soft:#E3ECF8;
+  --display:"Bricolage Grotesque","Be Vietnam Pro",system-ui,sans-serif;
+  --body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.65}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 16px 80px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4.5vw,38px)} h2{font-size:21px;margin:30px 0 10px} h3{font-size:16.5px;margin:0 0 6px}
+p{margin:8px 0} ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0} a{color:var(--blue)}
+.eyebrow{font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em}
+.lede{color:var(--ink-2);margin:10px 0 0;max-width:76ch}
+code{font-family:var(--mono);font-size:13px;background:var(--ground);padding:1px 5px;border-radius:4px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:26px 0 0;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:0;border-bottom:3px solid transparent;padding:10px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs button span{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-right:6px}
+.panel{display:none} .panel.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+.answer{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 12px 12px 0;padding:12px 18px;margin-top:16px}
+.warn{background:var(--warn-soft);border:1px solid #EBD3A8;border-radius:12px;padding:12px 16px;margin-top:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px;background:var(--surface)}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--ink-3);font-weight:600;font-family:var(--mono);background:#FAFBFA}
+td.n{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.tag{display:inline-block;font-family:var(--mono);font-size:12px;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.tag.b{background:var(--blue-soft);color:var(--blue)} .tag.w{background:var(--warn-soft);color:var(--warn)}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:10px}
+.step .h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.chat{font-family:var(--mono);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:10px;white-space:pre-wrap}
+.note{font-size:13.5px;color:var(--ink-3);margin-top:8px}
+footer{margin-top:40px;font-size:13px;color:var(--ink-3)}
+@media (max-width:640px){.grid2{grid-template-columns:1fr} td.n{white-space:normal}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">RADARD · KẾ HOẠCH · 16/10/2026</div>
+  <h1>Nhiều người dùng và trang web</h1>
+  <p class="lede">Bạn muốn sau này người khác cũng dùng được radard, và bước tiếp theo là làm web (feed, tìm kiếm). Trang này nói radard đang giả định "chỉ một người dùng" ở những chỗ nào, cần đổi gì trong dữ liệu, bot và điểm tin, cách đăng nhập, và làm theo thứ tự nào.</p>
+
+  <div class="answer"><p><b>Tóm tắt:</b> phần nặng nhất của radard (thu thập tin, gộp sự kiện, embedding, điểm chủ đề) vốn đã không phụ thuộc người dùng, nên dùng chung được cho mọi người. Chỉ phần "của riêng từng người" phải đổi: hồ sơ, chủ đề đã chọn, điểm tin đã gửi, phản hồi, và chat Telegram. Đăng nhập dùng thư viện <b>Better Auth</b>, với GitHub và Google. Làm theo 6 bước. Bước 1 (chuyển dữ liệu sang nhiều người dùng) phải xong trước, vì mọi bước sau dựa vào nó.</p></div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="hien-trang"><span>01</span>Hiện trạng</button>
+    <button role="tab" aria-selected="false" data-tab="dang-nhap"><span>02</span>Đăng nhập</button>
+    <button role="tab" aria-selected="false" data-tab="du-lieu"><span>03</span>Dữ liệu</button>
+    <button role="tab" aria-selected="false" data-tab="bot"><span>04</span>Bot và điểm tin</button>
+    <button role="tab" aria-selected="false" data-tab="web"><span>05</span>Web</button>
+    <button role="tab" aria-selected="false" data-tab="cach-viet"><span>06</span>Cách viết code</button>
+    <button role="tab" aria-selected="false" data-tab="thu-tu"><span>07</span>Thứ tự làm</button>
+    <button role="tab" aria-selected="false" data-tab="quyet"><span>08</span>Cần bạn quyết</button>
+  </div>
+
+  <!-- 01 -->
+  <section class="panel on" id="hien-trang" role="tabpanel">
+    <h2>Dữ liệu nào dùng chung, dữ liệu nào của riêng từng người</h2>
+    <p>Từ tuần 2, radard giữ một nguyên tắc (gọi là D4): <b>dữ liệu dẫn xuất không phụ thuộc hồ sơ</b>. "Dữ liệu dẫn xuất" là thứ radard tự tính ra từ tin đã thu thập, tính lại được bất cứ lúc nào. Hồ sơ chỉ được dùng ở bước cuối, lúc chọn tin cho điểm tin. Nhờ vậy khi có nhiều người, phần lớn dữ liệu không phải đổi.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Dùng chung cho mọi người <span class="tag">không đổi</span></h3>
+        <ul>
+          <li>Nguồn, tin đã thu thập: 32.151 tài liệu</li>
+          <li>Sự kiện (tin đã gộp): 29.758</li>
+          <li>Embedding, nội dung trang</li>
+          <li>Điểm của mỗi tin với mỗi chủ đề: 707.322 dòng</li>
+          <li>Thư viện 14 chủ đề, mặt bằng điểm (baselines)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Của riêng từng người <span class="tag w">phải đổi</span></h3>
+        <ul>
+          <li>Hồ sơ: lời mô tả, bản tiếng Anh, ngôn ngữ hiển thị (hiện 1 dòng)</li>
+          <li>Chủ đề đã chọn (14 dòng) và chủ đề tự thêm (0)</li>
+          <li>Điểm tin đã gửi (4), tin đã gửi (32), phản hồi (28)</li>
+          <li>Chat Telegram nhận điểm tin</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Số liệu đếm trên DB server ngày 16/10.</p>
+
+    <h2>Những chỗ code đang giả định chỉ có một người</h2>
+    <table>
+      <tr><th>Chỗ</th><th>Đang làm gì</th><th>Khi có nhiều người</th></tr>
+      <tr><td><code>profile.id</code> mặc định 1, hằng số <code>PROFILE_ID</code></td><td>17 chỗ trong code daemon dùng thẳng hồ sơ số 1</td><td>Mọi hàm nhận <code>profileId</code> làm tham số</td></tr>
+      <tr><td><code>rank.ts</code></td><td>Lấy mọi dòng <code>profile_topics</code> đang bật, không lọc theo hồ sơ</td><td>Xếp hạng của người này sẽ trộn chủ đề của người khác. Phải lọc theo hồ sơ</td></tr>
+      <tr><td><code>digest.ts</code></td><td>Đọc dòng hồ sơ đầu tiên; gửi cho một người nhận lấy từ biến môi trường <code>TELEGRAM_CHAT_ID</code></td><td>Chạy cho từng hồ sơ có chat đã nối</td></tr>
+      <tr><td>Bot Telegram</td><td>Chỉ trả lời đúng một chat (<code>allowedChatId</code>), chat khác bị bỏ qua</td><td>Nhận mọi chat; tìm hồ sơ theo chat</td></tr>
+      <tr><td>Lựa chọn đang tích dở trong <code>/profile</code></td><td>Nhớ theo <code>message_id</code>, với ghi chú "chỉ một chat nên đủ"</td><td><code>message_id</code> của Telegram chỉ là duy nhất trong một chat; hai người có thể trùng số. Phải nhớ theo cặp (chat, message_id)</td></tr>
+      <tr><td><code>llm_calls</code></td><td>Ghi chi phí mỗi lần gọi model, không ghi của ai</td><td>Thêm hồ sơ để biết mỗi người tốn bao nhiêu</td></tr>
+    </table>
+
+    <h2>Chi phí khi có thêm người</h2>
+    <p>Đo trên 3 ngày gần nhất: embedding tin tốn $0,10 (866 lần gọi), là chi phí chung, không tăng theo số người. Viết điểm tin tốn $0,011 cho 5 lần gọi, khoảng <b>$0,002 mỗi người mỗi ngày</b>. Hỏi Jev rất rẻ: 7 lần, chưa tới $0,0002. Với 100 người, phần riêng khoảng $0,2 mỗi ngày, tức chừng $6 mỗi tháng. Chi phí chủ yếu sẽ nằm ở máy chủ, không phải ở model.</p>
+  </section>
+
+  <!-- 02 -->
+  <section class="panel" id="dang-nhap" role="tabpanel">
+    <h2>Dùng Better Auth</h2>
+    <p><b>Better Auth</b> là thư viện đăng nhập viết bằng TypeScript. Nó tự lo phần khó (phiên đăng nhập, cookie, đăng nhập qua GitHub/Google, chống giả mạo yêu cầu) và lưu dữ liệu ngay trong Postgres của radard qua Drizzle. Đã kiểm trên tài liệu bản 1.6.23:</p>
+    <ul>
+      <li>Gắn vào Hono bằng một route <code>/api/auth/*</code>.</li>
+      <li>Có adapter Drizzle cho Postgres. Nó cần 4 bảng: <code>user</code>, <code>session</code> (phiên đăng nhập), <code>account</code> (tài khoản GitHub/Google nối với user), <code>verification</code> (mã dùng một lần).</li>
+      <li>Có sẵn đăng nhập GitHub và Google (<code>socialProviders</code>).</li>
+      <li>Có "hook" (đoạn code chạy trước hoặc sau khi tạo user), dùng được để chặn người chưa được mời và để nối hồ sơ hiện tại của bạn.</li>
+    </ul>
+    <p>Vì sao không dùng các cách khác: dịch vụ thuê ngoài (Clerk, Auth0) giữ dữ liệu người dùng ở chỗ họ và tính tiền theo số người; Cloudflare Access hợp cho công cụ nội bộ hơn là sản phẩm cho người lạ đăng ký; tự viết mật khẩu thì phải tự lo quên mật khẩu, xác minh email, chống đoán mật khẩu.</p>
+
+    <h2>Đăng nhập diễn ra thế nào</h2>
+    <ol>
+      <li>Người dùng mở web, bấm "Đăng nhập bằng GitHub" hoặc "bằng Google".</li>
+      <li>GitHub/Google hỏi họ có cho radard biết tên và email không. Đồng ý thì quay về radard.</li>
+      <li>Lần đầu: Better Auth tạo <code>user</code>. Hook của radard tạo luôn một hồ sơ trống cho user đó, rồi đưa họ tới trang viết mô tả và chọn chủ đề (giống <code>/profile</code> trên Telegram).</li>
+      <li>Trình duyệt giữ cookie phiên đăng nhập; lần sau vào thẳng.</li>
+    </ol>
+
+    <h2>Hồ sơ hiện tại của bạn</h2>
+    <p>Hồ sơ số 1 (14 chủ đề đã chọn, 4 điểm tin, 28 phản hồi) phải trở thành hồ sơ của tài khoản bạn, không được tạo hồ sơ mới. Cách làm: đặt biến môi trường <code>OWNER_EMAIL</code> là email GitHub của bạn. Khi user có email này đăng nhập lần đầu, hook nối user vào hồ sơ số 1 thay vì tạo hồ sơ mới.</p>
+
+    <h2>Ai được đăng ký</h2>
+    <p>Đề xuất lúc đầu <b>chỉ người được mời</b>: bảng <code>invites</code> giữ email được mời. Hook "trước khi tạo user" từ chối email không có trong danh sách. Khi muốn mở cho mọi người thì tắt kiểm tra này. Lý do: mỗi người thêm chi phí và có thể làm lộ lỗi chưa thấy khi một người dùng; mời từng người thì kiểm soát được.</p>
+  </section>
+
+  <!-- 03 -->
+  <section class="panel" id="du-lieu" role="tabpanel">
+    <h2>Thay đổi schema</h2>
+    <p>Giữ <code>profile</code> làm trung tâm: mọi dữ liệu riêng gắn vào hồ sơ, hồ sơ gắn vào user. Cách này ít đụng code nhất, vì <code>profile_topics</code> và chủ đề tự thêm (<code>topics.owner_profile_id</code>) đã gắn theo hồ sơ từ trước.</p>
+    <table>
+      <tr><th>Bảng</th><th>Đổi gì</th><th>Vì sao</th></tr>
+      <tr><td><code>user</code>, <code>session</code>, <code>account</code>, <code>verification</code></td><td>Bảng mới, theo schema Better Auth sinh ra</td><td>Đăng nhập</td></tr>
+      <tr><td><code>profile</code></td><td>Thêm <code>user_id</code> (duy nhất, trỏ tới <code>user</code>; trống được cho tới khi bạn đăng nhập lần đầu). <code>id</code> chuyển sang tự tăng, bỏ mặc định 1</td><td>Mỗi user một hồ sơ</td></tr>
+      <tr><td><code>profile_channels</code></td><td>Bảng mới: hồ sơ, kênh (<code>telegram</code>), địa chỉ (chat id), lúc nối, đang bật. Duy nhất theo (kênh, địa chỉ)</td><td>Thay biến <code>TELEGRAM_CHAT_ID</code>; sau này thêm Discord, Web Push cùng chỗ</td></tr>
+      <tr><td><code>channel_link_codes</code></td><td>Bảng mới: mã nối dùng một lần (lưu dạng băm), hồ sơ, hạn dùng, lúc đã dùng</td><td>Nối chat Telegram với tài khoản web (tab 04)</td></tr>
+      <tr><td><code>invites</code></td><td>Bảng mới: email được mời, ai mời, lúc dùng</td><td>Chỉ người được mời mới đăng ký được</td></tr>
+      <tr><td><code>digests</code>, <code>deliveries</code>, <code>feedback</code></td><td>Thêm <code>profile_id</code> (bắt buộc), điền 1 cho dữ liệu cũ</td><td>Biết điểm tin, tin gửi, phản hồi thuộc ai mà không phải dò theo chat id</td></tr>
+      <tr><td><code>llm_calls</code></td><td>Thêm <code>profile_id</code> (trống được: embedding là chi phí chung)</td><td>Đo chi phí mỗi người</td></tr>
+      <tr><td><code>profile_topics.profile_id</code></td><td>Bỏ mặc định 1</td><td>Không để code quên truyền hồ sơ mà vẫn chạy</td></tr>
+    </table>
+
+    <h2>Chuyển dữ liệu cũ</h2>
+    <ol>
+      <li>Tạo các bảng mới, thêm cột (trống được).</li>
+      <li>Điền <code>profile_id = 1</code> cho mọi dòng cũ của <code>digests</code>, <code>deliveries</code>, <code>feedback</code>, rồi đặt cột thành bắt buộc.</li>
+      <li>Điền <code>profile_channels</code> cho hồ sơ 1 từ người nhận trong các điểm tin đã gửi (<code>digests.recipient</code>). Chat id lấy từ dữ liệu, không ghi vào code hay migration.</li>
+      <li>Chuyển <code>profile.id</code> sang tự tăng, bắt đầu từ 2.</li>
+    </ol>
+    <p>Kiểm sau khi chạy trên server: hồ sơ 1 vẫn có 14 chủ đề, có đúng một chat; điểm tin 07:00 hôm sau đến đúng một lần (ràng buộc <code>digests_once_uq</code> giữ việc này).</p>
+    <div class="warn"><b>Biến <code>TELEGRAM_CHAT_ID</code></b> vẫn giữ trong lúc chuyển, để nếu cần quay lại bản cũ thì bản cũ vẫn chạy. Gỡ sau khi bản mới chạy ổn vài ngày.</div>
+  </section>
+
+  <!-- 04 -->
+  <section class="panel" id="bot" role="tabpanel">
+    <h2>Nối chat Telegram với tài khoản</h2>
+    <p>Telegram không cho bot biết email của ai, nên phải có một bước nối. Cách quen thuộc: web tạo một mã dùng một lần, gói trong link mở bot. Telegram gọi đây là "deep link": link dạng <code>t.me/radard_bot?start=&lt;mã&gt;</code>, bấm vào thì bot nhận lệnh <code>/start &lt;mã&gt;</code>.</p>
+    <div class="chat">Web, trang Cài đặt:  [Nhận điểm tin qua Telegram]
+   → mở Telegram, bot nhận /start a7Kq…
+
+BOT: Đã nối Telegram với tài khoản của bạn. Điểm tin sẽ đến lúc 07:00 mỗi sáng.
+     Gõ /profile để xem mô tả và chủ đề.</div>
+    <ul>
+      <li>Mã hết hạn sau 15 phút, dùng được một lần, chỉ lưu bản băm.</li>
+      <li>Chat chưa nối mà nhắn bot: bot trả lời "Mở radard trên web để nối tài khoản" kèm link, không làm gì khác.</li>
+      <li>Người dùng chỉ dùng Telegram, không vào web: vẫn phải đăng nhập web một lần để nối. Đổi lại, không ai dùng được bot nếu chưa được mời.</li>
+    </ul>
+
+    <h2>Bot nhận nhiều chat</h2>
+    <ul>
+      <li>Bỏ <code>allowedChatId</code>. Mỗi update: tra <code>profile_channels</code> theo chat id để ra hồ sơ, rồi gọi các handler hiện có với hồ sơ đó.</li>
+      <li>Trạng thái đang chờ gõ chữ và lựa chọn đang tích dở trong <code>/profile</code> nhớ theo cặp (chat, message_id).</li>
+      <li>Phản hồi 👍/👎 ghi kèm <code>profile_id</code>.</li>
+    </ul>
+
+    <h2>Điểm tin cho từng người</h2>
+    <ul>
+      <li>Lịch 07:00 vẫn một lịch. Nó tạo mỗi hồ sơ (có chat đang bật) một job trong hàng đợi pg-boss, khoá theo (hồ sơ, ngày) để không gửi trùng.</li>
+      <li>Mỗi job làm đúng như hiện nay, chỉ thay "hồ sơ 1" bằng hồ sơ của job: lấy chủ đề đang bật của người đó, xếp hạng, hỏi Jev ở cổng chủ đề, viết tóm tắt, gửi.</li>
+      <li>Một người lỗi không chặn người khác: mỗi job chạy lại riêng.</li>
+      <li>Giờ gửi theo múi giờ riêng từng người: để sau. Lúc đầu mọi người nhận lúc 07:00 giờ Việt Nam.</li>
+    </ul>
+  </section>
+
+  <!-- 05 -->
+  <section class="panel" id="web" role="tabpanel">
+    <h2>Chạy ở đâu</h2>
+    <p>Thêm vai trò <code>web</code> cho daemon, cạnh <code>scheduler</code>, <code>worker</code>, <code>bot</code> (chọn bằng <code>SERVICE_ROLE</code>, cùng một image Docker). Lúc đầu vẫn chạy chung trong service <code>radard</code> với <code>SERVICE_ROLE=all</code>; khi web cần chịu tải riêng thì tách thành service thứ hai trên Railway, không phải sửa code. Web server dùng Hono, chạy bằng Bun.</p>
+
+    <h2>Các trang, theo thứ tự làm</h2>
+    <table>
+      <tr><th>Trang</th><th>Nội dung</th><th>Trong thiết kế gốc</th></tr>
+      <tr><td>Đăng nhập, Cài đặt</td><td>Đăng nhập GitHub/Google; nối Telegram; viết mô tả và chọn chủ đề (dùng lại logic của <code>/profile</code>)</td><td>Hồ sơ người dùng: MVP</td></tr>
+      <tr><td>Feed</td><td>Sự kiện trong 24 giờ / 7 ngày, xếp theo điểm với chủ đề của bạn; mỗi sự kiện ghi gộp từ bao nhiêu nguồn, chủ đề, nút 👍/👎</td><td>Feed sự kiện: MVP</td></tr>
+      <tr><td>Chi tiết sự kiện</td><td>Các bài đã gộp, tóm tắt, vì sao được chọn (điểm R, P, C… lấy từ plan điểm tin)</td><td>Cột phải của Feed</td></tr>
+      <tr><td>Link từ điểm tin</td><td>Mỗi tin trong điểm tin có thêm link "Xem trên radard" tới trang chi tiết; "Đọc chi tiết" vẫn trỏ về bài gốc</td><td>Digest có link sang web: MVP</td></tr>
+      <tr><td>Tìm kiếm</td><td>Tìm theo từ khoá (full-text của Postgres, cộng <code>pg_trgm</code> cho gõ sai chính tả) và theo ý nghĩa (embedding đã có), trộn hai kết quả; lọc thời gian, nguồn, loại</td><td>Kho &amp; tìm kiếm: MVP</td></tr>
+      <tr><td>Nguồn</td><td>Sức khoẻ từng nguồn (lần lấy gần nhất, lỗi), chạy thử. Chỉ chủ sở hữu thấy</td><td>Quản lý nguồn: MVP</td></tr>
+    </table>
+
+    <h2>Giao diện viết bằng gì</h2>
+    <p>Bản thiết kế có nhiều tương tác: phím tắt (⌘K tìm kiếm, j/k di chuyển, o mở, a hỏi agent), cột chi tiết mở bên phải không tải lại trang, feed cập nhật khi có tin mới, chat với agent trả lời dần từng chữ, biểu đồ trên dashboard. Kiểu "server tạo HTML cho mỗi trang" (Hono JSX) hợp với trang chủ yếu hiển thị; với chừng ấy tương tác thì phần JavaScript tự viết sẽ phình ra và khó giữ. Vì vậy đề xuất:</p>
+    <table>
+      <tr><th>Phần</th><th>Chọn</th><th>Vì sao</th></tr>
+      <tr><td>Ứng dụng web</td><td><code>apps/web</code>: React + Vite, chạy hoàn toàn trên trình duyệt (SPA, ứng dụng một trang)</td><td>Hệ sinh thái lớn nhất cho giao diện tương tác; Vite build nhanh. Không cần render phía server: web nằm sau đăng nhập, không cần Google tìm thấy</td></tr>
+      <tr><td>Điều hướng, lấy dữ liệu</td><td>TanStack Router và TanStack Query</td><td>Tham số trên URL có kiểu (bộ lọc feed nằm trên URL, chia sẻ được); Query tự lưu đệm, tự lấy lại, làm mới khi có tin mới. Bản thiết kế đã chọn TanStack từ đầu</td></tr>
+      <tr><td>API</td><td>Hono, kiểm đầu vào bằng zod, client có kiểu <code>hc</code> của Hono</td><td>Đổi API ở server thì giao diện báo lỗi kiểu ngay lúc build, không phải viết kiểu dữ liệu hai lần</td></tr>
+      <tr><td>Cập nhật trực tiếp</td><td>Server-Sent Events (server đẩy sự kiện xuống trình duyệt qua một kết nối giữ mở)</td><td>Feed có tin mới, agent trả lời dần; đơn giản hơn WebSocket vì chỉ cần một chiều</td></tr>
+      <tr><td>Phục vụ file</td><td>Vai trò <code>web</code> của daemon trả cả API lẫn file đã build của <code>apps/web</code></td><td>Cùng một địa chỉ nên cookie đăng nhập đơn giản; một service trên Railway. Sau này đưa file tĩnh lên CDN cũng không phải sửa code</td></tr>
+    </table>
+    <p>Đổi lại: có thêm bước build và nhiều code hơn Hono JSX ở mấy trang đầu. Đáng đổi vì các trang sau (agent chat, dashboard, tìm kiếm có phím tắt) đều cần đúng các phần này.</p>
+    
+<p>Trình bày theo bản phác "Màn hình 1 · Feed" trong <code>radard-thiet-ke.html</code>. Câu chữ theo quy tắc đã có: không dùng "digest", không emoji màu, tránh từ kỹ thuật.</p>
+  </section>
+
+  <!-- cách viết -->
+  <section class="panel" id="cach-viet" role="tabpanel">
+    <h2>Đưa "người dùng nào" tới mọi truy vấn</h2>
+    <p>Mọi truy vấn vào bảng của người dùng (hồ sơ, chủ đề đã chọn, điểm tin, phản hồi) phải biết đang làm cho ai. Quên một chỗ là lộ dữ liệu người này sang người khác, như <code>rank.ts</code> hiện nay (tab 01). Hiện các truy vấn này rải ở 8 file: <code>report.ts</code> 44 chỗ, <code>topics.ts</code> 38, <code>digest.ts</code> 25, <code>cli.ts</code> 22, <code>feedback.ts</code> 16, <code>rank.ts</code> 10, <code>profile.ts</code>, <code>bot.ts</code>.</p>
+    <table>
+      <tr><th>Cách</th><th>Làm thế nào</th><th>Đánh giá</th></tr>
+      <tr><td>Truyền <code>profileId</code> qua mọi hàm</td><td>Thêm một tham số vào mọi hàm trên đường đi</td><td>Rõ ràng nhưng lặp lại khắp nơi; vẫn quên được ở một câu truy vấn</td></tr>
+      <tr><td>DI container (tsyringe, InversifyJS: thư viện tự tạo và nối các đối tượng theo khai báo)</td><td>Đăng ký các lớp, container tạo đối tượng cho từng request</td><td>Cần class và decorator, trong khi radard viết theo hàm. Vẫn phải tạo "phạm vi con" cho từng người. Thêm độ phức tạp mà không giải quyết tốt hơn cách cuối</td></tr>
+      <tr><td><code>AsyncLocalStorage</code> (biến ngầm đi theo một chuỗi lời gọi bất đồng bộ)</td><td>Đặt người dùng một lần ở đầu request hay job; hàm nào cũng đọc được</td><td>Gọn nhất khi viết, nhưng phụ thuộc bị ẩn: đọc chữ ký hàm không biết nó cần người dùng; quên đặt thì chỉ lỗi lúc chạy; test phải bọc. Hợp để gắn người dùng vào log, không hợp để truy vấn dữ liệu</td></tr>
+      <tr><td><b>Phạm vi hồ sơ</b> (đề xuất)</td><td>Một hàm tạo trả về bộ truy cập dữ liệu đã gắn sẵn hồ sơ; truyền một đối tượng thay vì một id</td><td>Vẫn là DI, nhưng bằng hàm tạo thay vì container, đúng kiểu radard đang dùng (<code>runtime.ts</code> đã dựng sẵn các <code>deps</code>). Không thể quên lọc: bộ truy cập không có cách nào truy vấn mà không kèm hồ sơ</td></tr>
+    </table>
+    <div class="card"><pre style="margin:0;font-family:var(--mono);font-size:13px;white-space:pre-wrap">// Bộ truy cập dữ liệu của MỘT hồ sơ. Ngoài thư mục repos/, không file nào import thẳng bảng của người dùng.
+export function forProfile(db: Database, profileId: number) {
+  return {
+    profileId,
+    profile: profileRepo(db, profileId),     // mô tả, bản tiếng Anh
+    topics: topicsRepo(db, profileId),       // chủ đề đã chọn, tự thêm
+    digests: digestsRepo(db, profileId),     // điểm tin, tin đã gửi
+    feedback: feedbackRepo(db, profileId),   // 👍/👎, nhận xét
+  };
+}
+export type Scope = ReturnType&lt;typeof forProfile&gt;;
+
+// Ba cửa vào, mỗi cửa dựng phạm vi một lần:
+// web:  middleware Hono đọc phiên đăng nhập → c.set("scope", forProfile(db, session.profileId))
+// job:  điểm tin 07:00 → mỗi hồ sơ một job → runDigest(deps, forProfile(db, job.profileId))
+// bot:  mỗi update → tra chat trong profile_channels → forProfile(db, channel.profileId)</pre></div>
+    <ul>
+      <li><b>Giữ luật bằng test:</b> một test quét mã nguồn, báo lỗi khi file ngoài <code>repos/</code> import <code>profile</code>, <code>profileTopics</code>, <code>digests</code>, <code>deliveries</code>, <code>feedback</code>. Ai viết thêm truy vấn sai chỗ thì check đỏ ngay.</li>
+      <li><b>Lưới an toàn ở Postgres (để sau):</b> Row-Level Security, tức Postgres tự lọc dòng theo người dùng của phiên kết nối. Code có lỗi thì vẫn không đọc được dữ liệu người khác. Đáng làm khi mở cho người lạ.</li>
+      <li><b>Log:</b> dùng <code>AsyncLocalStorage</code> chỉ để mọi dòng log trong một request hay job tự kèm hồ sơ, giúp tra lỗi.</li>
+    </ul>
+
+    <h2>Những chỗ khác nên sửa để scale</h2>
+    <table>
+      <tr><th>Chỗ</th><th>Hiện nay</th><th>Nên đổi</th><th>Khi nào</th></tr>
+      <tr><td>Logic nghiệp vụ nằm trong lớp bot</td><td><code>roles/bot.ts</code> chứa logic <code>/topics</code>, <code>/profile</code> (gợi ý, lưu, đếm chủ đề) cho Telegram</td><td>Tách thành service dùng chung (<code>profileService</code>, <code>topicsService</code>, <code>feedbackService</code>): bot, API web và CLI cùng gọi. Bot và web chỉ còn phần hiển thị</td><td>Bước 1–2</td></tr>
+      <tr><td>Chọn tin dính với gửi tin</td><td><code>digest.ts</code> (699 dòng) gồm chọn tin, viết prompt, gửi Telegram, chạy lại</td><td>Tách phần "chọn và giải thích vì sao chọn" để feed web dùng chung, nên feed và điểm tin xếp cùng một cách</td><td>Bước 4</td></tr>
+      <tr><td>Trạng thái bot giữ trong bộ nhớ</td><td>Lựa chọn đang tích dở, "đang chờ gõ chữ" nằm trong <code>Map</code> của tiến trình</td><td>Lưu vào một bảng nhỏ có hạn dùng. Hiện cứ deploy là mất, và không chạy được nếu có hai bản bot</td><td>Bước 1</td></tr>
+      <tr><td>Bot nhận update bằng long polling</td><td>Một tiến trình hỏi Telegram liên tục</td><td>Đủ cho nhiều người với một bản bot. Chỉ chuyển sang webhook khi cần chạy nhiều bản</td><td>Để sau</td></tr>
+      <tr><td>Lệnh <code>report</code> đọc thẳng các bảng</td><td><code>report.ts</code> 44 chỗ truy vấn, chấm nghiệm thu cho một người</td><td>Đi qua phạm vi hồ sơ; thêm báo cáo tổng cho chủ sở hữu (mọi người)</td><td>Bước 1</td></tr>
+    </table>
+    <h2>Những chỗ đã ổn, giữ nguyên</h2>
+    <ul>
+      <li>Phụ thuộc được dựng ở một chỗ (<code>runtime.ts</code>) rồi truyền vào job; test thay bằng bản giả (<code>ai-fake</code>, Telegram giả). Đây đã là DI bằng hàm tạo; phạm vi hồ sơ chỉ là bước tiếp của cùng cách đó.</li>
+      <li>Công thức xếp hạng là hàm thuần trong <code>packages/core/src/ranking.ts</code>, không đụng DB: web dùng lại được ngay.</li>
+      <li>Nguồn, model, kênh gửi đều qua interface (<code>SourceAdapter</code>, <code>LlmProvider</code>, <code>Notifier</code>…): thêm Discord, Web Push không phải sửa job.</li>
+      <li>Nguyên tắc D4: dữ liệu dẫn xuất dùng chung, nên số người tăng không làm tăng việc thu thập, embedding, gộp sự kiện.</li>
+    </ul>
+  </section>
+
+  <!-- 06 -->
+  <section class="panel" id="thu-tu" role="tabpanel">
+    <h2>6 bước</h2>
+    <p>Mỗi bước giao một sub-agent, làm trong worktree riêng với DB test riêng. Tôi kiểm lại mỗi bước (chạy lại check, đọc diff, kiểm trên dữ liệu thật) trước khi merge. Câu chữ người dùng thấy sẽ gửi bạn duyệt trước.</p>
+
+    <div class="step"><div class="h"><b>1. Dữ liệu nhiều người dùng</b><span class="tag">Opus</span></div>
+      <p>Migration ở tab 03; bỏ <code>PROFILE_ID</code>, đưa mọi truy vấn bảng của người dùng vào "phạm vi hồ sơ" và tách service dùng chung (tab 06); <code>rank.ts</code> lọc theo hồ sơ; điểm tin chạy theo từng hồ sơ; bot tra hồ sơ theo chat. Chưa có web. Sau bước này, với bạn mọi thứ chạy y như cũ.</p>
+      <p class="note">Kiểm: test có hai hồ sơ với chủ đề khác nhau thì xếp hạng và điểm tin không lẫn nhau; trên server, điểm tin 07:00 hôm sau đến đúng một lần, cùng nội dung như bản cũ sẽ chọn.</p></div>
+
+    <div class="step"><div class="h"><b>2. Web và đăng nhập</b><span class="tag">Opus</span></div>
+      <p>Vai trò <code>web</code>, API Hono, ứng dụng <code>apps/web</code> (React, Vite, TanStack), Better Auth (GitHub, Google), hook nối hồ sơ của bạn qua <code>OWNER_EMAIL</code>, danh sách mời. Trang đăng nhập và một trang trống sau đăng nhập.</p>
+      <p class="note">Cần bạn: tạo ứng dụng OAuth trên GitHub và Google (tôi hướng dẫn từng bước), đặt khoá vào biến môi trường Railway. Tôi không đọc khoá.</p></div>
+
+    <div class="step"><div class="h"><b>3. Nối Telegram từ web, trang Cài đặt</b><span class="tag b">Sonnet</span></div>
+      <p>Mã nối, deep link, bot nhận <code>/start &lt;mã&gt;</code>; trang Cài đặt dùng lại logic <code>/profile</code>.</p></div>
+
+    <div class="step"><div class="h"><b>4. Feed, chi tiết sự kiện, link từ điểm tin</b><span class="tag b">Sonnet</span></div>
+      <p>Dùng lại hàm xếp hạng đang dùng cho điểm tin, nên feed và điểm tin xếp cùng một cách.</p></div>
+
+    <div class="step"><div class="h"><b>5. Tìm kiếm</b><span class="tag">Opus</span></div>
+      <p>Trộn kết quả từ khoá và ý nghĩa là phần cần đo: chuẩn bị bộ câu hỏi thử trên dữ liệu thật, đo trước khi chọn cách trộn.</p></div>
+
+    <div class="step"><div class="h"><b>6. Trang Nguồn</b><span class="tag b">Sonnet</span></div>
+      <p>Đọc <code>fetch_runs</code> và <code>source_state</code> có sẵn.</p></div>
+
+    <h2>Cái gì chạy song song được</h2>
+    <ul>
+      <li>Bước 1 phải xong và merge trước: bước nào cũng dựa vào hồ sơ theo người dùng, và hai migration chạy song song dễ đụng nhau.</li>
+      <li>Sau bước 2: bước 3, 4, 5 chạy song song, mỗi bước một agent. Chúng đụng các phần code khác nhau.</li>
+      <li>Bước 6 chen vào bất cứ lúc nào sau bước 2.</li>
+    </ul>
+  </section>
+
+  <!-- 07 -->
+  <section class="panel" id="quyet" role="tabpanel">
+    <h2>Cần bạn quyết</h2>
+    <table>
+      <tr><th>Câu hỏi</th><th>Đề xuất</th><th>Vì sao</th></tr>
+      <tr><td>Ai được đăng ký?</td><td>Chỉ người được mời</td><td>Kiểm soát chi phí và lỗi lúc đầu; mở ra sau chỉ là tắt một bước kiểm</td></tr>
+      <tr><td>Đăng nhập bằng gì?</td><td>GitHub và Google</td><td>Người ngoài ngành có thể không có GitHub. Passkey, link qua email thêm sau được</td></tr>
+      <tr><td>Địa chỉ web?</td><td>Tên miền riêng (ví dụ một tên miền con của tên miền bạn đang có trên Cloudflare)</td><td>GitHub/Google cần địa chỉ quay về cố định; đổi địa chỉ sau thì phải sửa ở cả hai. Tên miền <code>*.up.railway.app</code> dùng tạm được</td></tr>
+      <tr><td>Giao diện viết bằng gì?</td><td>React + Vite + TanStack, API Hono có client <code>hc</code></td><td>Web có nhiều tương tác như bản thiết kế (phím tắt, cột chi tiết, cập nhật trực tiếp, agent chat)</td></tr>
+      <tr><td>Người chỉ dùng Telegram?</td><td>Vẫn phải đăng nhập web một lần để nối</td><td>Một cửa vào duy nhất, dễ chặn người chưa được mời</td></tr>
+    </table>
+    <p class="note">Bạn đồng ý các đề xuất (hoặc sửa chỗ nào) thì tôi giao bước 1 ngay. Bước 1 không cần các quyết định về giao diện hay tên miền.</p>
+  </section>
+
+  <footer>Số liệu: DB server radard ngày 16/10/2026 (đếm dòng; chi phí <code>llm_calls</code> 3 ngày gần nhất). Better Auth: tài liệu bản 1.6.23 (Hono, adapter Drizzle, socialProviders, databaseHooks).</footer>
+</div>
+<script>
+const tabs = document.querySelectorAll('.tabs button');
+const show = (id) => {
+  tabs.forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.id === id));
+  try { history.replaceState(null, '', '#' + id); } catch {}
+};
+tabs.forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+const start = location.hash.slice(1);
+if (start && document.getElementById(start)) show(start);
+</script>
+</body>
+</html>
