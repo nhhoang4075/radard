@@ -1,7 +1,8 @@
 /**
  * Cấu hình deploy của radard trên Railway (Infrastructure as Code, thay `railway.json` từ 13/10/2026).
  *
- * File này chỉ quản lý service `radard`. Service `postgres` (template của Railway) và mọi biến môi
+ * File này quản lý service `radard` và `backup` (sao lưu Postgres lên R2 mỗi đêm, xem ops/backup).
+ * Service `postgres` (template của Railway) và mọi biến môi
  * trường do Railway giữ (`variables.managed: false`), nên khoá bí mật không bao giờ nằm trong repo.
  * Xem trước bằng `railway config plan`, áp dụng bằng `railway config apply`.
  *
@@ -45,8 +46,25 @@ export default defineRailway(() => {
     replicas: { "asia-southeast1-eqsg3a": 1 },
   });
 
+  // Chạy một lần mỗi đêm rồi thoát (Railway Cron): 20:00 UTC = 03:00 giờ VN. Không thử lại khi lỗi:
+  // lượt hỏng báo trong log, đêm sau chạy tiếp; thử lại liên tục sẽ tải đi tải lại cả DB.
+  const backup = service("backup", {
+    source: github("nhhoang4075/radard", { branch: "main", checkSuites: false }),
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "ops/backup/Dockerfile",
+      watchPatterns: ["ops/backup/**", ".railway/**"],
+    },
+    deploy: {
+      cronSchedule: "0 20 * * *",
+      restartPolicyType: "NEVER",
+    },
+    // Cùng khu vực với Postgres: kéo cả DB mỗi đêm không phải đi xa.
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+  });
+
   return project("radard", {
     variables: { managed: false },
-    resources: [radard],
+    resources: [radard, backup],
   });
 });
