@@ -8,6 +8,7 @@
 import {
   canonicalizeUrl,
   type HttpClient,
+  HttpError,
   type ObjectStore,
   type RawItem,
   rawKey,
@@ -149,4 +150,19 @@ async function storeItems(
     nNew += inserted.length;
   }
   return nNew;
+}
+
+/**
+ * Hẹn lại một lượt fetch bị giới hạn tốc độ (HTTP 429). Cấu hình retry của queue (30 giây, 1
+ * phút, 2 phút) thử lại quá sớm: lần 30/10/2026 arXiv trả 429 cả bốn lượt trong 5 phút. Nên 429
+ * không ném lỗi cho pg-boss mà hẹn một job mới sau 15, 30, 60, 120 phút (hoặc `Retry-After` nếu
+ * server đòi lâu hơn); hết bậc thì ném lỗi như mọi lỗi khác. Trả về số giây chờ, hoặc `null`
+ * nếu không phải 429 hay đã hết bậc (người gọi ném lại lỗi).
+ */
+export const RATE_LIMIT_STEPS_MIN = [15, 30, 60, 120] as const;
+export function rateLimitDelaySeconds(err: unknown, attempt: number): number | null {
+  if (!(err instanceof HttpError) || err.status !== 429) return null;
+  const step = RATE_LIMIT_STEPS_MIN[attempt];
+  if (step === undefined) return null;
+  return Math.ceil(Math.max(step * 60, (err.retryAfterMs ?? 0) / 1000));
 }

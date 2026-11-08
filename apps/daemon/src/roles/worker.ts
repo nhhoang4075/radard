@@ -7,7 +7,7 @@ import { type FetchJob, QUEUE } from "../boss.ts";
 import { env } from "../env.ts";
 import { runBaselines } from "../jobs/baselines.ts";
 import { runDigest, type SendDeps } from "../jobs/digest.ts";
-import { type FetchDeps, runFetch } from "../jobs/fetch.ts";
+import { type FetchDeps, rateLimitDelaySeconds, runFetch } from "../jobs/fetch.ts";
 import { fetchPages, type PagesDeps } from "../jobs/pages.ts";
 import { type ProcessDeps, runProcess } from "../jobs/process.ts";
 import { runRepoStats } from "../jobs/repo-stats.ts";
@@ -26,7 +26,25 @@ export async function startWorker(
 ): Promise<void> {
   await boss.work<FetchJob>(QUEUE.fetch, { localConcurrency: opts.concurrency }, async (jobs) => {
     for (const job of jobs) {
-      const outcome = await runFetch(job.data.sourceId, deps);
+      let outcome: Awaited<ReturnType<typeof runFetch>>;
+      try {
+        outcome = await runFetch(job.data.sourceId, deps);
+      } catch (err) {
+        const attempt = job.data.rateLimited ?? 0;
+        const wait = rateLimitDelaySeconds(err, attempt);
+        if (wait === null) throw err;
+        await boss.send(
+          QUEUE.fetch,
+          { sourceId: job.data.sourceId, rateLimited: attempt + 1 } satisfies FetchJob,
+          { startAfter: wait, singletonKey: String(job.data.sourceId) },
+        );
+        log.warn("nguồn giới hạn tốc độ (429), hẹn lại", {
+          sourceId: job.data.sourceId,
+          sauGiay: wait,
+          lanHen: attempt + 1,
+        });
+        continue;
+      }
       if (outcome.behind) {
         log.warn("fetch chưa bắt kịp, lượt sau đọc tiếp", {
           sourceId: job.data.sourceId,

@@ -45,9 +45,20 @@ export class HttpError extends Error {
     readonly status: number,
     readonly url: string,
     readonly bodySnippet: string,
+    /** Từ header `Retry-After` (429/503) nếu server gửi; đơn vị mili giây. */
+    readonly retryAfterMs?: number,
   ) {
     super(`HTTP ${status} ${url}`);
   }
+}
+
+/** `Retry-After` là số giây hoặc một ngày giờ HTTP; sai dạng thì coi như không có. */
+export function parseRetryAfter(value: string | null, now = Date.now()): number | undefined {
+  if (!value) return undefined;
+  const secs = Number(value);
+  if (Number.isFinite(secs)) return secs >= 0 ? Math.round(secs * 1000) : undefined;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? undefined : Math.max(0, at - now);
 }
 
 const USER_AGENT = "radard/0.1 (personal research daemon; +https://nguyenhuyhoang.work)";
@@ -106,7 +117,12 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
     });
     if (res.status >= 400) {
       const snippet = await res.text().catch(() => "");
-      throw new HttpError(res.status, url, snippet.slice(0, 300));
+      throw new HttpError(
+        res.status,
+        url,
+        snippet.slice(0, 300),
+        parseRetryAfter(res.headers.get("retry-after")),
+      );
     }
     const { body, truncated } =
       res.status === 304 ? { body: "", truncated: false } : await readBody(res, o.maxBytes);

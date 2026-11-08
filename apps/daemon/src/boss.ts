@@ -35,6 +35,8 @@ export const DIGEST_CRON = "0 7 * * *";
 
 export interface FetchJob {
   sourceId: number;
+  /** Số lần đã hẹn lại vì bị giới hạn tốc độ (HTTP 429); bỏ trống = lượt theo lịch. */
+  rateLimited?: number;
 }
 
 export function createBoss(databaseUrl: string, opts: { schedule: boolean }): PgBoss {
