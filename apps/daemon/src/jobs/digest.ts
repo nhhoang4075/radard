@@ -524,7 +524,12 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
     const fallbackTitle =
       [...story.docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ?? p.event.title;
     const topic = written?.topic ?? story.topic;
-    const why = [topic ? `Chủ đề: ${topic}` : null, sourcesLine(story.docs)]
+    // N < 1: sự kiện đã gửi trước đó và nay có URL mới, nên là tin tiếp diễn (xep-hang.html, tab N).
+    const why = [
+      p.c.N < 1 ? "Cập nhật" : null,
+      topic ? `Chủ đề: ${topic}` : null,
+      sourcesLine(story.docs),
+    ]
       .filter(Boolean)
       .join(" · ");
     return {

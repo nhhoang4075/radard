@@ -165,7 +165,7 @@ describe("rankPeriod", () => {
     expect(r.picked.map((p) => p.event.eventId)).toEqual([ok.eventId]);
   });
 
-  test("tin đã gửi trong 7 ngày mà không có tài liệu mới thì bị loại (N = 0)", async () => {
+  test("tin đã gửi mà không có tài liệu mới thì bị loại (N = 0)", async () => {
     const e = await addEvent(0.79);
     const [dg] = await db
       .insert(digests)
@@ -189,6 +189,55 @@ describe("rankPeriod", () => {
       body: "đã gửi",
       sentAt: new Date("2026-10-05T23:00:00Z"),
     });
+    const r = await rankPeriod(db, periodEndingAt(END));
+    expect(r.picked).toHaveLength(0);
+    expect(r.rejected[0]?.reason).toBe("not_new");
+  });
+
+  test("tin gửi từ 40 ngày trước, nay chỉ có bài HN đăng lại cùng URL: vẫn bị loại, không cắt 7 ngày", async () => {
+    const old = new Date("2026-08-27T02:00:00Z");
+    const e = await addEvent(0.79, old);
+    const [first] = await db.select().from(documents).where(eq(documents.id, e.docId));
+    const [dg] = await db
+      .insert(digests)
+      .values({
+        channel: "telegram",
+        recipient: "1",
+        periodStart: new Date("2026-08-26T02:00:00Z"),
+        periodEnd: old,
+        lang: "vi",
+      })
+      .returning({ id: digests.id });
+    await db.insert(deliveries).values({
+      digestId: dg?.id ?? 0,
+      channel: "telegram",
+      recipient: "1",
+      messageId: "11",
+      kind: "event",
+      position: 1,
+      eventId: e.eventId,
+      documentIds: [e.docId],
+      body: "đã gửi",
+      sentAt: old,
+    });
+    // Hôm nay một bài HN khác đăng lại đúng bài đó: tài liệu mới, URL cũ.
+    const [repost] = await db
+      .insert(documents)
+      .values({
+        sourceId: hn,
+        externalId: "repost",
+        url: first?.url ?? "",
+        urlCanonical: first?.urlCanonical ?? "",
+        title: "đăng lại",
+        publishedAt: IN,
+        contentSha256: "repost",
+        rawKey: "r/repost",
+        contentType: "application/json",
+      })
+      .returning({ id: documents.id });
+    await db
+      .insert(eventDocuments)
+      .values({ eventId: e.eventId, documentId: repost?.id ?? 0, similarity: 1, reason: "url" });
     const r = await rankPeriod(db, periodEndingAt(END));
     expect(r.picked).toHaveLength(0);
     expect(r.rejected[0]?.reason).toBe("not_new");

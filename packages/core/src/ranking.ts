@@ -166,15 +166,15 @@ export interface Components {
 /**
  * Tính sáu thành phần của một sự kiện.
  *
- * `periodStart`: đầu khoảng digest (24 giờ trước). `sentDocIds`: tài liệu đã nằm trong các tin
- * đã gửi 7 ngày qua (`deliveries.document_ids`), để tính N.
+ * `periodStart`: đầu khoảng digest (24 giờ trước). `sentUrls`: `url_canonical` của mọi tài liệu đã
+ * nằm trong các tin đã gửi, không giới hạn thời gian (`deliveries.document_ids`), để tính N.
  */
 export function components(
   ev: RankEvent,
   base: Baselines,
   cfg: RankConfig,
   periodStart: Date,
-  sentDocIds: ReadonlySet<number>,
+  sentUrls: ReadonlySet<string>,
 ): Components {
   const r = relevanceOf(ev, base);
   return {
@@ -183,7 +183,7 @@ export function components(
     C: coverageOf(ev, base),
     A: Math.max(0, ...ev.docs.map((d) => cfg.priors.get(d.sourceId) ?? 0.5)),
     F: ev.firstSeenAt >= periodStart ? 1 : cfg.followUpF,
-    N: noveltyOf(ev, sentDocIds),
+    N: noveltyOf(ev, sentUrls),
     topicId: r.topicId,
     sourceId: r.sourceId,
     documentId: r.documentId,
@@ -241,11 +241,16 @@ function coverageOf(ev: RankEvent, base: Baselines): number {
   return cov ? normalize(Math.log1p(urls) + 0.5 * (nSources - 1), cov) : 0;
 }
 
-/** N: đã gửi mà không có gì mới thì loại (0); có tài liệu mới thì giảm theo tỉ lệ đã gửi. */
-function noveltyOf(ev: RankEvent, sentDocIds: ReadonlySet<number>): number {
-  const sent = ev.docs.filter((d) => sentDocIds.has(d.documentId)).length;
+/**
+ * N: đã gửi mà không có gì mới thì loại (0); có tin mới thì giảm theo tỉ lệ đã gửi. "Mới" tính theo
+ * URL chuẩn hoá, không theo tài liệu: một bài HN đăng lại cùng bài arXiv đã gửi là tài liệu mới
+ * nhưng không phải tin mới (quyết định 09/11/2026, vụ Next-Concept Modeling gửi 3 lần).
+ */
+function noveltyOf(ev: RankEvent, sentUrls: ReadonlySet<string>): number {
+  const urls = new Set(ev.docs.map((d) => d.urlCanonical));
+  const sent = [...urls].filter((u) => sentUrls.has(u)).length;
   if (sent === 0) return 1;
-  const fresh = (ev.docs.length - sent) / Math.max(1, ev.docs.length);
+  const fresh = (urls.size - sent) / Math.max(1, urls.size);
   return fresh === 0 ? 0 : 0.5 + 0.5 * fresh;
 }
 

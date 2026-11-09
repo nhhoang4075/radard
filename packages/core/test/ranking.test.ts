@@ -182,11 +182,20 @@ describe("components", () => {
     expect([c.A, c.F]).toEqual([0.8, 0.6]);
   });
 
-  test("N: chưa gửi 1; gửi rồi mà có 1/3 tài liệu mới 0,5 + 0,5/3; gửi rồi không có gì mới 0", () => {
+  test("N: chưa gửi 1; gửi rồi mà có 1/3 URL mới 0,5 + 0,5/3; gửi rồi không có gì mới 0", () => {
     const e = ev(1, [doc(1, 1, "a", 0.8), doc(2, 1, "b", 0.8), doc(3, 1, "c", 0.8)]);
     expect(components(e, base, cfg, start, new Set()).N).toBe(1);
-    expect(components(e, base, cfg, start, new Set([1, 2])).N).toBeCloseTo(0.5 + 0.5 / 3, 12);
-    expect(components(e, base, cfg, start, new Set([1, 2, 3])).N).toBe(0);
+    expect(components(e, base, cfg, start, new Set(["a", "b"])).N).toBeCloseTo(0.5 + 0.5 / 3, 12);
+    expect(components(e, base, cfg, start, new Set(["a", "b", "c"])).N).toBe(0);
+  });
+
+  test("N: tài liệu mới nhưng cùng URL đã gửi (HN đăng lại bài arXiv) không phải tin mới", () => {
+    const e = ev(1, [
+      doc(1, 1, "arxiv/x", 0.8),
+      doc(2, 2, "arxiv/x", 0.8),
+      doc(3, 2, "arxiv/x", 0.8),
+    ]);
+    expect(components(e, base, cfg, start, new Set(["arxiv/x"])).N).toBe(0);
   });
 
   test("S với trọng số mặc định", () => {

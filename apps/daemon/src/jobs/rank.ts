@@ -27,7 +27,6 @@ import {
 import {
   baselines,
   type Database,
-  deliveries,
   docSignals,
   docTopicScores,
   documents,
@@ -176,17 +175,17 @@ export async function rankPeriod(
     }
   }
 
-  const sent = new Set<number>();
-  for (const r of await db
-    .select({ ids: deliveries.documentIds })
-    .from(deliveries)
-    .where(
-      and(
-        gte(deliveries.sentAt, new Date(period.end.getTime() - 7 * 86_400_000)),
-        lt(deliveries.sentAt, period.end),
-      ),
-    ))
-    for (const id of r.ids) sent.add(id);
+  // URL của mọi tài liệu đã gửi trong các tin sự kiện, từ trước tới nay (không cắt 7 ngày: tin
+  // đã đọc 16/10 vẫn là đã đọc ngày 09/11). Mốc `end` giữ cho chạy lại một ngày cũ ra đúng kết quả
+  // của ngày đó.
+  const sent = new Set<string>();
+  for (const r of await db.execute<{ url: string }>(sql`
+    select distinct d.url_canonical as url
+    from deliveries dl
+    cross join lateral unnest(dl.document_ids) as x(id)
+    join documents d on d.id = x.id
+    where dl.kind = 'event' and dl.sent_at < ${period.end}`))
+    sent.add(r.url);
 
   const build = async (signals: Map<number, Record<string, number>>): Promise<RankEvent[]> => {
     const byEvent = new Map<number, RankDoc[]>();
