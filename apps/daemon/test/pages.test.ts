@@ -115,7 +115,7 @@ describe("fetchPages", () => {
     const fetcher = fakeFetcher({ "https://github.com/x/janas": "<p>README of Janas</p>" });
 
     const out = await fetchPages({ db, store, fetcher }, { since: SINCE });
-    expect(out).toEqual({ considered: 3, ok: 1, blocked: 0, skipped: 1, failed: 1 });
+    expect(out).toEqual({ considered: 3, ok: 1, blocked: 0, skipped: 1, failed: 1, deferred: 0 });
     expect(fetcher.asked.sort()).toEqual(["https://github.com/x/janas", "https://wsj.com/a"]);
     const rows = await db.select().from(linkedPages).orderBy(asc(linkedPages.urlCanonical));
     expect(rows.map((r) => [r.status, r.httpStatus])).toEqual([
@@ -127,6 +127,45 @@ describe("fetchPages", () => {
     expect(new TextDecoder().decode(raw ?? new Uint8Array())).toBe("<p>README of Janas</p>");
 
     expect((await fetchPages({ db, store, fetcher }, { since: SINCE })).considered).toBe(0);
+  });
+});
+
+describe("fetchPages: deferred", () => {
+  test("robots.txt chưa đọc được thì không ghi dòng, lần sau tải khi đã hồi lại", async () => {
+    await addStory("Janas", "https://github.com/x/janas");
+    let robotsUp = false;
+    const asked: string[] = [];
+    const fetcher: PageFetcher = {
+      async fetch(url): Promise<PageFetchResult> {
+        asked.push(url);
+        if (!robotsUp) return { status: "deferred", error: "robots.txt không đọc được" };
+        return {
+          status: "ok",
+          httpStatus: 200,
+          contentType: "text/html",
+          finalUrl: url,
+          html: "<p>README</p>",
+        };
+      },
+    };
+
+    const first = await fetchPages({ db, store, fetcher }, { since: SINCE });
+    expect(first).toEqual({ considered: 1, ok: 0, blocked: 0, skipped: 0, failed: 0, deferred: 1 });
+    expect(await db.select().from(linkedPages)).toHaveLength(0);
+    expect(asked).toHaveLength(1); // mỗi lượt chạy chỉ thử một lần
+
+    robotsUp = true;
+    const second = await fetchPages({ db, store, fetcher }, { since: SINCE });
+    expect(second).toEqual({
+      considered: 1,
+      ok: 1,
+      blocked: 0,
+      skipped: 0,
+      failed: 0,
+      deferred: 0,
+    });
+    const rows = await db.select().from(linkedPages);
+    expect(rows.map((r) => r.status)).toEqual(["ok"]);
   });
 });
 

@@ -107,17 +107,45 @@ function parseIPv6(input: string): number[] | null {
   return groups;
 }
 
-function isPublicIPv4([a, b, c]: [number, number, number, number]): boolean {
-  if (a === 0) return false; // 0.0.0.0/8 (trên Linux 0.0.0.0 trỏ về chính máy mình)
-  if (a === 10) return false;
-  if (a === 127) return false;
-  if (a === 100 && b >= 64 && b <= 127) return false; // 100.64.0.0/10 (CGNAT)
-  if (a === 169 && b === 254) return false; // gồm 169.254.169.254 (metadata)
-  if (a === 172 && b >= 16 && b <= 31) return false;
-  if (a === 192 && b === 168) return false;
-  if (a === 192 && b === 0 && c === 0) return false; // 192.0.0.0/24
-  if (a >= 224) return false; // multicast, dành riêng, broadcast
-  return true;
+/** Dải IPv4 không công khai: [địa chỉ đầu, độ dài tiền tố]. */
+const PRIVATE_V4: [string, number][] = [
+  ["0.0.0.0", 8], // trên Linux 0.0.0.0 trỏ về chính máy mình
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10], // CGNAT
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16], // gồm 169.254.169.254 (metadata)
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24], // TEST-NET-1
+  ["192.88.99.0", 24], // 6to4 relay cũ
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15], // benchmark
+  ["198.51.100.0", 24], // TEST-NET-2
+  ["203.0.113.0", 24], // TEST-NET-3
+  ["224.0.0.0", 3], // multicast, dành riêng, broadcast (224.0.0.0 – 255.255.255.255)
+];
+
+const v4ToInt = ([a, b, c, d]: readonly [number, number, number, number]) =>
+  ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
+const PRIVATE_V4_RANGES = PRIVATE_V4.map(([addr, bits]) => {
+  const start = v4ToInt(parseIPv4(addr) ?? [0, 0, 0, 0]);
+  const size = 2 ** (32 - bits);
+  return [start, start + size - 1] as const;
+});
+
+function isPublicIPv4(octets: [number, number, number, number]): boolean {
+  const n = v4ToInt(octets);
+  return !PRIVATE_V4_RANGES.some(([lo, hi]) => n >= lo && n <= hi);
+}
+
+/**
+ * IPv6 chỉ công khai khi nằm trong 2000::/3 (danh sách cho phép: mọi dải khác như fc00::/7,
+ * fe80::/10, ff00::/8 đều không), trừ Teredo 2001::/32, tài liệu 2001:db8::/32 và 3fff::/20.
+ */
+function isPublicGlobalV6(g0: number, g1: number): boolean {
+  if (g0 < 0x2000 || g0 > 0x3fff) return false;
+  if (g0 === 0x2001 && (g1 === 0 || g1 === 0xdb8)) return false;
+  return !(g0 === 0x3fff && g1 <= 0x0fff);
 }
 
 /**
@@ -149,12 +177,10 @@ export function isPublicAddress(address: string): boolean {
   if (g0 === 0x64 && g1 === 0xff9b && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) {
     return isPublicIPv4(embedded(g6, g7));
   }
+  // ::ffff:0:a.b.c.d (IPv4-translated, ::ffff:0:0:0/96): không dùng trên đường công khai.
+  if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0xffff && g5 === 0) return false;
   if (g0 === 0x2002) return isPublicIPv4(embedded(g1, g2)); // 6to4
-  if ((g0 & 0xfe00) === 0xfc00) return false; // fc00::/7
-  if ((g0 & 0xffc0) === 0xfe80) return false; // fe80::/10
-  if ((g0 & 0xffc0) === 0xfec0) return false; // fec0::/10 (site-local cũ)
-  if ((g0 & 0xff00) === 0xff00) return false; // ff00::/8 multicast
-  return true;
+  return isPublicGlobalV6(g0, g1); // gồm cả 64:ff9b:1::/48 → không công khai
 }
 
 /**

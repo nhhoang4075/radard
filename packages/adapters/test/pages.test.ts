@@ -225,11 +225,26 @@ describe("createPageFetcher: SSRF", () => {
       });
       const f = createPageFetcher({ http, resolve });
       const res = await f.fetch("https://c.com/p");
-      expect(res.status).toBe("failed");
+      expect(res.status).toBe("deferred");
       expect(res.error).toContain("robots.txt");
       expect(http.asked).toEqual(["https://c.com/robots.txt"]);
       expect(f.robotsCacheSize?.()).toBe(0); // lỗi không được nhớ: lần sau thử lại
     }
+  });
+
+  test("robots.txt 503 rồi hồi lại: lần sau tải được (không nhớ lỗi)", async () => {
+    let up = false;
+    const http = fakeHttp({
+      "https://c.com/robots.txt": () => {
+        if (!up) throw new HttpError(503, "https://c.com/robots.txt", "");
+        return html("User-agent: *\nAllow: /", "text/plain");
+      },
+      "https://c.com/p": () => html(ARTICLE),
+    });
+    const f = createPageFetcher({ http, resolve });
+    expect((await f.fetch("https://c.com/p")).status).toBe("deferred");
+    up = true;
+    expect((await f.fetch("https://c.com/p")).status).toBe("ok");
   });
 
   test("robots.txt redirect tới địa chỉ riêng thì không tải trang", async () => {
@@ -238,7 +253,7 @@ describe("createPageFetcher: SSRF", () => {
       "https://c.com/p": () => html(ARTICLE),
     });
     const res = await createPageFetcher({ http, resolve }).fetch("https://c.com/p");
-    expect(res.status).toBe("failed");
+    expect(res.status).toBe("deferred");
     expect(http.asked).not.toContain("https://c.com/p");
   });
 });

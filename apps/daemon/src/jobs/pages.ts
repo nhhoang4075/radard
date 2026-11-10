@@ -30,6 +30,8 @@ export interface PagesOutcome {
   blocked: number;
   skipped: number;
   failed: number;
+  /** robots.txt không đọc được: không ghi dòng nào, lần chạy sau thử lại. */
+  deferred: number;
 }
 
 /** Kiểu nguồn có trang nội dung riêng (adapter khai báo `articleUrl`). */
@@ -49,7 +51,14 @@ export async function fetchPages(
   deps: PagesDeps,
   opts: { since: Date; limit?: number; concurrency?: number },
 ): Promise<PagesOutcome> {
-  const out: PagesOutcome = { considered: 0, ok: 0, blocked: 0, skipped: 0, failed: 0 };
+  const out: PagesOutcome = {
+    considered: 0,
+    ok: 0,
+    blocked: 0,
+    skipped: 0,
+    failed: 0,
+    deferred: 0,
+  };
   const kinds = await articleKinds(deps.db);
   if (kinds.length === 0) return out;
   const kindList = sql.join(
@@ -95,7 +104,7 @@ export async function fetchPages(
 async function fetchOne(
   deps: PagesDeps,
   r: { url_canonical: string; url: string; external_id: string; kind: string },
-): Promise<"ok" | "blocked" | "skipped" | "failed"> {
+): Promise<"ok" | "blocked" | "skipped" | "failed" | "deferred"> {
   let target: string | null = null;
   try {
     target = adapterFor(r.kind).articleUrl?.(r.external_id, r.url) ?? null;
@@ -116,6 +125,8 @@ async function fetchOne(
   }
 
   const res = await deps.fetcher.fetch(target);
+  // Hoãn: không ghi `linked_pages` để câu truy vấn (URL chưa có dòng) chọn lại ở lần chạy sau.
+  if (res.status === "deferred") return "deferred";
   let key: string | null = null;
   let sha: string | null = null;
   if (res.status === "ok" && res.html !== undefined) {

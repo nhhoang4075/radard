@@ -115,9 +115,8 @@ export function createPageFetcher(opts: {
           async (hopUrl) => {
             const rules = await robotsFor(hopUrl);
             if (rules === "unreachable") {
-              // TODO(spec: RFC 9309 hoãn thử lại): job `pages` ghi mọi kết quả một lần và không có
-              // trạng thái cho phép thử lại, nên tạm ghi `failed`. Cần trạng thái mới (chủ dự án quyết).
-              return { status: "failed", error: "robots.txt không đọc được (5xx hoặc lỗi mạng)" };
+              // Hoãn: job không ghi dòng nào, lần chạy sau tự chọn lại URL này.
+              return { status: "deferred", error: "robots.txt không đọc được (5xx hoặc lỗi mạng)" };
             }
             return rules.allowed(hopUrl)
               ? null

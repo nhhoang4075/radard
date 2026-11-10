@@ -546,10 +546,11 @@ const COMMANDS: Record<string, Command> = {
   "pages fetch": async (base) => {
     const deps = createPagesDeps(base);
     const from = parseSince(flag("since", "30d"));
-    const total = { considered: 0, ok: 0, blocked: 0, skipped: 0, failed: 0 };
+    const total = { considered: 0, ok: 0, blocked: 0, skipped: 0, failed: 0, deferred: 0 };
     for (;;) {
       const out = await fetchPages(deps, { since: from, limit: 500, concurrency: 16 });
-      if (out.considered === 0) break;
+      // Hết URL, hoặc cả đợt đều bị hoãn (không ghi dòng nào nên vòng sau sẽ chọn lại y hệt).
+      if (out.considered === out.deferred) break;
       for (const k of Object.keys(total) as (keyof typeof total)[]) total[k] += out[k];
       console.log(new Date().toISOString(), total);
     }
