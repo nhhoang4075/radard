@@ -18,7 +18,7 @@ import { type AnyVariant, baselineVariant } from "./variants.ts";
 export const CLOSED_EVERY = 4;
 export const CLOSED_REMAINDER = 3;
 /** Ít hơn số ngày này thì không đủ để lấy khoảng tin cậy: báo "chưa đủ dữ liệu", không kết luận. */
-export const MIN_DAYS_FOR_INTERVAL = 3;
+export const MIN_DAYS_FOR_INTERVAL = 5;
 
 export interface DaySplit {
   /** Ngày dùng để fit và chấm bỏ-một-ngày. */
@@ -176,6 +176,7 @@ export function acceptOf(
   regular: Verdict | null,
   closed: Verdict | null,
 ): "accept" | "reject" | "insufficient" {
+  if (regular === null) return "insufficient";
   if (regular !== "win") return "reject";
   if (closed === null) return "insufficient";
   return closed === "win" ? "accept" : "reject";

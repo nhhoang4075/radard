@@ -221,7 +221,8 @@ describe("bộ chấm", () => {
   test("biến thể tốt hơn hẳn thắng ở cả hai tập → nhận; tập khoá kín quá nhỏ → chưa đủ dữ liệu", () => {
     // baseline xếp ngược nhãn (R tăng theo vị trí), oracle xếp đúng
     const days: EvalDay[] = [];
-    for (let i = 1; i <= 12; i++) {
+    // 24 ngày có thông tin → 6 ngày khoá kín, đủ ngưỡng MIN_DAYS_FOR_INTERVAL = 5.
+    for (let i = 1; i <= 24; i++) {
       days.push(
         dayOf(
           `2026-10-${String(i).padStart(2, "0")}`,
