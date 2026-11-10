@@ -187,8 +187,10 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   // 3 làm digest 12/10 chỉ còn 4 tin dù 5 tin HN vượt sàn; nâng lên 5 (chốt 13/10/2026).
   maxPerSource: 5,
   mmr: { start: 0.85, span: 0.1, max: 0.3 },
-  // Chủ dự án sẽ chọn T theo số đo thật; 0 = chọn xác định như cũ.
-  temperature: 0,
+  // Nhiệt độ T của chọn Gumbel top-k. 0,03 do chủ dự án duyệt 10/11/2026 (chưa đo trên bể thật).
+  // Sẽ chỉnh sau tuần đầu có bể, theo tiêu chí: p̂ ≥ 0,05 cho top 12 và trung bình p̂ của 7 tin
+  // gửi ≥ ~0,5. T > 0 cần rng tiêm từ ngoài có hạt giống; nơi xem thử đặt T = 0 hoặc đưa hạt giống.
+  temperature: 0.03,
 };
 
 export interface Components {

@@ -104,3 +104,40 @@ export const DEFAULT_WEIGHT_CAP = 20;
 export function inverseProbWeight(p: number, cap = DEFAULT_WEIGHT_CAP): number {
   return p > 0 ? Math.min(1 / p, cap) : cap;
 }
+
+/**
+ * Hạt giống mô phỏng suy ra từ hạt giống chọn (hàm thuần): biết hạt chọn là tái hiện được hạt mô
+ * phỏng, nên chỉ cần lưu một số. Khác hạt chọn để dòng số ngẫu nhiên của mô phỏng không trùng dòng
+ * của lần chọn thật.
+ */
+export function deriveSimSeed(selectSeed: number): number {
+  return (Math.imul((selectSeed ^ 0x5bd1e995) >>> 0, 0x9e3779b1) ^ 0x85ebca6b) >>> 0;
+}
+
+/**
+ * ln P của danh sách có thứ tự `order` (chỉ số vào `scores`) theo mô hình Plackett–Luce với
+ * logit = S / T (mo-hinh-de-xuat.html, tab Gumbel top-k): mỗi bước = logit đã chọn − logsumexp
+ * của các tin còn lại. LÀ XẤP XỈ cho chọn thật: bỏ qua phạt MMR, chỗ giữ cho nguồn và trần mỗi
+ * nguồn; spec chỉ giữ để đánh giá offline cả danh sách (IPW dùng p_ij, không dùng logP).
+ * T ≤ 0 thì không có phân phối: trả null.
+ */
+export function orderedListLogProb(
+  scores: readonly number[],
+  order: readonly number[],
+  temperature: number,
+): number | null {
+  if (!(temperature > 0)) return null;
+  const logits = scores.map((s) => s / temperature);
+  const left = new Set(logits.keys());
+  let logP = 0;
+  for (const i of order) {
+    const li = logits[i];
+    if (li === undefined || !left.has(i)) return null;
+    const m = Math.max(...[...left].map((j) => logits[j] ?? Number.NEGATIVE_INFINITY));
+    let sum = 0;
+    for (const j of left) sum += Math.exp((logits[j] ?? 0) - m);
+    logP += li - (m + Math.log(sum));
+    left.delete(i);
+  }
+  return logP;
+}

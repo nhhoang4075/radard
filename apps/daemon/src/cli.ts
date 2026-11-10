@@ -170,6 +170,16 @@ function flagValue(name: string): string {
   return next && !next.startsWith("--") ? next : "";
 }
 
+/** `--seed=N` (số nguyên 0 … 2^32−1): bật chọn Gumbel với hạt tường minh khi xem thử. */
+function seedOption(): { selectSeed?: number } {
+  const raw = flag("seed", "");
+  if (!raw) return {};
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n >= 2 ** 32)
+    throw new Error(`--seed phải là số nguyên từ 0 đến 4294967295, nhận "${raw}"`);
+  return { selectSeed: n };
+}
+
 const since = () => parseSince(flag("since", "24h"));
 const limit = () => Number(flag("limit", "20"));
 
@@ -545,6 +555,8 @@ const COMMANDS: Record<string, Command> = {
       profileId: currentProfileId(),
       // Xem thử: không ghi đè bộ cụm gu đang dùng.
       persistInterests: false,
+      // Mặc định T = 0 (xác định); chỉ có nhiễu khi người dùng đưa `--seed N` tường minh.
+      ...seedOption(),
       ...(process.argv.includes("--refresh") ? { http } : {}),
     });
     const f = (x: number) => Number(x.toFixed(2));
@@ -635,6 +647,8 @@ const COMMANDS: Record<string, Command> = {
         await buildPlan(
           { db, profileId: currentProfileId(), http, llm, decider: createDecider(db) },
           slot,
+          undefined,
+          seedOption().selectSeed,
         ),
       );
       return;

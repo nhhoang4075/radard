@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeDecision, fakeLlm } from "@radard/adapters/ai-fake";
 import { fakeNotifier } from "@radard/adapters/notify-fake";
+import { deriveSimSeed } from "@radard/core";
 import {
   baselines,
   createDatabase,
@@ -32,6 +33,7 @@ import {
   runDigest,
   vnDate,
 } from "../src/jobs/digest.ts";
+import type { SelectionLearning } from "../src/jobs/selection-learning.ts";
 
 import { addTopic } from "./topic-fixture.ts";
 
@@ -45,12 +47,12 @@ let hn = 0;
 let topic = 0;
 let seq = 0;
 
-async function addEvent(score = 0.79): Promise<{ eventId: number; docId: number }> {
+async function addEvent(score = 0.79, sourceId = hn): Promise<{ eventId: number; docId: number }> {
   const id = ++seq;
   const [d] = await db
     .insert(documents)
     .values({
-      sourceId: hn,
+      sourceId,
       externalId: String(1000 + id),
       url: `https://www.site${id}.com/post`,
       urlCanonical: `https://site${id}.com/post`,
@@ -199,11 +201,14 @@ describe("runDigest", () => {
       "Chủ đề: Agent AI · HN",
     ]);
     // Bài gốc (tên miền, link đầy đủ) và trang thảo luận HN do adapter khai báo.
-    expect(item?.links?.map((l) => [l.role, l.label])).toEqual([
-      ["main", "site1.com"],
-      ["discussion", "HN"],
-    ]);
-    expect(item?.links?.[1]?.url).toBe("https://news.ycombinator.com/item?id=1001");
+    // Thứ tự tin do chọn Gumbel (T > 0) nên tin đầu có thể là bất kỳ tin nào trong 4 tin gần điểm nhau.
+    const label = item?.links?.[0]?.label ?? "";
+    expect(label).toMatch(/^site[1-4]\.com$/);
+    expect(item?.links?.map((l) => l.role)).toEqual(["main", "discussion"]);
+    expect(item?.links?.[1]?.label).toBe("HN");
+    expect(item?.links?.[1]?.url).toBe(
+      `https://news.ycombinator.com/item?id=${1000 + Number(label.slice(4, 5))}`,
+    );
     expect(item?.actions?.map((a) => a.id)).toEqual(["like", "dislike"]);
     // Prompt đọc bối cảnh từ hồ sơ, không viết cứng.
     expect(calls[0]?.system).toContain("I build AI agents.");
@@ -446,5 +451,130 @@ describe("hàm thuần", () => {
         2,
       ),
     ).toThrow("thiếu tóm tắt cho tin 2");
+  });
+});
+
+describe("chọn Gumbel top-k trong luồng thật", () => {
+  const picked = (plan: DigestPlan) => plan.items.map((i) => i.eventId);
+  const metaOf = async () => {
+    const [dg] = await db.select().from(digests);
+    return (dg?.meta ?? {}) as {
+      selectSeed?: number;
+      plan?: DigestPlan;
+      learning?: SelectionLearning;
+    };
+  };
+  /** 12 tin giống điểm nhau trên hai nguồn (mỗi nguồn tối đa 5 tin, nên cần hai nguồn mới đủ 7 tin). */
+  const many = async () => {
+    const [s2] = await db
+      .insert(sources)
+      .values({ kind: "hn", name: "HN2", cadence: "*/15 * * * *", trustScore: 0.6 })
+      .returning({ id: sources.id });
+    await db.insert(baselines).values([
+      {
+        metric: "relevance",
+        sourceId: s2?.id ?? 0,
+        topicId: topic,
+        median: 0.4,
+        p999: 0.8,
+        n: 10_000,
+        windowDays: 30,
+      },
+      {
+        metric: "engagement",
+        sourceId: s2?.id ?? 0,
+        median: 1,
+        p999: 7,
+        n: 10_000,
+        windowDays: 30,
+      },
+    ]);
+    for (let i = 0; i < 12; i++) await addEvent(0.79, i % 2 ? (s2?.id ?? hn) : hn);
+  };
+
+  test("T mặc định 0,03 trong runDigest; lưu hạt giống, p_i của cả bể, 21 cặp, logP, T, số lần", async () => {
+    await many();
+    await runDigest(
+      { db, profileId: 1, llm: null, notifier: fakeNotifier(), recipient: RECIPIENT },
+      SLOT,
+    );
+    const m = await metaOf();
+    const l = m.learning;
+    expect(m.plan?.ranking.config.temperature).toBe(0.03);
+    expect(l?.selectSeed).toBe(m.selectSeed ?? -1);
+    expect(l?.simSeed).toBe(deriveSimSeed(m.selectSeed ?? 0));
+    expect(l?.temperature).toBe(0.03);
+    expect(l?.runs).toBe(10_000);
+    expect(l?.pool.length).toBe(12);
+    expect(l?.pool.filter((x) => x.sent).length).toBe(7);
+    expect(l?.pool.every((x) => x.p >= 0 && x.p <= 1)).toBe(true);
+    // Tin đã gửi phải có p > 0 (chính lần chọn thật cho thấy nó có thể được chọn).
+    expect(l?.pool.filter((x) => x.sent).every((x) => x.p > 0)).toBe(true);
+    expect(l?.pairs.length).toBe(21);
+    expect(l?.pairs.every((x) => x.a < x.b && x.p >= 0 && x.p <= 1)).toBe(true);
+    expect(typeof l?.logP).toBe("number");
+    expect(l?.logP ?? 0).toBeLessThan(0);
+  });
+
+  test("cùng hạt giống ra cùng tập; hạt khác ra tập khác; không hạt thì xác định (T = 0)", async () => {
+    await many();
+    const deps = { db, profileId: 1, llm: null };
+    const a1 = await buildPlan(deps, SLOT, undefined, 12345);
+    const a2 = await buildPlan(deps, SLOT, undefined, 12345);
+    expect(picked(a2)).toEqual(picked(a1));
+    const sets = new Set<string>();
+    for (let seed = 1; seed <= 20; seed++) {
+      sets.add([...picked(await buildPlan(deps, SLOT, undefined, seed))].sort().join(","));
+    }
+    expect(sets.size).toBeGreaterThan(1);
+    const n1 = await buildPlan(deps, SLOT);
+    const n2 = await buildPlan(deps, SLOT);
+    expect(n1.ranking.config.temperature).toBe(0);
+    expect(picked(n2)).toEqual(picked(n1));
+  });
+
+  test("xem thử (buildPlan không hạt) không ghi dữ liệu học vào digests", async () => {
+    await many();
+    await buildPlan({ db, profileId: 1, llm: null }, SLOT);
+    expect(await db.select().from(digests)).toHaveLength(0);
+  });
+
+  test("chạy lại khi plan chưa kịp lưu: dùng hạt đã lưu, ra đúng tập cũ", async () => {
+    await many();
+    const deps = { db, profileId: 1, llm: null, notifier: fakeNotifier(), recipient: RECIPIENT };
+    await runDigest(deps, SLOT);
+    const first = await metaOf();
+    // Giả lập chết sau khi lưu hạt nhưng trước khi lưu plan.
+    await db.delete(deliveries);
+    await db.update(digests).set({ status: "sending", meta: { selectSeed: first.selectSeed } });
+    await db.execute(sql`truncate candidate_pool`);
+    await runDigest(deps, SLOT);
+    const again = await metaOf();
+    expect(again.selectSeed).toBe(first.selectSeed ?? -1);
+    expect(picked(again.plan as DigestPlan)).toEqual(picked(first.plan as DigestPlan));
+    expect(again.learning?.pool.map((x) => x.p)).toEqual(first.learning?.pool.map((x) => x.p));
+  });
+
+  test("mô phỏng lỗi: vẫn gửi tin, chỉ không có dữ liệu học", async () => {
+    await many();
+    const notifier = fakeNotifier();
+    const out = await runDigest(
+      {
+        db,
+        profileId: 1,
+        llm: null,
+        notifier,
+        recipient: RECIPIENT,
+        computeLearning: () => {
+          throw new Error("mô phỏng hỏng");
+        },
+      },
+      SLOT,
+    );
+    expect(out.status).toBe("sent");
+    expect(notifier.sent.length).toBeGreaterThan(1);
+    const m = await metaOf();
+    expect(m.learning).toBeUndefined();
+    expect(m.plan?.items.length).toBe(7);
   });
 });

@@ -18,6 +18,7 @@ import {
   type FloorResult,
   type HttpClient,
   type InterestCluster,
+  mulberry32,
   needsDecision,
   passesGate,
   percentileFloor,
@@ -65,6 +66,12 @@ export interface RankResult extends Selection {
   period: RankPeriod;
   candidates: number;
   passedGate: number;
+  /** Danh sách ứng viên đã chấm đưa vào `select` (cả tin bị cổng/sàn loại), để mô phỏng đúng đầu vào. */
+  scored: Scored[];
+  /** Cấu hình đưa vào `select` (đã gồm sàn S và T), để mô phỏng đúng đầu vào. */
+  selectConfig: RankConfig;
+  /** Hạt giống của lần chọn; `null` khi chọn xác định (T = 0, xem thử). */
+  selectSeed: number | null;
   /** Mọi sự kiện có R trong vùng xám: đã hỏi model quyết định, hoặc dùng luật cũ (`fallback`). */
   gateDecisions: GateDecision[];
   gateCounts: GateCounts;
@@ -111,6 +118,11 @@ export async function rankPeriod(
      * `false` để không ghi đè cụm đang dùng.
      */
     persistInterests?: boolean;
+    /**
+     * Hạt giống chọn Gumbel top-k. CÓ hạt: T lấy từ `config` hoặc mặc định (0,03), rng là
+     * mulberry32(hạt). KHÔNG có hạt: T = 0, chọn xác định (xem thử không đổi ngẫu nhiên).
+     */
+    selectSeed?: number;
   },
 ): Promise<RankResult> {
   const srcRows = await db.select().from(sources);
@@ -119,6 +131,8 @@ export async function rankPeriod(
     priors: new Map(srcRows.map((s) => [s.id, s.trustScore])),
     ...opts.config,
   };
+  if (opts.selectSeed === undefined && opts.config?.temperature === undefined)
+    config.temperature = 0;
   const kindOf = new Map(srcRows.map((s) => [s.id, s.kind]));
 
   const baseRows = await db.select().from(baselines);
@@ -307,9 +321,18 @@ export async function rankPeriod(
     n: floor.n ?? null,
     days: floor.days,
   });
-  const selection = select(scored, { ...config, floorS: floor.value });
+  const selectConfig: RankConfig = { ...config, floorS: floor.value };
+  const selection = select(
+    scored,
+    selectConfig,
+    undefined,
+    opts.selectSeed === undefined ? undefined : mulberry32(opts.selectSeed),
+  );
   return {
     ...selection,
+    scored,
+    selectConfig,
+    selectSeed: config.temperature > 0 && opts.selectSeed !== undefined ? opts.selectSeed : null,
     floor,
     period,
     candidates: evRows.length,

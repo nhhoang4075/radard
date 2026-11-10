@@ -74,6 +74,7 @@ describe("normalize", () => {
 
 const cfg: RankConfig = {
   ...DEFAULT_RANK_CONFIG,
+  temperature: 0, // oracle xác định; chọn Gumbel có test riêng
   priors: new Map([
     [1, 0.6],
     [2, 0.6],

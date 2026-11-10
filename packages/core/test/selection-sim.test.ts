@@ -9,11 +9,18 @@ import {
   type Scored,
   select,
 } from "../src/ranking.ts";
-import { inverseProbWeight, pairKey, simulateInclusion } from "../src/selection-sim.ts";
+import {
+  deriveSimSeed,
+  inverseProbWeight,
+  orderedListLogProb,
+  pairKey,
+  simulateInclusion,
+} from "../src/selection-sim.ts";
 import { cosine } from "../src/vector.ts";
 
 const cfg: RankConfig = {
   ...DEFAULT_RANK_CONFIG,
+  temperature: 0,
   floorS: 0,
   maxPerSource: 7,
   priors: new Map(),
@@ -295,5 +302,29 @@ describe("inverseProbWeight", () => {
     expect(inverseProbWeight(0)).toBe(20);
     expect(inverseProbWeight(0.01, 50)).toBe(50);
     expect(inverseProbWeight(0.2, 3)).toBe(3);
+  });
+});
+
+describe("deriveSimSeed và orderedListLogProb", () => {
+  test("hạt mô phỏng suy ra được, là số nguyên 32 bit không dấu, khác hạt chọn", () => {
+    for (const s of [0, 1, 12345, 4294967295]) {
+      const d = deriveSimSeed(s);
+      expect(d).toBe(deriveSimSeed(s));
+      expect(Number.isInteger(d) && d >= 0 && d < 2 ** 32).toBe(true);
+      expect(d).not.toBe(s);
+    }
+  });
+
+  test("ví dụ spec: S = 0,80/0,75/0,70/0,60, T = 0,05, chọn tin 0 rồi tin 1", () => {
+    // Tay: P(0) = e^16/(e^16+e^15+e^14+e^12), P(1 | còn 1,2,3) = e^15/(e^15+e^14+e^12).
+    const e = Math.exp;
+    const want =
+      Math.log(e(16) / (e(16) + e(15) + e(14) + e(12))) + Math.log(e(15) / (e(15) + e(14) + e(12)));
+    const got = orderedListLogProb([0.8, 0.75, 0.7, 0.6], [0, 1], 0.05);
+    expect(got).toBeCloseTo(want, 9);
+  });
+
+  test("T = 0 không có phân phối: null", () => {
+    expect(orderedListLogProb([0.8, 0.7], [0], 0)).toBeNull();
   });
 });

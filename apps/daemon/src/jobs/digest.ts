@@ -35,6 +35,11 @@ import { buildTrackingUrl } from "../web/token.ts";
 import { recordCandidatePoolSafely } from "./candidate-pool.ts";
 import type { GateCounts, GateDecision } from "./gate-decision.ts";
 import { type RankResult, rankPeriod } from "./rank.ts";
+import {
+  computeSelectionLearning,
+  newSelectSeed,
+  type SelectionLearning,
+} from "./selection-learning.ts";
 
 const log = createLogger("digest");
 
@@ -475,6 +480,8 @@ export async function buildPlan(
   deps: DigestDeps,
   slot: Date,
   onRanked?: (rank: RankResult) => Promise<void>,
+  /** Hạt giống chọn Gumbel top-k. Vắng: chọn xác định (T = 0), như CLI xem thử. */
+  selectSeed?: number,
 ): Promise<DigestPlan> {
   const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
   const rankStarted = Date.now();
@@ -482,6 +489,7 @@ export async function buildPlan(
     profileId: deps.profileId,
     http: deps.http,
     decider: deps.decider,
+    ...(selectSeed === undefined ? {} : { selectSeed }),
   });
   const rankMs = Date.now() - rankStarted;
   await onRanked?.(rank);
@@ -592,6 +600,8 @@ export interface SendDeps extends DigestDeps {
   recipient: string;
   /** Có thì link trong tin gửi đi là link theo dõi `<baseUrl>/o/<token>`; DB vẫn lưu link trực tiếp. */
   tracking?: { baseUrl: string; secret: string };
+  /** Tính dữ liệu học sau khi chọn (mặc định `computeSelectionLearning`); chỉ test thay. */
+  computeLearning?: (rank: RankResult) => SelectionLearning | null;
 }
 
 export interface DigestOutcome {
@@ -601,6 +611,11 @@ export interface DigestOutcome {
   sentNow: number;
   items: number;
   summarized: boolean;
+}
+
+function savedSeed(meta: Record<string, unknown>): number | undefined {
+  const v = meta.selectSeed;
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 2 ** 32 ? v : undefined;
 }
 
 function asPlan(meta: Record<string, unknown>): DigestPlan | null {
@@ -646,9 +661,31 @@ export async function runDigest(
   try {
     let plan = asPlan(row.meta);
     if (!plan) {
+      // Hạt giống chọn: lưu NGAY khi sinh, trước khi chọn, để lượt chạy lại (plan chưa kịp lưu) dùng
+      // đúng hạt đó và ra đúng tập tin. Từ khi có plan thì plan là nguồn chọn, không chọn lại.
+      const seed = savedSeed(row.meta) ?? newSelectSeed();
+      if (savedSeed(row.meta) === undefined) {
+        row.meta = { ...row.meta, selectSeed: seed };
+        await deps.db.update(digests).set({ meta: row.meta }).where(eq(digests.id, row.id));
+      }
+      let learning: SelectionLearning | null = null;
       // Ghi bể ứng viên (mọi tin qua cổng, kể cả tin không chọn); lỗi ghi bị nuốt, không chặn gửi.
-      plan = await buildPlan(deps, slot, (rank) =>
-        recordCandidatePoolSafely(deps.db, deps.profileId, rank),
+      plan = await buildPlan(
+        deps,
+        slot,
+        async (rank) => {
+          await recordCandidatePoolSafely(deps.db, deps.profileId, rank);
+          // Mô phỏng p_i, p_ij ngay sau khi chọn; lỗi chỉ log, bỏ phần lưu, không chặn gửi.
+          try {
+            learning = (deps.computeLearning ?? computeSelectionLearning)(rank);
+          } catch (err) {
+            log.warn("mô phỏng xác suất chọn lỗi, bỏ dữ liệu học của ngày này", {
+              digestId: row.id,
+              error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+            });
+          }
+        },
+        seed,
       );
       const [prof] = await deps.db
         .select({ lang: profile.displayLang })
@@ -657,7 +694,7 @@ export async function runDigest(
       await deps.db
         .update(digests)
         .set({
-          meta: { ...row.meta, plan },
+          meta: { ...row.meta, plan, ...(learning ? { learning } : {}) },
           lang: prof?.lang ?? row.lang,
           status: "sending",
           error: null,
