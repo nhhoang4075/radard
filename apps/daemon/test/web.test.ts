@@ -15,7 +15,14 @@ const TARGET_0 = "https://example.org/bai-chinh?a=1";
 const TARGET_1 = "http://example.net:8080/bai-lien-quan";
 
 let clock = new Date("2026-11-10T00:00:00Z");
-const web = () => createWebApp({ db, secret: SECRET, now: () => clock });
+/** Mọi app tạo trong test: lượt ghi `link_opens` chạy nền, phải chờ xong trước khi test sau `truncate`. */
+const created: Array<{ idle: () => Promise<void> }> = [];
+const makeApp = (secret: string | undefined) => {
+  const w = createWebApp({ db, secret, now: () => clock });
+  created.push(w);
+  return w;
+};
+const web = () => makeApp(SECRET);
 const tokenOf = (k: number, digestId = 1, position = 1) =>
   signToken(SECRET, { digestId, position, k });
 const open = (w: ReturnType<typeof web>, token: string, init?: RequestInit) =>
@@ -27,6 +34,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  await Promise.all(created.splice(0).map((w) => w.idle()));
   clock = new Date("2026-11-10T00:00:00Z");
   await db.execute(sql`truncate profile, digests, deliveries, link_opens restart identity cascade`);
   await db.insert(profile).values([
@@ -195,10 +203,10 @@ describe("GET /o/:token", () => {
   });
 
   test("không có LINK_SECRET: 404 mọi token, không ghi", async () => {
-    const w = createWebApp({ db, secret: undefined, now: () => clock });
+    const w = makeApp(undefined);
     for (const t of [tokenOf(0), tokenOf(1)]) expect((await open(w, t)).status).toBe(404);
     expect(
-      (await open(createWebApp({ db, secret: "", now: () => clock }), tokenOf(0))).status,
+      (await open(makeApp(""), tokenOf(0))).status,
     ).toBe(404);
     await w.idle();
     expect(await opens()).toHaveLength(0);
