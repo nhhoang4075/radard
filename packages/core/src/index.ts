@@ -1,5 +1,6 @@
 export * from "./ai.ts";
 export * from "./eval/index.ts";
+export * from "./feed.ts";
 export * from "./floor.ts";
 export * from "./hash.ts";
 export * from "./http.ts";

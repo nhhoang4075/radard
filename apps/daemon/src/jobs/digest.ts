@@ -1,5 +1,8 @@
 /**
- * Job điểm tin (digest) mỗi sáng: chọn tin, nhờ LLM viết lời mở đầu và tóm tắt, gửi qua Notifier.
+ * Job điểm tin (digest) mỗi sáng: lớp THÔNG BÁO của feed (quyết định 10/11/2026). Tin lấy từ bản chụp
+ * feed của ngày (feed.ts: một bản chụp mỗi hồ sơ mỗi khung, select chạy một lần với trần K); digest
+ * chỉ lấy ≤ 7 tin đầu của bản chụp qua sàn thông báo, nhờ LLM viết lời mở đầu và tóm tắt, gửi qua
+ * Notifier. Telegram không ảnh hưởng việc chọn feed.
  *
  * Chạy lại an toàn (tuan-3-thuc-thi.html, bước 6):
  *   1. Mỗi khung giờ (07:00 giờ VN) một dòng `digests`. Đã `sent` thì dừng.
@@ -24,23 +27,29 @@ import {
   digests,
   docSignals,
   docText,
+  docTopicScores,
   documents,
   enabledRecipients,
-  eventDocuments,
+  type FeedItem,
   profile,
+  sources,
 } from "@radard/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
 import { buildTrackingUrl } from "../web/token.ts";
-import { recordCandidatePoolSafely } from "./candidate-pool.ts";
-import type { GateCounts, GateDecision } from "./gate-decision.ts";
-import { type RankResult, rankPeriod } from "./rank.ts";
 import {
-  computeSelectionLearning,
-  newSelectSeed,
-  type SelectionLearning,
-} from "./selection-learning.ts";
+  ensureFeedSnapshot,
+  type FeedItemDraft,
+  feedItemsOf,
+  notifiedItems,
+  type RankingInfo,
+  rankingInfo,
+  snapshotLearning,
+  snapshotRanking,
+} from "./feed.ts";
+import { loadProfileTopics, type RankResult, rankPeriod } from "./rank.ts";
+import type { SelectionLearning } from "./selection-learning.ts";
 
 const log = createLogger("digest");
 
@@ -89,6 +98,9 @@ export function vnDate(d: Date): string {
 export interface PlanItem {
   /** 1…n; tin mở đầu là 0. */
   position: number;
+  /** Tin feed tương ứng và vị trí của nó trong bản chụp; vắng ở plan trước feed và ở bản xem thử. */
+  feedItemId?: number;
+  feedPosition?: number;
   eventId: number;
   documentIds: number[];
   message: Message;
@@ -121,26 +133,8 @@ export interface DigestPlan {
   /** `false`: bản không tóm tắt (LLM lỗi hoặc chưa cấu hình). */
   summarized: boolean;
   llm: { model: string; error?: string } | null;
-  ranking: {
-    candidates: number;
-    passedGate: number;
-    rejected: Record<string, number>;
-    config: Record<string, unknown>;
-    baselines: RankResult["baselines"];
-    /** Thời gian cả bước xếp hạng, mili giây (vắng ở plan trước 16/10/2026). */
-    ms?: number;
-    /**
-     * Cổng bằng model quyết định cho các sự kiện có R trong vùng xám: số đếm, từng sự kiện đã xét
-     * (R, chủ đề, xác suất, qua hay không, có dùng luật cũ không) và thời gian hỏi. Vắng ở plan
-     * trước 16/10/2026.
-     */
-    decision?: {
-      model: string | null;
-      counts: GateCounts;
-      ms: number;
-      events: GateDecision[];
-    };
-  };
+  /** Xếp hạng của bản chụp feed mà bản tin lấy tin (cấu hình là cấu hình chung, gồm trần feed). */
+  ranking: RankingInfo;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -368,13 +362,67 @@ export interface DigestDeps {
   decider?: DecisionProvider | null;
 }
 
-async function loadDocs(db: Database, rank: RankResult): Promise<Map<number, ItemDoc[]>> {
+/** Một tin của bản thông báo: tin feed đã lưu (có `id`) hoặc tin của bản xem thử (chưa lưu). */
+type NotifySource = (FeedItem | FeedItemDraft) & { id?: number };
+
+async function loadSignals(
+  db: Database,
+  ids: readonly number[],
+): Promise<Map<number, Record<string, number>>> {
+  const out = new Map<number, Record<string, number>>();
+  for (const s of await db
+    .select()
+    .from(docSignals)
+    .where(inArray(docSignals.documentId, [...ids]))) {
+    out.set(s.documentId, { ...out.get(s.documentId), [s.metric]: s.value });
+  }
+  return out;
+}
+
+/** Điểm chủ đề theo khoá `documentId|topicId`, chỉ cho chủ đề cho R của các tin. */
+async function loadTopicScores(
+  db: Database,
+  ids: readonly number[],
+  items: readonly NotifySource[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const topicIds = [...new Set(items.flatMap((it) => (it.topicId === null ? [] : [it.topicId])))];
+  if (topicIds.length === 0) return out;
+  for (const t of await db
+    .select()
+    .from(docTopicScores)
+    .where(
+      and(inArray(docTopicScores.documentId, [...ids]), inArray(docTopicScores.topicId, topicIds)),
+    )) {
+    out.set(`${t.documentId}|${t.topicId}`, t.score);
+  }
+  return out;
+}
+
+/** Độ nổi thô do adapter của nguồn tính từ tín hiệu, như bước xếp hạng; không có thì null. */
+function engagementOf(kind: string, sig: Record<string, number> | undefined): number | null {
+  if (!sig || !kind) return null;
+  try {
+    return adapterFor(kind).engagement?.(sig) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tài liệu của các tin sẽ báo, theo `document_ids` đã chụp trong bản chụp (đúng các tài liệu bước
+ * xếp hạng đã xét), đủ để dựng link và đưa cho LLM. Điểm chủ đề lấy theo chủ đề cho R của tin; độ
+ * nổi tính lại từ tín hiệu đã lưu bằng adapter của nguồn, như bước xếp hạng.
+ */
+async function loadItemDocs(
+  db: Database,
+  items: readonly NotifySource[],
+): Promise<Map<number, ItemDoc[]>> {
   const out = new Map<number, ItemDoc[]>();
-  const eventIds = rank.picked.map((p) => p.event.eventId);
-  if (eventIds.length === 0) return out;
+  const ids = [...new Set(items.flatMap((it) => it.documentIds))];
+  if (ids.length === 0) return out;
   const rows = await db
     .select({
-      eventId: eventDocuments.eventId,
       id: documents.id,
       sourceId: documents.sourceId,
       externalId: documents.externalId,
@@ -383,40 +431,39 @@ async function loadDocs(db: Database, rank: RankResult): Promise<Map<number, Ite
       urlCanonical: documents.urlCanonical,
       text: docText.text,
     })
-    .from(eventDocuments)
-    .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
+    .from(documents)
     .leftJoin(docText, eq(docText.documentId, documents.id))
-    .where(inArray(eventDocuments.eventId, eventIds));
-  const ids = rows.map((r) => r.id);
-  const signals = new Map<number, Record<string, number>>();
-  if (ids.length) {
-    for (const s of await db.select().from(docSignals).where(inArray(docSignals.documentId, ids))) {
-      signals.set(s.documentId, { ...signals.get(s.documentId), [s.metric]: s.value });
+    .where(inArray(documents.id, ids));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const signals = await loadSignals(db, ids);
+  const topicScore = await loadTopicScores(db, ids, items);
+  const srcRows = await db
+    .select({ id: sources.id, name: sources.name, kind: sources.kind })
+    .from(sources);
+  const src = new Map(srcRows.map((x) => [x.id, x]));
+  for (const it of items) {
+    const list: ItemDoc[] = [];
+    for (const id of it.documentIds) {
+      const r = byId.get(id);
+      if (!r) continue;
+      const kind = src.get(r.sourceId)?.kind ?? "";
+      const sig = signals.get(r.id);
+      list.push({
+        id: r.id,
+        sourceId: r.sourceId,
+        sourceName: src.get(r.sourceId)?.name ?? String(r.sourceId),
+        kind,
+        externalId: r.externalId,
+        title: r.title,
+        url: r.url,
+        urlCanonical: r.urlCanonical,
+        excerpt: excerptOf(r.text, r.title),
+        signals: sig ?? {},
+        topicScore: it.topicId === null ? 0 : (topicScore.get(`${r.id}|${it.topicId}`) ?? 0),
+        engagement: engagementOf(kind, sig),
+      });
     }
-  }
-  const picked = new Map(rank.picked.map((p) => [p.event.eventId, p]));
-  for (const r of rows) {
-    const p = picked.get(r.eventId);
-    // Chỉ tài liệu mà bước xếp hạng đã xét (cùng mốc thời gian).
-    const rankDoc = p?.event.docs.find((d) => d.documentId === r.id);
-    if (!p || !rankDoc) continue;
-    const topicId = p.c.topicId;
-    const list = out.get(r.eventId) ?? [];
-    list.push({
-      id: r.id,
-      sourceId: r.sourceId,
-      sourceName: rank.sourceNames.get(r.sourceId) ?? String(r.sourceId),
-      kind: rank.sourceKinds.get(r.sourceId) ?? "",
-      externalId: r.externalId,
-      title: r.title,
-      url: r.url,
-      urlCanonical: r.urlCanonical,
-      excerpt: excerptOf(r.text, r.title),
-      signals: signals.get(r.id) ?? {},
-      topicScore: topicId === null ? 0 : (rankDoc.topicScores.get(topicId) ?? 0),
-      engagement: rankDoc.engagement,
-    });
-    out.set(r.eventId, list);
+    out.set(it.eventId, list);
   }
   return out;
 }
@@ -430,52 +477,24 @@ function excerptOf(text: string | null, title: string | null): string {
   return body.length > LLM_EXCERPT_CHARS ? `${body.slice(0, LLM_EXCERPT_CHARS)}…` : body;
 }
 
-function scoreOfPick(p: RankResult["picked"][number]): PlanItem["score"] {
+function scoreOfItem(it: NotifySource): PlanItem["score"] {
   const r = (x: number) => Math.round(x * 1000) / 1000;
   return {
-    S: r(p.S),
-    penalty: r(p.penalty),
-    R: r(p.c.R),
-    P: r(p.c.P),
-    C: r(p.c.C),
-    A: r(p.c.A),
-    F: r(p.c.F),
-    U: r(p.c.U),
-    N: r(p.c.N),
-  };
-}
-
-function rankingInfo(
-  rank: RankResult,
-  ms: number,
-  decider: DecisionProvider | null | undefined,
-): DigestPlan["ranking"] {
-  const rejected: Record<string, number> = {};
-  for (const x of rank.rejected) rejected[x.reason] = (rejected[x.reason] ?? 0) + 1;
-  const { priors, ...rest } = rank.config;
-  return {
-    candidates: rank.candidates,
-    passedGate: rank.passedGate,
-    rejected,
-    config: { ...rest, priors: Object.fromEntries(priors) },
-    baselines: rank.baselines,
-    ms,
-    decision: {
-      model: decider?.model ?? null,
-      counts: rank.gateCounts,
-      ms: rank.gateMs,
-      events: rank.gateDecisions.map((d) => ({
-        ...d,
-        R: Math.round(d.R * 1000) / 1000,
-        probability: d.probability === null ? null : Math.round(d.probability * 1000) / 1000,
-      })),
-    },
+    S: r(it.score),
+    penalty: r(it.penalty),
+    R: r(it.r),
+    P: r(it.p),
+    C: r(it.c),
+    A: r(it.a),
+    F: r(it.f),
+    U: r(it.u ?? 0),
+    N: r(it.n),
   };
 }
 
 /**
- * Chọn tin và viết nội dung cho khoảng 24 giờ kết thúc ở `slot`. Tự nó không ghi gì vào DB (CLI
- * `--dry-run` gọi thẳng); `onRanked` cho nơi gọi móc việc ghi vào ngay sau bước xếp hạng.
+ * Xem thử (CLI `--dry-run`, test): xếp hạng như bản chụp feed (cùng select, trần K) rồi dựng bản
+ * thông báo từ các tin được báo, KHÔNG ghi gì vào DB. `onRanked` cho nơi gọi móc việc ghi.
  */
 export async function buildPlan(
   deps: DigestDeps,
@@ -494,44 +513,64 @@ export async function buildPlan(
   });
   const rankMs = Date.now() - rankStarted;
   await onRanked?.(rank);
+  return planFromItems(
+    deps,
+    slot,
+    notifiedItems(feedItemsOf(rank, deps.profileId)),
+    rankingInfo(rank, rankMs, deps.decider),
+  );
+}
+
+/**
+ * Bản thông báo từ các tin được báo của bản chụp (theo thứ tự báo): đọc tài liệu, nhờ LLM tóm tắt,
+ * dựng tin. Không chọn lại gì.
+ */
+export async function planFromItems(
+  deps: Pick<DigestDeps, "db" | "profileId" | "llm">,
+  slot: Date,
+  picked: readonly NotifySource[],
+  ranking: RankingInfo,
+): Promise<DigestPlan> {
+  const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
   const [prof] = await deps.db.select().from(profile).where(eq(profile.id, deps.profileId));
-  const docsByEvent = await loadDocs(deps.db, rank);
+  const topicRows = await loadProfileTopics(deps.db, deps.profileId);
+  const topicLabels = new Map(topicRows.map((t) => [t.id, t.label]));
+  const docsByEvent = await loadItemDocs(deps.db, picked);
   const date = vnDate(slot);
   const base = {
     version: 1 as const,
     builtAt: new Date().toISOString(),
     period: { start: period.start.toISOString(), end: period.end.toISOString() },
-    ranking: rankingInfo(rank, rankMs, deps.decider),
+    ranking,
   };
 
-  if (rank.picked.length === 0) {
+  if (picked.length === 0) {
     const header: Message = {
       kind: "digest",
       title: `Điểm tin ${date}`,
       // Câu chữ do bạn chốt 13/10/2026.
       lines: [
         "Hôm nay không có tin tức đáng chú ý.",
-        rank.passedGate > 0
-          ? `Có ${rank.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm nhưng chưa đủ mức đáng đọc.`
+        ranking.passedGate > 0
+          ? `Có ${ranking.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm nhưng chưa đủ mức đáng đọc.`
           : "Không có sự kiện nào thuộc các chủ đề bạn quan tâm trong 24 giờ qua.",
       ],
     };
     return { ...base, header, items: [], summarized: false, llm: null };
   }
 
-  const stories = rank.picked.map((p, i) => ({
+  const stories = picked.map((p, i) => ({
     n: i + 1,
-    topic: p.c.topicId === null ? null : (rank.topicLabels.get(p.c.topicId) ?? null),
-    docs: docsByEvent.get(p.event.eventId) ?? [],
+    topic: p.topicId === null ? null : (topicLabels.get(p.topicId) ?? null),
+    docs: docsByEvent.get(p.eventId) ?? [],
   }));
 
   let summaries: Summaries | null = null;
   let llmInfo: DigestPlan["llm"] = null;
   if (deps.llm) {
-    const topics = [...rank.topicLabels].map(([id, label]): TopicChoice => {
-      const note = rank.topicNotes.get(id);
-      return note ? { label, note } : { label };
-    });
+    const topics = topicRows.map(
+      (t): TopicChoice => (t.note ? { label: t.label, note: t.note } : { label: t.label }),
+    );
     const result = await summarize(
       deps.llm,
       digestSystem(prof?.promptContext ?? "", prof?.displayLang ?? "vi", topics),
@@ -545,16 +584,16 @@ export async function buildPlan(
     } else llmInfo = { model: deps.llm.model, error: result.error };
   }
 
-  const items: PlanItem[] = rank.picked.map((p, i) => {
+  const items: PlanItem[] = picked.map((p, i) => {
     const story = stories[i] ?? { n: i + 1, topic: null, docs: [] };
     const written = summaries?.items.get(story.n);
     const { links, moreRelated } = buildLinks(story.docs);
     const fallbackTitle =
-      [...story.docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ?? p.event.title;
+      [...story.docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ?? p.title;
     const topic = written?.topic ?? story.topic;
     // N < 1: sự kiện đã gửi trước đó và nay có URL mới, nên là tin tiếp diễn (xep-hang.html, tab N).
     const why = [
-      p.c.N < 1 ? "Cập nhật" : null,
+      p.n < 1 ? "Cập nhật" : null,
       topic ? `Chủ đề: ${topic}` : null,
       sourcesLine(story.docs),
     ]
@@ -562,7 +601,9 @@ export async function buildPlan(
       .join(" · ");
     return {
       position: story.n,
-      eventId: p.event.eventId,
+      ...(p.id === undefined ? {} : { feedItemId: p.id }),
+      feedPosition: p.position,
+      eventId: p.eventId,
       documentIds: story.docs.map((d) => d.id),
       message: {
         kind: "digest",
@@ -572,14 +613,14 @@ export async function buildPlan(
         moreRelated,
         actions: ACTIONS,
       },
-      score: scoreOfPick(p),
+      score: scoreOfItem(p),
       topic,
       topicByEmbedding: story.topic,
       topicSource: written?.topic ? "llm" : "embedding",
     };
   });
 
-  const count = `Chọn ${items.length} trong ${rank.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`;
+  const count = `Chọn ${items.length} trong ${ranking.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`;
   const header: Message = {
     kind: "digest",
     title: `Điểm tin ${date}`,
@@ -601,7 +642,7 @@ export interface SendDeps extends DigestDeps {
   recipient: string;
   /** Có thì link trong tin gửi đi là link theo dõi `<baseUrl>/o/<token>`; DB vẫn lưu link trực tiếp. */
   tracking?: { baseUrl: string; secret: string };
-  /** Tính dữ liệu học sau khi chọn (mặc định `computeSelectionLearning`); chỉ test thay. */
+  /** Tính dữ liệu học sau khi chọn bản chụp (mặc định `computeSelectionLearning`); chỉ test thay. */
   computeLearning?: (rank: RankResult) => SelectionLearning | null;
 }
 
@@ -614,11 +655,6 @@ export interface DigestOutcome {
   summarized: boolean;
 }
 
-function savedSeed(meta: Record<string, unknown>): number | undefined {
-  const v = meta.selectSeed;
-  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 2 ** 32 ? v : undefined;
-}
-
 function asPlan(meta: Record<string, unknown>): DigestPlan | null {
   const plan = meta.plan as DigestPlan | undefined;
   return plan?.version === 1 ? plan : null;
@@ -628,9 +664,10 @@ function asPlan(meta: Record<string, unknown>): DigestPlan | null {
 export type DigestJobDeps = Omit<SendDeps, "profileId" | "recipient">;
 
 /**
- * Chạy digest cho từng người nhận đang bật của kênh đang có notifier, mỗi người với hồ sơ của họ
- * (`profile_channels`). Kênh chưa có ai thì không làm gì. Một người lỗi không chặn người khác; xong hết
- * mới ném lỗi (để pg-boss chạy lại; người đã gửi xong thì lượt sau là `already_sent`).
+ * Mỗi khung 07:00: trước hết dựng (hoặc đọc lại) MỘT bản chụp feed cho mỗi hồ sơ có người nhận đang
+ * bật của kênh đang có notifier (`profile_channels`), rồi gửi bản thông báo cho từng người nhận. Kênh
+ * chưa có ai thì không làm gì. Một hồ sơ/người lỗi không chặn người khác; xong hết mới ném lỗi (để
+ * pg-boss chạy lại; bản chụp đã `ready` và người đã gửi xong thì lượt sau không làm lại).
  */
 export async function runDigestAll(
   deps: DigestJobDeps,
@@ -638,7 +675,22 @@ export async function runDigestAll(
 ): Promise<DigestOutcome[]> {
   const outcomes: DigestOutcome[] = [];
   const errors: unknown[] = [];
-  for (const r of await enabledRecipients(deps.db, deps.notifier.channel)) {
+  const recipients = await enabledRecipients(deps.db, deps.notifier.channel);
+  const failedProfiles = new Set<number>();
+  for (const profileId of [...new Set(recipients.map((r) => r.profileId))]) {
+    try {
+      await ensureFeedSnapshot({ ...deps, profileId }, slot);
+    } catch (err) {
+      log.error("bản chụp feed lỗi cho một hồ sơ", {
+        profileId,
+        error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+      });
+      failedProfiles.add(profileId);
+      errors.push(err);
+    }
+  }
+  for (const r of recipients) {
+    if (failedProfiles.has(r.profileId)) continue;
     try {
       outcomes.push(
         await runDigest({ ...deps, profileId: r.profileId, recipient: r.recipient }, slot),
@@ -659,7 +711,11 @@ export async function runDigestAll(
   return outcomes;
 }
 
-/** Gửi điểm tin của khung giờ `slot` (mặc định: khung gần nhất). Chạy lại an toàn. */
+/**
+ * Gửi điểm tin của khung giờ `slot` (mặc định: khung gần nhất) cho một người nhận. Chạy lại an toàn.
+ * Tin lấy từ bản chụp feed của (hồ sơ, khung) (dựng nếu chưa có, dùng lại nếu đã có): các tin có
+ * `notify_position`, theo thứ tự đó. Không chọn lại gì ở đây.
+ */
 export async function runDigest(
   deps: SendDeps,
   slot = digestSlot(new Date()),
@@ -698,32 +754,13 @@ export async function runDigest(
   try {
     let plan = asPlan(row.meta);
     if (!plan) {
-      // Hạt giống chọn: lưu NGAY khi sinh, trước khi chọn, để lượt chạy lại (plan chưa kịp lưu) dùng
-      // đúng hạt đó và ra đúng tập tin. Từ khi có plan thì plan là nguồn chọn, không chọn lại.
-      const seed = savedSeed(row.meta) ?? newSelectSeed();
-      if (savedSeed(row.meta) === undefined) {
-        row.meta = { ...row.meta, selectSeed: seed };
-        await deps.db.update(digests).set({ meta: row.meta }).where(eq(digests.id, row.id));
-      }
-      let learning: SelectionLearning | null = null;
-      // Ghi bể ứng viên (mọi tin qua cổng, kể cả tin không chọn); lỗi ghi bị nuốt, không chặn gửi.
-      plan = await buildPlan(
-        deps,
-        slot,
-        async (rank) => {
-          await recordCandidatePoolSafely(deps.db, deps.profileId, rank);
-          // Mô phỏng p_i, p_ij ngay sau khi chọn; lỗi chỉ log, bỏ phần lưu, không chặn gửi.
-          try {
-            learning = (deps.computeLearning ?? computeSelectionLearning)(rank);
-          } catch (err) {
-            log.warn("mô phỏng xác suất chọn lỗi, bỏ dữ liệu học của ngày này", {
-              digestId: row.id,
-              error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
-            });
-          }
-        },
-        seed,
-      );
+      // Bản chụp là nguồn chọn: hạt giống, danh sách và tin được báo đã lưu ở đó (feed.ts). Chạy lại
+      // khi plan chưa kịp lưu thì đọc lại đúng bản chụp, ra đúng các tin cũ.
+      const { snapshot, items } = await ensureFeedSnapshot(deps, slot);
+      const ranking = snapshotRanking(snapshot);
+      if (!ranking) throw new Error(`bản chụp ${snapshot.id} thiếu thông tin xếp hạng`);
+      plan = await planFromItems(deps, slot, notifiedItems(items), ranking);
+      const learning = snapshotLearning(snapshot);
       const [prof] = await deps.db
         .select({ lang: profile.displayLang })
         .from(profile)
@@ -731,7 +768,14 @@ export async function runDigest(
       await deps.db
         .update(digests)
         .set({
-          meta: { ...row.meta, plan, ...(learning ? { learning } : {}) },
+          feedSnapshotId: snapshot.id,
+          meta: {
+            ...row.meta,
+            feedSnapshotId: snapshot.id,
+            selectSeed: snapshot.selectSeed,
+            plan,
+            ...(learning ? { learning } : {}),
+          },
           lang: prof?.lang ?? row.lang,
           status: "sending",
           error: null,
@@ -739,6 +783,7 @@ export async function runDigest(
         .where(eq(digests.id, row.id));
       log.info("đã lưu plan", {
         digestId: row.id,
+        snapshotId: snapshot.id,
         items: plan.items.length,
         summarized: plan.summarized,
       });
@@ -799,7 +844,14 @@ async function sendMissing(deps: SendDeps, digestId: number, plan: DigestPlan): 
     ).map((r) => r.position),
   );
   const queue = [
-    { position: 0, kind: "header" as const, eventId: null, documentIds: [], message: plan.header },
+    {
+      position: 0,
+      kind: "header" as const,
+      eventId: null,
+      documentIds: [],
+      message: plan.header,
+      feedItemId: undefined,
+    },
     ...plan.items.map((it) => ({ ...it, kind: "event" as const })),
   ];
   let sent = 0;
@@ -823,6 +875,7 @@ async function sendMissing(deps: SendDeps, digestId: number, plan: DigestPlan): 
       title: q.message.title,
       body: q.message.lines.join("\n\n"),
       meta: { links: q.message.links ?? [], moreRelated: q.message.moreRelated ?? 0 },
+      feedItemId: q.feedItemId ?? null,
     });
     sent++;
   }

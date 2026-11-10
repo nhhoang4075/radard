@@ -42,6 +42,11 @@ export function percentileFloor(args: {
   minDays?: number;
   targetPerDay?: number;
   maxQ?: number;
+  /**
+   * Sàn feed (quyết định 10/11/2026): n ≤ mục tiêu cho q kẹp = 0, nghĩa là KHÔNG lọc theo sàn
+   * (giá trị 0; S luôn ≥ 0), thay vì lấy điểm thấp nhất của cửa sổ. Sàn thông báo giữ cách cũ.
+   */
+  noFilterAtZeroQ?: boolean;
 }): FloorResult {
   const { scores, days, fixed } = args;
   const minDays = args.minDays ?? FLOOR_MIN_DAYS;
@@ -49,6 +54,7 @@ export function percentileFloor(args: {
   const n = scores.length / days;
   const target = args.targetPerDay ?? FLOOR_TARGET_PER_DAY;
   const q = Math.min(Math.max(1 - target / n, 0), args.maxQ ?? FLOOR_MAX_Q);
+  if (q === 0 && args.noFilterAtZeroQ) return { value: 0, source: "percentile", q, n, days };
   const sorted = [...scores].sort((a, b) => a - b);
   return { value: percentileCont(sorted, q), source: "percentile", q, n, days };
 }

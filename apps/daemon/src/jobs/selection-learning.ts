@@ -10,8 +10,21 @@
  *
  * Bể = tin ĐÃ gửi + tin qua cổng/sàn nhưng không được chọn (`not_picked`, `source_cap`); tin bị
  * cổng, sàn hay `not_new` loại có p = 0 nên không ghi. p_ij chỉ ghi cho các cặp trong tin đã gửi.
+ *
+ * Từ khi có feed (quyết định 10/11/2026): `select` chọn bản chụp K tin, và "đã gửi" là lớp thông báo
+ * (≤ 7 tin đầu của bản chụp qua sàn thông báo, `pickNotify`). Mô phỏng chạy CẢ hai bước (select rồi
+ * pickNotify) nên p_i, p_ij vẫn là xác suất được GỬI của đúng 7 tin, như trước. Tin trong bản chụp
+ * mà không gửi nằm trong bể với `sent = false`. Học theo vị trí của feed (θk) là việc sau.
  */
-import { deriveSimSeed, orderedListLogProb, pairKey, simulateInclusion } from "@radard/core";
+import {
+  deriveSimSeed,
+  type NotifyRule,
+  orderedListLogProb,
+  pairKey,
+  pickNotify,
+  type Selection,
+  simulateInclusion,
+} from "@radard/core";
 import type { RankResult } from "./rank.ts";
 
 /** Số lần chạy Monte Carlo mỗi bản tin (duyệt 10/11/2026). */
@@ -39,22 +52,50 @@ export function newSelectSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
 }
 
-/** Null khi chọn xác định (T = 0, không hạt) hoặc không có tin nào được chọn. */
+/** Các sự kiện được báo (gửi) từ một kết quả `select`: vị trí = thứ tự trong `picked`. */
+export function notifiedEventIds(selection: Selection, rule: NotifyRule): number[] {
+  return pickNotify(
+    selection.picked.map((p, i) => ({
+      position: i + 1,
+      S: p.S,
+      sourceId: p.c.sourceId,
+      eventId: p.event.eventId,
+    })),
+    rule,
+  ).map((x) => x.eventId);
+}
+
+/** Lớp thông báo của một lần xếp hạng: trần của `config.notify` và sàn thông báo `floor`. */
+export function notifyRuleOf(rank: RankResult): NotifyRule {
+  return {
+    floor: rank.floor.value,
+    maxItems: rank.config.notify.maxItems,
+    maxPerSource: rank.config.notify.maxPerSource,
+  };
+}
+
+/** Null khi chọn xác định (T = 0, không hạt) hoặc không có tin nào được gửi. */
 export function computeSelectionLearning(rank: RankResult): SelectionLearning | null {
   const seed = rank.selectSeed;
   const cfg = rank.selectConfig;
-  if (seed === null || !(cfg.temperature > 0) || rank.picked.length === 0) return null;
+  const rule = notifyRuleOf(rank);
+  const sentIds = notifiedEventIds(rank, rule);
+  if (seed === null || !(cfg.temperature > 0) || sentIds.length === 0) return null;
   const started = Date.now();
   const simSeed = deriveSimSeed(seed);
-  const sent = rank.picked.map((p) => ({ eventId: p.event.eventId, S: p.S, sent: true }));
-  const rest = rank.rejected
-    .filter((r) => r.reason === "not_picked" || r.reason === "source_cap")
-    .map((r) => ({ eventId: r.event.eventId, S: r.S, sent: false }));
+  const byId = new Map(rank.picked.map((p) => [p.event.eventId, p]));
+  const sentSet = new Set(sentIds);
+  const sent = sentIds.map((id) => ({ eventId: id, S: byId.get(id)?.S ?? 0, sent: true }));
+  const rest = [
+    ...rank.picked.filter((p) => !sentSet.has(p.event.eventId)),
+    ...rank.rejected.filter((r) => r.reason === "not_picked" || r.reason === "source_cap"),
+  ].map((r) => ({ eventId: r.event.eventId, S: r.S, sent: false }));
   const members = [...sent, ...rest];
   const sim = simulateInclusion(rank.scored, cfg, {
     runs: SIMULATION_RUNS,
     seed: simSeed,
     focusEventIds: members.map((m) => m.eventId),
+    chosen: (selection) => notifiedEventIds(selection, rule),
   });
   const ids = sent.map((s) => s.eventId);
   const pairs: SelectionLearning["pairs"] = [];

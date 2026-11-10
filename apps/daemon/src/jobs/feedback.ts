@@ -32,7 +32,11 @@ export async function recordFeedback(
   reason?: "replayed" | "unchanged";
 }> {
   const [d] = await db
-    .select({ id: deliveries.id, profileId: deliveries.profileId })
+    .select({
+      id: deliveries.id,
+      profileId: deliveries.profileId,
+      feedItemId: deliveries.feedItemId,
+    })
     .from(deliveries)
     .where(
       and(
@@ -72,6 +76,8 @@ export async function recordFeedback(
       // Tin đã biết thì phản hồi thuộc đúng hồ sơ của tin, không phụ thuộc người nối dây.
       profileId: d?.profileId ?? profileId,
       deliveryId,
+      // Tin gửi từ bản chụp feed: nối phản hồi tới tin feed, để web và Telegram chung một ý kiến.
+      feedItemId: d?.feedItemId ?? null,
       channel: ev.channel,
       recipient: ev.recipient,
       kind,

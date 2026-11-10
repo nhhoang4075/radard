@@ -4,7 +4,7 @@
  * xấp xỉ, nên cùng một hàm phục vụ sản xuất và mô phỏng.
  */
 import { mulberry32 } from "./eval/bootstrap.ts";
-import { type RankConfig, type RankEvent, type Scored, select } from "./ranking.ts";
+import { type RankConfig, type RankEvent, type Scored, type Selection, select } from "./ranking.ts";
 import { cosine } from "./vector.ts";
 
 export interface SimulateOptions {
@@ -16,6 +16,12 @@ export interface SimulateOptions {
   focusEventIds?: readonly number[];
   /** Độ giống giữa hai sự kiện; mặc định cosine giữa tâm (được tính trước một lần cho cả mô phỏng). */
   sim?: (a: RankEvent, b: RankEvent) => number;
+  /**
+   * Từ kết quả một lần `select`, các sự kiện được tính là "được chọn" (mặc định: mọi tin `picked`).
+   * Luồng feed truyền lớp thông báo (≤ 7 tin đầu qua sàn thông báo) để p_i, p_ij là xác suất được
+   * GỬI, đúng với tin đã gửi; hàm phải thuần (chỉ phụ thuộc kết quả chọn).
+   */
+  chosen?: (selection: Selection) => readonly number[];
 }
 
 export interface InclusionResult {
@@ -80,9 +86,10 @@ export function simulateInclusion(
   for (const [x, a] of ids.entries()) for (const b of ids.slice(x + 1)) pair.set(pairKey(a, b), 0);
 
   for (let r = 0; r < runs; r++) {
-    const chosen = select(scored, cfg, sim, rng)
-      .picked.map((p) => p.event.eventId)
-      .filter((id) => focus.has(id));
+    const selection = select(scored, cfg, sim, rng);
+    const chosen = (
+      opts.chosen ? opts.chosen(selection) : selection.picked.map((p) => p.event.eventId)
+    ).filter((id) => focus.has(id));
     for (const [x, a] of chosen.entries()) {
       bump(single, a);
       for (const b of chosen.slice(x + 1)) bump(pair, pairKey(a, b));

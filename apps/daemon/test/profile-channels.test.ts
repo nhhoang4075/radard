@@ -282,7 +282,8 @@ describe("migration 0025 trên dữ liệu có sẵn", () => {
     try {
       await mdb.execute(sql`create extension if not exists vector`);
       await mdb.execute(sql`create extension if not exists pg_trgm`);
-      // Bản sao thư mục migration không có 0025 = DB ở trạng thái trước khi có bảng.
+      // Bản sao thư mục migration không có 0025 trở đi = DB ở trạng thái trước khi có bảng (drizzle
+      // chỉ chạy migration mới hơn migration cuối đã chạy, nên phải bỏ cả các migration sau 0025).
       const src = join(import.meta.dir, "../../../packages/db/drizzle");
       const old = await mkdtemp(join(tmpdir(), "mig-"));
       await cp(src, old, { recursive: true });
@@ -290,7 +291,7 @@ describe("migration 0025 trên dữ liệu có sẵn", () => {
       const journal = JSON.parse(await readFile(journalPath, "utf8")) as {
         entries: Array<{ tag: string }>;
       };
-      journal.entries = journal.entries.filter((e) => !e.tag.startsWith("0025_"));
+      journal.entries = journal.entries.filter((e) => Number(e.tag.slice(0, 4)) < 25);
       await writeFile(journalPath, JSON.stringify(journal));
       await migrate(mdb, { migrationsFolder: old });
       await mdb.execute(sql`insert into profile (id, prompt_context) values (1, 'x')`);
