@@ -16,6 +16,7 @@ import {
   eventDocuments,
   events,
   profile,
+  profileTopics,
   runMigrations,
   sources,
   topics,
@@ -23,6 +24,7 @@ import {
 import { asc, eq, sql } from "drizzle-orm";
 import {
   buildLinks,
+  buildPlan,
   type DigestPlan,
   digestSlot,
   type ItemDoc,
@@ -140,6 +142,30 @@ const planOf = (meta: unknown): DigestPlan => {
 
 const positions = async () =>
   (await db.select().from(deliveries).orderBy(asc(deliveries.position))).map((d) => d.position);
+
+describe("hồ sơ thứ hai", () => {
+  test("buildPlan và runDigest của hồ sơ 2 dùng ngôn ngữ và bối cảnh của hồ sơ 2, không lấy của hồ sơ 1", async () => {
+    await db
+      .insert(profile)
+      .values({ id: 2, promptContext: "I study robotics.", displayLang: "en" });
+    await db.insert(profileTopics).values({ profileId: 2, topicId: topic });
+    for (let i = 0; i < 3; i++) await addEvent();
+    const one = goodLlm();
+    await buildPlan({ db, profileId: 1, llm: one.llm }, SLOT);
+    const two = goodLlm();
+    const plan = await buildPlan({ db, profileId: 2, llm: two.llm }, SLOT);
+    expect(plan.items.length).toBeGreaterThan(0);
+    expect(one.calls[0]?.system).toContain("I build AI agents.");
+    expect(one.calls[0]?.system).toContain("Write in Vietnamese");
+    expect(two.calls[0]?.system).toContain("I study robotics.");
+    expect(two.calls[0]?.system).not.toContain("I build AI agents.");
+    expect(two.calls[0]?.system).toContain("Write in English");
+    const notifier = fakeNotifier();
+    await runDigest({ db, profileId: 2, llm: goodLlm().llm, notifier, recipient: RECIPIENT }, SLOT);
+    const [row] = await db.select().from(digests).where(eq(digests.profileId, 2));
+    expect(row?.lang).toBe("en");
+  });
+});
 
 describe("runDigest", () => {
   test("digest và mọi tin gửi mang đúng profile_id của hồ sơ được truyền vào", async () => {

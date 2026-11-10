@@ -112,6 +112,7 @@ const wire = (p: ReturnType<typeof proposal>) => ({
 
 const deps = (over: Partial<SuggestDeps>): SuggestDeps => ({
   db,
+  profileId: 1,
   decider: null,
   llm: null,
   embedder,

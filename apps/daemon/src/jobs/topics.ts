@@ -12,8 +12,6 @@ import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../topics/library.ts";
 
 const log = createLogger("topics");
 
-export const PROFILE_ID = 1;
-
 /**
  * Đưa thư viện trong code vào bảng `topics`: thêm chủ đề mới, cập nhật chủ đề đã có theo `key`.
  * Chủ đề có câu mô tả mới thì xoá embedding để lượt process embed lại (điểm cũ xoá theo); đổi
@@ -132,7 +130,7 @@ export interface LibraryEntry {
 }
 
 /** Thư viện kèm trạng thái đã chọn, theo thứ tự hiển thị. */
-export async function listLibrary(db: Database): Promise<LibraryEntry[]> {
+export async function listLibrary(db: Database, profileId: number): Promise<LibraryEntry[]> {
   return db
     .select({
       id: topics.id,
@@ -145,14 +143,14 @@ export async function listLibrary(db: Database): Promise<LibraryEntry[]> {
     .from(topics)
     .leftJoin(
       profileTopics,
-      and(eq(profileTopics.topicId, topics.id), eq(profileTopics.profileId, PROFILE_ID)),
+      and(eq(profileTopics.topicId, topics.id), eq(profileTopics.profileId, profileId)),
     )
     .where(and(eq(topics.origin, "library"), eq(topics.active, true)))
     .orderBy(asc(topics.position));
 }
 
 /** Chọn chủ đề từ thư viện theo `key`. Đã chọn rồi thì bật lại. Trả về số chủ đề được bật. */
-export async function pickTopics(db: Database, keys: string[]): Promise<number> {
+export async function pickTopics(db: Database, profileId: number, keys: string[]): Promise<number> {
   if (keys.length === 0) return 0;
   const found = await db
     .select()
@@ -163,7 +161,7 @@ export async function pickTopics(db: Database, keys: string[]): Promise<number> 
   for (const t of found) {
     await db
       .insert(profileTopics)
-      .values({ profileId: PROFILE_ID, topicId: t.id })
+      .values({ profileId: profileId, topicId: t.id })
       .onConflictDoUpdate({
         target: [profileTopics.profileId, profileTopics.topicId],
         set: { active: true, updatedAt: new Date() },
@@ -173,23 +171,32 @@ export async function pickTopics(db: Database, keys: string[]): Promise<number> 
 }
 
 /** Bật hoặc tắt chủ đề theo id của `profile_topics`. Không xoá: điểm cũ và embedding giữ lại. */
-export async function setTopicActive(db: Database, id: number, active: boolean): Promise<boolean> {
+export async function setTopicActive(
+  db: Database,
+  profileId: number,
+  id: number,
+  active: boolean,
+): Promise<boolean> {
   const rows = await db
     .update(profileTopics)
     .set({ active, updatedAt: new Date() })
-    .where(and(eq(profileTopics.id, id), eq(profileTopics.profileId, PROFILE_ID)))
+    .where(and(eq(profileTopics.id, id), eq(profileTopics.profileId, profileId)))
     .returning({ id: profileTopics.id });
   return rows.length > 0;
 }
 
 /** Bật tắt chủ đề thư viện theo id của `topics` (nút trên Telegram mang id này). */
-export async function toggleLibraryTopic(db: Database, topicId: number): Promise<boolean> {
+export async function toggleLibraryTopic(
+  db: Database,
+  profileId: number,
+  topicId: number,
+): Promise<boolean> {
   const [row] = await db
     .select({ id: profileTopics.id, active: profileTopics.active })
     .from(profileTopics)
-    .where(and(eq(profileTopics.topicId, topicId), eq(profileTopics.profileId, PROFILE_ID)));
+    .where(and(eq(profileTopics.topicId, topicId), eq(profileTopics.profileId, profileId)));
   if (row) {
-    await setTopicActive(db, row.id, !row.active);
+    await setTopicActive(db, profileId, row.id, !row.active);
     return !row.active;
   }
   const [t] = await db
@@ -197,7 +204,7 @@ export async function toggleLibraryTopic(db: Database, topicId: number): Promise
     .from(topics)
     .where(and(eq(topics.id, topicId), eq(topics.origin, "library")));
   if (!t?.key) throw new Error(`không có chủ đề ${topicId} trong thư viện`);
-  await pickTopics(db, [t.key]);
+  await pickTopics(db, profileId, [t.key]);
   return true;
 }
 
@@ -205,7 +212,12 @@ export async function toggleLibraryTopic(db: Database, topicId: number): Promise
  * Bật (chọn, hoặc bật lại dòng cũ) hoặc tắt nhiều chủ đề thư viện theo id của `topics`, trong một
  * giao dịch. Id không thuộc thư viện đang dùng thì bỏ qua. Trả về số chủ đề được bật mới.
  */
-export async function setLibraryTopics(db: Database, on: number[], off: number[]): Promise<number> {
+export async function setLibraryTopics(
+  db: Database,
+  profileId: number,
+  on: number[],
+  off: number[],
+): Promise<number> {
   return db.transaction(async (tx) => {
     let enabled = 0;
     const found =
@@ -220,7 +232,7 @@ export async function setLibraryTopics(db: Database, on: number[], off: number[]
     if (found.length > 0) {
       const rows = await tx
         .insert(profileTopics)
-        .values(found.map((t) => ({ profileId: PROFILE_ID, topicId: t.id })))
+        .values(found.map((t) => ({ profileId: profileId, topicId: t.id })))
         .onConflictDoUpdate({
           target: [profileTopics.profileId, profileTopics.topicId],
           set: { active: true, updatedAt: new Date() },
@@ -235,7 +247,7 @@ export async function setLibraryTopics(db: Database, on: number[], off: number[]
         .set({ active: false, updatedAt: new Date() })
         .where(
           and(
-            eq(profileTopics.profileId, PROFILE_ID),
+            eq(profileTopics.profileId, profileId),
             eq(profileTopics.active, true),
             inArray(profileTopics.topicId, off),
           ),
@@ -287,14 +299,18 @@ export interface CustomTopicInput {
  * Lưu chủ đề tự thêm: một dòng `topics` của hồ sơ, rồi chọn nó (bật ngay). Trùng tên (không phân biệt
  * hoa thường) với chủ đề thư viện hay chủ đề đã tự thêm thì báo lỗi. Trả về id của `profile_topics`.
  */
-export async function addCustomTopic(db: Database, input: CustomTopicInput): Promise<number> {
+export async function addCustomTopic(
+  db: Database,
+  profileId: number,
+  input: CustomTopicInput,
+): Promise<number> {
   const label = nfc(input.label).trim();
   const [dup] = await db
     .select({ id: topics.id })
     .from(topics)
     .where(
       and(
-        or(eq(topics.origin, "library"), eq(topics.ownerProfileId, PROFILE_ID)),
+        or(eq(topics.origin, "library"), eq(topics.ownerProfileId, profileId)),
         sql`lower(${topics.name}) = lower(${label})`,
       ),
     );
@@ -307,13 +323,13 @@ export async function addCustomTopic(db: Database, input: CustomTopicInput): Pro
         description: nfc(input.description).trim(),
         embedText: input.embedText,
         origin: "custom",
-        ownerProfileId: PROFILE_ID,
+        ownerProfileId: profileId,
       })
       .returning({ id: topics.id });
     if (!topic) throw new Error("không ghi được chủ đề");
     const [row] = await tx
       .insert(profileTopics)
-      .values({ profileId: PROFILE_ID, topicId: topic.id, kind: input.kind ?? "include" })
+      .values({ profileId: profileId, topicId: topic.id, kind: input.kind ?? "include" })
       .returning({ id: profileTopics.id });
     if (!row) throw new Error("không ghi được chủ đề");
     return row.id;
@@ -367,7 +383,7 @@ export async function embedPendingTopics(
 }
 
 /** Chủ đề của người dùng, để CLI và bot hiển thị. */
-export async function listProfileTopics(db: Database) {
+export async function listProfileTopics(db: Database, profileId: number) {
   return db
     .select({
       id: profileTopics.id,
@@ -381,6 +397,6 @@ export async function listProfileTopics(db: Database) {
     })
     .from(profileTopics)
     .innerJoin(topics, eq(topics.id, profileTopics.topicId))
-    .where(eq(profileTopics.profileId, PROFILE_ID))
+    .where(eq(profileTopics.profileId, profileId))
     .orderBy(asc(profileTopics.id));
 }

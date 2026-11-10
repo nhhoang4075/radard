@@ -155,7 +155,12 @@ const relation = (choice: string, p: number) => ({
 const check = (
   decider: Parameters<typeof checkTopicOverlap>[0]["decider"],
   opts: { hubMinTopics?: number } = {},
-) => checkTopicOverlap({ db, embedder, decider }, DRAFT, { topN: TOP_N, now: NOW, ...opts });
+) =>
+  checkTopicOverlap({ db, profileId: 1, embedder, decider }, DRAFT, {
+    topN: TOP_N,
+    now: NOW,
+    ...opts,
+  });
 
 beforeAll(async () => {
   await runMigrations(TEST_URL);

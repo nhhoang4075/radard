@@ -50,13 +50,13 @@ describe("thư viện chủ đề", () => {
     await seedLibrary(db);
     const [n] = await db.select({ n: sql<number>`count(*)::int` }).from(topics);
     expect(n?.n).toBe(TOPIC_LIBRARY.length);
-    const lib = await listLibrary(db);
+    const lib = await listLibrary(db, 1);
     expect(lib.map((t) => t.key)).toEqual(TOPIC_LIBRARY.map((t) => t.key));
     expect(lib.every((t) => !t.chosen)).toBe(true);
   });
 
   test("sửa câu mô tả trong thư viện thì chủ đề nhận câu mới và phải embed lại", async () => {
-    await pickTopics(db, ["agents"]);
+    await pickTopics(db, 1, ["agents"]);
     await embedPendingTopics(db, embedder);
     await db.update(topics).set({ embedText: "cũ" }).where(eq(topics.key, "agents"));
     // Code giữ câu thật; seed lại đưa câu thật trở về và xoá embedding cũ của đúng chủ đề đó.
@@ -70,7 +70,7 @@ describe("thư viện chủ đề", () => {
   });
 
   test("chủ đề embed kèm chỉ dẫn nhiệm vụ (Instruct/Query), ghi công thức; đổi công thức thì embed lại", async () => {
-    await pickTopics(db, ["agents"]);
+    await pickTopics(db, 1, ["agents"]);
     const seen: string[] = [];
     const spy: typeof embedder = {
       ...embedder,
@@ -104,7 +104,7 @@ describe("thư viện chủ đề", () => {
   });
 
   test("đổi tên llm_models (16/10/2026): nhãn mới, giữ khoá và embedding, không embed lại", async () => {
-    await pickTopics(db, ["llm_models"]);
+    await pickTopics(db, 1, ["llm_models"]);
     await embedPendingTopics(db, embedder);
     // Dòng như trước khi đổi tên: nhãn và phạm vi cũ, câu mô tả không đổi.
     await db
@@ -121,7 +121,7 @@ describe("thư viện chủ đề", () => {
     expect(after?.embedding).toEqual(before?.embedding ?? []);
     expect(after?.embeddingModel).toBe(embedder.model);
     // Lựa chọn của bạn vẫn trỏ đúng chủ đề đó.
-    const mine = await listProfileTopics(db);
+    const mine = await listProfileTopics(db, 1);
     expect(mine.map((t) => t.label)).toContain("Model AI: phát hành và hành vi");
     // Phạm vi của "Ảnh, video và âm thanh" trỏ sang nhãn mới.
     const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal");
@@ -223,7 +223,7 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
         "ai_coding",
       ].sort(),
     );
-    expect((await listLibrary(db)).filter((t) => t.chosen).map((t) => t.key)).toEqual([
+    expect((await listLibrary(db, 1)).filter((t) => t.chosen).map((t) => t.key)).toEqual([
       "llm_models",
       "training",
       "agents",
@@ -277,26 +277,26 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
 
 describe("chọn và bật tắt", () => {
   test("chọn lại chủ đề đã tắt thì bật dòng cũ, không thêm dòng", async () => {
-    expect(await pickTopics(db, ["agents", "llm_apps"])).toBe(2);
-    const [first] = await listProfileTopics(db);
-    await setTopicActive(db, first?.id ?? 0, false);
-    await pickTopics(db, ["agents"]);
-    const mine = await listProfileTopics(db);
+    expect(await pickTopics(db, 1, ["agents", "llm_apps"])).toBe(2);
+    const [first] = await listProfileTopics(db, 1);
+    await setTopicActive(db, 1, first?.id ?? 0, false);
+    await pickTopics(db, 1, ["agents"]);
+    const mine = await listProfileTopics(db, 1);
     expect(mine).toHaveLength(2);
     expect(mine.every((t) => t.active)).toBe(true);
   });
 
   test("key lạ bị từ chối, không chọn gì", async () => {
-    await expect(pickTopics(db, ["agents", "khong_co"])).rejects.toThrow("khong_co");
-    expect(await listProfileTopics(db)).toHaveLength(0);
+    await expect(pickTopics(db, 1, ["agents", "khong_co"])).rejects.toThrow("khong_co");
+    expect(await listProfileTopics(db, 1)).toHaveLength(0);
   });
 
   test("bấm nút thư viện hai lần: bật rồi tắt", async () => {
-    const [lib] = await listLibrary(db);
-    expect(await toggleLibraryTopic(db, lib?.id ?? 0)).toBe(true);
-    expect((await listLibrary(db))[0]?.chosen).toBe(true);
-    expect(await toggleLibraryTopic(db, lib?.id ?? 0)).toBe(false);
-    expect((await listLibrary(db))[0]?.chosen).toBe(false);
+    const [lib] = await listLibrary(db, 1);
+    expect(await toggleLibraryTopic(db, 1, lib?.id ?? 0)).toBe(true);
+    expect((await listLibrary(db, 1))[0]?.chosen).toBe(true);
+    expect(await toggleLibraryTopic(db, 1, lib?.id ?? 0)).toBe(false);
+    expect((await listLibrary(db, 1))[0]?.chosen).toBe(false);
   });
 });
 
@@ -310,7 +310,7 @@ describe("tự thêm chủ đề", () => {
     });
     const en = await describeTopic(llm, "Postgres cho AI", "pgvector, index vector, tìm kiếm");
     expect(en).toBe("Postgres for AI: pgvector, vector indexes, HNSW, hybrid search in Postgres");
-    const id = await addCustomTopic(db, {
+    const id = await addCustomTopic(db, 1, {
       label: "Postgres cho AI",
       description: "pgvector, index vector, tìm kiếm",
       embedText: en,
@@ -334,11 +334,11 @@ describe("tự thêm chủ đề", () => {
   });
 
   test("trùng tên (không phân biệt hoa thường) bị chặn", async () => {
-    await pickTopics(db, ["agents"]);
+    await pickTopics(db, 1, ["agents"]);
     const label = TOPIC_LIBRARY.find((t) => t.key === "agents")?.name.toUpperCase() ?? "";
-    await expect(addCustomTopic(db, { label, description: "a", embedText: "b" })).rejects.toThrow(
-      "đã có",
-    );
+    await expect(
+      addCustomTopic(db, 1, { label, description: "a", embedText: "b" }),
+    ).rejects.toThrow("đã có");
   });
 
   test("DB chặn chủ đề tự thêm thiếu lời của người dùng", async () => {
@@ -354,9 +354,9 @@ describe("tự thêm chủ đề", () => {
 
 describe("embed chủ đề", () => {
   test("embed mọi chủ đề thư viện, bật hay chưa bật, trong một request; lần hai không gọi model", async () => {
-    await pickTopics(db, ["agents", "llm_apps", "training"]);
-    const mine = await listProfileTopics(db);
-    await setTopicActive(db, mine[2]?.id ?? 0, false);
+    await pickTopics(db, 1, ["agents", "llm_apps", "training"]);
+    const mine = await listProfileTopics(db, 1);
+    await setTopicActive(db, 1, mine[2]?.id ?? 0, false);
     let calls = 0;
     const counting = fakeEmbedding({
       dimensions: EMBED_DIMENSIONS,

@@ -222,7 +222,7 @@ afterAll(async () => {
   await db.$bun.close();
 });
 
-const report = (): Promise<Report> => buildReport(db, reportWindow(NOW));
+const report = (): Promise<Report> => buildReport(db, 1, reportWindow(NOW));
 
 describe("reportWindow", () => {
   test("7 khung 07:00 và 7 ngày lịch giờ VN trọn vẹn", () => {
@@ -251,6 +251,58 @@ describe("reportWindow", () => {
     const w = reportWindow(NOW, 24);
     expect(w.slots).toEqual([END]);
     expect(w.days).toEqual(["2026-10-19"]);
+  });
+});
+
+describe("buildReport theo hồ sơ", () => {
+  test("digest và phản hồi của hồ sơ 2 không lẫn vào báo cáo của hồ sơ 1 và ngược lại", async () => {
+    const before = await report();
+    await db.insert(profile).values({ id: 2, promptContext: "y" }).onConflictDoNothing();
+    const [d] = await db
+      .insert(digests)
+      .values({
+        profileId: 2,
+        channel: "telegram",
+        recipient: "200000002",
+        periodStart: new Date(slot(3).getTime() - 24 * H),
+        periodEnd: slot(3),
+        status: "sent",
+        lang: "en",
+        sentAt: new Date(slot(3).getTime() + MIN),
+        meta: {},
+      })
+      .returning({ id: digests.id });
+    const [dl] = await db
+      .insert(deliveries)
+      .values({
+        profileId: 2,
+        digestId: d?.id ?? 0,
+        channel: "telegram",
+        recipient: "200000002",
+        messageId: "9001",
+        kind: "event",
+        position: 1,
+        eventId: 1,
+        body: "tin",
+      })
+      .returning({ id: deliveries.id });
+    await db.insert(feedback).values({
+      profileId: 2,
+      deliveryId: dl?.id ?? 0,
+      channel: "telegram",
+      recipient: "200000002",
+      kind: "like",
+    });
+    const one = await report();
+    const day3 = one.digests.days[2];
+    expect([day3?.date, day3?.status]).toEqual(["2026-10-16", "missing"]);
+    expect(one.feedback).toEqual(before.feedback);
+    expect(one.digests).toEqual(before.digests);
+    const two = await buildReport(db, 2, reportWindow(NOW));
+    expect(two.digests.days.filter((x) => x.status !== "missing").map((x) => x.digestId)).toEqual([
+      d?.id ?? 0,
+    ]);
+    expect([two.feedback.deliveries, two.feedback.likes]).toEqual([1, 1]);
   });
 });
 

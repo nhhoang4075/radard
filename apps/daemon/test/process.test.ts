@@ -131,7 +131,7 @@ describe("tin giả định của chủ đề (HyDE, đề xuất C)", () => {
 
   test("chấm theo cosine lớn nhất giữa mô tả và tin giả định, nhờ vậy tin cùng kiểu câu lên điểm", async () => {
     await seedLibrary(db);
-    await pickTopics(db, ["agents"]);
+    await pickTopics(db, 1, ["agents"]);
     await addStory(TITLE, "https://z.com/1");
     await runProcess(deps());
     const without = await scoreOf();
@@ -147,7 +147,7 @@ describe("tin giả định của chủ đề (HyDE, đề xuất C)", () => {
 
   test("thêm tin giả định thì xoá điểm cũ để tính lại; có đủ rồi thì không gọi LLM nữa", async () => {
     await seedLibrary(db);
-    await pickTopics(db, ["agents"]);
+    await pickTopics(db, 1, ["agents"]);
     await addStory(TITLE, "https://z.com/1");
     await runProcess(deps());
     expect(await scoreOf()).toBeLessThan(0.95);
@@ -325,14 +325,14 @@ describe("runProcess", () => {
       name: "Agent",
       embedText: "LLM agents framework",
     });
-    await pickTopics(db, ["agents"]);
-    await addCustomTopic(db, {
+    await pickTopics(db, 1, ["agents"]);
+    await addCustomTopic(db, 1, {
       label: "Làm vườn",
       description: "trồng cà chua",
       embedText: "gardening tomatoes",
     });
-    const [agents, garden] = await listProfileTopics(db);
-    await setTopicActive(db, garden?.id ?? 0, false);
+    const [agents, garden] = await listProfileTopics(db, 1);
+    await setTopicActive(db, 1, garden?.id ?? 0, false);
 
     // Chủ đề đang tắt vẫn được embed và chấm: điểm không phụ thuộc người dùng bật gì (D4).
     const out = await runProcess(deps());
@@ -344,9 +344,9 @@ describe("runProcess", () => {
       .orderBy(asc(docTopicScores.documentId));
     expect(agentsScores[0]?.score ?? 0).toBeGreaterThan(agentsScores[1]?.score ?? 1);
 
-    await setTopicActive(db, garden?.id ?? 0, true);
+    await setTopicActive(db, 1, garden?.id ?? 0, true);
     expect(await runProcess(deps())).toMatchObject({ topicsEmbedded: 0, scored: 0 });
-    await addCustomTopic(db, {
+    await addCustomTopic(db, 1, {
       label: "Ảnh",
       description: "ảnh",
       embedText: "image models",
@@ -359,7 +359,7 @@ describe("runProcess", () => {
     await addStory("Gardening tips for growing tomatoes", "https://c.com/z");
     await runProcess(deps());
     const before = await db.select().from(eventDocuments).orderBy(asc(eventDocuments.documentId));
-    await addCustomTopic(db, {
+    await addCustomTopic(db, 1, {
       label: "Làm vườn",
       description: "trồng cà chua",
       embedText: "gardening tomatoes",
