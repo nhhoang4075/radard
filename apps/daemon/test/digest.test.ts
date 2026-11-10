@@ -126,7 +126,7 @@ beforeEach(async () => {
       windowDays: 30,
     },
     { metric: "engagement", sourceId: hn, median: 1, p999: 7, n: 10_000, windowDays: 30 },
-    { metric: "coverage", median: Math.log(2), p999: 2, n: 10_000, windowDays: 30 },
+    { metric: "coverage", median: 0.3, p999: 2, n: 10_000, windowDays: 30 },
   ]);
 });
 

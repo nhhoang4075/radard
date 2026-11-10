@@ -29,7 +29,7 @@ function cand(id: number, S: number, sourceId = 1, centroid: number[] = [1, 0]):
   };
   return {
     event,
-    c: { R: 0.9, P: 0, C: 0, A: 0, F: 0, N: 1, topicId: 1, sourceId, documentId: null },
+    c: { R: 0.9, P: 0, C: 0, A: 0, F: 0, U: 0, N: 1, topicId: 1, sourceId, documentId: null },
     S,
   };
 }

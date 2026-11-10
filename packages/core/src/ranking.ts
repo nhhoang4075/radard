@@ -4,6 +4,7 @@
  * Mọi thành phần điểm đều về thang 0–1 bằng cách so với MẶT BẰNG của chính nguồn đó (và chủ đề
  * đó): trung vị ứng với 0 (bình thường như mọi bài), mốc 0,1% cao nhất ứng với 1 (hiếm có).
  */
+import { type InterestCluster, interestScore } from "./interest.ts";
 import { cosine } from "./vector.ts";
 
 /** Mặt bằng của một tín hiệu: trung vị, mốc 0,1% cao nhất, và số mẫu đã dùng để tính. */
@@ -88,6 +89,11 @@ export interface RankDoc {
    * không có tín hiệu (arXiv, releases), hoặc chưa lấy được tín hiệu.
    */
   engagement: number | null;
+  /**
+   * Vector cả tài liệu (đã chuẩn hoá L2) để chấm điểm gu U; vắng thì tài liệu không góp vào U.
+   * Chỉ cần nạp khi có cụm gu active.
+   */
+  vector?: readonly number[];
 }
 
 export interface RankEvent {
@@ -107,7 +113,7 @@ export interface Baselines {
 }
 
 export interface RankConfig {
-  weights: { R: number; P: number; C: number; A: number; F: number };
+  weights: { R: number; P: number; C: number; A: number; F: number; U: number };
   /**
    * Cổng: chỉ xét sự kiện có R ≥ ngưỡng này ("có thuộc chủ đề của bạn không"). Sự kiện có R trong
    * vùng `decision` thì hỏi model quyết định thay cho luật này; luật chỉ còn dùng khi không hỏi được.
@@ -129,6 +135,18 @@ export interface RankConfig {
   neutralP: number;
   /** F khi sự kiện bắt đầu trước khoảng digest, nay có tin mới. */
   followUpF: number;
+  /**
+   * Gom cụm gu từ tin 👍 (interest.ts). `distanceThreshold` là τ của Ward (đo 10/11/2026 trên 👍
+   * thật, chủ dự án duyệt τ = 1,4). Mỗi tham số ở đây truyền thẳng xuống `clusterInterests`.
+   */
+  interest: {
+    distanceThreshold: number;
+    maxClusters: number;
+    minMembers: number;
+    halfLifeDays: number;
+    dropBelowWeight: number;
+    nameCarryMinCosine: number;
+  };
   maxItems: number;
   maxPerSource: number;
   /** Phạt trùng: từ giống `start` bắt đầu phạt, tới `start + span` thì phạt tối đa `max`. */
@@ -144,7 +162,19 @@ export interface RankConfig {
 
 /** Hằng số khởi đầu (xep-hang.html), chưa kiểm chứng: chỉnh lại sau tuần đầu theo 👍/👎. */
 export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
-  weights: { R: 0.4, P: 0.25, C: 0.15, A: 0.1, F: 0.1 },
+  // Duyệt 10/11/2026: hệ số cũ (0,40/0,25/0,15/0,10/0,10) nhân 0,9, cộng w_U = 0,10; tổng = 1.
+  // Chuẩn hoá lại L1 sau khi fit hằng tuần là việc sau.
+  weights: { R: 0.36, P: 0.225, C: 0.135, A: 0.09, F: 0.09, U: 0.1 },
+  interest: {
+    distanceThreshold: 1.4,
+    maxClusters: 6,
+    minMembers: 3,
+    halfLifeDays: 60,
+    dropBelowWeight: 0.1,
+    // Cụm mới chỉ nhận tên cụm cũ khi tâm hai cụm có cosine >= mức này. 0,8 = chọn của người
+    // triển khai (spec bắt buộc có mức, chưa đo): đủ gần để coi là "cùng sở thích".
+    nameCarryMinCosine: 0.8,
+  },
   gateR: 0.6,
   // Đo 13–16/10/2026 trên tin thật có R trong [0,5; 0,7): Jev ở ngưỡng 0,6 khớp nhãn tham chiếu
   // 84%, luật cũ (R ≥ 0,6) chỉ 53%; bạn đã xác nhận các nhãn tham chiếu.
@@ -167,6 +197,8 @@ export interface Components {
   C: number;
   A: number;
   F: number;
+  /** Điểm gu: 0 khi chưa có cụm active (hoặc không có vector tài liệu). */
+  U: number;
   N: number;
   /** Chủ đề cho R cao nhất: lý do "vì sao chọn" hiện trong digest. */
   topicId: number | null;
@@ -181,6 +213,8 @@ export interface Components {
  *
  * `periodStart`: đầu khoảng digest (24 giờ trước). `sentUrls`: `url_canonical` của mọi tài liệu đã
  * nằm trong các tin đã gửi, không giới hạn thời gian (`deliveries.document_ids`), để tính N.
+ * `interests`: cụm gu active của hồ sơ (interest.ts); vắng hoặc rỗng thì U = 0. U của sự kiện là
+ * U lớn nhất trên các tài liệu có vector.
  */
 export function components(
   ev: RankEvent,
@@ -188,6 +222,7 @@ export function components(
   cfg: RankConfig,
   periodStart: Date,
   sentUrls: ReadonlySet<string>,
+  interests: readonly InterestCluster[] = [],
 ): Components {
   const r = relevanceOf(ev, base);
   return {
@@ -196,11 +231,19 @@ export function components(
     C: coverageOf(ev, base),
     A: Math.max(0, ...ev.docs.map((d) => cfg.priors.get(d.sourceId) ?? 0.5)),
     F: ev.firstSeenAt >= periodStart ? 1 : cfg.followUpF,
+    U: tasteOf(ev, interests),
     N: noveltyOf(ev, sentUrls),
     topicId: r.topicId,
     sourceId: r.sourceId,
     documentId: r.documentId,
   };
+}
+
+/** U: `interestScore` lớn nhất trên các tài liệu có vector; không có cụm active thì 0. */
+function tasteOf(ev: RankEvent, interests: readonly InterestCluster[]): number {
+  let u = 0;
+  for (const d of ev.docs) if (d.vector) u = Math.max(u, interestScore(d.vector, interests));
+  return u;
 }
 
 /** R: lớn nhất trên mọi cặp (tài liệu, chủ đề), sau chuẩn hoá theo mặt bằng của nguồn × chủ đề. */
@@ -267,10 +310,10 @@ function noveltyOf(ev: RankEvent, sentUrls: ReadonlySet<string>): number {
   return fresh === 0 ? 0 : 0.5 + 0.5 * fresh;
 }
 
-/** S = N × (0,40·R + 0,25·P + 0,15·C + 0,10·A + 0,10·F). Phần cá nhân hoá U để sau (wU = 0). */
+/** S = N × (0,36·R + 0,225·P + 0,135·C + 0,09·A + 0,09·F + 0,10·U) (duyệt 10/11/2026). */
 export function scoreOf(c: Components, cfg: Pick<RankConfig, "weights">): number {
   const w = cfg.weights;
-  return c.N * (w.R * c.R + w.P * c.P + w.C * c.C + w.A * c.A + w.F * c.F);
+  return c.N * (w.R * c.R + w.P * c.P + w.C * c.C + w.A * c.A + w.F * c.F + w.U * c.U);
 }
 
 // ---------------------------------------------------------------------------------------------

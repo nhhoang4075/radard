@@ -543,6 +543,8 @@ const COMMANDS: Record<string, Command> = {
     const period = periodEndingAt(at ? new Date(at) : new Date());
     const r = await rankPeriod(db, period, {
       profileId: currentProfileId(),
+      // Xem thử: không ghi đè bộ cụm gu đang dùng.
+      persistInterests: false,
       ...(process.argv.includes("--refresh") ? { http } : {}),
     });
     const f = (x: number) => Number(x.toFixed(2));

@@ -95,6 +95,8 @@ export interface PlanItem {
     C: number;
     A: number;
     F: number;
+    /** Điểm gu; vắng ở plan trước khi có U (S theo công thức cũ). */
+    U?: number;
     N: number;
   };
   /** Nhãn hiện trong tin: chủ đề LLM chọn khi đọc tin, hoặc chủ đề embedding khớp nhất. */
@@ -432,6 +434,7 @@ function scoreOfPick(p: RankResult["picked"][number]): PlanItem["score"] {
     C: r(p.c.C),
     A: r(p.c.A),
     F: r(p.c.F),
+    U: r(p.c.U),
     N: r(p.c.N),
   };
 }

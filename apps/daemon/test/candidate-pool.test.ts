@@ -96,7 +96,7 @@ beforeEach(async () => {
       windowDays: 30,
     },
     { metric: "engagement", sourceId: hn, median: 1, p999: 7, n: 10_000, windowDays: 30 },
-    { metric: "coverage", median: Math.log(2), p999: 2, n: 10_000, windowDays: 30 },
+    { metric: "coverage", median: 0.3, p999: 2, n: 10_000, windowDays: 30 },
   ]);
 });
 
@@ -128,7 +128,7 @@ describe("candidate_pool", () => {
     const dropped = rows.filter((r) => !r.selected);
     expect(dropped.map((r) => r.rejectReason)).toEqual(["source_cap", "source_cap", "source_cap"]);
     expect(dropped.every((r) => r.penalty === null)).toBe(true);
-    expect(rows.every((r) => r.profileId === 1 && r.u === null)).toBe(true);
+    expect(rows.every((r) => r.profileId === 1 && r.u === 0)).toBe(true);
     expect(rows[0]?.periodEnd.getTime()).toBe(SLOT.getTime());
     expect(rows[0]?.urlCanonicals).toHaveLength(1);
   });
@@ -147,12 +147,13 @@ describe("candidate_pool", () => {
       const row = rows.find((r) => r.eventId === it.eventId);
       expect(row).toBeDefined();
       expect([r3(row?.score), r3(row?.penalty)]).toEqual([it.score.S, it.score.penalty]);
-      expect([row?.r, row?.p, row?.c, row?.a, row?.f, row?.n].map(r3)).toEqual([
+      expect([row?.r, row?.p, row?.c, row?.a, row?.f, row?.u, row?.n].map(r3)).toEqual([
         it.score.R,
         it.score.P,
         it.score.C,
         it.score.A,
         it.score.F,
+        it.score.U ?? Number.NaN,
         it.score.N,
       ]);
     }

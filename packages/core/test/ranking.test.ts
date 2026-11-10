@@ -198,13 +198,59 @@ describe("components", () => {
     expect(components(e, base, cfg, start, new Set(["arxiv/x"])).N).toBe(0);
   });
 
-  test("S với trọng số mặc định", () => {
-    expect(
-      scoreOf(
-        { R: 1, P: 0.5, C: 0, A: 0.6, F: 1, N: 1, topicId: 1, sourceId: 1, documentId: null },
-        cfg,
-      ),
-    ).toBeCloseTo(0.4 + 0.125 + 0.06 + 0.1, 12);
+  test("hệ số mặc định đúng spec 10/11/2026 và tổng bằng 1", () => {
+    expect(DEFAULT_RANK_CONFIG.weights).toEqual({
+      R: 0.36,
+      P: 0.225,
+      C: 0.135,
+      A: 0.09,
+      F: 0.09,
+      U: 0.1,
+    });
+    const w = DEFAULT_RANK_CONFIG.weights;
+    expect(w.R + w.P + w.C + w.A + w.F + w.U).toBeCloseTo(1, 12);
+  });
+
+  test("tham số gom cụm gu: τ = 1,4, trần 6, tối thiểu 3, nửa đời 60 ngày, bỏ < 0,1", () => {
+    expect(DEFAULT_RANK_CONFIG.interest).toEqual({
+      distanceThreshold: 1.4,
+      maxClusters: 6,
+      minMembers: 3,
+      halfLifeDays: 60,
+      dropBelowWeight: 0.1,
+      nameCarryMinCosine: 0.8,
+    });
+  });
+
+  test("S với trọng số mặc định (U = 0: chỉ đổi do hệ số ×0,9)", () => {
+    const c = { R: 1, P: 0.5, C: 0, A: 0.6, F: 1, U: 0, N: 1, topicId: 1, sourceId: 1 };
+    const old = 0.4 * 1 + 0.25 * 0.5 + 0.15 * 0 + 0.1 * 0.6 + 0.1 * 1;
+    expect(scoreOf({ ...c, documentId: null }, cfg)).toBeCloseTo(0.9 * old, 12);
+    expect(scoreOf({ ...c, documentId: null }, cfg)).toBeCloseTo(0.36 + 0.1125 + 0.054 + 0.09, 12);
+  });
+
+  test("S cộng 0,10·U", () => {
+    const c = { R: 0, P: 0, C: 0, A: 0, F: 0, U: 0.8, N: 1, topicId: 1, sourceId: 1 };
+    expect(scoreOf({ ...c, documentId: null }, cfg)).toBeCloseTo(0.08, 12);
+    expect(scoreOf({ ...c, N: 0, documentId: null }, cfg)).toBe(0);
+  });
+
+  test("U = 0 khi không có cụm; U = interestScore của vector tài liệu khi có cụm active", () => {
+    const e = ev(1, [{ ...doc(1, 1, "a", 0.8), vector: [1, 0] }]);
+    expect(components(e, base, cfg, start, new Set()).U).toBe(0);
+    const active = {
+      status: "active" as const,
+      name: null,
+      center: [1, 0],
+      importance: 3,
+      medoid: "x",
+      memberIds: ["x"],
+    };
+    expect(components(e, base, cfg, start, new Set(), [active]).U).toBeCloseTo(1, 12);
+    const pending = { ...active, status: "pending" as const };
+    expect(components(e, base, cfg, start, new Set(), [pending]).U).toBe(0);
+    const noVec = ev(2, [doc(2, 1, "b", 0.8)]);
+    expect(components(noVec, base, cfg, start, new Set(), [active]).U).toBe(0);
   });
 });
 
@@ -212,7 +258,7 @@ describe("components", () => {
 function cand(id: number, S: number, sourceId = 1, R = 0.9): Scored {
   return {
     event: ev(id, []),
-    c: { R, P: 0, C: 0, A: 0, F: 0, N: 1, topicId: 1, sourceId, documentId: null },
+    c: { R, P: 0, C: 0, A: 0, F: 0, U: 0, N: 1, topicId: 1, sourceId, documentId: null },
     S,
   };
 }

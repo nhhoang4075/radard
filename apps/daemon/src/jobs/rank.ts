@@ -17,6 +17,7 @@ import {
   FLOOR_WINDOW_DAYS,
   type FloorResult,
   type HttpClient,
+  type InterestCluster,
   needsDecision,
   passesGate,
   percentileFloor,
@@ -50,6 +51,7 @@ import {
   type GateCounts,
   type GateDecision,
 } from "./gate-decision.ts";
+import { computeInterestClusters } from "./interest.ts";
 import { refreshSignals } from "./signals.ts";
 
 const log = createLogger("rank");
@@ -69,6 +71,8 @@ export interface RankResult extends Selection {
   /** Thời gian hỏi model quyết định cho cổng, mili giây. */
   gateMs: number;
   config: RankConfig;
+  /** Cụm gu (từ tin 👍) đã dùng để chấm U, gồm cả cụm `pending` chưa tham gia. */
+  interestClusters: InterestCluster[];
   /** Sàn điểm đã dùng và nguồn của nó (cố định hay phân vị). */
   floor: FloorResult;
   /** Mặt bằng đã dùng, để digest lưu lại và giải thích được vì sao chọn. */
@@ -102,6 +106,11 @@ export async function rankPeriod(
     config?: Partial<RankConfig>;
     /** Model quyết định cho vùng xám của cổng; không có thì dùng luật R ≥ `gateR` (test, CLI). */
     decider?: DecisionProvider | null;
+    /**
+     * Lưu bộ cụm gu của lần chạy làm "cụm hôm qua" (mặc định có). CLI xem thử (`rank --at …`) đặt
+     * `false` để không ghi đè cụm đang dùng.
+     */
+    persistInterests?: boolean;
   },
 ): Promise<RankResult> {
   const srcRows = await db.select().from(sources);
@@ -204,7 +213,16 @@ export async function rankPeriod(
     where dl.profile_id = ${opts.profileId} and dl.kind = 'event' and dl.sent_at < ${period.end}`))
     sent.add(r.url);
 
-  const build = async (signals: Map<number, Record<string, number>>): Promise<RankEvent[]> => {
+  // Gu: gom lại từ đầu các tin 👍 tại mốc `end` mỗi lần xếp hạng (cụm mới mượn tên cụm lần trước).
+  const interests = await computeInterestClusters(db, opts.profileId, period.end, config.interest, {
+    persist: opts.persistInterests ?? true,
+  });
+  const hasTaste = interests.some((c) => c.status === "active");
+
+  const build = async (
+    signals: Map<number, Record<string, number>>,
+    vectors?: ReadonlyMap<number, number[]>,
+  ): Promise<RankEvent[]> => {
     const byEvent = new Map<number, RankDoc[]>();
     for (const d of docRows) {
       let engagement: number | null = null;
@@ -218,12 +236,14 @@ export async function rankPeriod(
         }
       }
       const list = byEvent.get(d.eventId) ?? [];
+      const vector = vectors?.get(d.id);
       list.push({
         documentId: d.id,
         sourceId: d.sourceId,
         urlCanonical: d.url,
         topicScores: scores.get(d.id) ?? new Map(),
         engagement,
+        ...(vector ? { vector } : {}),
       });
       byEvent.set(d.eventId, list);
     }
@@ -265,10 +285,13 @@ export async function rankPeriod(
   const passingDocIds = passing.flatMap((e) => e.docs.map((d) => d.documentId));
   if (opts.http) await refreshSignals(db, opts.http, passingDocIds);
   const signals = await loadSignals(passingDocIds);
-  const full = await build(signals);
+  // Vector tài liệu chỉ nạp khi có cụm active và chỉ cho sự kiện qua cổng (U của tin bị cổng loại
+  // không ai dùng: chúng không vào bể hay kế hoạch).
+  const vectors = hasTaste ? await loadDocVectors(db, passingDocIds) : undefined;
+  const full = await build(signals, vectors);
   // Sự kiện không qua cổng vẫn được chấm (để CLI giải thích vì sao bị loại), không có tín hiệu.
   const scored: Scored[] = full.map((e) => {
-    const c = components(e, base, config, period.start, sent);
+    const c = components(e, base, config, period.start, sent, interests);
     const gate = gateOf(e.eventId);
     return gate === undefined
       ? { event: e, c, S: scoreOf(c, config) }
@@ -295,6 +318,7 @@ export async function rankPeriod(
     gateCounts: countGate(gateDecisions),
     gateMs,
     config,
+    interestClusters: interests,
     // Chỉ lưu mặt bằng đã dùng: chủ đề đang bật, cùng mặt bằng tín hiệu và độ phủ.
     baselines: baseRows
       .filter((b) => b.topicId === null || topicIds.includes(b.topicId))
@@ -315,9 +339,37 @@ export async function rankPeriod(
 
 const DAY_MS = 86_400_000;
 
+/** Vector cả tài liệu (`coalesce(content_embedding, embedding)`), chuẩn hoá L2, để chấm U. */
+async function loadDocVectors(
+  db: Database,
+  ids: readonly number[],
+): Promise<Map<number, number[]>> {
+  const out = new Map<number, number[]>();
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += 500) {
+    const chunk = unique.slice(i, i + 500);
+    for (const r of await db.execute<{ id: number; vec: string }>(sql`
+      select document_id as id, coalesce(content_embedding, embedding)::text as vec
+      from doc_text where document_id = any(${`{${chunk.join(",")}}`}::bigint[])`)) {
+      const v = JSON.parse(r.vec) as number[];
+      const n = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;
+      out.set(
+        Number(r.id),
+        v.map((x) => x / n),
+      );
+    }
+  }
+  return out;
+}
+
 /**
  * Sàn của lần xếp hạng: phân vị điểm S trong bể của hồ sơ ở [end − 30 ngày, end) (không gồm ngày
  * đang xếp hạng), bỏ tin đã gửi (`not_new`, N = 0) khỏi cả phân vị lẫn n. Chế độ "fixed" không đọc bể.
+ *
+ * LƯU Ý THANG ĐIỂM (10/11/2026): các dòng bể cũ có S theo công thức trước khi có U (hệ số ×1,0, không
+ * có phần U), dòng mới theo công thức 0,9× + 0,10·U. Hai thang pha trộn trong cửa sổ 30 ngày và KHÔNG
+ * được sửa lại. Trong 14 ngày đầu của bể (`FLOOR_MIN_DAYS`) vẫn dùng sàn cố định 0,59 theo cơ chế
+ * hiện có; logic sàn không đổi vì U.
  */
 async function resolveFloor(
   db: Database,

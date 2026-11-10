@@ -2,6 +2,7 @@ export * from "./candidate-pool.ts";
 export * from "./collected.ts";
 export * from "./delivery.ts";
 export * from "./derived.ts";
+export * from "./interest-clusters.ts";
 export * from "./link-opens.ts";
 export * from "./ops.ts";
 export * from "./profile.ts";

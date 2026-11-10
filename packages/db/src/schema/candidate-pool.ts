@@ -40,7 +40,7 @@ export const candidatePool = pgTable(
     a: doublePrecision("a").notNull(),
     f: doublePrecision("f").notNull(),
     n: doublePrecision("n").notNull(),
-    /** Phần U (chưa có): NULL. */
+    /** Điểm gu U (0 khi chưa có cụm active); NULL ở dòng ghi trước khi có U (S theo công thức cũ). */
     u: doublePrecision("u"),
     /** S, điểm chưa trừ phạt trùng. */
     score: doublePrecision("score").notNull(),

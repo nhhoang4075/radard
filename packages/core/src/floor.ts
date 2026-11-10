@@ -2,6 +2,8 @@
  * Sàn điểm theo phân vị (duyệt 10/11/2026): sàn = phân vị q của điểm S các sự kiện qua cổng trong
  * 30 ngày trước, với q = 1 − 12/n (n = số sự kiện qua cổng trung bình mỗi ngày), để khoảng 12
  * tin/ngày vượt sàn; ngày không nổi bật thì ít tin hơn. Chưa đủ 14 ngày dữ liệu thì dùng sàn cố định.
+ * Lưu ý (10/11/2026): S trong bể trước khi có điểm gu U theo công thức cũ (không có U, hệ số ×1,0),
+ * sau đó theo công thức mới (0,9× + 0,10·U); cửa sổ 30 ngày pha trộn hai thang, không sửa dữ liệu cũ.
  * Hàm thuần: việc đọc bể và lọc dòng ở `apps/daemon/src/jobs/rank.ts`.
  */
 import { percentileCont } from "./ranking.ts";

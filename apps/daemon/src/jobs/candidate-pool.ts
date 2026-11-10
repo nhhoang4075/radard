@@ -38,7 +38,7 @@ function rowOf(
     a: x.c.A,
     f: x.c.F,
     n: x.c.N,
-    u: null,
+    u: x.c.U,
     score: x.S,
     penalty: state.selected ? state.penalty : null,
     selected: state.selected,
