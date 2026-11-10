@@ -133,6 +133,11 @@ export interface RankConfig {
   maxPerSource: number;
   /** Phạt trùng: từ giống `start` bắt đầu phạt, tới `start + span` thì phạt tối đa `max`. */
   mmr: { start: number; span: number; max: number };
+  /**
+   * Nhiệt độ T của chọn Gumbel top-k: khoá chọn là S + T·G (G ~ Gumbel(0,1)). T = 0: chọn xác
+   * định như trước. Cổng, sàn và loại tin đã gửi luôn tính trên S thật, không nhiễu.
+   */
+  temperature: number;
   /** Uy tín của nguồn (A), 0–1, theo `sources.trust_score`. */
   priors: ReadonlyMap<number, number>;
 }
@@ -152,6 +157,8 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   // 3 làm digest 12/10 chỉ còn 4 tin dù 5 tin HN vượt sàn; nâng lên 5 (chốt 13/10/2026).
   maxPerSource: 5,
   mmr: { start: 0.85, span: 0.1, max: 0.3 },
+  // Chủ dự án sẽ chọn T theo số đo thật; 0 = chọn xác định như cũ.
+  temperature: 0,
 };
 
 export interface Components {
@@ -298,17 +305,37 @@ export function mmrPenalty(maxSim: number, mmr: RankConfig["mmr"]): number {
   return mmr.max * clamp((maxSim - mmr.start) / mmr.span);
 }
 
+/** Nhiễu Gumbel(0,1) từ một số U ∈ [0,1): −ln(−ln U), U kẹp vào (ε, 1−ε) để không ra vô hạn. */
+export function gumbelNoise(u: number): number {
+  const eps = 1e-12;
+  const x = Math.min(1 - eps, Math.max(eps, u));
+  return -Math.log(-Math.log(x));
+}
+
 /**
  * Chọn tin: cổng R, sàn S, loại tin đã gửi không có gì mới; giữ một chỗ cho mỗi nguồn có ứng
- * viên vượt sàn; phần còn lại chọn từng tin một theo S trừ phạt trùng với tin đã chọn (MMR,
+ * viên vượt sàn; phần còn lại chọn từng tin một theo khoá trừ phạt trùng với tin đã chọn (MMR,
  * Carbonell & Goldstein 1998), mỗi nguồn tối đa `maxPerSource` tin. Kết quả sắp theo S − phạt.
+ *
+ * Khoá chọn là S khi `cfg.temperature` = 0 (xác định, không gọi `rng`); khi T > 0 là S + T·G với
+ * G ~ Gumbel(0,1) rút MỘT LẦN cho mỗi ứng viên của pool trong mỗi lần gọi, dùng cho cả bước giữ
+ * chỗ lẫn bước MMR (Gumbel top-k). Khoá nhiễu chỉ quyết định tin nào vào danh sách: phạt trùng
+ * trả về và thứ tự kết quả vẫn theo S thật. `rng` trả số trong [0,1); T > 0 mà thiếu `rng` là lỗi.
  */
 export function select(
   scored: readonly Scored[],
   cfg: RankConfig,
   sim: (a: RankEvent, b: RankEvent) => number = (a, b) => cosine(a.centroid, b.centroid),
+  rng?: () => number,
 ): Selection {
   const { pool, rejected } = screen(scored, cfg);
+  const noisy = cfg.temperature > 0;
+  if (noisy && !rng) throw new Error("temperature > 0 cần rng");
+  const keyOf = new Map<Scored, number>();
+  for (const s of pool)
+    keyOf.set(s, noisy && rng ? s.S + cfg.temperature * gumbelNoise(rng()) : s.S);
+  // pool đã sắp theo S; sắp lại theo khoá (sort ổn định, T = 0 giữ nguyên thứ tự cũ).
+  const order = noisy ? [...pool].sort((a, b) => (keyOf.get(b) ?? 0) - (keyOf.get(a) ?? 0)) : pool;
   const picked: Selection["picked"] = [];
   const perSource = new Map<number, number>();
   const take = (s: Scored, penalty: number, reserved: boolean) => {
@@ -317,21 +344,21 @@ export function select(
   };
   const isPicked = (s: Scored) => picked.some((p) => p.event.eventId === s.event.eventId);
 
-  // Giữ chỗ: tin tốt nhất của mỗi nguồn (pool đã sắp theo S, nên gặp trước là tốt nhất).
+  // Giữ chỗ: tin có khoá cao nhất của mỗi nguồn (order đã sắp theo khoá, gặp trước là tốt nhất).
   const seen = new Set<number>();
-  for (const s of pool) {
+  for (const s of order) {
     if (picked.length >= cfg.maxItems) break;
     if (seen.has(s.c.sourceId)) continue;
     seen.add(s.c.sourceId);
     take(s, 0, true);
   }
 
-  // Phần còn lại: từng tin một, S trừ phạt trùng với tin đã chọn giống nó nhất.
+  // Phần còn lại: từng tin một, khoá trừ phạt trùng với tin đã chọn giống nó nhất.
   while (picked.length < cfg.maxItems) {
-    const open = pool.filter(
+    const open = order.filter(
       (s) => !isPicked(s) && (perSource.get(s.c.sourceId) ?? 0) < cfg.maxPerSource,
     );
-    const best = bestByPenalizedScore(open, picked, cfg, sim);
+    const best = bestByPenalizedScore(open, picked, cfg, sim, (s) => keyOf.get(s) ?? s.S);
     if (!best) break;
     take(best.s, best.penalty, false);
   }
@@ -379,12 +406,13 @@ function bestByPenalizedScore(
   picked: readonly Scored[],
   cfg: RankConfig,
   sim: (a: RankEvent, b: RankEvent) => number,
+  keyOf: (s: Scored) => number,
 ) {
   let best: { s: Scored; penalty: number; value: number } | null = null;
   for (const s of open) {
     const maxSim = Math.max(...picked.map((p) => sim(s.event, p.event)));
     const penalty = mmrPenalty(maxSim, cfg.mmr);
-    const value = s.S - penalty;
+    const value = keyOf(s) - penalty;
     if (!best || value > best.value) best = { s, penalty, value };
   }
   return best;

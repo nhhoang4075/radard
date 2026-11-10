@@ -9,6 +9,7 @@ export * from "./notify.ts";
 export * from "./object-store.ts";
 export * from "./page.ts";
 export * from "./ranking.ts";
+export * from "./selection-sim.ts";
 export * from "./source.ts";
 export * from "./url.ts";
 export * from "./url-guard.ts";
