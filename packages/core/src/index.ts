@@ -8,4 +8,5 @@ export * from "./page.ts";
 export * from "./ranking.ts";
 export * from "./source.ts";
 export * from "./url.ts";
+export * from "./url-guard.ts";
 export * from "./vector.ts";

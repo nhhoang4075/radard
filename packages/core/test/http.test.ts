@@ -23,6 +23,9 @@ const server = Bun.serve({
       body: await req.text(),
       type: req.headers.get("content-type"),
     });
+    if (new URL(req.url).pathname === "/chuyen") {
+      return new Response(null, { status: 302, headers: { location: "/dich" } });
+    }
     return new URL(req.url).pathname === "/loi"
       ? new Response("không được", { status: 401 })
       : new Response("ok");
@@ -66,4 +69,15 @@ test("POST gửi body nguyên văn, chung lượt giãn với GET; mã ≥ 400 t
   const err = await http.post(`http://${host}/loi`, "{}").catch((e: unknown) => e);
   expect(err).toBeInstanceOf(HttpError);
   expect((err as HttpError).status).toBe(401);
+});
+
+test('redirect: "manual" trả thẳng 3xx kèm location; mặc định vẫn đi theo', async () => {
+  const http = createHttpClient({ minIntervalMs: 0 });
+  const base = `http://localhost:${server.port}`;
+  const manual = await http.get(`${base}/chuyen`, { redirect: "manual" });
+  expect(manual.status).toBe(302);
+  expect(manual.headers.get("location")).toBe("/dich");
+  const followed = await http.get(`${base}/chuyen`);
+  expect(followed.status).toBe(200);
+  expect(followed.url).toBe(`${base}/dich`);
 });

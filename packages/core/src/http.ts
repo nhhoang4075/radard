@@ -25,9 +25,14 @@ export interface GetOptions {
   timeoutMs?: number;
   /** Đọc body tối đa chừng này byte rồi dừng (trang web lạ có thể rất nặng). */
   maxBytes?: number;
+  /**
+   * `"manual"`: không tự đi theo redirect, trả thẳng phản hồi 3xx (kèm header `location`) để người
+   * gọi kiểm từng đích (đường tải trang lạ). Mặc định đi theo redirect như `fetch`.
+   */
+  redirect?: "manual";
 }
 
-export type PostOptions = Pick<GetOptions, "headers" | "timeoutMs" | "maxBytes">;
+export type PostOptions = Pick<GetOptions, "headers" | "timeoutMs" | "maxBytes" | "redirect">;
 
 /**
  * `post` bắt buộc chứ không tuỳ chọn: mọi client thật đều POST được, còn để tuỳ chọn thì chỗ gọi
@@ -114,6 +119,7 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
       ...init,
       headers: { "user-agent": USER_AGENT, ...init.headers },
       signal: AbortSignal.timeout(o.timeoutMs ?? 30_000),
+      ...(o.redirect ? { redirect: o.redirect } : {}),
     });
     if (res.status >= 400) {
       const snippet = await res.text().catch(() => "");

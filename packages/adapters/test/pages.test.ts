@@ -28,6 +28,19 @@ function fakeHttp(routes: Record<string, () => HttpResponse>): HttpClient & { as
   };
 }
 
+/** DNS giả: mọi tên miền công khai trừ vài tên được dặn riêng. */
+const table: Record<string, string[]> = {
+  "mixed.example": ["93.184.216.34", "10.0.0.5"],
+  "internal.example": ["192.168.1.10"],
+};
+const resolve = async (host: string) => table[host] ?? ["93.184.216.34"];
+
+const redirect = (to: string): HttpResponse => ({
+  status: 302,
+  body: "",
+  headers: new Headers({ location: to }),
+});
+
 const html = (body: string, type = "text/html; charset=utf-8"): HttpResponse => ({
   status: 200,
   body,
@@ -57,7 +70,7 @@ describe("createPageFetcher", () => {
         html("User-agent: radard\nDisallow: /private/", "text/plain"),
       "https://a.com/public": () => html(ARTICLE),
     });
-    const f = createPageFetcher({ http });
+    const f = createPageFetcher({ http, resolve });
     expect((await f.fetch("https://a.com/private/x")).status).toBe("blocked");
     const ok = await f.fetch("https://a.com/public");
     expect(ok).toMatchObject({ status: "ok", httpStatus: 200, contentType: "text/html" });
@@ -72,7 +85,7 @@ describe("createPageFetcher", () => {
         throw new HttpError(403, "https://b.com/paywall", "");
       },
     });
-    const f = createPageFetcher({ http });
+    const f = createPageFetcher({ http, resolve });
     expect(await f.fetch("https://b.com/paper.pdf")).toMatchObject({
       status: "skipped",
       contentType: "application/pdf",
@@ -85,7 +98,7 @@ describe("createPageFetcher", () => {
 
   test("mục robots.txt hết hạn của host không gặp lại bị xoá, Map không phình", async () => {
     const http = fakeHttp({});
-    const f = createPageFetcher({ http });
+    const f = createPageFetcher({ http, resolve });
     setSystemTime(new Date("2026-10-30T00:00:00Z"));
     await f.fetch("https://old1.com/x");
     await f.fetch("https://old2.com/x");
@@ -93,6 +106,140 @@ describe("createPageFetcher", () => {
     setSystemTime(new Date("2026-10-31T01:00:00Z")); // quá 24 giờ
     await f.fetch("https://new.com/x");
     expect(f.robotsCacheSize?.()).toBe(1);
+  });
+});
+
+describe("createPageFetcher: SSRF", () => {
+  test.each([
+    "file:///etc/passwd",
+    "ftp://a.com/x",
+    "gopher://a.com/x",
+    "http://a.com:5432/",
+    "http://a.com:6379/",
+    "http://127.0.0.1/",
+    "http://[::1]/",
+    "http://10.1.2.3/",
+    "http://172.16.0.1/",
+    "http://172.31.255.255/",
+    "http://192.168.0.1/",
+    "http://169.254.169.254/latest/meta-data/",
+    "http://100.64.0.1/",
+    "http://[fc00::1]/",
+    "http://[fe80::1]/",
+    "http://[::ffff:127.0.0.1]/",
+    "http://2130706433/",
+    "http://mixed.example/",
+    "http://internal.example./",
+  ])("từ chối %p, không gọi mạng", async (url) => {
+    const http = fakeHttp({});
+    const res = await createPageFetcher({ http, resolve }).fetch(url);
+    expect(res.status).toBe("failed");
+    expect(res.error).toContain("URL bị chặn");
+    expect(http.asked).toEqual([]);
+  });
+
+  test("trang công khai 302 tới địa chỉ riêng thì dừng ở bước đó", async () => {
+    const http = fakeHttp({
+      "https://a.com/go": () => redirect("http://169.254.169.254/latest/meta-data/"),
+    });
+    const res = await createPageFetcher({ http, resolve }).fetch("https://a.com/go");
+    expect(res).toMatchObject({ status: "failed" });
+    expect(res.error).toContain("169.254.169.254");
+    expect(http.asked).toEqual(["https://a.com/robots.txt", "https://a.com/go"]);
+  });
+
+  test("redirect tới tên miền có một bản ghi riêng cũng bị chặn", async () => {
+    const http = fakeHttp({ "https://a.com/go": () => redirect("https://mixed.example/x") });
+    const res = await createPageFetcher({ http, resolve }).fetch("https://a.com/go");
+    expect(res.status).toBe("failed");
+    expect(http.asked).not.toContain("https://mixed.example/x");
+  });
+
+  test("redirect có hợp lệ thì theo; robots.txt tính theo host CUỐI", async () => {
+    const http = fakeHttp({
+      "https://a.com/start": () => redirect("https://b.com/article"),
+      "https://b.com/robots.txt": () => html("User-agent: *\nDisallow: /article", "text/plain"),
+      "https://b.com/article": () => html(ARTICLE),
+    });
+    const res = await createPageFetcher({ http, resolve }).fetch("https://a.com/start");
+    expect(res.status).toBe("blocked");
+    expect(http.asked).toContain("https://b.com/robots.txt");
+    expect(http.asked).not.toContain("https://b.com/article");
+  });
+
+  test("redirect hợp lệ tới trang cho phép: finalUrl là đích cuối", async () => {
+    const http = fakeHttp({
+      "https://a.com/start": () => redirect("/next"),
+      "https://a.com/next": () => html(ARTICLE),
+    });
+    const res = await createPageFetcher({ http, resolve }).fetch("https://a.com/start");
+    expect(res).toMatchObject({ status: "ok", finalUrl: "https://a.com/next" });
+  });
+
+  test("đủ 5 redirect vẫn được; thêm một nữa thì dừng và ghi lỗi", async () => {
+    const chain = (n: number) => {
+      const routes: Record<string, () => HttpResponse> = {};
+      for (let i = 0; i < n; i++) {
+        routes[`https://a.com/r${i}`] = () => redirect(`https://a.com/r${i + 1}`);
+      }
+      routes[`https://a.com/r${n}`] = () => html(ARTICLE);
+      return routes;
+    };
+    const five = await createPageFetcher({ http: fakeHttp(chain(5)), resolve }).fetch(
+      "https://a.com/r0",
+    );
+    expect(five.status).toBe("ok");
+    const http = fakeHttp(chain(6));
+    const six = await createPageFetcher({ http, resolve }).fetch("https://a.com/r0");
+    expect(six.status).toBe("failed");
+    expect(six.error).toContain("redirect");
+    expect(http.asked).not.toContain("https://a.com/r6");
+  });
+
+  test("robots.txt 404 và 403 = được phép", async () => {
+    for (const code of [404, 403]) {
+      const http = fakeHttp({
+        "https://c.com/robots.txt": () => {
+          throw new HttpError(code, "https://c.com/robots.txt", "");
+        },
+        "https://c.com/p": () => html(ARTICLE),
+      });
+      expect((await createPageFetcher({ http, resolve }).fetch("https://c.com/p")).status).toBe(
+        "ok",
+      );
+    }
+  });
+
+  test("robots.txt 503 hoặc không kết nối được thì KHÔNG tải trang", async () => {
+    for (const fail of [
+      () => {
+        throw new HttpError(503, "https://c.com/robots.txt", "");
+      },
+      () => {
+        throw new TypeError("Unable to connect");
+      },
+    ]) {
+      const http = fakeHttp({
+        "https://c.com/robots.txt": fail,
+        "https://c.com/p": () => html(ARTICLE),
+      });
+      const f = createPageFetcher({ http, resolve });
+      const res = await f.fetch("https://c.com/p");
+      expect(res.status).toBe("failed");
+      expect(res.error).toContain("robots.txt");
+      expect(http.asked).toEqual(["https://c.com/robots.txt"]);
+      expect(f.robotsCacheSize?.()).toBe(0); // lỗi không được nhớ: lần sau thử lại
+    }
+  });
+
+  test("robots.txt redirect tới địa chỉ riêng thì không tải trang", async () => {
+    const http = fakeHttp({
+      "https://c.com/robots.txt": () => redirect("http://127.0.0.1/robots.txt"),
+      "https://c.com/p": () => html(ARTICLE),
+    });
+    const res = await createPageFetcher({ http, resolve }).fetch("https://c.com/p");
+    expect(res.status).toBe("failed");
+    expect(http.asked).not.toContain("https://c.com/p");
   });
 });
 
