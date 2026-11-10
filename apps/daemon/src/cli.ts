@@ -19,13 +19,17 @@ import {
   docText,
   docTopicScores,
   documents,
+  enabledRecipients,
   eventDocuments,
   events,
   feedback,
   fetchRuns,
   llmCalls,
   profile,
+  profileChannels,
+  profileOf,
   runMigrations,
+  seedProfileChannel,
   sourceState,
   sources,
   topics,
@@ -99,6 +103,12 @@ radard — CLI
                              chi phí) cho các khung 07:00 tới khung gần nhất; chỉ đọc DB
   store check                Ghi, đọc lại rồi kiểm một key thử trên kho bản thô (đĩa hoặc R2)
   store push [--limit=N]     Chép bản thô từ DATA_DIR lên R2 (cần biến R2_*); key đã có thì bỏ qua
+
+  channels                   Người nhận digest (kênh, người nhận, hồ sơ, bật/tắt)
+  channels add <hồ sơ> <kênh> <người nhận>
+                             Nối người nhận với một hồ sơ (vd: channels add 1 telegram <chat_id>);
+                             chạy lại không đổi gì. Chưa có dòng nào thì digest không gửi ai và bot
+                             từ chối mọi chat
 
   topics                     Thư viện chủ đề (✓ = đã chọn) và chủ đề của bạn
   topics seed                Nạp/cập nhật thư viện chủ đề từ code
@@ -462,12 +472,41 @@ const COMMANDS: Record<string, Command> = {
     );
   },
 
+  channels: async ({ db }) => {
+    const rows = await db.select().from(profileChannels).orderBy(profileChannels.id);
+    console.table(
+      rows.map((r) => ({
+        hồ_sơ: r.profileId,
+        kênh: r.channel,
+        người_nhận: r.recipient,
+        bật: r.enabled,
+      })),
+    );
+  },
+
+  "channels add": async ({ db }) => {
+    const [profileArg, channel, recipient] = process.argv.slice(4);
+    const profileId = Number(profileArg);
+    if (!Number.isInteger(profileId) || !channel || !recipient) {
+      throw new Error("cách dùng: channels add <hồ sơ> <kênh> <người nhận>");
+    }
+    const owner = await profileOf(db, channel, recipient);
+    if (owner !== null && owner !== profileId) {
+      throw new Error(`người nhận này đã thuộc hồ sơ ${owner}`);
+    }
+    const added = await seedProfileChannel(db, { profileId, channel, recipient });
+    if (!added && owner === null) throw new Error(`không có hồ sơ ${profileId}`);
+    console.log(added ? "đã thêm" : "đã có sẵn, không đổi");
+  },
+
   "notify test": async ({ db }) => {
     const notifier = createNotifier();
-    if (!notifier || !env.telegramChatId) {
-      throw new Error("chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong .env");
-    }
-    const n = { notifier, recipient: env.telegramChatId };
+    if (!notifier) throw new Error("chưa đặt TELEGRAM_BOT_TOKEN trong .env");
+    const [first] = (await enabledRecipients(db, notifier.channel)).filter(
+      (r) => r.profileId === cliDefaultProfileId(),
+    );
+    if (!first) throw new Error("chưa có người nhận: chạy `channels add` trước");
+    const n = { notifier, recipient: first.recipient };
     const msg = {
       kind: "system" as const,
       title: "radard: tin thử <bước 4> & nút bấm",

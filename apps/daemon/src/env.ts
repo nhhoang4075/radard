@@ -23,11 +23,10 @@ export const env = {
   role: (process.env.SERVICE_ROLE ?? "all") as Role,
 
   /**
-   * Bot Telegram. Không có token hay chat id thì không gửi digest và không chạy vai trò bot. Chat id
-   * là của bạn (người nhận duy nhất ở MVP-0): bot bỏ qua mọi chat khác.
+   * Bot Telegram. Không có token thì không gửi digest và không chạy vai trò bot. Người nhận
+   * lấy từ bảng `profile_channels` (`channels add`), không từ biến môi trường: bot bỏ qua mọi chat chưa có trong bảng.
    */
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || undefined,
-  telegramChatId: process.env.TELEGRAM_CHAT_ID || undefined,
   /** Cổng HTTP của vai trò `web` (Railway đặt `PORT`). */
   port: num(process.env.PORT, 8080),
   /**

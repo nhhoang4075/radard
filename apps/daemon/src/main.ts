@@ -8,7 +8,7 @@
  *   all        cả bốn, dùng khi dev và trên Railway ở MVP-0
  */
 import { createLogger } from "@radard/core";
-import { runMigrations, seedProfileChannel } from "@radard/db";
+import { runMigrations } from "@radard/db";
 import { createBoss, ensureQueues } from "./boss.ts";
 import { env } from "./env.ts";
 import { seedLibrary } from "./jobs/topics.ts";
@@ -17,7 +17,6 @@ import { startScheduler } from "./roles/scheduler.ts";
 import { startWeb } from "./roles/web.ts";
 import { startWorker } from "./roles/worker.ts";
 import {
-  cliDefaultProfileId,
   createChatChannel,
   createDecider,
   createDeps,
@@ -44,18 +43,6 @@ async function main(): Promise<void> {
   await ensureQueues(boss);
 
   const stops: Array<() => void | Promise<void>> = [];
-  // Người nhận duy nhất từ biến môi trường (TELEGRAM_CHAT_ID) nối với hồ sơ 1: giữ hành vi một người
-  // dùng sau khi có bảng `profile_channels`. Mọi vai trò cần người nhận đều seed TRƯỚC khi khởi động
-  // (chạy lại và chạy đồng thời đều không đổi gì: `on conflict do nothing`), để bot không từ chối chat
-  // của chủ dự án trong lúc chờ scheduler. Thiếu chat id hay hồ sơ 1 thì bỏ qua.
-  if (env.telegramChatId && (runsScheduler || runsWorker || runsBot)) {
-    const seeded = await seedProfileChannel(deps.db, {
-      profileId: cliDefaultProfileId(),
-      channel: "telegram",
-      recipient: env.telegramChatId,
-    });
-    log.info("người nhận telegram từ env", { seeded });
-  }
   if (runsScheduler) {
     // Thư viện chủ đề sống trong code: mỗi lần deploy nạp lại, khỏi chạy tay `topics seed`. Chạy lại
     // nhiều lần không đổi gì. Chỉ vai trò scheduler (một bản duy nhất) làm, để không hai bản cùng ghi.
