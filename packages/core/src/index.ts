@@ -2,6 +2,7 @@ export * from "./ai.ts";
 export * from "./eval/index.ts";
 export * from "./hash.ts";
 export * from "./http.ts";
+export * from "./interest.ts";
 export * from "./log.ts";
 export * from "./notify.ts";
 export * from "./object-store.ts";
