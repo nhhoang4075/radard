@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fakeDecision, fakeEmbedding } from "@radard/adapters/ai-fake";
+import { fakeDecision, fakeEmbedding, fakeLlm } from "@radard/adapters/ai-fake";
 import { fsObjectStore } from "@radard/adapters/object-store-fs";
 import {
   canonicalizeUrl,
@@ -28,6 +28,7 @@ import {
   profile,
   runMigrations,
   sources,
+  topicExamples,
   topics,
 } from "@radard/db";
 import { asc, eq, sql } from "drizzle-orm";
@@ -38,10 +39,12 @@ import {
   runProcess,
   SAME_STORY_QUESTION,
 } from "../src/jobs/process.ts";
+import { resetExampleBackoff } from "../src/jobs/topic-examples.ts";
 import {
   addCustomTopic,
   listProfileTopics,
   pickTopics,
+  seedLibrary,
   setTopicActive,
 } from "../src/jobs/topics.ts";
 
@@ -97,6 +100,76 @@ beforeEach(async () => {
 afterAll(async () => {
   await db.$bun.close();
   await rm(root, { recursive: true, force: true });
+});
+
+describe("tin giả định của chủ đề (HyDE, đề xuất C)", () => {
+  const TITLE = "Zebra quantum kernels land in the toolkit";
+  const llm = fakeLlm({
+    reply: () =>
+      JSON.stringify([
+        TITLE,
+        "Obsidian walrus compiler adds lazy scheduling support",
+        "Marmot vector store ships incremental snapshots today",
+        "Falcon sandbox isolates untrusted tool calls cheaply",
+      ]),
+  });
+  const agentsExamples = async () => {
+    const [t] = await db.select({ id: topics.id }).from(topics).where(eq(topics.key, "agents"));
+    return db
+      .select()
+      .from(topicExamples)
+      .where(eq(topicExamples.topicId, t?.id ?? 0));
+  };
+  const scoreOf = async () => {
+    const [t] = await db.select({ id: topics.id }).from(topics).where(eq(topics.key, "agents"));
+    const [r] = await db
+      .select({ score: docTopicScores.score })
+      .from(docTopicScores)
+      .where(eq(docTopicScores.topicId, t?.id ?? 0));
+    return r?.score ?? Number.NaN;
+  };
+
+  test("chấm theo cosine lớn nhất giữa mô tả và tin giả định, nhờ vậy tin cùng kiểu câu lên điểm", async () => {
+    await seedLibrary(db);
+    await pickTopics(db, ["agents"]);
+    await addStory(TITLE, "https://z.com/1");
+    await runProcess(deps());
+    const without = await scoreOf();
+    expect(await db.select().from(topicExamples)).toHaveLength(0);
+
+    await db.delete(docTopicScores);
+    await runProcess({ ...deps(), llm });
+    expect(await agentsExamples()).toHaveLength(4);
+    const withExamples = await scoreOf();
+    expect(withExamples).toBeGreaterThan(without);
+    expect(withExamples).toBeGreaterThan(0.95);
+  });
+
+  test("thêm tin giả định thì xoá điểm cũ để tính lại; có đủ rồi thì không gọi LLM nữa", async () => {
+    await seedLibrary(db);
+    await pickTopics(db, ["agents"]);
+    await addStory(TITLE, "https://z.com/1");
+    await runProcess(deps());
+    expect(await scoreOf()).toBeLessThan(0.95);
+    let empty = 0;
+    const failing = fakeLlm({
+      reply: () => {
+        empty++;
+        return "[]";
+      },
+    });
+    // Trả về rỗng: lỗi, không lưu gì, điểm cũ giữ nguyên.
+    await runProcess({ ...deps(), llm: failing });
+    expect(await db.select().from(topicExamples)).toHaveLength(0);
+    expect(empty).toBeGreaterThan(0);
+
+    resetExampleBackoff();
+    await runProcess({ ...deps(), llm });
+    expect(await agentsExamples()).toHaveLength(4);
+    const before = empty;
+    await runProcess({ ...deps(), llm: failing });
+    expect(empty).toBe(before);
+  });
 });
 
 describe("runProcess", () => {

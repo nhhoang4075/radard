@@ -24,6 +24,7 @@ import {
   setTopicActive,
   toggleLibraryTopic,
 } from "../src/jobs/topics.ts";
+import { TOPIC_RECIPE, topicQueryText } from "../src/topics/instruct.ts";
 import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../src/topics/library.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
@@ -66,6 +67,28 @@ describe("thư viện chủ đề", () => {
     expect(agents?.embedText).toBe(TOPIC_LIBRARY.find((t) => t.key === "agents")?.embedText);
     expect(agents?.embedding).toBeNull();
     expect(rows.filter((t) => t.embedding !== null)).toHaveLength(TOPIC_LIBRARY.length - 1);
+  });
+
+  test("chủ đề embed kèm chỉ dẫn nhiệm vụ (Instruct/Query), ghi công thức; đổi công thức thì embed lại", async () => {
+    await pickTopics(db, ["agents"]);
+    const seen: string[] = [];
+    const spy: typeof embedder = {
+      ...embedder,
+      embed: (t, k) => {
+        seen.push(...t);
+        return embedder.embed(t, k);
+      },
+    };
+    expect(await embedPendingTopics(db, spy)).toBe(TOPIC_LIBRARY.length);
+    const agents = TOPIC_LIBRARY.find((t) => t.key === "agents");
+    expect(seen).toContain(topicQueryText(agents?.embedText ?? ""));
+    expect(seen.every((t) => t.startsWith("Instruct: ") && t.includes("\nQuery: "))).toBe(true);
+    const rows = await db.select().from(topics);
+    expect(rows.every((t) => t.embeddingRecipe === TOPIC_RECIPE)).toBe(true);
+    expect(await embedPendingTopics(db, embedder)).toBe(0);
+    // Vector cũ từ trước khi có chỉ dẫn (recipe trống) phải được tính lại.
+    await db.update(topics).set({ embeddingRecipe: null }).where(eq(topics.key, "agents"));
+    expect(await embedPendingTopics(db, embedder)).toBe(1);
   });
 
   test("sửa phạm vi (labelGuide) thì chỉ cập nhật chữ, không phải embed lại", async () => {

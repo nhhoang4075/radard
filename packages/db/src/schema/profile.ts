@@ -77,6 +77,8 @@ export const topics = pgTable(
     /** Trống = chưa embed (vừa thêm, vừa sửa mô tả, hoặc đổi model): job process sẽ tính. */
     embedding: halfvec("embedding", { dimensions: EMBED_DIMENSIONS }),
     embeddingModel: text("embedding_model"),
+    /** Cách tạo vector (chỉ dẫn nhiệm vụ…); khác giá trị hiện hành thì job process embed lại. */
+    embeddingRecipe: text("embedding_recipe"),
   },
   (t) => [
     check("topics_origin_ck", sql`${t.origin} in ('library', 'custom')`),
@@ -91,6 +93,27 @@ export const topics = pgTable(
       .on(t.ownerProfileId, sql`lower(${t.name})`)
       .where(sql`${t.origin} = 'custom'`),
   ],
+);
+
+/**
+ * Tin giả định của chủ đề (HyDE): vài tin ngắn LLM viết như tin thật của chủ đề, embed như một tài
+ * liệu. Điểm R của một tin với chủ đề là cosine lớn nhất trong vector mô tả và các vector này
+ * (`scoreTopics`). Dẫn xuất từ `topics.embed_text`: mô tả đổi thì xoá đi sinh lại.
+ */
+export const topicExamples = pgTable(
+  "topic_examples",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    topicId: integer("topic_id")
+      .notNull()
+      .references(() => topics.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    text: text("text").notNull(),
+    embedding: halfvec("embedding", { dimensions: EMBED_DIMENSIONS }).notNull(),
+    embeddingModel: text("embedding_model").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("topic_examples_topic_pos_uq").on(t.topicId, t.position)],
 );
 
 /**

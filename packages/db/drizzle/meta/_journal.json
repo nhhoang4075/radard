@@ -134,6 +134,20 @@
       "when": 1794178010237,
       "tag": "0018_curved_mole_man",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794227577799,
+      "tag": "0019_kind_invisible_woman",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794227636437,
+      "tag": "0020_chemical_angel",
+      "breakpoints": true
     }
   ]
 }
