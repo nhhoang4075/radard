@@ -7,6 +7,13 @@
  */
 import { pushFsToR2 } from "@radard/adapters/object-store-r2";
 import {
+  formatEvalReport,
+  parseSnapshot,
+  REFERENCE_VARIANTS,
+  runEval,
+  toSnapshot,
+} from "@radard/core";
+import {
   deliveries,
   digests,
   docText,
@@ -25,6 +32,7 @@ import {
 } from "@radard/db";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { env } from "./env.ts";
+import { loadDays } from "./eval/load-days.ts";
 import { runBaselines } from "./jobs/baselines.ts";
 import { buildPlan, type DigestPlan, digestSlot, runDigest } from "./jobs/digest.ts";
 import { type FetchDeps, runFetch } from "./jobs/fetch.ts";
@@ -111,6 +119,12 @@ radard — CLI
   notify test                Gửi một tin thử có nút 👍/👎 tới chat của bạn (ghi vào deliveries)
   feedback [--limit=20]      Các phản hồi gần nhất
 
+  eval [--closed] [--export f] [--snapshot f]
+                             Bộ chấm bất biến: phát lại các ngày đã gửi, chấm NDCG theo nhãn 👍/👎
+                             cho baseline, oracle, random (không gọi model). --closed: in cả tập
+                             khoá kín và kết luận chung; --export: ghi dữ liệu ra JSON; --snapshot:
+                             đọc JSON thay cho DB
+
   rank [--at=<ISO>] [--refresh]  Chọn tin cho 24 giờ kết thúc ở --at (mặc định: bây giờ);
                              --refresh lấy lại điểm HN cho sự kiện qua cổng trước khi chấm
 
@@ -144,6 +158,15 @@ function parseHours(v: string): number {
 
 function parseSince(v: string): Date {
   return new Date(Date.now() - parseHours(v) * 3600_000);
+}
+
+/** Giá trị cờ dạng `--name=v` hoặc `--name v`; không có thì chuỗi rỗng. */
+function flagValue(name: string): string {
+  const eq = flag(name, "");
+  if (eq) return eq;
+  const i = process.argv.indexOf(`--${name}`);
+  const next = i >= 0 ? process.argv[i + 1] : undefined;
+  return next && !next.startsWith("--") ? next : "";
 }
 
 const since = () => parseSince(flag("since", "24h"));
@@ -458,6 +481,26 @@ const COMMANDS: Record<string, Command> = {
       body: msg.lines.join("\n"),
     });
     console.log(`đã gửi tin thử, message_id ${messageId}`);
+  },
+
+  eval: async ({ db }) => {
+    const snapshotPath = flagValue("snapshot");
+    const days = snapshotPath
+      ? parseSnapshot(await Bun.file(snapshotPath).json())
+      : await loadDays(db).then((r) => {
+          if (r.skipped > 0) console.log(`(bỏ ${r.skipped} tin vì plan không có điểm đã lưu)`);
+          return r.days;
+        });
+    const exportPath = flagValue("export");
+    if (exportPath) {
+      await Bun.write(exportPath, `${JSON.stringify(toSnapshot(days), null, 2)}\n`);
+      console.log(`Đã ghi ${days.length} ngày ra ${exportPath}`);
+    }
+    console.log(
+      formatEvalReport(
+        runEval(days, REFERENCE_VARIANTS, { includeClosed: process.argv.includes("--closed") }),
+      ),
+    );
   },
 
   feedback: async ({ db }) => {
