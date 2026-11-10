@@ -24,7 +24,7 @@ import { profile } from "./profile.ts";
 /**
  * Cột `profile_id`: hồ sơ (người dùng) sở hữu dòng này. Người nhận theo kênh (`recipient`) vẫn giữ
  * nguyên để gửi và nối lượt bấm; `profile_id` là chiều để lọc dữ liệu theo người dùng (xếp hạng,
- * bộ chấm). Chưa có bảng ánh xạ người nhận → hồ sơ: nơi nối dây truyền giá trị này vào.
+ * bộ chấm). Giá trị lấy từ `profile_channels` (người nhận → hồ sơ).
  */
 const profileIdColumn = () =>
   integer("profile_id")
@@ -59,8 +59,8 @@ export const digests = pgTable(
     meta: jsonb<Record<string, unknown>>("meta").notNull().default(sql`'{}'::jsonb`),
   },
   (t) => [
-    // Một người nhận chỉ nhận một digest cho mỗi khoảng: job chạy lại không gửi trùng.
-    uniqueIndex("digests_once_uq").on(t.channel, t.recipient, t.periodEnd),
+    // Một người nhận của một hồ sơ chỉ nhận một digest cho mỗi khoảng: job chạy lại không gửi trùng.
+    uniqueIndex("digests_once_uq").on(t.profileId, t.channel, t.recipient, t.periodEnd),
     index("digests_profile_idx").on(t.profileId, t.periodEnd),
     check("digests_status_ck", sql`${t.status} in ('sending', 'sent', 'failed')`),
   ],

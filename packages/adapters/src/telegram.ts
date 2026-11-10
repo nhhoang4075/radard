@@ -13,6 +13,7 @@ import { autoRetry } from "@grammyjs/auto-retry";
 import {
   type ChatChannel,
   type ChatHandlers,
+  type ChatResolver,
   type CustomTopicDraft,
   createLogger,
   type FeedbackKind,
@@ -553,8 +554,12 @@ function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: A
 }
 
 export interface TelegramChatOptions extends TelegramOptions {
-  /** Chỉ xử lý update từ chat này (`TELEGRAM_CHAT_ID`); mọi chat khác bị bỏ qua, im lặng. */
-  allowedChatId: string;
+  /**
+   * Chế độ một bộ xử lý cố định: chỉ xử lý update từ chat này; mọi chat khác bị bỏ qua, im lặng.
+   * Không đặt thì `createTelegramBot` từ chối mọi chat (fail-closed); đa người dùng dùng
+   * `createTelegramRouter` / `start(resolver)` thay vì tuỳ chọn này.
+   */
+  allowedChatId?: string;
   /** Có sẵn thì Bot không gọi `getMe` lúc khởi động (test). */
   botInfo?: UserFromGetMe;
 }
@@ -566,7 +571,9 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
 
   bot.use(async (ctx, next) => {
     // ctx.chat gom chat id của mọi loại update (tin nhắn, lượt bấm) về một chỗ.
-    if (String(ctx.chat?.id) === opts.allowedChatId) await next();
+    if (opts.allowedChatId !== undefined && String(ctx.chat?.id) === opts.allowedChatId) {
+      await next();
+    }
   });
 
   bot.callbackQuery(/^fb:(like|dislike)$/, async (ctx) => {
@@ -617,6 +624,39 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
 }
 
 /**
+ * Đa người dùng: một Bot "cổng" nhận mọi update, tra chat → bộ xử lý của hồ sơ qua `resolve`.
+ * `null` (chat không có quyền): bỏ qua, im lặng, không gọi handler nào. Có quyền: chuyển update cho
+ * một Bot con của đúng chat đó (lưu theo chat + `scope` hồ sơ; đổi hồ sơ thì dựng lại), nên trạng thái
+ * hội thoại (đang chờ nhập mô tả…) cũng tách theo chat.
+ */
+export function createTelegramRouter(opts: TelegramChatOptions, resolve: ChatResolver): Bot {
+  const gate = new Bot(opts.token, opts.botInfo ? { botInfo: opts.botInfo } : {});
+  withRetry(gate.api, opts.transformer);
+  const inner = new Map<string, { scope: string; bot: Bot }>();
+  gate.use(async (ctx) => {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const recipient = String(chatId);
+    const found = await resolve(recipient);
+    if (!found) return;
+    let entry = inner.get(recipient);
+    if (!entry || entry.scope !== found.scope) {
+      entry = {
+        scope: found.scope,
+        bot: createTelegramBot(
+          { ...opts, allowedChatId: recipient, botInfo: gate.botInfo },
+          found.handlers,
+        ),
+      };
+      inner.set(recipient, entry);
+    }
+    await entry.bot.handleUpdate(ctx.update);
+  });
+  gate.catch((err) => log.error("xử lý update lỗi", describeError(err.error)));
+  return gate;
+}
+
+/**
  * Chạy `start` (long polling, chỉ trả về khi dừng) và chạy lại khi nó dừng vì lỗi, chờ 5, 10, 20…
  * giây, tối đa `maxDelayMs`. Lỗi 409 "terminated by other getUpdates request" xảy ra lúc chuyển giữa
  * hai bản deploy (13/10/2026: bot dừng hẳn 17 giây sau khi bản mới lên, lượt bấm không được ghi).
@@ -655,14 +695,15 @@ export function telegramChat(opts: TelegramChatOptions): ChatChannel {
   return {
     channel: CHANNEL,
     async start(handlers) {
-      const b = createTelegramBot(opts, handlers);
+      const resolver = typeof handlers === "function";
+      const b = resolver ? createTelegramRouter(opts, handlers) : createTelegramBot(opts, handlers);
       bot = b;
-      if (handlers.topics) {
+      if (resolver || handlers.topics) {
         // Menu lệnh khi gõ "/". Tên lệnh tiếng Anh, mô tả tiếng Việt (quyết định 12/10/2026).
         await b.api
           .setMyCommands([
             { command: "topics", description: "Chọn chủ đề theo dõi" },
-            ...(handlers.profile
+            ...(resolver || handlers.profile
               ? [{ command: "profile", description: "Mô tả về bạn và nhận gợi ý chủ đề" }]
               : []),
             { command: "start", description: "Bắt đầu" },

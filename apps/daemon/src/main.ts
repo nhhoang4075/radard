@@ -8,7 +8,7 @@
  *   all        cả bốn, dùng khi dev và trên Railway ở MVP-0
  */
 import { createLogger } from "@radard/core";
-import { runMigrations } from "@radard/db";
+import { runMigrations, seedProfileChannel } from "@radard/db";
 import { createBoss, ensureQueues } from "./boss.ts";
 import { env } from "./env.ts";
 import { seedLibrary } from "./jobs/topics.ts";
@@ -17,6 +17,7 @@ import { startScheduler } from "./roles/scheduler.ts";
 import { startWeb } from "./roles/web.ts";
 import { startWorker } from "./roles/worker.ts";
 import {
+  cliDefaultProfileId,
   createChatChannel,
   createDecider,
   createDeps,
@@ -25,7 +26,6 @@ import {
   createLlm,
   createPagesDeps,
   createProcessDeps,
-  currentProfileId,
 } from "./runtime.ts";
 
 const log = createLogger("radard");
@@ -48,6 +48,16 @@ async function main(): Promise<void> {
     // Thư viện chủ đề sống trong code: mỗi lần deploy nạp lại, khỏi chạy tay `topics seed`. Chạy lại
     // nhiều lần không đổi gì. Chỉ vai trò scheduler (một bản duy nhất) làm, để không hai bản cùng ghi.
     log.info("thư viện chủ đề", await seedLibrary(deps.db));
+    // Người nhận duy nhất từ biến môi trường (TELEGRAM_CHAT_ID) nối với hồ sơ 1: giữ hành vi một người
+    // dùng sau khi có bảng `profile_channels`. Chạy lại không đổi gì; thiếu chat id hay hồ sơ 1 thì bỏ qua.
+    if (env.telegramChatId) {
+      const seeded = await seedProfileChannel(deps.db, {
+        profileId: cliDefaultProfileId(),
+        channel: "telegram",
+        recipient: env.telegramChatId,
+      });
+      log.info("người nhận telegram từ env", { seeded });
+    }
     stops.push(await startScheduler(boss, deps.db));
   }
   if (runsWorker) {
@@ -63,13 +73,12 @@ async function main(): Promise<void> {
     if (chat) {
       const bot = {
         db: deps.db,
-        profileId: currentProfileId(),
         embedder: createEmbedder(deps.db),
         llm: createLlm(deps.db),
         decider: createDecider(deps.db),
       };
       stops.push(await startBot(bot, chat));
-    } else log.warn("vai trò bot tắt: chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID");
+    } else log.warn("vai trò bot tắt: chưa đặt TELEGRAM_BOT_TOKEN");
   }
   if (runsWeb) {
     const stopWeb = startWeb({ db: deps.db, port: env.port, secret: env.linkSecret });

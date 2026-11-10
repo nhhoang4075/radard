@@ -34,7 +34,7 @@ import { desc, eq, gte, sql } from "drizzle-orm";
 import { env } from "./env.ts";
 import { loadDays } from "./eval/load-days.ts";
 import { runBaselines } from "./jobs/baselines.ts";
-import { buildPlan, type DigestPlan, digestSlot, runDigest } from "./jobs/digest.ts";
+import { buildPlan, type DigestPlan, digestSlot, runDigestAll } from "./jobs/digest.ts";
 import { type FetchDeps, runFetch } from "./jobs/fetch.ts";
 import { fetchPages } from "./jobs/pages.ts";
 import { rebuildEvents, runProcess } from "./jobs/process.ts";
@@ -60,6 +60,7 @@ import {
   setTopicActive,
 } from "./jobs/topics.ts";
 import {
+  cliDefaultProfileId,
   createDecider,
   createDeps,
   createDigestDeps,
@@ -68,7 +69,6 @@ import {
   createNotifier,
   createPagesDeps,
   createProcessDeps,
-  currentProfileId,
 } from "./runtime.ts";
 import { DEFAULT_PROFILE, DEFAULT_SOURCES } from "./sources/index.ts";
 
@@ -303,7 +303,7 @@ const COMMANDS: Record<string, Command> = {
   "profile set": async ({ db }) => {
     const promptContext = process.argv[4];
     if (!promptContext) throw new Error('thiếu mô tả: profile set "…"');
-    const profileId = currentProfileId();
+    const profileId = cliDefaultProfileId();
     // Sửa đúng dòng của hồ sơ này, chưa có thì tạo.
     const updated = await db
       .update(profile)
@@ -317,14 +317,14 @@ const COMMANDS: Record<string, Command> = {
   "profile seed": async ({ db }) => {
     const added = await db
       .insert(profile)
-      .values({ id: currentProfileId(), promptContext: DEFAULT_PROFILE })
+      .values({ id: cliDefaultProfileId(), promptContext: DEFAULT_PROFILE })
       .onConflictDoNothing()
       .returning();
     console.log(added.length ? "đã đặt mô tả mặc định (TẠM)" : "đã có profile, giữ nguyên");
   },
 
   profile: async ({ db }) => {
-    const [p] = await db.select().from(profile).where(eq(profile.id, currentProfileId()));
+    const [p] = await db.select().from(profile).where(eq(profile.id, cliDefaultProfileId()));
     console.log(p ?? "chưa có profile");
   },
 
@@ -334,14 +334,14 @@ const COMMANDS: Record<string, Command> = {
 
   topics: async ({ db }) => {
     let group = "";
-    for (const t of await listLibrary(db, currentProfileId())) {
+    for (const t of await listLibrary(db, cliDefaultProfileId())) {
       if (t.groupName !== group) {
         group = t.groupName;
         console.log(`\n${group}`);
       }
       console.log(`  ${t.chosen ? "✓" : " "} ${t.key.padEnd(14)} ${t.name}`);
     }
-    const mine = await listProfileTopics(db, currentProfileId());
+    const mine = await listProfileTopics(db, cliDefaultProfileId());
     console.log("\nChủ đề của bạn");
     if (mine.length === 0) console.log("  (chưa có: topics pick <key,…> hoặc topics add)");
     for (const t of mine) {
@@ -359,7 +359,7 @@ const COMMANDS: Record<string, Command> = {
       .map((k) => k.trim())
       .filter(Boolean);
     if (keys.length === 0) throw new Error("thiếu key: topics pick agents,llm_apps");
-    console.log(`đã chọn ${await pickTopics(db, currentProfileId(), keys)} chủ đề`);
+    console.log(`đã chọn ${await pickTopics(db, cliDefaultProfileId(), keys)} chủ đề`);
     await embedTopicsNow(db);
   },
 
@@ -370,7 +370,7 @@ const COMMANDS: Record<string, Command> = {
     if (!llm) throw new Error("chưa có AI_GATEWAY_API_KEY: không viết được câu mô tả");
     const embedText = await describeTopic(llm, label, text);
     const kind = process.argv.includes("--exclude") ? "exclude" : "include";
-    const id = await addCustomTopic(db, currentProfileId(), {
+    const id = await addCustomTopic(db, cliDefaultProfileId(), {
       label,
       description: text,
       embedText,
@@ -388,7 +388,7 @@ const COMMANDS: Record<string, Command> = {
     if (!embedder) throw new Error("chưa có embedder: không đo được tỉ lệ trùng tin");
     const started = Date.now();
     const res = await checkTopicOverlap(
-      { db, profileId: currentProfileId(), embedder, decider: createDecider(db) },
+      { db, profileId: cliDefaultProfileId(), embedder, decider: createDecider(db) },
       { label, embedText },
     );
     printOverlap(label, res, Date.now() - started);
@@ -400,7 +400,7 @@ const COMMANDS: Record<string, Command> = {
       const [p] = await db
         .select({ promptContext: profile.promptContext })
         .from(profile)
-        .where(eq(profile.id, currentProfileId()));
+        .where(eq(profile.id, cliDefaultProfileId()));
       if (!p) throw new Error('chưa có bối cảnh: profile set "…" hoặc --text="…"');
       text = p.promptContext;
     }
@@ -408,7 +408,7 @@ const COMMANDS: Record<string, Command> = {
     const res = await suggestTopics(
       {
         db,
-        profileId: currentProfileId(),
+        profileId: cliDefaultProfileId(),
         decider: createDecider(db),
         llm: createLlm(db),
         embedder: createEmbedder(db),
@@ -420,14 +420,14 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "topics on": async ({ db }) => {
-    if (!(await setTopicActive(db, currentProfileId(), Number(process.argv[4]), true)))
+    if (!(await setTopicActive(db, cliDefaultProfileId(), Number(process.argv[4]), true)))
       throw new Error("không có id đó");
     console.log("đã bật");
     await embedTopicsNow(db);
   },
 
   "topics off": async ({ db }) => {
-    if (!(await setTopicActive(db, currentProfileId(), Number(process.argv[4]), false)))
+    if (!(await setTopicActive(db, cliDefaultProfileId(), Number(process.argv[4]), false)))
       throw new Error("không có id đó");
     console.log("đã tắt");
   },
@@ -463,8 +463,11 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "notify test": async ({ db }) => {
-    const n = createNotifier();
-    if (!n) throw new Error("chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong .env");
+    const notifier = createNotifier();
+    if (!notifier || !env.telegramChatId) {
+      throw new Error("chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong .env");
+    }
+    const n = { notifier, recipient: env.telegramChatId };
     const msg = {
       kind: "system" as const,
       title: "radard: tin thử <bước 4> & nút bấm",
@@ -500,7 +503,7 @@ const COMMANDS: Record<string, Command> = {
     // Không có digest: delivery `test` đứng riêng, để lượt bấm vẫn nối được về một tin mà không lẫn
     // vào phản hồi thật (phân tích chỉ lấy `kind = 'event'`).
     await db.insert(deliveries).values({
-      profileId: currentProfileId(),
+      profileId: cliDefaultProfileId(),
       channel: n.notifier.channel,
       recipient: n.recipient,
       messageId,
@@ -542,7 +545,7 @@ const COMMANDS: Record<string, Command> = {
       })
       .from(feedback)
       .leftJoin(deliveries, eq(deliveries.id, feedback.deliveryId))
-      .where(eq(feedback.profileId, currentProfileId()))
+      .where(eq(feedback.profileId, cliDefaultProfileId()))
       .orderBy(desc(feedback.id))
       .limit(limit());
     console.table(rows);
@@ -552,7 +555,7 @@ const COMMANDS: Record<string, Command> = {
     const at = flag("at", "");
     const period = periodEndingAt(at ? new Date(at) : new Date());
     const r = await rankPeriod(db, period, {
-      profileId: currentProfileId(),
+      profileId: cliDefaultProfileId(),
       // Xem thử: không ghi đè bộ cụm gu đang dùng.
       persistInterests: false,
       // Mặc định T = 0 (xác định); chỉ có nhiễu khi người dùng đưa `--seed N` tường minh.
@@ -645,7 +648,7 @@ const COMMANDS: Record<string, Command> = {
       if (!llm) console.log("(chưa có AI_GATEWAY_API_KEY: bản không tóm tắt, cổng dùng luật R)");
       printPlan(
         await buildPlan(
-          { db, profileId: currentProfileId(), http, llm, decider: createDecider(db) },
+          { db, profileId: cliDefaultProfileId(), http, llm, decider: createDecider(db) },
           slot,
           undefined,
           seedOption().selectSeed,
@@ -655,14 +658,14 @@ const COMMANDS: Record<string, Command> = {
     }
     if (process.argv.includes("--now")) {
       const deps = createDigestDeps(base);
-      if (!deps) throw new Error("chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong .env");
-      console.log(await runDigest(deps));
+      if (!deps) throw new Error("chưa đặt TELEGRAM_BOT_TOKEN trong .env");
+      console.log(await runDigestAll(deps));
       return;
     }
     const rows = await db
       .select()
       .from(digests)
-      .where(eq(digests.profileId, currentProfileId()))
+      .where(eq(digests.profileId, cliDefaultProfileId()))
       .orderBy(desc(digests.periodEnd))
       .limit(limit());
     console.table(
@@ -778,7 +781,7 @@ const COMMANDS: Record<string, Command> = {
 
   report: async ({ db }) => {
     const window = reportWindow(new Date(), parseHours(flag("since", "7d")));
-    for (const block of formatReport(await buildReport(db, currentProfileId(), window))) {
+    for (const block of formatReport(await buildReport(db, cliDefaultProfileId(), window))) {
       if (typeof block === "string") console.log(block);
       else console.table(block);
     }

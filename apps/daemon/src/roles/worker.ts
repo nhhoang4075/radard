@@ -6,7 +6,7 @@ import type { PgBoss } from "pg-boss";
 import { type FetchJob, QUEUE } from "../boss.ts";
 import { env } from "../env.ts";
 import { runBaselines } from "../jobs/baselines.ts";
-import { runDigest, type SendDeps } from "../jobs/digest.ts";
+import { type DigestJobDeps, runDigestAll } from "../jobs/digest.ts";
 import { type FetchDeps, rateLimitDelaySeconds, runFetch } from "../jobs/fetch.ts";
 import { fetchPages, type PagesDeps } from "../jobs/pages.ts";
 import { type ProcessDeps, runProcess } from "../jobs/process.ts";
@@ -20,7 +20,7 @@ export async function startWorker(
   opts: {
     concurrency: number;
     process: ProcessDeps | null;
-    digest: SendDeps | null;
+    digest: DigestJobDeps | null;
     pages: PagesDeps;
   },
 ): Promise<void> {
@@ -77,10 +77,10 @@ export async function startWorker(
   const digestDeps = opts.digest;
   if (digestDeps) {
     await boss.work(QUEUE.digest, { localConcurrency: 1 }, async () => {
-      await runDigest(digestDeps);
+      await runDigestAll(digestDeps);
     });
     log.info("đang nhận job", { queue: QUEUE.digest, summaries: Boolean(digestDeps.llm) });
-  } else log.warn("job digest tắt: chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID");
+  } else log.warn("job digest tắt: chưa đặt TELEGRAM_BOT_TOKEN");
 
   const processDeps = opts.process;
   if (!processDeps) {

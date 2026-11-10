@@ -25,6 +25,7 @@ import {
   docSignals,
   docText,
   documents,
+  enabledRecipients,
   eventDocuments,
   profile,
 } from "@radard/db";
@@ -623,6 +624,41 @@ function asPlan(meta: Record<string, unknown>): DigestPlan | null {
   return plan?.version === 1 ? plan : null;
 }
 
+/** Phụ thuộc của job digest trước khi gắn người nhận: thiếu `profileId` và `recipient`. */
+export type DigestJobDeps = Omit<SendDeps, "profileId" | "recipient">;
+
+/**
+ * Chạy digest cho từng người nhận đang bật của kênh đang có notifier, mỗi người với hồ sơ của họ
+ * (`profile_channels`). Kênh chưa có ai thì không làm gì. Một người lỗi không chặn người khác; xong hết
+ * mới ném lỗi (để pg-boss chạy lại; người đã gửi xong thì lượt sau là `already_sent`).
+ */
+export async function runDigestAll(
+  deps: DigestJobDeps,
+  slot = digestSlot(new Date()),
+): Promise<DigestOutcome[]> {
+  const outcomes: DigestOutcome[] = [];
+  const errors: unknown[] = [];
+  for (const r of await enabledRecipients(deps.db, deps.notifier.channel)) {
+    try {
+      outcomes.push(
+        await runDigest({ ...deps, profileId: r.profileId, recipient: r.recipient }, slot),
+      );
+    } catch (err) {
+      log.error("digest lỗi cho một người nhận", {
+        profileId: r.profileId,
+        error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+      });
+      errors.push(err);
+    }
+  }
+  if (errors.length > 0) {
+    throw errors.length === 1
+      ? errors[0]
+      : new AggregateError(errors, `${errors.length} người nhận digest lỗi`);
+  }
+  return outcomes;
+}
+
 /** Gửi điểm tin của khung giờ `slot` (mặc định: khung gần nhất). Chạy lại an toàn. */
 export async function runDigest(
   deps: SendDeps,
@@ -630,6 +666,7 @@ export async function runDigest(
 ): Promise<DigestOutcome> {
   const channel = deps.notifier.channel;
   const key = and(
+    eq(digests.profileId, deps.profileId),
     eq(digests.channel, channel),
     eq(digests.recipient, deps.recipient),
     eq(digests.periodEnd, slot),

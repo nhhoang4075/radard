@@ -6,4 +6,5 @@ export * from "./interest-clusters.ts";
 export * from "./link-opens.ts";
 export * from "./ops.ts";
 export * from "./profile.ts";
+export * from "./profile-channels.ts";
 export * from "./scores.ts";

@@ -4,6 +4,7 @@
  */
 import {
   type ChatChannel,
+  type ChatHandlers,
   createLogger,
   type DecisionProvider,
   type EmbeddingProvider,
@@ -13,7 +14,7 @@ import {
   type TopicHandlers,
   type TopicItem,
 } from "@radard/core";
-import type { Database } from "@radard/db";
+import { type Database, profileOf } from "@radard/db";
 import { runBaselines } from "../jobs/baselines.ts";
 import { recordFeedback } from "../jobs/feedback.ts";
 import { scoreTopics } from "../jobs/process.ts";
@@ -46,7 +47,7 @@ export interface BotDeps {
  * Sau khi bật hoặc thêm chủ đề: embed (1 request), chấm điểm (SQL), tính lại mặt bằng, để digest
  * kế tiếp dùng được ngay mà không phải chờ lượt process hay job 06:30. Chạy nền, lần lượt.
  */
-function refresher({ db, embedder }: BotDeps) {
+function refresher({ db, embedder }: BotBase) {
   let chain = Promise.resolve();
   return () => {
     if (!embedder) return;
@@ -193,13 +194,34 @@ export function profileHandlers(
   };
 }
 
-export async function startBot(deps: BotDeps, chat: ChatChannel): Promise<() => Promise<void>> {
-  // Một chuỗi làm mới dùng chung: bật chủ đề từ /topics và /profile không chạy embed chồng nhau.
-  const refresh = refresher(deps);
-  await chat.start({
+/** Bộ xử lý của MỘT hồ sơ: mọi truy vấn trong đó dùng đúng `profileId` này. */
+export function handlersFor(deps: BotDeps, refresh: () => void): ChatHandlers {
+  return {
     onFeedback: (ev) => recordFeedback(deps.db, ev, deps.profileId),
     topics: topicHandlers(deps, refresh),
     profile: profileHandlers(deps, refresh),
-  });
+  };
+}
+
+/** Dụng cụ bot dùng chung cho mọi hồ sơ: không có `profileId`, mỗi người nhận tự gắn hồ sơ của mình. */
+export type BotBase = Omit<BotDeps, "profileId">;
+
+/**
+ * Người nhận (chat id) → bộ xử lý của hồ sơ họ qua `profile_channels`. Không có trong bảng (hay đã
+ * tắt) thì `null`: kênh bỏ qua update, người lạ không dùng được bot.
+ */
+export function chatResolver(base: BotBase, channel: string, refresh: () => void) {
+  return async (recipient: string): Promise<{ scope: string; handlers: ChatHandlers } | null> => {
+    const profileId = await profileOf(base.db, channel, recipient);
+    if (profileId === null) return null;
+    return { scope: String(profileId), handlers: handlersFor({ ...base, profileId }, refresh) };
+  };
+}
+
+export async function startBot(base: BotBase, chat: ChatChannel): Promise<() => Promise<void>> {
+  // Một chuỗi làm mới dùng chung (chỉ phụ thuộc db và embedder): bật chủ đề từ /topics và /profile
+  // của bất kỳ ai không chạy embed chồng nhau.
+  const refresh = refresher(base);
+  await chat.start(chatResolver(base, chat.channel, refresh));
   return () => chat.stop();
 }

@@ -148,10 +148,19 @@ export interface ChatHandlers {
   profile?: ProfileHandlers;
 }
 
+/**
+ * Đa người dùng: tra người nhận (chat id) → bộ xử lý của đúng hồ sơ đó. `null` = người nhận không có
+ * quyền: kênh bỏ qua update, không trả lời, không gọi bất kỳ handler nào (fail-closed).
+ * `scope` định danh hồ sơ đứng sau bộ xử lý (kênh dùng nó để biết khi nào phải dựng lại bộ xử lý).
+ */
+export type ChatResolver = (
+  recipient: string,
+) => Promise<{ scope: string; handlers: ChatHandlers } | null>;
+
 /** Chiều về: nhận lượt bấm (sau này: lệnh, tin nhắn) từ một kênh. */
 export interface ChatChannel {
   readonly channel: string;
   /** Bắt đầu nhận; trả về ngay, việc nhận chạy nền cho tới `stop()`. */
-  start(handlers: ChatHandlers): Promise<void>;
+  start(handlers: ChatHandlers | ChatResolver): Promise<void>;
   stop(): Promise<void>;
 }

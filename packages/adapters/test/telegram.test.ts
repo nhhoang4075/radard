@@ -15,6 +15,7 @@ import type { Transformer } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 import {
   createTelegramBot,
+  createTelegramRouter,
   describeError,
   escapeHtml,
   feedbackKeyboard,
@@ -167,6 +168,51 @@ describe("telegramNotifier", () => {
     const d = JSON.stringify(describeError(err));
     expect(d).toContain("can't parse entities");
     expect(d).not.toContain("SECRET");
+  });
+});
+
+describe("bot đa người dùng (router)", () => {
+  const OTHER = "100000002";
+  function setup() {
+    const api = fakeApi();
+    const seen: Array<{ scope: string; ev: FeedbackEvent }> = [];
+    const asked: string[] = [];
+    const bot = createTelegramRouter(
+      { token: "123:TEST", botInfo, transformer: api.t },
+      async (recipient) => {
+        asked.push(recipient);
+        if (recipient !== ME && recipient !== OTHER) return null;
+        const scope = recipient === ME ? "1" : "2";
+        return {
+          scope,
+          handlers: {
+            onFeedback: async (ev) => {
+              seen.push({ scope, ev });
+              return { recorded: true };
+            },
+          },
+        };
+      },
+    );
+    return { bot, seen, asked, calls: api.calls };
+  }
+
+  test("mỗi chat tới đúng bộ xử lý của hồ sơ mình", async () => {
+    const { bot, seen } = setup();
+    await bot.handleUpdate(press("fb:like", ME));
+    await bot.handleUpdate(press("fb:dislike", OTHER, "cb-2"));
+    expect(seen.map((s) => [s.scope, s.ev.recipient, s.ev.kind])).toEqual([
+      ["1", ME, "like"],
+      ["2", OTHER, "dislike"],
+    ]);
+  });
+
+  test("chat lạ: tra rồi bỏ qua, không handler nào chạy, không gọi API nào", async () => {
+    const { bot, seen, asked, calls } = setup();
+    await bot.handleUpdate(press("fb:like", "999"));
+    expect(asked).toEqual(["999"]);
+    expect(seen).toHaveLength(0);
+    expect(calls).toHaveLength(0);
   });
 });
 

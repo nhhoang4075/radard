@@ -20,7 +20,7 @@ import {
 } from "@radard/core";
 import { createDatabase, type Database, dbUsageSink, EMBED_DIMENSIONS } from "@radard/db";
 import { env } from "./env.ts";
-import type { SendDeps } from "./jobs/digest.ts";
+import type { DigestJobDeps } from "./jobs/digest.ts";
 import type { FetchDeps } from "./jobs/fetch.ts";
 import type { PagesDeps } from "./jobs/pages.ts";
 import type { ProcessDeps } from "./jobs/process.ts";
@@ -99,33 +99,30 @@ export function createProcessDeps(base: FetchDeps): ProcessDeps | null {
 }
 
 /**
- * Hồ sơ của người nhận hiện tại: NƠI DUY NHẤT nối dây người dùng với `profileId` truyền qua `deps`.
- * TODO(multi-user): chưa có ánh xạ người nhận → hồ sơ (bảng hay cột nào chưa quyết); tới lúc đó
- * hệ thống chỉ có một người dùng, hồ sơ id 1. Đa người dùng thì thay hàm này bằng tra theo người nhận.
+ * Hồ sơ mặc định của CLI (lệnh một người dùng: `topics`, `feedback`, `report`…): hồ sơ id 1.
+ * KHÔNG dùng trong luồng chạy thật (digest, bot, web): ở đó hồ sơ suy ra từ người nhận qua
+ * `profile_channels` (`profileOf`, `enabledRecipients`).
  */
-export function currentProfileId(): number {
+export function cliDefaultProfileId(): number {
   return 1;
 }
 
-/** Kênh gửi digest và người nhận; `null` khi chưa đặt TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID. */
-export function createNotifier(): { notifier: Notifier; recipient: string } | null {
-  if (!env.telegramToken || !env.telegramChatId) return null;
-  return {
-    notifier: telegramNotifier({ token: env.telegramToken }),
-    recipient: env.telegramChatId,
-  };
+/** Kênh gửi digest; `null` khi chưa đặt TELEGRAM_BOT_TOKEN. Người nhận lấy từ `profile_channels`. */
+export function createNotifier(): Notifier | null {
+  if (!env.telegramToken) return null;
+  return telegramNotifier({ token: env.telegramToken });
 }
 
 /**
- * Phụ thuộc của job digest; `null` khi chưa có kênh gửi. Không có LLM thì gửi bản không tóm tắt;
- * không có model quyết định thì cổng chủ đề dùng luật R ≥ gateR.
+ * Phụ thuộc của job digest; `null` khi chưa có kênh gửi. Chưa gắn hồ sơ và người nhận: `runDigestAll`
+ * chạy cho từng người nhận đang bật của kênh, mỗi người với hồ sơ của họ. Không có LLM thì gửi bản
+ * không tóm tắt; không có model quyết định thì cổng chủ đề dùng luật R ≥ gateR.
  */
-export function createDigestDeps(base: FetchDeps): SendDeps | null {
-  const n = createNotifier();
-  if (!n) return null;
+export function createDigestDeps(base: FetchDeps): DigestJobDeps | null {
+  const notifier = createNotifier();
+  if (!notifier) return null;
   return {
     db: base.db,
-    profileId: currentProfileId(),
     http: base.http,
     llm: createLlm(base.db),
     decider: createDecider(base.db),
@@ -134,7 +131,7 @@ export function createDigestDeps(base: FetchDeps): SendDeps | null {
       env.publicBaseUrl && env.linkSecret
         ? { baseUrl: env.publicBaseUrl, secret: env.linkSecret }
         : undefined,
-    ...n,
+    notifier,
   };
 }
 
@@ -142,8 +139,8 @@ export function createPagesDeps(base: FetchDeps): PagesDeps {
   return { db: base.db, store: base.store, fetcher: createPageFetcher({ http: base.http }) };
 }
 
-/** Kênh nhận lượt bấm; `null` khi chưa đặt token và chat id. */
+/** Kênh nhận lượt bấm; `null` khi chưa đặt token. Ai được dùng bot do `profile_channels` quyết định. */
 export function createChatChannel(): ChatChannel | null {
-  if (!env.telegramToken || !env.telegramChatId) return null;
-  return telegramChat({ token: env.telegramToken, allowedChatId: env.telegramChatId });
+  if (!env.telegramToken) return null;
+  return telegramChat({ token: env.telegramToken });
 }
