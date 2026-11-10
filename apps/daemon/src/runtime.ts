@@ -129,6 +129,11 @@ export function createDigestDeps(base: FetchDeps): SendDeps | null {
     http: base.http,
     llm: createLlm(base.db),
     decider: createDecider(base.db),
+    // Chỉ bật khi đủ cả hai biến; thiếu một thì tin giữ link trực tiếp như trước.
+    tracking:
+      env.publicBaseUrl && env.linkSecret
+        ? { baseUrl: env.publicBaseUrl, secret: env.linkSecret }
+        : undefined,
     ...n,
   };
 }

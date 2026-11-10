@@ -13,6 +13,7 @@
     "drizzle-orm": "0.45.3",
     "fast-xml-parser": "5.11.1",
     "franc": "6.2.0",
+    "hono": "^4.13.17",
     "linkedom": "0.18.13",
     "pg-boss": "12.35.0"
   }

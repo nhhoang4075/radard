@@ -2,7 +2,7 @@
  * Cấu hình từ biến môi trường. Gom một chỗ để thấy ngay daemon cần những gì để chạy.
  * Bun tự đọc file `.env` ở thư mục chạy lệnh.
  */
-export type Role = "scheduler" | "worker" | "bot" | "all";
+export type Role = "scheduler" | "worker" | "bot" | "web" | "all";
 export type EmbedderKind = "gateway" | "fake" | "none";
 export type ObjectStoreKind = "fs" | "r2";
 
@@ -28,6 +28,14 @@ export const env = {
    */
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || undefined,
   telegramChatId: process.env.TELEGRAM_CHAT_ID || undefined,
+  /** Cổng HTTP của vai trò `web` (Railway đặt `PORT`). */
+  port: num(process.env.PORT, 8080),
+  /**
+   * Khoá HMAC ký link theo dõi. Thiếu thì route `/o/*` trả 404 và tin giữ link trực tiếp: không có khoá mặc định.
+   */
+  linkSecret: process.env.LINK_SECRET || undefined,
+  /** Địa chỉ công khai của vai trò `web` (ví dụ https://radard.example.com); cùng `linkSecret` bật link theo dõi. */
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || undefined,
   fetchConcurrency: num(process.env.FETCH_CONCURRENCY, 4),
 
   /**

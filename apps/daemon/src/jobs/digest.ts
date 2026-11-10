@@ -31,6 +31,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
+import { buildTrackingUrl } from "../web/token.ts";
 import { recordCandidatePoolSafely } from "./candidate-pool.ts";
 import type { GateCounts, GateDecision } from "./gate-decision.ts";
 import { type RankResult, rankPeriod } from "./rank.ts";
@@ -586,6 +587,8 @@ export async function buildPlan(
 export interface SendDeps extends DigestDeps {
   notifier: Notifier;
   recipient: string;
+  /** Có thì link trong tin gửi đi là link theo dõi `<baseUrl>/o/<token>`; DB vẫn lưu link trực tiếp. */
+  tracking?: { baseUrl: string; secret: string };
 }
 
 export interface DigestOutcome {
@@ -686,6 +689,26 @@ export async function runDigest(
   }
 }
 
+/**
+ * Thay `url` của từng link bằng link theo dõi (chỉ số k = vị trí trong `links`, khớp `deliveries.meta.links`).
+ * Không cấu hình theo dõi thì trả nguyên tin. Bản lưu trong DB vẫn là tin gốc.
+ */
+export function withTrackedLinks(
+  message: Message,
+  tracking: SendDeps["tracking"],
+  digestId: number,
+  position: number,
+): Message {
+  if (!tracking || !message.links?.length) return message;
+  return {
+    ...message,
+    links: message.links.map((l, k) => ({
+      ...l,
+      url: buildTrackingUrl({ ...tracking, digestId, position, k }),
+    })),
+  };
+}
+
 async function sendMissing(deps: SendDeps, digestId: number, plan: DigestPlan): Promise<number> {
   const done = new Set(
     (
@@ -702,7 +725,10 @@ async function sendMissing(deps: SendDeps, digestId: number, plan: DigestPlan): 
   let sent = 0;
   for (const q of queue) {
     if (done.has(q.position)) continue;
-    const { messageId } = await deps.notifier.send(deps.recipient, q.message);
+    const { messageId } = await deps.notifier.send(
+      deps.recipient,
+      withTrackedLinks(q.message, deps.tracking, digestId, q.position),
+    );
     // Ghi ngay sau khi gửi: lỗi ở tin sau thì lượt chạy lại không gửi lại tin này.
     await deps.db.insert(deliveries).values({
       profileId: deps.profileId,

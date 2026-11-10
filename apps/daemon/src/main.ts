@@ -4,7 +4,8 @@
  *   scheduler  đồng bộ lịch cron (chỉ chạy MỘT bản)
  *   worker     chạy job, nhân bản được
  *   bot        nhận lượt bấm 👍/👎 (chỉ MỘT bản cho mỗi bot token)
- *   all        cả ba, dùng khi dev và trên Railway ở MVP-0
+ *   web        máy chủ HTTP: /healthz và /o/:token (theo dõi lượt mở link)
+ *   all        cả bốn, dùng khi dev và trên Railway ở MVP-0
  */
 import { createLogger } from "@radard/core";
 import { runMigrations } from "@radard/db";
@@ -13,6 +14,7 @@ import { env } from "./env.ts";
 import { seedLibrary } from "./jobs/topics.ts";
 import { startBot } from "./roles/bot.ts";
 import { startScheduler } from "./roles/scheduler.ts";
+import { startWeb } from "./roles/web.ts";
 import { startWorker } from "./roles/worker.ts";
 import {
   createChatChannel,
@@ -34,6 +36,7 @@ async function main(): Promise<void> {
   const runsScheduler = env.role === "scheduler" || env.role === "all";
   const runsWorker = env.role === "worker" || env.role === "all";
   const runsBot = env.role === "bot" || env.role === "all";
+  const runsWeb = env.role === "web" || env.role === "all";
 
   const boss = createBoss(env.databaseUrl, { schedule: runsScheduler });
   boss.on("error", (err) => log.error("pg-boss lỗi", { err: String(err) }));
@@ -67,6 +70,10 @@ async function main(): Promise<void> {
       };
       stops.push(await startBot(bot, chat));
     } else log.warn("vai trò bot tắt: chưa đặt TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID");
+  }
+  if (runsWeb) {
+    const stopWeb = startWeb({ db: deps.db, port: env.port, secret: env.linkSecret });
+    stops.push(stopWeb);
   }
   log.info("đang chạy", { role: env.role });
 
