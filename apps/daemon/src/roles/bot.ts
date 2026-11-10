@@ -34,6 +34,8 @@ const log = createLogger("bot");
 
 export interface BotDeps {
   db: Database;
+  /** Hồ sơ gán cho phản hồi không nối được về tin nào. */
+  profileId: number;
   embedder: EmbeddingProvider | null;
   llm: LlmProvider | null;
   /** Model ra quyết định: chấm thư viện khi gợi ý chủ đề (/profile). Thiếu thì không gợi ý được. */
@@ -195,7 +197,7 @@ export async function startBot(deps: BotDeps, chat: ChatChannel): Promise<() => 
   // Một chuỗi làm mới dùng chung: bật chủ đề từ /topics và /profile không chạy embed chồng nhau.
   const refresh = refresher(deps);
   await chat.start({
-    onFeedback: (ev) => recordFeedback(deps.db, ev),
+    onFeedback: (ev) => recordFeedback(deps.db, ev, deps.profileId),
     topics: topicHandlers(deps, refresh),
     profile: profileHandlers(deps, refresh),
   });

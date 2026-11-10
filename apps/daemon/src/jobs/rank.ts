@@ -87,11 +87,13 @@ export async function rankPeriod(
   db: Database,
   period: RankPeriod,
   opts: {
+    /** Hồ sơ đang xếp hạng: chỉ chủ đề đang bật và tin đã gửi của hồ sơ này được tính. */
+    profileId: number;
     http?: HttpClient;
     config?: Partial<RankConfig>;
     /** Model quyết định cho vùng xám của cổng; không có thì dùng luật R ≥ `gateR` (test, CLI). */
     decider?: DecisionProvider | null;
-  } = {},
+  },
 ): Promise<RankResult> {
   const srcRows = await db.select().from(sources);
   const config: RankConfig = {
@@ -118,7 +120,13 @@ export async function rankPeriod(
     .select({ id: topicsTable.id, label: topicsTable.name, note: topicsTable.labelGuide })
     .from(profileTopics)
     .innerJoin(topicsTable, eq(topicsTable.id, profileTopics.topicId))
-    .where(and(eq(profileTopics.active, true), eq(profileTopics.kind, "include")))
+    .where(
+      and(
+        eq(profileTopics.profileId, opts.profileId),
+        eq(profileTopics.active, true),
+        eq(profileTopics.kind, "include"),
+      ),
+    )
     .orderBy(profileTopics.id);
   const topicIds = topics.map((t) => t.id);
 
@@ -177,14 +185,14 @@ export async function rankPeriod(
 
   // URL của mọi tài liệu đã gửi trong các tin sự kiện, từ trước tới nay (không cắt 7 ngày: tin
   // đã đọc 16/10 vẫn là đã đọc ngày 09/11). Mốc `end` giữ cho chạy lại một ngày cũ ra đúng kết quả
-  // của ngày đó.
+  // của ngày đó. Chỉ tin gửi cho CHÍNH hồ sơ này: tin gửi người khác không làm hồ sơ này coi là đã thấy.
   const sent = new Set<string>();
   for (const r of await db.execute<{ url: string }>(sql`
     select distinct d.url_canonical as url
     from deliveries dl
     cross join lateral unnest(dl.document_ids) as x(id)
     join documents d on d.id = x.id
-    where dl.kind = 'event' and dl.sent_at < ${period.end}`))
+    where dl.profile_id = ${opts.profileId} and dl.kind = 'event' and dl.sent_at < ${period.end}`))
     sent.add(r.url);
 
   const build = async (signals: Map<number, Record<string, number>>): Promise<RankEvent[]> => {

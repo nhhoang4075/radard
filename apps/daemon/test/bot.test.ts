@@ -15,7 +15,7 @@ import { type BotDeps, profileHandlers, topicHandlers } from "../src/roles/bot.t
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
-const h = topicHandlers({ db, embedder: null, llm: null, decider: null });
+const h = topicHandlers({ db, profileId: 1, embedder: null, llm: null, decider: null });
 
 beforeAll(async () => {
   await runMigrations(TEST_URL);
@@ -89,7 +89,7 @@ async function idToKey(): Promise<Map<number, string>> {
 }
 
 function deps(over: Partial<BotDeps> = {}): BotDeps {
-  return { db, embedder: null, llm: null, decider: null, ...over };
+  return { db, profileId: 1, embedder: null, llm: null, decider: null, ...over };
 }
 
 function fakes(keys: Map<number, string>) {

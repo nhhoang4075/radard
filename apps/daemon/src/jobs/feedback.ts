@@ -22,6 +22,8 @@ const DOUBLE_TAP_MS = 2_000;
 export async function recordFeedback(
   db: Database,
   ev: FeedbackEvent,
+  /** Hồ sơ gán cho phản hồi khi không tìm thấy tin; có tin thì lấy hồ sơ của tin đó. */
+  profileId: number,
 ): Promise<{
   recorded: boolean;
   deliveryId: number | null;
@@ -30,7 +32,7 @@ export async function recordFeedback(
   reason?: "replayed" | "unchanged";
 }> {
   const [d] = await db
-    .select({ id: deliveries.id })
+    .select({ id: deliveries.id, profileId: deliveries.profileId })
     .from(deliveries)
     .where(
       and(
@@ -67,6 +69,8 @@ export async function recordFeedback(
   const rows = await db
     .insert(feedback)
     .values({
+      // Tin đã biết thì phản hồi thuộc đúng hồ sơ của tin, không phụ thuộc người nối dây.
+      profileId: d?.profileId ?? profileId,
       deliveryId,
       channel: ev.channel,
       recipient: ev.recipient,

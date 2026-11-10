@@ -23,6 +23,7 @@ import {
   createLlm,
   createPagesDeps,
   createProcessDeps,
+  currentProfileId,
 } from "./runtime.ts";
 
 const log = createLogger("radard");
@@ -59,6 +60,7 @@ async function main(): Promise<void> {
     if (chat) {
       const bot = {
         db: deps.db,
+        profileId: currentProfileId(),
         embedder: createEmbedder(deps.db),
         llm: createLlm(deps.db),
         decider: createDecider(deps.db),

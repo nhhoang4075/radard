@@ -350,6 +350,8 @@ async function summarize(
 
 export interface DigestDeps {
   db: Database;
+  /** Hồ sơ nhận digest: xếp hạng và ghi `profile_id` của digest, tin, phản hồi theo giá trị này. */
+  profileId: number;
   http?: HttpClient;
   llm: LlmProvider | null;
   /** Model quyết định cho vùng xám của cổng chủ đề; không có thì dùng luật R ≥ gateR. */
@@ -464,7 +466,11 @@ function rankingInfo(
 export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPlan> {
   const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
   const rankStarted = Date.now();
-  const rank = await rankPeriod(deps.db, period, { http: deps.http, decider: deps.decider });
+  const rank = await rankPeriod(deps.db, period, {
+    profileId: deps.profileId,
+    http: deps.http,
+    decider: deps.decider,
+  });
   const rankMs = Date.now() - rankStarted;
   const [prof] = await deps.db.select().from(profile);
   const docsByEvent = await loadDocs(deps.db, rank);
@@ -601,6 +607,7 @@ export async function runDigest(
   await deps.db
     .insert(digests)
     .values({
+      profileId: deps.profileId,
       channel,
       recipient: deps.recipient,
       periodStart: new Date(slot.getTime() - DAY_MS),
@@ -686,6 +693,7 @@ async function sendMissing(deps: SendDeps, digestId: number, plan: DigestPlan): 
     const { messageId } = await deps.notifier.send(deps.recipient, q.message);
     // Ghi ngay sau khi gửi: lỗi ở tin sau thì lượt chạy lại không gửi lại tin này.
     await deps.db.insert(deliveries).values({
+      profileId: deps.profileId,
       digestId,
       channel: deps.notifier.channel,
       recipient: deps.recipient,

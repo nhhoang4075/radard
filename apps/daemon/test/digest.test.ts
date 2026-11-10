@@ -142,11 +142,22 @@ const positions = async () =>
   (await db.select().from(deliveries).orderBy(asc(deliveries.position))).map((d) => d.position);
 
 describe("runDigest", () => {
+  test("digest và mọi tin gửi mang đúng profile_id của hồ sơ được truyền vào", async () => {
+    await db.insert(profile).values({ id: 2, promptContext: "y" });
+    const notifier = fakeNotifier();
+    await runDigest({ db, profileId: 2, llm: null, notifier, recipient: RECIPIENT }, SLOT);
+    const dgs = await db.select().from(digests);
+    expect(dgs.map((d) => d.profileId)).toEqual([2]);
+    const dls = await db.select().from(deliveries);
+    expect(dls.length).toBeGreaterThan(0);
+    expect(dls.every((d) => d.profileId === 2)).toBe(true);
+  });
+
   test("gửi tin mở đầu rồi từng tin; chạy lại cùng khung thì không gửi gì thêm", async () => {
     for (let i = 0; i < 4; i++) await addEvent();
     const notifier = fakeNotifier();
     const { llm, calls } = goodLlm();
-    const deps = { db, llm, notifier, recipient: RECIPIENT };
+    const deps = { db, profileId: 1, llm, notifier, recipient: RECIPIENT };
 
     const first = await runDigest(deps, SLOT);
     expect(first).toMatchObject({ status: "sent", sentNow: 5, items: 4, summarized: true });
@@ -189,7 +200,7 @@ describe("runDigest", () => {
     for (let i = 0; i < 4; i++) await addEvent();
     const notifier = fakeNotifier({ failAfter: 3 });
     const { llm, calls } = goodLlm();
-    const deps = { db, llm, notifier, recipient: RECIPIENT };
+    const deps = { db, profileId: 1, llm, notifier, recipient: RECIPIENT };
 
     await expect(runDigest(deps, SLOT)).rejects.toThrow("mạng rớt");
     const [failed] = await db.select().from(digests);
@@ -222,7 +233,7 @@ describe("runDigest", () => {
       },
     });
     const notifier = fakeNotifier();
-    const out = await runDigest({ db, llm, notifier, recipient: RECIPIENT }, SLOT);
+    const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     expect(out).toMatchObject({ status: "sent", summarized: false, items: 1 });
     expect(calls).toBe(2);
     const [header, item] = notifier.sent.map((s) => s.msg);
@@ -243,7 +254,7 @@ describe("runDigest", () => {
       },
     });
     const notifier = fakeNotifier();
-    const out = await runDigest({ db, llm, notifier, recipient: RECIPIENT }, SLOT);
+    const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     expect(out).toMatchObject({ status: "sent", sentNow: 1, items: 0 });
     expect(calls).toBe(0);
     expect(notifier.sent[0]?.msg.lines).toEqual([
@@ -256,7 +267,7 @@ describe("runDigest", () => {
     await addEvent(0.66); // z = 0,65: qua cổng R, S ≈ 0,5 dưới sàn 0,59
     await addEvent(0.66);
     const notifier = fakeNotifier();
-    await runDigest({ db, llm: null, notifier, recipient: RECIPIENT }, SLOT);
+    await runDigest({ db, profileId: 1, llm: null, notifier, recipient: RECIPIENT }, SLOT);
     expect(notifier.sent[0]?.msg.lines[1]).toBe(
       "Có 2 sự kiện thuộc các chủ đề bạn quan tâm nhưng chưa đủ mức đáng đọc.",
     );
@@ -273,7 +284,7 @@ describe("runDigest", () => {
     await addEvent();
     const notifier = fakeNotifier();
     const { llm, calls } = goodLlm((n) => (n === 1 ? "GPU & inference" : "Không có chủ đề này"));
-    await runDigest({ db, llm, notifier, recipient: RECIPIENT }, SLOT);
+    await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     const system = calls[0]?.system ?? "";
     expect(system).toContain(
       '  - "Agent AI"\n  - "GPU & inference": GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI).\n',
@@ -312,7 +323,7 @@ describe("runDigest", () => {
           : 0.1,
     });
     const notifier = fakeNotifier();
-    await runDigest({ db, llm: null, decider, notifier, recipient: RECIPIENT }, SLOT);
+    await runDigest({ db, profileId: 1, llm: null, decider, notifier, recipient: RECIPIENT }, SLOT);
     const plan = planOf((await db.select().from(digests))[0]?.meta);
     expect(plan.ranking.decision?.model).toBe("fake-decision");
     expect(plan.ranking.decision?.counts).toEqual({
@@ -339,7 +350,10 @@ describe("runDigest", () => {
   test("không có LLM (chưa đặt khoá) vẫn gửi bản không tóm tắt", async () => {
     await addEvent();
     const notifier = fakeNotifier();
-    const out = await runDigest({ db, llm: null, notifier, recipient: RECIPIENT }, SLOT);
+    const out = await runDigest(
+      { db, profileId: 1, llm: null, notifier, recipient: RECIPIENT },
+      SLOT,
+    );
     expect(out).toMatchObject({ status: "sent", summarized: false, sentNow: 2 });
   });
 });

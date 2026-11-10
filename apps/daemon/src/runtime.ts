@@ -98,6 +98,15 @@ export function createProcessDeps(base: FetchDeps): ProcessDeps | null {
   };
 }
 
+/**
+ * Hồ sơ của người nhận hiện tại: NƠI DUY NHẤT nối dây người dùng với `profileId` truyền qua `deps`.
+ * TODO(multi-user): chưa có ánh xạ người nhận → hồ sơ (bảng hay cột nào chưa quyết); tới lúc đó
+ * hệ thống chỉ có một người dùng, hồ sơ id 1. Đa người dùng thì thay hàm này bằng tra theo người nhận.
+ */
+export function currentProfileId(): number {
+  return 1;
+}
+
 /** Kênh gửi digest và người nhận; `null` khi chưa đặt TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID. */
 export function createNotifier(): { notifier: Notifier; recipient: string } | null {
   if (!env.telegramToken || !env.telegramChatId) return null;
@@ -116,6 +125,7 @@ export function createDigestDeps(base: FetchDeps): SendDeps | null {
   if (!n) return null;
   return {
     db: base.db,
+    profileId: currentProfileId(),
     http: base.http,
     llm: createLlm(base.db),
     decider: createDecider(base.db),

@@ -16,8 +16,10 @@ import {
   eventDocuments,
   events,
   profile,
+  profileTopics,
   runMigrations,
   sources,
+  topics,
 } from "@radard/db";
 import { eq, sql } from "drizzle-orm";
 import { periodEndingAt, rankPeriod } from "../src/jobs/rank.ts";
@@ -142,7 +144,7 @@ describe("rankPeriod", () => {
         };
       },
     };
-    const r = await rankPeriod(db, periodEndingAt(END), { http });
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1, http });
     expect(r.candidates).toBe(2);
     expect(r.passedGate).toBe(1);
     expect(asked).toHaveLength(1);
@@ -160,7 +162,7 @@ describe("rankPeriod", () => {
       .update(documents)
       .set({ meta: { suspicious: true } })
       .where(eq(documents.id, bad.docId));
-    const r = await rankPeriod(db, periodEndingAt(END));
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1 });
     expect(r.candidates).toBe(1);
     expect(r.picked.map((p) => p.event.eventId)).toEqual([ok.eventId]);
   });
@@ -170,6 +172,7 @@ describe("rankPeriod", () => {
     const [dg] = await db
       .insert(digests)
       .values({
+        profileId: 1,
         channel: "telegram",
         recipient: "1",
         periodStart: new Date("2026-10-04T02:00:00Z"),
@@ -178,6 +181,7 @@ describe("rankPeriod", () => {
       })
       .returning({ id: digests.id });
     await db.insert(deliveries).values({
+      profileId: 1,
       digestId: dg?.id ?? 0,
       channel: "telegram",
       recipient: "1",
@@ -189,7 +193,7 @@ describe("rankPeriod", () => {
       body: "đã gửi",
       sentAt: new Date("2026-10-05T23:00:00Z"),
     });
-    const r = await rankPeriod(db, periodEndingAt(END));
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1 });
     expect(r.picked).toHaveLength(0);
     expect(r.rejected[0]?.reason).toBe("not_new");
   });
@@ -201,6 +205,7 @@ describe("rankPeriod", () => {
     const [dg] = await db
       .insert(digests)
       .values({
+        profileId: 1,
         channel: "telegram",
         recipient: "1",
         periodStart: new Date("2026-08-26T02:00:00Z"),
@@ -209,6 +214,7 @@ describe("rankPeriod", () => {
       })
       .returning({ id: digests.id });
     await db.insert(deliveries).values({
+      profileId: 1,
       digestId: dg?.id ?? 0,
       channel: "telegram",
       recipient: "1",
@@ -238,7 +244,7 @@ describe("rankPeriod", () => {
     await db
       .insert(eventDocuments)
       .values({ eventId: e.eventId, documentId: repost?.id ?? 0, similarity: 1, reason: "url" });
-    const r = await rankPeriod(db, periodEndingAt(END));
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1 });
     expect(r.picked).toHaveLength(0);
     expect(r.rejected[0]?.reason).toBe("not_new");
   });
@@ -272,7 +278,7 @@ describe("cổng vùng xám bằng model quyết định", () => {
         calls.push(e);
       },
     });
-    const r = await rankPeriod(db, periodEndingAt(END), { config, decider });
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1, config, decider });
 
     expect(states).toHaveLength(2);
     expect(calls.map((c) => c.task)).toEqual(["decide_topic_gate", "decide_topic_gate"]);
@@ -315,7 +321,7 @@ describe("cổng vùng xám bằng model quyết định", () => {
         throw new Error("model hỏng");
       },
     });
-    const r = await rankPeriod(db, periodEndingAt(END), { config, decider });
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1, config, decider });
     expect(r.picked.map((p) => p.event.eventId)).toEqual([mid.eventId]);
     expect(r.rejected.map((x) => [x.event.eventId, x.reason])).toEqual([[low.eventId, "gate"]]);
     expect(r.gateCounts).toEqual({ inBand: 2, asked: 0, passed: 0, rejected: 0, fallback: 2 });
@@ -325,9 +331,91 @@ describe("cổng vùng xám bằng model quyết định", () => {
   test("không có model quyết định: luật R ≥ 0,6 như trước, vùng xám vẫn được ghi", async () => {
     const mid = await addEvent(scoreForR(0.65));
     await addEvent(scoreForR(0.55));
-    const r = await rankPeriod(db, periodEndingAt(END), { config });
+    const r = await rankPeriod(db, periodEndingAt(END), { profileId: 1, config });
     expect(r.picked.map((p) => p.event.eventId)).toEqual([mid.eventId]);
     expect(r.gateCounts.fallback).toBe(2);
     expect(r.gateDecisions.find((d) => d.eventId === mid.eventId)?.pass).toBe(true);
+  });
+
+  describe("nhiều hồ sơ", () => {
+    // Hồ sơ 2 chỉ bật chủ đề "Rust"; hồ sơ 1 chỉ bật "Agent" (dựng ở beforeEach).
+    let rustTopic = 0;
+    beforeEach(async () => {
+      await db.insert(profile).values({ id: 2, promptContext: "y" });
+      const [t] = await db
+        .insert(topics)
+        .values({
+          name: "Rust",
+          embedText: "Rust language",
+          description: "Rust",
+          origin: "custom",
+          ownerProfileId: 2,
+        })
+        .returning({ id: topics.id });
+      rustTopic = t?.id ?? 0;
+      await db.insert(profileTopics).values({ profileId: 2, topicId: rustTopic, active: true });
+    });
+
+    test("chủ đề đang bật của hồ sơ khác không lọt vào xếp hạng", async () => {
+      const a = await rankPeriod(db, periodEndingAt(END), { profileId: 1 });
+      const b = await rankPeriod(db, periodEndingAt(END), { profileId: 2 });
+      expect([...a.topicLabels.values()]).toEqual(["Agent"]);
+      expect([...b.topicLabels.values()]).toEqual(["Rust"]);
+    });
+
+    // Gửi tin `e` cho hồ sơ `profileId` từ trước kỳ xếp hạng.
+    async function sendTo(
+      profileId: number,
+      recipient: string,
+      e: { eventId: number; docId: number },
+    ) {
+      const [dg] = await db
+        .insert(digests)
+        .values({
+          profileId,
+          channel: "telegram",
+          recipient,
+          periodStart: new Date("2026-10-04T02:00:00Z"),
+          periodEnd: new Date("2026-10-05T02:00:00Z"),
+          lang: "vi",
+        })
+        .returning({ id: digests.id });
+      await db.insert(deliveries).values({
+        profileId,
+        digestId: dg?.id ?? 0,
+        channel: "telegram",
+        recipient,
+        messageId: `m${profileId}`,
+        kind: "event",
+        position: 1,
+        eventId: e.eventId,
+        documentIds: [e.docId],
+        body: "đã gửi",
+        sentAt: new Date("2026-10-05T23:00:00Z"),
+      });
+    }
+
+    test("tin đã gửi cho A không làm B coi là đã thấy, vẫn làm A coi là đã thấy", async () => {
+      // Cả hai hồ sơ cùng chấm điểm cao cho tài liệu này.
+      const e = await addEvent(0.79);
+      await db
+        .insert(docTopicScores)
+        .values({ documentId: e.docId, topicId: rustTopic, score: 0.79 });
+      await db.insert(baselines).values({
+        metric: "relevance",
+        sourceId: hn,
+        topicId: rustTopic,
+        median: 0.4,
+        p999: 0.8,
+        n: 10_000,
+        windowDays: 30,
+      });
+      await sendTo(1, "A", e);
+      const a = await rankPeriod(db, periodEndingAt(END), { profileId: 1 });
+      const b = await rankPeriod(db, periodEndingAt(END), { profileId: 2 });
+      expect(a.picked).toHaveLength(0);
+      expect(a.rejected[0]?.reason).toBe("not_new");
+      expect(b.picked.map((p) => p.event.eventId)).toEqual([e.eventId]);
+    });
   });
 });

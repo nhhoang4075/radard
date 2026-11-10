@@ -68,6 +68,7 @@ import {
   createNotifier,
   createPagesDeps,
   createProcessDeps,
+  currentProfileId,
 } from "./runtime.ts";
 import { DEFAULT_PROFILE, DEFAULT_SOURCES } from "./sources/index.ts";
 
@@ -473,6 +474,7 @@ const COMMANDS: Record<string, Command> = {
     // Không có digest: delivery `test` đứng riêng, để lượt bấm vẫn nối được về một tin mà không lẫn
     // vào phản hồi thật (phân tích chỉ lấy `kind = 'event'`).
     await db.insert(deliveries).values({
+      profileId: currentProfileId(),
       channel: n.notifier.channel,
       recipient: n.recipient,
       messageId,
@@ -522,7 +524,10 @@ const COMMANDS: Record<string, Command> = {
   rank: async ({ db, http }) => {
     const at = flag("at", "");
     const period = periodEndingAt(at ? new Date(at) : new Date());
-    const r = await rankPeriod(db, period, process.argv.includes("--refresh") ? { http } : {});
+    const r = await rankPeriod(db, period, {
+      profileId: currentProfileId(),
+      ...(process.argv.includes("--refresh") ? { http } : {}),
+    });
     const f = (x: number) => Number(x.toFixed(2));
     console.log(
       `${period.start.toISOString()} → ${period.end.toISOString()}: ${r.candidates} sự kiện ứng viên, ${r.passedGate} qua cổng R ≥ ${r.config.gateR}`,
@@ -607,7 +612,12 @@ const COMMANDS: Record<string, Command> = {
       const slot = digestSlot(at ? new Date(at) : new Date());
       const llm = createLlm(db);
       if (!llm) console.log("(chưa có AI_GATEWAY_API_KEY: bản không tóm tắt, cổng dùng luật R)");
-      printPlan(await buildPlan({ db, http, llm, decider: createDecider(db) }, slot));
+      printPlan(
+        await buildPlan(
+          { db, profileId: currentProfileId(), http, llm, decider: createDecider(db) },
+          slot,
+        ),
+      );
       return;
     }
     if (process.argv.includes("--now")) {

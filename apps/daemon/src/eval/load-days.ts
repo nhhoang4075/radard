@@ -2,15 +2,17 @@
  * Đọc dữ liệu cho bộ chấm bất biến (a) từ DB. Hai lớp tách riêng:
  *   1. các câu truy vấn (`queryDeliveries`, `queryLatestFeedback`, `queryUrls`) trả dòng thô;
  *   2. `buildDays` dựng mẫu từ dòng thô, thuần, không chạm DB.
- * Khi `feedback`/`deliveries` có thêm `profile_id`, chỉ phải sửa lớp 1 (thêm điều kiện vào `EvalFilter`).
+ * Lọc theo hồ sơ/người nhận nằm ở lớp 1 (`EvalFilter`).
  */
 
 import type { EvalDay, EvalSample, Level, StoredScore } from "@radard/core";
 import { type Database, deliveries, digests, documents, feedback } from "@radard/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-/** Bộ lọc tuỳ chọn; để trống = mọi người nhận. Chỗ để thêm `profileId` sau này. */
+/** Bộ lọc tuỳ chọn; để trống = mọi người nhận. */
 export interface EvalFilter {
+  /** Chỉ lấy tin của hồ sơ này (`digests.profile_id`). */
+  profileId?: number;
   channel?: string;
   recipient?: string;
 }
@@ -36,6 +38,7 @@ export async function queryDeliveries(
   filter: EvalFilter = {},
 ): Promise<RawDelivery[]> {
   const conds = [eq(deliveries.kind, "event")];
+  if (filter.profileId !== undefined) conds.push(eq(digests.profileId, filter.profileId));
   if (filter.channel) conds.push(eq(digests.channel, filter.channel));
   if (filter.recipient) conds.push(eq(digests.recipient, filter.recipient));
   const rows = await db

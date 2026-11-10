@@ -11,6 +11,7 @@ import {
   eventDocuments,
   events,
   feedback,
+  profile,
   runMigrations,
   sources,
 } from "@radard/db";
@@ -29,7 +30,10 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await db.execute(sql`truncate sources, events, digests, feedback restart identity cascade`);
+  await db.execute(
+    sql`truncate sources, events, profile, digests, feedback restart identity cascade`,
+  );
+  await db.insert(profile).values({ promptContext: "x" });
   const [s] = await db
     .insert(sources)
     .values({ kind: "hn", name: "HN giả", cadence: "*/15 * * * *" })
@@ -64,6 +68,7 @@ beforeEach(async () => {
   const [dg] = await db
     .insert(digests)
     .values({
+      profileId: 1,
       channel: "telegram",
       recipient,
       periodStart: new Date("2026-10-11T00:00:00Z"),
@@ -74,6 +79,7 @@ beforeEach(async () => {
   const [dl] = await db
     .insert(deliveries)
     .values({
+      profileId: 1,
       digestId: dg?.id,
       channel: "telegram",
       recipient,
@@ -96,8 +102,9 @@ afterAll(async () => {
 describe("deliveries + feedback", () => {
   test("phản hồi và ảnh chụp document_ids sống sót khi dữ liệu dẫn xuất bị xoá (reprocess --all)", async () => {
     await db.insert(feedback).values([
-      { deliveryId, channel: "telegram", recipient, kind: "like" },
+      { profileId: 1, deliveryId, channel: "telegram", recipient, kind: "like" },
       {
+        profileId: 1,
         deliveryId,
         channel: "telegram",
         recipient,
@@ -116,6 +123,7 @@ describe("deliveries + feedback", () => {
 
   test("góp ý chung không gắn tin nào", async () => {
     await db.insert(feedback).values({
+      profileId: 1,
       channel: "telegram",
       recipient,
       kind: "comment",
@@ -129,29 +137,44 @@ describe("deliveries + feedback", () => {
   test("ràng buộc: nhận xét phải có chữ, like không kèm chữ, không ghi trùng tin của người dùng", async () => {
     await expect(
       attempt(
-        db.insert(feedback).values({ deliveryId, channel: "telegram", recipient, kind: "comment" }),
+        db
+          .insert(feedback)
+          .values({ profileId: 1, deliveryId, channel: "telegram", recipient, kind: "comment" }),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      attempt(
+        db.insert(feedback).values({
+          profileId: 1,
+          deliveryId,
+          channel: "telegram",
+          recipient,
+          kind: "comment",
+          text: "",
+        }),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      attempt(
+        db.insert(feedback).values({
+          profileId: 1,
+          deliveryId,
+          channel: "telegram",
+          recipient,
+          kind: "like",
+          text: "x",
+        }),
       ),
     ).rejects.toThrow();
     await expect(
       attempt(
         db
           .insert(feedback)
-          .values({ deliveryId, channel: "telegram", recipient, kind: "comment", text: "" }),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      attempt(
-        db
-          .insert(feedback)
-          .values({ deliveryId, channel: "telegram", recipient, kind: "like", text: "x" }),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      attempt(
-        db.insert(feedback).values({ deliveryId, channel: "telegram", recipient, kind: "love" }),
+          .values({ profileId: 1, deliveryId, channel: "telegram", recipient, kind: "love" }),
       ),
     ).rejects.toThrow();
     const c = {
+      profileId: 1,
       deliveryId,
       channel: "telegram",
       recipient,
@@ -168,30 +191,43 @@ describe("deliveries + feedback", () => {
     const [dg] = await db.select({ id: digests.id }).from(digests);
     // Tin sự kiện không có digest (kiểu notify test cũ) hoặc không có event_id: bị chặn.
     await expect(
-      attempt(db.insert(deliveries).values({ ...base, messageId: "70", kind: "event" })),
+      attempt(
+        db.insert(deliveries).values({ profileId: 1, ...base, messageId: "70", kind: "event" }),
+      ),
     ).rejects.toThrow();
     await expect(
       attempt(
-        db
-          .insert(deliveries)
-          .values({ ...base, messageId: "71", kind: "event", digestId: dg?.id, position: 2 }),
+        db.insert(deliveries).values({
+          profileId: 1,
+          ...base,
+          messageId: "71",
+          kind: "event",
+          digestId: dg?.id,
+          position: 2,
+        }),
       ),
     ).rejects.toThrow();
     // Tin thử nằm trong digest: bị chặn. Tin thử đứng riêng: ghi được.
     await expect(
       attempt(
-        db
-          .insert(deliveries)
-          .values({ ...base, messageId: "72", kind: "test", digestId: dg?.id, position: 3 }),
+        db.insert(deliveries).values({
+          profileId: 1,
+          ...base,
+          messageId: "72",
+          kind: "test",
+          digestId: dg?.id,
+          position: 3,
+        }),
       ),
     ).rejects.toThrow();
-    await db.insert(deliveries).values({ ...base, messageId: "73", kind: "test" });
+    await db.insert(deliveries).values({ profileId: 1, ...base, messageId: "73", kind: "test" });
   });
 
   test("một khoảng thời gian chỉ một digest cho một người nhận", async () => {
     await expect(
       attempt(
         db.insert(digests).values({
+          profileId: 1,
           channel: "telegram",
           recipient,
           periodStart: new Date("2026-10-11T00:00:00Z"),
@@ -203,10 +239,12 @@ describe("deliveries + feedback", () => {
   });
 
   test("bấm nhiều lần là nhiều dòng; dòng mới nhất là ý kiến hiện tại", async () => {
-    await db.insert(feedback).values({ deliveryId, channel: "telegram", recipient, kind: "like" });
     await db
       .insert(feedback)
-      .values({ deliveryId, channel: "telegram", recipient, kind: "dislike" });
+      .values({ profileId: 1, deliveryId, channel: "telegram", recipient, kind: "like" });
+    await db
+      .insert(feedback)
+      .values({ profileId: 1, deliveryId, channel: "telegram", recipient, kind: "dislike" });
     const [latest] = await db.execute(
       sql`select kind from feedback where delivery_id = ${deliveryId} and kind in ('like','dislike') order by id desc limit 1`,
     );

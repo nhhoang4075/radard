@@ -12,6 +12,7 @@ import {
   feedback,
   fetchRuns,
   llmCalls,
+  profile,
   runMigrations,
   sources,
 } from "@radard/db";
@@ -55,6 +56,7 @@ async function addDigest(
   const [d] = await db
     .insert(digests)
     .values({
+      profileId: 1,
       channel: "telegram",
       recipient: ME,
       periodStart: new Date(periodEnd.getTime() - 24 * H),
@@ -77,6 +79,7 @@ async function addDelivery(
   const [d] = await db
     .insert(deliveries)
     .values({
+      profileId: 1,
       digestId,
       channel: "telegram",
       recipient: ME,
@@ -94,6 +97,7 @@ async function addDelivery(
 async function press(deliveryId: number, ...kinds: ("like" | "dislike" | "clear" | "comment")[]) {
   for (const kind of kinds) {
     await db.insert(feedback).values({
+      profileId: 1,
       deliveryId,
       channel: "telegram",
       recipient: ME,
@@ -152,8 +156,9 @@ beforeAll(async () => {
 beforeEach(async () => {
   msg = 0;
   await db.execute(
-    sql`truncate sources, digests, deliveries, feedback, llm_calls, events restart identity cascade`,
+    sql`truncate sources, profile, digests, deliveries, feedback, llm_calls, events restart identity cascade`,
   );
+  await db.insert(profile).values({ promptContext: "x" });
   const rows = await db
     .insert(sources)
     .values([

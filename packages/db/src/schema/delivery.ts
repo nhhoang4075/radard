@@ -8,14 +8,35 @@
  * nhanh khi sự kiện chưa bị dựng lại.
  */
 import { sql } from "drizzle-orm";
-import { bigint, check, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { jsonb } from "./json.ts";
+import { profile } from "./profile.ts";
+
+/**
+ * Cột `profile_id`: hồ sơ (người dùng) sở hữu dòng này. Người nhận theo kênh (`recipient`) vẫn giữ
+ * nguyên để gửi và nối lượt bấm; `profile_id` là chiều để lọc dữ liệu theo người dùng (xếp hạng,
+ * bộ chấm). Chưa có bảng ánh xạ người nhận → hồ sơ: nơi nối dây truyền giá trị này vào.
+ */
+const profileIdColumn = () =>
+  integer("profile_id")
+    .notNull()
+    .references(() => profile.id);
 
 /** Một lượt digest (ví dụ bản 07:00 ngày 12/10) gửi tới một người nhận. */
 export const digests = pgTable(
   "digests",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    profileId: profileIdColumn(),
     /** `telegram` · `discord` · `webpush`… */
     channel: text("channel").notNull(),
     /** Định danh người nhận theo kênh (Telegram: chat id). */
@@ -40,6 +61,7 @@ export const digests = pgTable(
   (t) => [
     // Một người nhận chỉ nhận một digest cho mỗi khoảng: job chạy lại không gửi trùng.
     uniqueIndex("digests_once_uq").on(t.channel, t.recipient, t.periodEnd),
+    index("digests_profile_idx").on(t.profileId, t.periodEnd),
     check("digests_status_ck", sql`${t.status} in ('sending', 'sent', 'failed')`),
   ],
 );
@@ -53,6 +75,7 @@ export const deliveries = pgTable(
   "deliveries",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    profileId: profileIdColumn(),
     digestId: bigint("digest_id", { mode: "number" }).references(() => digests.id, {
       onDelete: "cascade",
     }),
@@ -77,6 +100,8 @@ export const deliveries = pgTable(
   (t) => [
     uniqueIndex("deliveries_message_uq").on(t.channel, t.recipient, t.messageId),
     index("deliveries_digest_idx").on(t.digestId),
+    // Truy vấn "đã gửi" của xếp hạng: theo hồ sơ, loại tin, mốc gửi.
+    index("deliveries_profile_idx").on(t.profileId, t.kind, t.sentAt),
     // Mỗi vị trí của một digest gửi đúng một lần (tin thử ngoài digest có digest_id trống).
     uniqueIndex("deliveries_digest_position_uq").on(t.digestId, t.position),
     check("deliveries_kind_ck", sql`${t.kind} in ('header', 'event', 'test')`),
@@ -98,6 +123,7 @@ export const feedback = pgTable(
   "feedback",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    profileId: profileIdColumn(),
     /** Tin được phản hồi. Trống = góp ý chung, không gắn sự kiện nào (nhắn tin thường). */
     deliveryId: bigint("delivery_id", { mode: "number" }).references(() => deliveries.id, {
       onDelete: "set null",
@@ -116,6 +142,7 @@ export const feedback = pgTable(
   (t) => [
     index("feedback_delivery_idx").on(t.deliveryId),
     index("feedback_created_idx").on(t.createdAt),
+    index("feedback_profile_idx").on(t.profileId, t.createdAt),
     uniqueIndex("feedback_source_message_uq").on(t.channel, t.recipient, t.sourceMessageId),
     check("feedback_kind_ck", sql`${t.kind} in ('like', 'dislike', 'clear', 'comment')`),
     check(

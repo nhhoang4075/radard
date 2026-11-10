@@ -9,6 +9,7 @@ import {
   digests,
   documents,
   feedback,
+  profile,
   runMigrations,
   sources,
 } from "@radard/db";
@@ -30,8 +31,9 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.execute(
-    sql`truncate digests, deliveries, feedback, documents, sources restart identity cascade`,
+    sql`truncate profile, digests, deliveries, feedback, documents, sources restart identity cascade`,
   );
+  await db.insert(profile).values({ promptContext: "x" });
   await db.insert(sources).values({ kind: "hn", name: "hn", cadence: "* * * * *" });
 });
 
@@ -70,6 +72,7 @@ async function addDigest(
   periodEnd: string,
   items: Item[],
   recipient = ME,
+  profileId = 1,
 ): Promise<{ digestId: number; ids: number[] }> {
   const end = new Date(periodEnd);
   const plan = {
@@ -81,6 +84,7 @@ async function addDigest(
   const [dg] = await db
     .insert(digests)
     .values({
+      profileId,
       channel: "telegram",
       recipient,
       periodStart: new Date(end.getTime() - 24 * H),
@@ -92,6 +96,7 @@ async function addDigest(
     .returning({ id: digests.id });
   const digestId = dg?.id ?? 0;
   await db.insert(deliveries).values({
+    profileId,
     digestId,
     channel: "telegram",
     recipient,
@@ -106,6 +111,7 @@ async function addDigest(
     const [d] = await db
       .insert(deliveries)
       .values({
+        profileId,
         digestId,
         channel: "telegram",
         recipient,
@@ -131,6 +137,7 @@ async function press(
     // created_at tăng dần để thứ tự không phụ thuộc đồng hồ máy
     clock += 60_000;
     await db.insert(feedback).values({
+      profileId: 1,
       deliveryId,
       channel: "telegram",
       recipient: ME,
@@ -179,6 +186,7 @@ describe("loadDays", () => {
 
   test("chỉ lấy tin sự kiện: bỏ header và tin thử; item không có điểm trong plan thì bỏ qua", async () => {
     await db.insert(deliveries).values({
+      profileId: 1,
       channel: "telegram",
       recipient: ME,
       messageId: String(++msg),
@@ -221,6 +229,18 @@ describe("loadDays", () => {
     const mine = await loadDays(db, { recipient: ME });
     expect(mine.days.map((d) => d.date)).toEqual(["2026-10-20"]);
     expect((await loadDays(db, { channel: "discord" })).days).toHaveLength(0);
+  });
+
+  test("bộ lọc profileId: chỉ lấy tin của hồ sơ đó, kể cả khi cùng người nhận", async () => {
+    await db.insert(profile).values({ id: 2, promptContext: "y" });
+    await addDigest("2026-10-20T00:00:00Z", [{ url: "https://a.com/1", R: 0.9 }], ME, 1);
+    await addDigest("2026-10-21T00:00:00Z", [{ url: "https://a.com/2", R: 0.9 }], ME, 2);
+    expect((await loadDays(db)).days).toHaveLength(2);
+    const one = await loadDays(db, { profileId: 1 });
+    expect(one.days.map((d) => d.date)).toEqual(["2026-10-20"]);
+    const two = await loadDays(db, { profileId: 2 });
+    expect(two.days.map((d) => d.date)).toEqual(["2026-10-21"]);
+    expect((await loadDays(db, { profileId: 3 })).days).toHaveLength(0);
   });
 
   test("DB trống: không có ngày nào", async () => {
