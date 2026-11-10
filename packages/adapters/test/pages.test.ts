@@ -288,7 +288,8 @@ describe("createPageFetcher: SSRF", () => {
       "https://c.com/p": () => html(ARTICLE),
     });
     const res = await createPageFetcher({ http, resolve }).fetch("https://c.com/p");
-    expect(res.status).toBe("deferred");
+    expect(res.status).toBe("failed"); // chặn chủ động, không phải lỗi tạm
+    expect(res.error).toContain("127.0.0.1");
     expect(http.asked).not.toContain("https://c.com/p");
   });
 });

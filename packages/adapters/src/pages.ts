@@ -98,7 +98,11 @@ export function createPageFetcher(opts: {
     throw new UrlBlockedError(`quá ${MAX_REDIRECTS} lần redirect`, start);
   }
 
-  /** `unreachable`: robots.txt 5xx hoặc không kết nối được → không tải trang (RFC 9309 §2.3.1.4). */
+  function sweepExpired(now: number): void {
+    for (const [key, entry] of robots) if (now - entry.at >= ROBOTS_TTL_MS) robots.delete(key);
+  }
+
+  /** `unreachable`: robots.txt 5xx, quá giờ hoặc không kết nối được → không tải trang (RFC 9309 §2.3.1.4). */
   async function robotsFor(url: string): Promise<Rules | "unreachable"> {
     const origin = new URL(url).origin;
     const hit = robots.get(origin);
@@ -117,11 +121,14 @@ export function createPageFetcher(opts: {
       // Các mã 3xx còn lại (không có location): coi như không có luật.
     } catch (err) {
       // 4xx (404…): không có robots.txt, được tải. 5xx, lỗi mạng, bị chặn: không được tải.
+      // Bị url-guard chặn (redirect vào địa chỉ riêng...) là chặn chủ động, không phải lỗi tạm: lỗi
+      // này bay lên `fetch` và thành `failed`.
+      if (err instanceof UrlBlockedError) throw err;
       if (!(err instanceof HttpError) || err.status >= 500) return "unreachable";
     }
     // Mục hết hạn của host không gặp lại sẽ không bao giờ bị ghi đè, nên dọn ở đây để Map không phình.
     const now = Date.now();
-    for (const [key, entry] of robots) if (now - entry.at >= ROBOTS_TTL_MS) robots.delete(key);
+    sweepExpired(now);
     const rules = { at: now, allowed: check };
     robots.set(origin, rules);
     return rules;

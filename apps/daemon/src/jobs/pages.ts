@@ -18,6 +18,12 @@ const log = createLogger("pages");
 /** Job process đợi trang tối đa chừng này kể từ lúc lấy tài liệu, rồi embed bằng tiêu đề. */
 export const PAGE_WAIT_MS = 30 * 60_000;
 
+/**
+ * Mỗi host tối đa chừng này URL trong một lượt chọn: host hỏng robots.txt (URL deferred không có
+ * dòng nên lần nào cũng được chọn lại) không chiếm hết đợt và bỏ đói URL cũ hơn của host khoẻ.
+ */
+const MAX_PER_HOST = 10;
+
 export interface PagesDeps {
   db: Database;
   store: ObjectStore;
@@ -73,25 +79,31 @@ export async function fetchPages(
       external_id: string;
       kind: string;
     }>(sql`
-      select * from (
-        select distinct on (d.url_canonical) d.url_canonical, d.url, d.external_id, s.kind,
-               coalesce(d.published_at, d.fetched_at) as at
-        from documents d
-        join sources s on s.id = d.source_id
-        left join linked_pages lp on lp.url_canonical = d.url_canonical
-        where s.kind in (${kindList}) and lp.id is null
-          and coalesce(d.published_at, d.fetched_at) >= ${opts.since}
-        order by d.url_canonical, d.id
-      ) x
+      select url_canonical, url, external_id, kind, at from (
+        select *, row_number() over (partition by split_part(url, '/', 3) order by at desc) as rn
+        from (
+          select distinct on (d.url_canonical) d.url_canonical, d.url, d.external_id, s.kind,
+                 coalesce(d.published_at, d.fetched_at) as at
+          from documents d
+          join sources s on s.id = d.source_id
+          left join linked_pages lp on lp.url_canonical = d.url_canonical
+          where s.kind in (${kindList}) and lp.id is null
+            and coalesce(d.published_at, d.fetched_at) >= ${opts.since}
+          order by d.url_canonical, d.id
+        ) x
+      ) y
+      where rn <= ${MAX_PER_HOST}
       order by at desc
       limit ${opts.limit ?? 300}`)),
   ] as Row[];
   out.considered = rows.length;
 
   const queue = [...rows];
+  /** Host đã ra `deferred` trong lượt này: các URL còn lại của host đó bỏ qua, khỏi gọi lại. */
+  const deferredHosts = new Set<string>();
   const worker = async () => {
     for (let r = queue.shift(); r; r = queue.shift()) {
-      const status = await fetchOne(deps, r);
+      const status = await fetchOne(deps, r, deferredHosts);
       out[status]++;
     }
   };
@@ -104,6 +116,7 @@ export async function fetchPages(
 async function fetchOne(
   deps: PagesDeps,
   r: { url_canonical: string; url: string; external_id: string; kind: string },
+  deferredHosts: Set<string>,
 ): Promise<"ok" | "blocked" | "skipped" | "failed" | "deferred"> {
   let target: string | null = null;
   try {
@@ -124,9 +137,14 @@ async function fetchOne(
     return "skipped";
   }
 
+  const host = hostOf(target);
+  if (deferredHosts.has(host)) return "deferred";
   const res = await deps.fetcher.fetch(target);
   // Hoãn: không ghi `linked_pages` để câu truy vấn (URL chưa có dòng) chọn lại ở lần chạy sau.
-  if (res.status === "deferred") return "deferred";
+  if (res.status === "deferred") {
+    deferredHosts.add(host);
+    return "deferred";
+  }
   let key: string | null = null;
   let sha: string | null = null;
   if (res.status === "ok" && res.html !== undefined) {
@@ -150,4 +168,12 @@ async function fetchOne(
     })
     .onConflictDoNothing();
   return key ? "ok" : res.status === "ok" ? "failed" : res.status;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
