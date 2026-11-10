@@ -1,10 +1,20 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createSecureContext, createServer as createTlsServer } from "node:tls";
 import { createHttpClient, HttpError } from "../src/http.ts";
 
 // Server cục bộ ghi lại phương thức và body của request. Khoảng giãn đo ở LÚC GỬI (bọc `fetch`), vì
 // client chỉ kiểm soát lúc gửi: đo lúc server nhận thì lượt đầu mở kết nối chậm vài ms (máy đang
 // chạy nhiều file test) làm khoảng cách trông ngắn hơn, test lỗi thất thường (139 ms, 13/10/2026).
-const hits: { at: number; method: string; body: string; type: string | null }[] = [];
+const hits: {
+  at: number;
+  method: string;
+  body: string;
+  type: string | null;
+  host: string | null;
+}[] = [];
 const sentAt: number[] = [];
 const realFetch = globalThis.fetch;
 globalThis.fetch = Object.assign(
@@ -22,6 +32,7 @@ const server = Bun.serve({
       method: req.method,
       body: await req.text(),
       type: req.headers.get("content-type"),
+      host: req.headers.get("host"),
     });
     if (new URL(req.url).pathname === "/chuyen") {
       return new Response(null, { status: 302, headers: { location: "/dich" } });
@@ -80,4 +91,97 @@ test('redirect: "manual" trả thẳng 3xx kèm location; mặc định vẫn đ
   const followed = await http.get(`${base}/chuyen`);
   expect(followed.status).toBe(200);
   expect(followed.url).toBe(`${base}/dich`);
+});
+
+// Ghim địa chỉ: kết nối tới IP đã kiểm nhưng Host, SNI và kiểm chứng chứng chỉ vẫn theo tên gốc.
+test("connectTo: HTTP giữ header Host của tên gốc", async () => {
+  const http = createHttpClient({ minIntervalMs: 0 });
+  hits.length = 0;
+  const res = await http.get(`http://pinned.example:${server.port}/x`, {
+    connectTo: "127.0.0.1",
+  });
+  expect(res.status).toBe(200);
+  expect(res.url).toBe(`http://pinned.example:${server.port}/x`);
+  expect(hits.at(-1)?.host).toBe(`pinned.example:${server.port}`);
+});
+
+const openssl = Bun.spawnSync(["openssl", "version"]).exitCode === 0;
+describe.skipIf(!openssl)("connectTo: HTTPS", () => {
+  const dir = mkdtempSync(join(tmpdir(), "radard-tls-"));
+  Bun.spawnSync([
+    "openssl",
+    "req",
+    "-x509",
+    "-newkey",
+    "rsa:2048",
+    "-nodes",
+    "-days",
+    "2",
+    "-keyout",
+    join(dir, "k.pem"),
+    "-out",
+    join(dir, "c.pem"),
+    "-subj",
+    "/CN=pin.test",
+    "-addext",
+    "subjectAltName=DNS:pin.test",
+  ]);
+  const cert = readFileSync(join(dir, "c.pem"), "utf8");
+  const key = readFileSync(join(dir, "k.pem"), "utf8");
+  const sni: string[] = [];
+  const hosts: (string | null)[] = [];
+  let port = 0;
+  let tlsServer: ReturnType<typeof createTlsServer>;
+  beforeAll(async () => {
+    tlsServer = createTlsServer(
+      {
+        key,
+        cert,
+        SNICallback: (name, cb) => {
+          sni.push(name);
+          cb(null, createSecureContext({ key, cert }));
+        },
+      },
+      (sock) => {
+        sock.on("data", (d) => {
+          hosts.push(/^host: (.*)\r$/im.exec(d.toString())?.[1] ?? null);
+          sock.end("HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok");
+        });
+      },
+    );
+    await new Promise<void>((r) => tlsServer.listen(0, "127.0.0.1", r));
+    port = (tlsServer.address() as { port: number }).port;
+  });
+  afterAll(() => {
+    tlsServer.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  // Cho test tin chứng chỉ tự ký qua CA riêng (KHÔNG tắt kiểm chứng); client thật không có đường này.
+  const withCa = (init: RequestInit | undefined) =>
+    ({ ...init, tls: { ...((init as { tls?: object })?.tls ?? {}), ca: cert } }) as RequestInit;
+  const fetchBefore = globalThis.fetch;
+  beforeAll(() => {
+    globalThis.fetch = Object.assign(
+      (i: Parameters<typeof fetch>[0], init?: RequestInit) => fetchBefore(i, withCa(init)),
+      fetchBefore,
+    );
+  });
+  afterAll(() => {
+    globalThis.fetch = fetchBefore;
+  });
+
+  test("SNI và Host theo tên gốc; chứng chỉ được kiểm chứng theo tên đó", async () => {
+    const http = createHttpClient({ minIntervalMs: 0 });
+    const res = await http.get(`https://pin.test:${port}/`, { connectTo: "127.0.0.1" });
+    expect(res.body).toBe("ok");
+    expect(sni.at(-1)).toBe("pin.test");
+    expect(hosts.at(-1)).toBe(`pin.test:${port}`);
+  });
+
+  test("tên gốc không khớp chứng chỉ thì LỖI (kiểm chứng không bị tắt)", async () => {
+    const http = createHttpClient({ minIntervalMs: 0 });
+    await expect(
+      http.get(`https://other.test:${port}/`, { connectTo: "127.0.0.1" }),
+    ).rejects.toThrow();
+  });
 });

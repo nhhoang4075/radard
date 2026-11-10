@@ -14,7 +14,7 @@
 import { Readability } from "@mozilla/readability";
 import {
   type AddressResolver,
-  assertPublicUrl,
+  type CheckedUrl,
   checkUrlShape,
   defaultResolver,
   type GetOptions,
@@ -25,6 +25,7 @@ import {
   type PageExtractor,
   type PageFetcher,
   type PageFetchResult,
+  resolvePublicUrl,
   UrlBlockedError,
 } from "@radard/core";
 import { parseHTML } from "linkedom";
@@ -32,6 +33,8 @@ import robotsParser from "robots-parser";
 
 /** Tên bot trong robots.txt (khớp phần đầu User-Agent của HttpClient). */
 const BOT = "radard";
+/** Số địa chỉ tối đa thử khi kết nối không được. */
+const MAX_PIN_ATTEMPTS = 3;
 const ROBOTS_TTL_MS = 24 * 3_600_000;
 /** Dưới mức này coi như không rút được gì: trang chỉ có khung, cần JavaScript. */
 const MIN_TEXT_CHARS = 300;
@@ -42,10 +45,35 @@ export function createPageFetcher(opts: {
   timeoutMs?: number;
   /** Phân giải DNS; tiêm được để test không cần mạng. Mặc định `node:dns/promises`. */
   resolve?: AddressResolver;
+  /** Kết nối thẳng tới địa chỉ đã kiểm (mặc định `true`); chỉ tắt trong test dùng client giả. */
+  pinAddress?: boolean;
 }): PageFetcher {
   type Rules = { at: number; allowed: (url: string) => boolean };
   const robots = new Map<string, Rules>();
   const resolve = opts.resolve ?? defaultResolver;
+
+  /**
+   * GET kết nối thẳng tới một địa chỉ ĐÃ KIỂM (chống DNS rebinding). Thử lần lượt tối đa
+   * `MAX_PIN_ATTEMPTS` địa chỉ khi không kết nối được (như happy eyeballs thô); lỗi HTTP thì dừng.
+   */
+  async function getPinned(
+    url: string,
+    checked: CheckedUrl,
+    getOpts: GetOptions,
+  ): Promise<HttpResponse> {
+    const base = { ...getOpts, redirect: "manual" } as const;
+    if (checked.literal || opts.pinAddress === false) return opts.http.get(url, base);
+    let last: unknown;
+    for (const address of checked.addresses.slice(0, MAX_PIN_ATTEMPTS)) {
+      try {
+        return await opts.http.get(url, { ...base, connectTo: address });
+      } catch (err) {
+        if (err instanceof HttpError) throw err;
+        last = err;
+      }
+    }
+    throw last;
+  }
 
   /**
    * GET một URL, đi theo redirect bằng tay tối đa `MAX_REDIRECTS` bước. MỖI đích (kể cả đích đầu)
@@ -59,10 +87,10 @@ export function createPageFetcher(opts: {
   ): Promise<{ res: HttpResponse; url: string } | PageFetchResult> {
     let current = start;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      await assertPublicUrl(current, resolve);
+      const checked = await resolvePublicUrl(current, resolve);
       const refused = await gate?.(current);
       if (refused) return refused;
-      const res = await opts.http.get(current, { ...getOpts, redirect: "manual" });
+      const res = await getPinned(current, checked, getOpts);
       const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
       if (!location) return { res, url: current };
       current = new URL(location, current).href;

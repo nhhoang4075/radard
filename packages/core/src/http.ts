@@ -1,3 +1,5 @@
+import { hostnameOf } from "./url-guard.ts";
+
 /**
  * HTTP cho adapter nguồn: GET có điều kiện, POST (GraphQL của GitHub) và giới hạn tốc độ theo host.
  *
@@ -30,9 +32,18 @@ export interface GetOptions {
    * gọi kiểm từng đích (đường tải trang lạ). Mặc định đi theo redirect như `fetch`.
    */
   redirect?: "manual";
+  /**
+   * Kết nối thẳng tới địa chỉ IP này thay vì để `fetch` phân giải lại tên miền (chống DNS rebinding:
+   * địa chỉ đã được `resolvePublicUrl` kiểm là địa chỉ được nối). Giữ nguyên header `Host`, SNI và
+   * việc kiểm chứng chứng chỉ theo tên miền gốc. Không dùng khi host trong URL đã là IP.
+   */
+  connectTo?: string;
 }
 
-export type PostOptions = Pick<GetOptions, "headers" | "timeoutMs" | "maxBytes" | "redirect">;
+export type PostOptions = Pick<
+  GetOptions,
+  "headers" | "timeoutMs" | "maxBytes" | "redirect" | "connectTo"
+>;
 
 /**
  * `post` bắt buộc chứ không tuỳ chọn: mọi client thật đều POST được, còn để tuỳ chọn thì chỗ gọi
@@ -115,12 +126,14 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
     o: PostOptions,
   ): Promise<HttpResponse> {
     await waitTurn(new URL(url).host);
-    const res = await fetch(url, {
+    const pinned = o.connectTo ? pinTo(url, o.connectTo) : null;
+    const res = await fetch(pinned?.url ?? url, {
       ...init,
-      headers: { "user-agent": USER_AGENT, ...init.headers },
+      headers: { "user-agent": USER_AGENT, ...init.headers, ...pinned?.headers },
       signal: AbortSignal.timeout(o.timeoutMs ?? 30_000),
       ...(o.redirect ? { redirect: o.redirect } : {}),
-    });
+      ...(pinned?.tls ? { tls: pinned.tls } : {}),
+    } as RequestInit);
     if (res.status >= 400) {
       const snippet = await res.text().catch(() => "");
       throw new HttpError(
@@ -135,7 +148,7 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
     return {
       status: res.status,
       body,
-      url: res.url || url,
+      url: pinned ? url : res.url || url,
       truncated,
       etag: res.headers.get("etag") ?? undefined,
       lastModified: res.headers.get("last-modified") ?? undefined,
@@ -153,6 +166,22 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
     async post(url, body, o = {}) {
       return send(url, { method: "POST", headers: { ...o.headers }, body }, o);
     },
+  };
+}
+
+/**
+ * URL trỏ thẳng IP + header `Host` gốc; với https thêm `tls.serverName` để SNI và kiểm chứng chứng
+ * chỉ vẫn theo tên miền gốc (đã thử trên Bun 1.4.3: sai tên hay không tin CA thì vẫn lỗi).
+ */
+function pinTo(url: string, address: string) {
+  const u = new URL(url);
+  const original = u.host;
+  const name = hostnameOf(u);
+  u.hostname = address.includes(":") ? `[${address}]` : address;
+  return {
+    url: u.href,
+    headers: { host: original },
+    tls: u.protocol === "https:" ? { serverName: name } : undefined,
   };
 }
 

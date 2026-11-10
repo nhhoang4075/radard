@@ -14,13 +14,18 @@ const ARTICLE = `<!doctype html><html><head><title>Janas</title></head><body>
 </article>
 <footer>© 2026 · Privacy · Terms</footer></body></html>`;
 
-function fakeHttp(routes: Record<string, () => HttpResponse>): HttpClient & { asked: string[] } {
+function fakeHttp(
+  routes: Record<string, () => HttpResponse>,
+): HttpClient & { asked: string[]; pins: (string | undefined)[] } {
   const asked: string[] = [];
+  const pins: (string | undefined)[] = [];
   return {
     asked,
+    pins,
     post: () => Promise.reject(new Error("test này không POST")),
-    async get(url) {
+    async get(url, o) {
       asked.push(url);
+      pins.push(o?.connectTo);
       const route = routes[url];
       if (!route) throw new HttpError(404, url, "");
       return route();
@@ -194,6 +199,36 @@ describe("createPageFetcher: SSRF", () => {
     expect(six.status).toBe("failed");
     expect(six.error).toContain("redirect");
     expect(http.asked).not.toContain("https://a.com/r6");
+  });
+
+  test("kết nối thẳng tới địa chỉ đã kiểm (ghim), cả robots.txt; IP viết thẳng thì không ghim", async () => {
+    const http = fakeHttp({
+      "https://a.com/p": () => html(ARTICLE),
+      "http://8.8.8.8/p": () => html(ARTICLE),
+    });
+    const f = createPageFetcher({ http, resolve });
+    expect((await f.fetch("https://a.com/p")).status).toBe("ok");
+    expect(http.pins).toEqual(["93.184.216.34", "93.184.216.34"]);
+    http.pins.length = 0;
+    expect((await f.fetch("http://8.8.8.8/p")).status).toBe("ok");
+    expect(http.pins).toEqual([undefined, undefined]);
+  });
+
+  test("địa chỉ đầu không kết nối được thì thử địa chỉ kế (đều đã kiểm)", async () => {
+    const tried: (string | undefined)[] = [];
+    const http: HttpClient = {
+      post: () => Promise.reject(new Error("không POST")),
+      async get(url, o) {
+        tried.push(o?.connectTo);
+        if (o?.connectTo === "2606:4700::1") throw new TypeError("Unable to connect");
+        if (url.endsWith("/robots.txt")) throw new HttpError(404, url, "");
+        return html(ARTICLE);
+      },
+    };
+    const two = async () => ["2606:4700::1", "93.184.216.34"];
+    const res = await createPageFetcher({ http, resolve: two }).fetch("https://a.com/p");
+    expect(res.status).toBe("ok");
+    expect(tried).toEqual(["2606:4700::1", "93.184.216.34", "2606:4700::1", "93.184.216.34"]);
   });
 
   test("robots.txt 404 và 403 = được phép", async () => {

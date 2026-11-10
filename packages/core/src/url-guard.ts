@@ -183,22 +183,29 @@ export function isPublicAddress(address: string): boolean {
   return isPublicGlobalV6(g0, g1); // gồm cả 64:ff9b:1::/48 → không công khai
 }
 
+/** Kết quả kiểm một URL: URL đã parse và các địa chỉ ĐÃ KIỂM (đều công khai) để ghim vào kết nối. */
+export interface CheckedUrl {
+  url: URL;
+  addresses: string[];
+  /** `true`: host đã là địa chỉ IP viết thẳng, không cần ghim. */
+  literal: boolean;
+}
+
 /**
  * Kiểm một URL trước khi gửi request: lược đồ, cổng, rồi MỌI địa chỉ của host phải là công khai.
- *
- * TODO(spec: SSRF ghim địa chỉ): hàm này phân giải DNS rồi `fetch` phân giải lại, nên kẻ điều khiển
- * DNS có thể trả địa chỉ công khai lúc kiểm và địa chỉ nội bộ lúc kết nối (DNS rebinding). `fetch`
- * của Bun không cho chọn IP gọn; cần chặn thêm ở tầng mạng.
+ * Trả kèm các địa chỉ đã kiểm để người gọi kết nối thẳng tới đúng chúng (chống DNS rebinding:
+ * `GetOptions.connectTo`), thay vì để `fetch` phân giải lại.
  */
-export async function assertPublicUrl(
+export async function resolvePublicUrl(
   raw: string,
   resolve: AddressResolver = defaultResolver,
-): Promise<URL> {
+): Promise<CheckedUrl> {
   const u = checkUrlShape(raw);
   const host = hostnameOf(u);
   if (host === "") throw new UrlBlockedError("thiếu host", raw);
+  const literal = isIP(host) !== 0;
   let addresses: string[];
-  if (isIP(host)) {
+  if (literal) {
     addresses = [host];
   } else {
     try {
@@ -213,5 +220,13 @@ export async function assertPublicUrl(
   if (addresses.length === 0) throw new UrlBlockedError(`${host} không có địa chỉ`, raw);
   const bad = addresses.find((a) => !isPublicAddress(a));
   if (bad !== undefined) throw new UrlBlockedError(`${host} trỏ tới địa chỉ riêng ${bad}`, raw);
-  return u;
+  return { url: u, addresses, literal };
+}
+
+/** Như `resolvePublicUrl` nhưng chỉ trả URL (khi không cần ghim). */
+export async function assertPublicUrl(
+  raw: string,
+  resolve: AddressResolver = defaultResolver,
+): Promise<URL> {
+  return (await resolvePublicUrl(raw, resolve)).url;
 }
