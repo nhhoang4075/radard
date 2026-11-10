@@ -93,6 +93,7 @@ export function createProcessDeps(base: FetchDeps): ProcessDeps | null {
     thresholds: env.thresholds,
     // Vùng xám của gộp sự kiện; không có khoá thì gộp như trước (chỉ theo ngưỡng vector).
     decider: createDecider(base.db),
+    llm: createLlm(base.db),
     extractPage: extractPageText,
   };
 }

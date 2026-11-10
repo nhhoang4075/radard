@@ -19,6 +19,7 @@ import {
   createLogger,
   type DecisionProvider,
   type EmbeddingProvider,
+  type LlmProvider,
   nfc,
   type ObjectStore,
   type PageExtractor,
@@ -37,6 +38,7 @@ import { and, asc, cosineDistance, eq, gte, inArray, isNull, lte, not, sql } fro
 import { franc } from "franc";
 import { adapterFor } from "../sources/index.ts";
 import { articleKinds, PAGE_WAIT_MS } from "./pages.ts";
+import { ensureTopicExamples } from "./topic-examples.ts";
 import { embedPendingTopics } from "./topics.ts";
 
 const log = createLogger("process");
@@ -76,6 +78,8 @@ export interface ProcessDeps {
   db: Database;
   store: ObjectStore;
   embedder: EmbeddingProvider;
+  /** Viết tin giả định cho chủ đề (HyDE). Không có thì chủ đề chấm bằng mô tả như trước. */
+  llm?: LlmProvider | null;
   thresholds: Thresholds;
   /**
    * Model quyết định cho vùng xám của gộp theo vector. Không có (hoặc lỗi) thì gộp như trước khi
@@ -125,6 +129,7 @@ export async function runProcess(deps: ProcessDeps): Promise<ProcessOutcome> {
     decisionsSkipped: 0,
     created: 0,
   };
+  await ensureTopicExamples(deps.db, deps.llm ?? null, deps.embedder);
   // Pha A theo lô cho tới khi hết việc (hoặc hết trần số lô của lượt này).
   for (let batches = 0; batches < (deps.maxBatches ?? Infinity); batches++) {
     const n = await embedBatch(deps, out);
@@ -185,9 +190,19 @@ export async function scoreTopics(db: Database, embeddingModel: string): Promise
     with ins as (
       insert into doc_topic_scores (document_id, topic_id, score)
       -- Chấm bằng vector có nội dung trang nếu có (xem doc_text.content_embedding).
-      select dt.document_id, t.id, 1 - (coalesce(dt.content_embedding, dt.embedding) <=> t.embedding)
+      -- Điểm là cosine lớn nhất trong vector mô tả và các tin giả định của chủ đề (topic_examples).
+      select dt.document_id, t.id,
+        greatest(
+          1 - (coalesce(dt.content_embedding, dt.embedding) <=> t.embedding),
+          coalesce(ex.best, -1)
+        )
       from topics t
       join doc_text dt on dt.embedding_model = t.embedding_model
+      left join lateral (
+        select max(1 - (coalesce(dt.content_embedding, dt.embedding) <=> e.embedding)) as best
+        from topic_examples e
+        where e.topic_id = t.id and e.embedding_model = t.embedding_model
+      ) ex on true
       where t.embedding is not null and t.embedding_model = ${embeddingModel}
         and not exists (
           select 1 from doc_topic_scores s

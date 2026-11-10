@@ -14,6 +14,7 @@
 import type { DecisionProvider, EmbeddingProvider } from "@radard/core";
 import type { Database } from "@radard/db";
 import { sql } from "drizzle-orm";
+import { topicQueryText } from "../topics/instruct.ts";
 import { TOPIC_NAMES_EN } from "../topics/library.ts";
 import { PROFILE_ID } from "./topics.ts";
 
@@ -155,7 +156,10 @@ async function measureOverlap(
   const topN = opts.topN ?? OVERLAP_TOP_N;
   const since = new Date((opts.now ?? new Date()).getTime() - OVERLAP_WINDOW_DAYS * 86_400_000);
   const model = deps.embedder.model;
-  const [vector] = await deps.embedder.embed([draft.embedText], "embed_topic_draft");
+  const [vector] = await deps.embedder.embed(
+    [topicQueryText(draft.embedText)],
+    "embed_topic_draft",
+  );
   if (!vector) throw new Error("embedder không trả vector");
   const newTop = await topDocsForVector(deps.db, vector, model, since, topN);
   // Tập top N của chủ đề gần (để tính tỉ lệ) và của mọi chủ đề thư viện (để nhận ra tin chung

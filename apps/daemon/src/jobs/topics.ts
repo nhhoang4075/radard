@@ -5,8 +5,9 @@
  * seed lại = cập nhật thư viện), vì chúng được gọi từ cả CLI lẫn bot Telegram.
  */
 import { createLogger, type EmbeddingProvider, type LlmProvider, nfc } from "@radard/core";
-import { type Database, docTopicScores, profileTopics, topics } from "@radard/db";
+import { type Database, docTopicScores, profileTopics, topicExamples, topics } from "@radard/db";
 import { and, asc, eq, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { TOPIC_RECIPE, topicQueryText } from "../topics/instruct.ts";
 import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../topics/library.ts";
 
 const log = createLogger("topics");
@@ -330,25 +331,35 @@ export async function embedPendingTopics(
 ): Promise<number> {
   const picked = db.select({ id: profileTopics.topicId }).from(profileTopics);
   const pending = await db
-    .select({ id: topics.id, embedText: topics.embedText })
+    .select({ id: topics.id, embedText: topics.embedText, fresh: isNull(topics.embedding) })
     .from(topics)
     .where(
       and(
         or(and(eq(topics.origin, "library"), eq(topics.active, true)), inArray(topics.id, picked)),
-        or(isNull(topics.embedding), ne(topics.embeddingModel, embedder.model)),
+        or(
+          isNull(topics.embedding),
+          ne(topics.embeddingModel, embedder.model),
+          or(isNull(topics.embeddingRecipe), ne(topics.embeddingRecipe, TOPIC_RECIPE)),
+        ),
       ),
     );
   if (pending.length === 0) return 0;
   const vectors = await embedder.embed(
-    pending.map((p) => p.embedText),
+    pending.map((p) => topicQueryText(p.embedText)),
     "embed_topic",
   );
   for (const [i, p] of pending.entries()) {
     // Vector mới (mô tả đổi, hoặc đổi model) thì điểm cũ của chủ đề không còn đúng.
     await db.delete(docTopicScores).where(eq(docTopicScores.topicId, p.id));
+    // Mô tả mới (chưa có vector) thì tin giả định viết từ mô tả cũ không còn đúng.
+    if (p.fresh) await db.delete(topicExamples).where(eq(topicExamples.topicId, p.id));
     await db
       .update(topics)
-      .set({ embedding: vectors[i], embeddingModel: embedder.model })
+      .set({
+        embedding: vectors[i],
+        embeddingModel: embedder.model,
+        embeddingRecipe: TOPIC_RECIPE,
+      })
       .where(eq(topics.id, p.id));
   }
   log.info("đã embed chủ đề", { n: pending.length });
