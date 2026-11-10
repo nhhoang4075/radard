@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fakeEmbedding } from "@radard/adapters/ai-fake";
 import { fsObjectStore } from "@radard/adapters/object-store-fs";
+import { createPageFetcher } from "@radard/adapters/pages";
 import {
   canonicalizeUrl,
   type PageFetcher,
@@ -115,7 +116,7 @@ describe("fetchPages", () => {
     const fetcher = fakeFetcher({ "https://github.com/x/janas": "<p>README of Janas</p>" });
 
     const out = await fetchPages({ db, store, fetcher }, { since: SINCE });
-    expect(out).toEqual({ considered: 3, ok: 1, blocked: 0, skipped: 1, failed: 1 });
+    expect(out).toEqual({ considered: 3, ok: 1, blocked: 0, skipped: 1, failed: 1, deferred: 0 });
     expect(fetcher.asked.sort()).toEqual(["https://github.com/x/janas", "https://wsj.com/a"]);
     const rows = await db.select().from(linkedPages).orderBy(asc(linkedPages.urlCanonical));
     expect(rows.map((r) => [r.status, r.httpStatus])).toEqual([
@@ -127,6 +128,98 @@ describe("fetchPages", () => {
     expect(new TextDecoder().decode(raw ?? new Uint8Array())).toBe("<p>README of Janas</p>");
 
     expect((await fetchPages({ db, store, fetcher }, { since: SINCE })).considered).toBe(0);
+  });
+});
+
+describe("fetchPages: deferred", () => {
+  test("robots.txt chưa đọc được thì không ghi dòng, lần sau tải khi đã hồi lại", async () => {
+    await addStory("Janas", "https://github.com/x/janas");
+    let robotsUp = false;
+    const asked: string[] = [];
+    const fetcher: PageFetcher = {
+      async fetch(url): Promise<PageFetchResult> {
+        asked.push(url);
+        if (!robotsUp) return { status: "deferred", error: "robots.txt không đọc được" };
+        return {
+          status: "ok",
+          httpStatus: 200,
+          contentType: "text/html",
+          finalUrl: url,
+          html: "<p>README</p>",
+        };
+      },
+    };
+
+    const first = await fetchPages({ db, store, fetcher }, { since: SINCE });
+    expect(first).toEqual({ considered: 1, ok: 0, blocked: 0, skipped: 0, failed: 0, deferred: 1 });
+    expect(await db.select().from(linkedPages)).toHaveLength(0);
+    expect(asked).toHaveLength(1); // mỗi lượt chạy chỉ thử một lần
+
+    robotsUp = true;
+    const second = await fetchPages({ db, store, fetcher }, { since: SINCE });
+    expect(second).toEqual({
+      considered: 1,
+      ok: 1,
+      blocked: 0,
+      skipped: 0,
+      failed: 0,
+      deferred: 0,
+    });
+    const rows = await db.select().from(linkedPages);
+    expect(rows.map((r) => r.status)).toEqual(["ok"]);
+  });
+});
+
+describe("fetchPages: host hỏng không làm nghẽn host khác", () => {
+  test("host deferred chỉ bị thử một lần mỗi lượt, đủ 10 URL/host, URL cũ của host khoẻ vẫn được tải", async () => {
+    // 25 URL mới của host hỏng, rồi 1 URL cũ hơn của host khoẻ.
+    for (let i = 0; i < 25; i++) await addStory(`bad ${i}`, `https://bad.example/p${i}`);
+    await addStory("old good", "https://good.example/a", new Date("2026-10-11T10:00:00Z"));
+    const asked: string[] = [];
+    const fetcher: PageFetcher = {
+      async fetch(url): Promise<PageFetchResult> {
+        asked.push(url);
+        if (url.startsWith("https://bad.example")) return { status: "deferred", error: "robots" };
+        return {
+          status: "ok",
+          httpStatus: 200,
+          contentType: "text/html",
+          finalUrl: url,
+          html: "<p>x</p>",
+        };
+      },
+    };
+    const out = await fetchPages(
+      { db, store, fetcher },
+      { since: SINCE, limit: 11, concurrency: 1 },
+    );
+    expect(out).toMatchObject({ considered: 11, ok: 1, deferred: 10 });
+    expect(asked.filter((u) => u.includes("bad.example"))).toHaveLength(1);
+    expect(asked).toContain("https://good.example/a");
+    expect((await db.select().from(linkedPages)).map((r) => r.status)).toEqual(["ok"]);
+  });
+
+  test("robots.txt redirect vào IP riêng: failed và có dòng linked_pages (bộ tải thật)", async () => {
+    await addStory("Evil", "https://evil.example/a");
+    const http = {
+      post: () => Promise.reject(new Error("không POST")),
+      async get(url: string) {
+        if (url.endsWith("/robots.txt")) {
+          return {
+            status: 302,
+            body: "",
+            headers: new Headers({ location: "http://127.0.0.1/robots.txt" }),
+          };
+        }
+        throw new Error("không được tải trang");
+      },
+    };
+    const fetcher = createPageFetcher({ http, resolve: async () => ["93.184.216.34"] });
+    const out = await fetchPages({ db, store, fetcher }, { since: SINCE });
+    expect(out).toMatchObject({ considered: 1, failed: 1, deferred: 0 });
+    const [row] = await db.select().from(linkedPages);
+    expect(row?.status).toBe("failed");
+    expect(row?.error).toContain("127.0.0.1");
   });
 });
 

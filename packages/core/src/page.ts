@@ -5,9 +5,11 @@
 
 /**
  * ok: tải được HTML · blocked: robots.txt không cho bot tải · skipped: không phải trang HTML
- * (PDF, ảnh, video) · failed: lỗi HTTP (401/403 trang trả phí…) hoặc lỗi mạng.
+ * (PDF, ảnh, video) · failed: lỗi HTTP (401/403 trang trả phí…) hoặc lỗi mạng · deferred: chưa
+ * quyết được vì robots.txt không đọc được (5xx hoặc không kết nối được, RFC 9309); KHÔNG phải trạng
+ * thái lưu trong DB, job không ghi dòng nào để lần chạy sau thử lại.
  */
-export type PageStatus = "ok" | "blocked" | "skipped" | "failed";
+export type PageStatus = "ok" | "blocked" | "skipped" | "failed" | "deferred";
 
 export interface PageFetchResult {
   status: PageStatus;
