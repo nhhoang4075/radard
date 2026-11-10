@@ -120,6 +120,11 @@ export interface RankConfig {
   decision: { low: number; high: number; minP: number };
   /** Sàn: không lấy tin có S dưới mức này, kể cả khi chưa đủ số tin ("có đủ đáng đọc không"). */
   floorS: number;
+  /**
+   * Nguồn của sàn: "fixed" luôn dùng `floorS`; "percentile" dùng phân vị 30 ngày (floor.ts) khi
+   * bể có đủ 14 ngày dữ liệu, chưa đủ thì vẫn dùng `floorS`.
+   */
+  floorMode: "fixed" | "percentile";
   /** Độ nổi góp bởi nguồn không có tín hiệu (chốt 12/10/2026: 0,3). */
   neutralP: number;
   /** F khi sự kiện bắt đầu trước khoảng digest, nay có tin mới. */
@@ -140,6 +145,7 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   // 84%, luật cũ (R ≥ 0,6) chỉ 53%; bạn đã xác nhận các nhãn tham chiếu.
   decision: { low: 0.5, high: 0.7, minP: 0.6 },
   floorS: 0.59,
+  floorMode: "percentile",
   neutralP: 0.3,
   followUpF: 0.6,
   maxItems: 7,

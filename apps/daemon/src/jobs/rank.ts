@@ -11,11 +11,15 @@ import {
   type Baselines,
   type Components,
   components,
+  createLogger,
   DEFAULT_RANK_CONFIG,
   type DecisionProvider,
+  FLOOR_WINDOW_DAYS,
+  type FloorResult,
   type HttpClient,
   needsDecision,
   passesGate,
+  percentileFloor,
   type RankConfig,
   type RankDoc,
   type RankEvent,
@@ -38,6 +42,7 @@ import {
 } from "@radard/db";
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
+import { readCandidateScores } from "./candidate-pool.ts";
 import {
   countGate,
   decideGate,
@@ -46,6 +51,8 @@ import {
   type GateDecision,
 } from "./gate-decision.ts";
 import { refreshSignals } from "./signals.ts";
+
+const log = createLogger("rank");
 
 export interface RankPeriod {
   start: Date;
@@ -62,6 +69,8 @@ export interface RankResult extends Selection {
   /** Thời gian hỏi model quyết định cho cổng, mili giây. */
   gateMs: number;
   config: RankConfig;
+  /** Sàn điểm đã dùng và nguồn của nó (cố định hay phân vị). */
+  floor: FloorResult;
   /** Mặt bằng đã dùng, để digest lưu lại và giải thích được vì sao chọn. */
   baselines: {
     metric: string;
@@ -266,9 +275,19 @@ export async function rankPeriod(
       : { event: e, c, S: scoreOf(c, config), gate };
   });
 
-  const selection = select(scored, config);
+  const floor = await resolveFloor(db, opts.profileId, period, config);
+  log.info("sàn điểm", {
+    profileId: opts.profileId,
+    source: floor.source,
+    value: floor.value,
+    q: floor.q ?? null,
+    n: floor.n ?? null,
+    days: floor.days,
+  });
+  const selection = select(scored, { ...config, floorS: floor.value });
   return {
     ...selection,
+    floor,
     period,
     candidates: evRows.length,
     passedGate: passing.length,
@@ -292,6 +311,39 @@ export async function rankPeriod(
     sourceNames: new Map(srcRows.map((s) => [s.id, s.name])),
     sourceKinds: kindOf,
   };
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Sàn của lần xếp hạng: phân vị điểm S trong bể của hồ sơ ở [end − 30 ngày, end) (không gồm ngày
+ * đang xếp hạng), bỏ tin đã gửi (`not_new`, N = 0) khỏi cả phân vị lẫn n. Chế độ "fixed" không đọc bể.
+ */
+async function resolveFloor(
+  db: Database,
+  profileId: number,
+  period: RankPeriod,
+  config: RankConfig,
+): Promise<FloorResult> {
+  if (config.floorMode === "fixed") return { value: config.floorS, source: "fixed", days: 0 };
+  let rows: Awaited<ReturnType<typeof readCandidateScores>>;
+  try {
+    rows = await readCandidateScores(db, {
+      profileId,
+      from: new Date(period.end.getTime() - FLOOR_WINDOW_DAYS * DAY_MS),
+      to: period.end,
+    });
+  } catch (err) {
+    // Bể là dữ liệu phụ: đọc hỏng thì dùng sàn cố định, không chặn việc xếp hạng và gửi tin.
+    log.warn("không đọc được bể ứng viên, dùng sàn cố định", {
+      profileId,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+    });
+    return { value: config.floorS, source: "fixed", days: 0 };
+  }
+  const days = new Set(rows.map((r) => r.periodEnd.getTime())).size;
+  const scores = rows.filter((r) => r.rejectReason !== "not_new" && r.n !== 0).map((r) => r.score);
+  return percentileFloor({ scores, days, fixed: config.floorS });
 }
 
 /**
