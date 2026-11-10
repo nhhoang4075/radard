@@ -44,20 +44,22 @@ async function main(): Promise<void> {
   await ensureQueues(boss);
 
   const stops: Array<() => void | Promise<void>> = [];
+  // Người nhận duy nhất từ biến môi trường (TELEGRAM_CHAT_ID) nối với hồ sơ 1: giữ hành vi một người
+  // dùng sau khi có bảng `profile_channels`. Mọi vai trò cần người nhận đều seed TRƯỚC khi khởi động
+  // (chạy lại và chạy đồng thời đều không đổi gì: `on conflict do nothing`), để bot không từ chối chat
+  // của chủ dự án trong lúc chờ scheduler. Thiếu chat id hay hồ sơ 1 thì bỏ qua.
+  if (env.telegramChatId && (runsScheduler || runsWorker || runsBot)) {
+    const seeded = await seedProfileChannel(deps.db, {
+      profileId: cliDefaultProfileId(),
+      channel: "telegram",
+      recipient: env.telegramChatId,
+    });
+    log.info("người nhận telegram từ env", { seeded });
+  }
   if (runsScheduler) {
     // Thư viện chủ đề sống trong code: mỗi lần deploy nạp lại, khỏi chạy tay `topics seed`. Chạy lại
     // nhiều lần không đổi gì. Chỉ vai trò scheduler (một bản duy nhất) làm, để không hai bản cùng ghi.
     log.info("thư viện chủ đề", await seedLibrary(deps.db));
-    // Người nhận duy nhất từ biến môi trường (TELEGRAM_CHAT_ID) nối với hồ sơ 1: giữ hành vi một người
-    // dùng sau khi có bảng `profile_channels`. Chạy lại không đổi gì; thiếu chat id hay hồ sơ 1 thì bỏ qua.
-    if (env.telegramChatId) {
-      const seeded = await seedProfileChannel(deps.db, {
-        profileId: cliDefaultProfileId(),
-        channel: "telegram",
-        recipient: env.telegramChatId,
-      });
-      log.info("người nhận telegram từ env", { seeded });
-    }
     stops.push(await startScheduler(boss, deps.db));
   }
   if (runsWorker) {
