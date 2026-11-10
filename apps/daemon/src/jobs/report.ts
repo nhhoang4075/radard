@@ -17,7 +17,7 @@
  * (00:00 → 24:00) nằm trọn trước khung cuối.
  */
 import { type Database, digests } from "@radard/db";
-import { and, asc, gt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 import { type DigestPlan, digestSlot } from "./digest.ts";
 
 /** VN không đổi giờ theo mùa nên lệch UTC cố định +7 (như digest.ts). */
@@ -296,7 +296,11 @@ function digestDay(slot: Date, row: DigestRow | undefined): DigestDay {
   };
 }
 
-async function digestReport(db: Database, w: ReportWindow): Promise<DigestReport> {
+async function digestReport(
+  db: Database,
+  profileId: number,
+  w: ReportWindow,
+): Promise<DigestReport> {
   const rows: DigestRow[] = await db
     .select({
       id: digests.id,
@@ -312,7 +316,13 @@ async function digestReport(db: Database, w: ReportWindow): Promise<DigestReport
         where x.digest_id = digests.id and x.kind = 'event')`,
     })
     .from(digests)
-    .where(and(gt(digests.periodEnd, w.start), lte(digests.periodEnd, w.end)))
+    .where(
+      and(
+        eq(digests.profileId, profileId),
+        gt(digests.periodEnd, w.start),
+        lte(digests.periodEnd, w.end),
+      ),
+    )
     .orderBy(asc(digests.id));
   // MVP-0 có một người nhận: mỗi khung một dòng. Nhiều dòng cùng khung thì lấy dòng tạo trước.
   const bySlot = new Map<number, DigestRow>();
@@ -332,13 +342,17 @@ async function digestReport(db: Database, w: ReportWindow): Promise<DigestReport
 // ---------------------------------------------------------------------------------------------
 // 3. Phản hồi
 
-async function feedbackReport(db: Database, w: ReportWindow): Promise<FeedbackReport> {
+async function feedbackReport(
+  db: Database,
+  profileId: number,
+  w: ReportWindow,
+): Promise<FeedbackReport> {
   const [r] = [
     ...(await db.execute<{ deliveries: number; rated: number; likes: number; dislikes: number }>(
       sql`
       with ev as (
         select dl.id from deliveries dl join digests d on d.id = dl.digest_id
-        where dl.kind = 'event' and d.period_end > ${w.start} and d.period_end <= ${w.end}
+        where dl.profile_id = ${profileId} and dl.kind = 'event' and d.period_end > ${w.start} and d.period_end <= ${w.end}
       ), latest as (
         -- feedback chỉ ghi thêm: dòng mới nhất (id lớn nhất) là ý kiến hiện tại
         -- dòng clear (bỏ chọn) vẫn là dòng mới nhất của tin đó: tin đã bỏ chọn không tính là có phản hồi
@@ -453,10 +467,14 @@ async function metricsReport(db: Database, w: ReportWindow): Promise<MetricsRepo
 
 // ---------------------------------------------------------------------------------------------
 
-export async function buildReport(db: Database, w: ReportWindow): Promise<Report> {
+export async function buildReport(
+  db: Database,
+  profileId: number,
+  w: ReportWindow,
+): Promise<Report> {
   const fetch = await fetchReport(db, w);
-  const digestsOut = await digestReport(db, w);
-  const feedback = await feedbackReport(db, w);
+  const digestsOut = await digestReport(db, profileId, w);
+  const feedback = await feedbackReport(db, profileId, w);
   const cost = await costReport(db, w);
   const metrics = await metricsReport(db, w);
   return {

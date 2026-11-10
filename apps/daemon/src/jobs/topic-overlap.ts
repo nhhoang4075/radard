@@ -16,7 +16,6 @@ import type { Database } from "@radard/db";
 import { sql } from "drizzle-orm";
 import { topicQueryText } from "../topics/instruct.ts";
 import { TOPIC_NAMES_EN } from "../topics/library.ts";
-import { PROFILE_ID } from "./topics.ts";
 
 /** Số tin khớp nhất của mỗi chủ đề đem ra so (tab 02: 300 tin của 30 ngày). */
 export const OVERLAP_TOP_N = 300;
@@ -115,6 +114,7 @@ interface Relation {
 
 export interface OverlapDeps {
   db: Database;
+  profileId: number;
   embedder: EmbeddingProvider;
   decider: DecisionProvider | null;
 }
@@ -129,7 +129,7 @@ export async function checkTopicOverlap(
   draft: TopicDraft,
   opts: { topN?: number; now?: Date; hubMinTopics?: number } = {},
 ): Promise<OverlapCheck> {
-  const topics = await existingTopics(deps.db, deps.embedder.model);
+  const topics = await existingTopics(deps.db, deps.profileId, deps.embedder.model);
   const notRun = { ran: false, candidates: [], asked: topics.length, model: null, docs: 0 };
   if (!deps.decider) return notRun;
   if (topics.length === 0) return { ...notRun, ran: true };
@@ -227,16 +227,16 @@ async function topDocsForVector(
 }
 
 /** Chủ đề đem ra so: thư viện đang dùng và chủ đề tự thêm của hồ sơ, có embedding cùng model. */
-async function existingTopics(db: Database, model: string): Promise<TopicRow[]> {
+async function existingTopics(db: Database, profileId: number, model: string): Promise<TopicRow[]> {
   const rows = await db.execute(sql`
     select t.id::int as id, t.key, t.name as label, t.origin, t.embed_text as "embedText",
       coalesce(pt.active, false) as enabled,
       exists (select 1 from doc_topic_scores s where s.topic_id = t.id) as scored
     from topics t
-    left join profile_topics pt on pt.topic_id = t.id and pt.profile_id = ${PROFILE_ID}
+    left join profile_topics pt on pt.topic_id = t.id and pt.profile_id = ${profileId}
     where t.embedding is not null and t.embedding_model = ${model}
       and ((t.origin = 'library' and t.active)
-        or (t.origin = 'custom' and t.owner_profile_id = ${PROFILE_ID}))
+        or (t.origin = 'custom' and t.owner_profile_id = ${profileId}))
     order by t.id`);
   return [...rows].map((r) => ({
     id: Number(r.id),

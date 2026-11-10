@@ -89,6 +89,7 @@ export interface SuggestResult {
 
 export interface SuggestDeps {
   db: Database;
+  profileId: number;
   decider: DecisionProvider | null;
   llm: LlmProvider | null;
   /** Cần cho bước soát chủ đề gần giống; thiếu thì đề xuất mới giữ nguyên, `overlapChecked = false`. */
@@ -297,7 +298,7 @@ async function checkProposals(
       if (!embedder || !decider) return { p, ran: false, candidates: [] as OverlapCandidate[] };
       try {
         const res = await checkTopicOverlap(
-          { db: deps.db, embedder, decider },
+          { db: deps.db, profileId: deps.profileId, embedder, decider },
           { label: p.name, embedText: p.embedText },
         );
         return { p, ran: res.ran, candidates: res.candidates };

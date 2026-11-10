@@ -33,7 +33,7 @@ afterAll(async () => {
 
 describe("topicHandlers", () => {
   test("danh sách = thư viện (theo thứ tự) + chủ đề tự thêm; bật tắt cả hai loại", async () => {
-    await addCustomTopic(db, {
+    await addCustomTopic(db, 1, {
       label: "Postgres cho AI",
       description: "pgvector",
       embedText: "pgvector",
@@ -85,7 +85,7 @@ const NEW_TOPIC = {
 };
 
 async function idToKey(): Promise<Map<number, string>> {
-  return new Map((await listLibrary(db)).map((t) => [t.id, t.key]));
+  return new Map((await listLibrary(db, 1)).map((t) => [t.id, t.key]));
 }
 
 function deps(over: Partial<BotDeps> = {}): BotDeps {
@@ -124,7 +124,7 @@ describe("profileHandlers", () => {
     const { llm, llmTasks } = fakes(await idToKey());
     const p = profileHandlers(deps({ llm }), () => {});
     expect(await p.saveDescription("  Mình là kỹ sư AI  ")).toEqual({ rewritten: true });
-    expect(await readProfile(db)).toEqual({
+    expect(await readProfile(db, 1)).toEqual({
       description: "Mình là kỹ sư AI",
       promptContext: NEW_CONTEXT,
     });
@@ -134,7 +134,7 @@ describe("profileHandlers", () => {
   test("thiếu LLM: vẫn lưu lời người dùng, giữ bối cảnh cũ", async () => {
     const p = profileHandlers(deps(), () => {});
     expect(await p.saveDescription("Mình là kỹ sư AI")).toEqual({ rewritten: false });
-    expect(await readProfile(db)).toEqual({
+    expect(await readProfile(db, 1)).toEqual({
       description: "Mình là kỹ sư AI",
       promptContext: OLD_CONTEXT,
     });
@@ -145,14 +145,17 @@ describe("profileHandlers", () => {
     const llm = fakeLlm({ reply: () => "ok" });
     const p = profileHandlers(deps({ llm }), () => {});
     expect(await p.saveDescription("Mình là kỹ sư AI")).toEqual({ rewritten: false });
-    expect(await readProfile(db)).toEqual({ description: "Mình là kỹ sư AI", promptContext: "" });
+    expect(await readProfile(db, 1)).toEqual({
+      description: "Mình là kỹ sư AI",
+      promptContext: "",
+    });
     await expect(describeReader(llm, "x")).rejects.toThrow();
   });
 
   test("gợi ý: tích sẵn mức nên theo dõi; chủ đề đang bật luôn hiện và tích; còn lại không hiện", async () => {
     const keys = await idToKey();
     // Đang bật từ trước: một chủ đề mức "có thể quan tâm" và một chủ đề không được gợi ý.
-    await pickTopics(db, ["multimodal", "robotics"]);
+    await pickTopics(db, 1, ["multimodal", "robotics"]);
     const { llm, decider } = fakes(keys);
     const p = profileHandlers(deps({ llm, decider }), () => {});
     const s = await p.suggest();
@@ -192,7 +195,7 @@ describe("profileHandlers", () => {
   test("Lưu: bật chủ đề tích, tắt chủ đề bỏ tích, chỉ trong các chủ đề được hiện", async () => {
     const keys = await idToKey();
     const id = (k: string) => [...keys].find(([, v]) => v === k)?.[0];
-    await pickTopics(db, ["robotics", "ai_safety"]);
+    await pickTopics(db, 1, ["robotics", "ai_safety"]);
     let refreshed = 0;
     const p = profileHandlers(deps(), () => refreshed++);
     const n = await p.apply(
@@ -200,7 +203,7 @@ describe("profileHandlers", () => {
       [`l:${id("ai_safety")}`],
       [],
     );
-    const chosen = (await listLibrary(db)).filter((t) => t.chosen).map((t) => t.key);
+    const chosen = (await listLibrary(db, 1)).filter((t) => t.chosen).map((t) => t.key);
     // robotics không hiện trong gợi ý: giữ nguyên.
     expect(new Set(chosen)).toEqual(new Set(["agents", "llm_apps", "robotics"]));
     expect(n).toBe(3);
@@ -227,7 +230,7 @@ describe("profileHandlers", () => {
       description: `${NEW_TOPIC.labelVi}: ${NEW_TOPIC.why}`,
       embedText: NEW_TOPIC.descriptionEn,
     });
-    const mine = (await listProfileTopics(db)).find((x) => x.topicId === t?.id);
+    const mine = (await listProfileTopics(db, 1)).find((x) => x.topicId === t?.id);
     expect(mine?.active).toBe(true);
     // Số đang theo dõi tính cả chủ đề vừa tạo; bật và tạo cùng lúc chỉ làm mới một lần.
     expect(n).toBe(2);

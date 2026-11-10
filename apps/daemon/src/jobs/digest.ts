@@ -482,7 +482,7 @@ export async function buildPlan(
   });
   const rankMs = Date.now() - rankStarted;
   await onRanked?.(rank);
-  const [prof] = await deps.db.select().from(profile);
+  const [prof] = await deps.db.select().from(profile).where(eq(profile.id, deps.profileId));
   const docsByEvent = await loadDocs(deps.db, rank);
   const date = vnDate(slot);
   const base = {
@@ -647,7 +647,10 @@ export async function runDigest(
       plan = await buildPlan(deps, slot, (rank) =>
         recordCandidatePoolSafely(deps.db, deps.profileId, rank),
       );
-      const [prof] = await deps.db.select({ lang: profile.displayLang }).from(profile);
+      const [prof] = await deps.db
+        .select({ lang: profile.displayLang })
+        .from(profile)
+        .where(eq(profile.id, deps.profileId));
       await deps.db
         .update(digests)
         .set({

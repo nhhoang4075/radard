@@ -293,26 +293,28 @@ const COMMANDS: Record<string, Command> = {
   "profile set": async ({ db }) => {
     const promptContext = process.argv[4];
     if (!promptContext) throw new Error('thiếu mô tả: profile set "…"');
-    // Chỉ có một hồ sơ: sửa dòng đang có, chưa có thì tạo.
+    const profileId = currentProfileId();
+    // Sửa đúng dòng của hồ sơ này, chưa có thì tạo.
     const updated = await db
       .update(profile)
       .set({ promptContext, updatedAt: new Date() })
+      .where(eq(profile.id, profileId))
       .returning({ id: profile.id });
-    if (updated.length === 0) await db.insert(profile).values({ promptContext });
+    if (updated.length === 0) await db.insert(profile).values({ id: profileId, promptContext });
     console.log("đã lưu bối cảnh");
   },
 
   "profile seed": async ({ db }) => {
     const added = await db
       .insert(profile)
-      .values({ promptContext: DEFAULT_PROFILE })
+      .values({ id: currentProfileId(), promptContext: DEFAULT_PROFILE })
       .onConflictDoNothing()
       .returning();
     console.log(added.length ? "đã đặt mô tả mặc định (TẠM)" : "đã có profile, giữ nguyên");
   },
 
   profile: async ({ db }) => {
-    const [p] = await db.select().from(profile);
+    const [p] = await db.select().from(profile).where(eq(profile.id, currentProfileId()));
     console.log(p ?? "chưa có profile");
   },
 
@@ -322,14 +324,14 @@ const COMMANDS: Record<string, Command> = {
 
   topics: async ({ db }) => {
     let group = "";
-    for (const t of await listLibrary(db)) {
+    for (const t of await listLibrary(db, currentProfileId())) {
       if (t.groupName !== group) {
         group = t.groupName;
         console.log(`\n${group}`);
       }
       console.log(`  ${t.chosen ? "✓" : " "} ${t.key.padEnd(14)} ${t.name}`);
     }
-    const mine = await listProfileTopics(db);
+    const mine = await listProfileTopics(db, currentProfileId());
     console.log("\nChủ đề của bạn");
     if (mine.length === 0) console.log("  (chưa có: topics pick <key,…> hoặc topics add)");
     for (const t of mine) {
@@ -347,7 +349,7 @@ const COMMANDS: Record<string, Command> = {
       .map((k) => k.trim())
       .filter(Boolean);
     if (keys.length === 0) throw new Error("thiếu key: topics pick agents,llm_apps");
-    console.log(`đã chọn ${await pickTopics(db, keys)} chủ đề`);
+    console.log(`đã chọn ${await pickTopics(db, currentProfileId(), keys)} chủ đề`);
     await embedTopicsNow(db);
   },
 
@@ -358,7 +360,12 @@ const COMMANDS: Record<string, Command> = {
     if (!llm) throw new Error("chưa có AI_GATEWAY_API_KEY: không viết được câu mô tả");
     const embedText = await describeTopic(llm, label, text);
     const kind = process.argv.includes("--exclude") ? "exclude" : "include";
-    const id = await addCustomTopic(db, { label, description: text, embedText, kind });
+    const id = await addCustomTopic(db, currentProfileId(), {
+      label,
+      description: text,
+      embedText,
+      kind,
+    });
     console.log(`đã thêm chủ đề ${id}: ${label}\n  câu dùng để embed: ${embedText}`);
     await embedTopicsNow(db);
   },
@@ -371,7 +378,7 @@ const COMMANDS: Record<string, Command> = {
     if (!embedder) throw new Error("chưa có embedder: không đo được tỉ lệ trùng tin");
     const started = Date.now();
     const res = await checkTopicOverlap(
-      { db, embedder, decider: createDecider(db) },
+      { db, profileId: currentProfileId(), embedder, decider: createDecider(db) },
       { label, embedText },
     );
     printOverlap(label, res, Date.now() - started);
@@ -380,13 +387,22 @@ const COMMANDS: Record<string, Command> = {
   "topics suggest": async ({ db }) => {
     let text = flag("text", "");
     if (!text) {
-      const [p] = await db.select({ promptContext: profile.promptContext }).from(profile);
+      const [p] = await db
+        .select({ promptContext: profile.promptContext })
+        .from(profile)
+        .where(eq(profile.id, currentProfileId()));
       if (!p) throw new Error('chưa có bối cảnh: profile set "…" hoặc --text="…"');
       text = p.promptContext;
     }
     const started = Date.now();
     const res = await suggestTopics(
-      { db, decider: createDecider(db), llm: createLlm(db), embedder: createEmbedder(db) },
+      {
+        db,
+        profileId: currentProfileId(),
+        decider: createDecider(db),
+        llm: createLlm(db),
+        embedder: createEmbedder(db),
+      },
       text,
     );
     if (process.argv.includes("--json")) console.log(JSON.stringify(res, null, 2));
@@ -394,14 +410,14 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "topics on": async ({ db }) => {
-    if (!(await setTopicActive(db, Number(process.argv[4]), true)))
+    if (!(await setTopicActive(db, currentProfileId(), Number(process.argv[4]), true)))
       throw new Error("không có id đó");
     console.log("đã bật");
     await embedTopicsNow(db);
   },
 
   "topics off": async ({ db }) => {
-    if (!(await setTopicActive(db, Number(process.argv[4]), false)))
+    if (!(await setTopicActive(db, currentProfileId(), Number(process.argv[4]), false)))
       throw new Error("không có id đó");
     console.log("đã tắt");
   },
@@ -516,6 +532,7 @@ const COMMANDS: Record<string, Command> = {
       })
       .from(feedback)
       .leftJoin(deliveries, eq(deliveries.id, feedback.deliveryId))
+      .where(eq(feedback.profileId, currentProfileId()))
       .orderBy(desc(feedback.id))
       .limit(limit());
     console.table(rows);
@@ -626,7 +643,12 @@ const COMMANDS: Record<string, Command> = {
       console.log(await runDigest(deps));
       return;
     }
-    const rows = await db.select().from(digests).orderBy(desc(digests.periodEnd)).limit(limit());
+    const rows = await db
+      .select()
+      .from(digests)
+      .where(eq(digests.profileId, currentProfileId()))
+      .orderBy(desc(digests.periodEnd))
+      .limit(limit());
     console.table(
       rows.map((r) => {
         const plan = (r.meta as { plan?: DigestPlan }).plan;
@@ -740,7 +762,7 @@ const COMMANDS: Record<string, Command> = {
 
   report: async ({ db }) => {
     const window = reportWindow(new Date(), parseHours(flag("since", "7d")));
-    for (const block of formatReport(await buildReport(db, window))) {
+    for (const block of formatReport(await buildReport(db, currentProfileId(), window))) {
       if (typeof block === "string") console.log(block);
       else console.table(block);
     }

@@ -63,15 +63,15 @@ function refresher({ db, embedder }: BotDeps) {
 }
 
 export function topicHandlers(deps: BotDeps, refresh: () => void = refresher(deps)): TopicHandlers {
-  const { db } = deps;
+  const { db, profileId } = deps;
   return {
     async list(): Promise<TopicItem[]> {
-      const library = (await listLibrary(db)).map((t) => ({
+      const library = (await listLibrary(db, profileId)).map((t) => ({
         key: `l:${t.id}`,
         label: t.name,
         chosen: t.chosen,
       }));
-      const custom = (await listProfileTopics(db))
+      const custom = (await listProfileTopics(db, profileId))
         .filter((t) => t.origin === "custom" && t.kind === "include")
         .map((t) => ({ key: `c:${t.id}`, label: t.label, chosen: t.active }));
       return [...library, ...custom];
@@ -81,12 +81,12 @@ export function topicHandlers(deps: BotDeps, refresh: () => void = refresher(dep
       const id = Number(raw);
       let on: boolean;
       if (kind === "l") {
-        on = await toggleLibraryTopic(db, id);
+        on = await toggleLibraryTopic(db, profileId, id);
       } else {
-        const mine = (await listProfileTopics(db)).find((t) => t.id === id);
+        const mine = (await listProfileTopics(db, profileId)).find((t) => t.id === id);
         if (!mine) throw new Error(`không có chủ đề ${key}`);
         on = !mine.active;
-        await setTopicActive(db, id, on);
+        await setTopicActive(db, profileId, id, on);
       }
       if (on) refresh();
       return on;
@@ -96,16 +96,16 @@ export function topicHandlers(deps: BotDeps, refresh: () => void = refresher(dep
       return describeTopic(deps.llm, label, text);
     },
     async addCustom(draft) {
-      await addCustomTopic(db, draft);
+      await addCustomTopic(db, profileId, draft);
       refresh();
     },
   };
 }
 
 /** Số chủ đề đang theo dõi, đếm như danh sách /topics: thư viện đang bật + tự thêm đang bật. */
-async function countFollowed(db: Database): Promise<number> {
-  const library = (await listLibrary(db)).filter((t) => t.chosen).length;
-  const custom = (await listProfileTopics(db)).filter(
+async function countFollowed(db: Database, profileId: number): Promise<number> {
+  const library = (await listLibrary(db, profileId)).filter((t) => t.chosen).length;
+  const custom = (await listProfileTopics(db, profileId)).filter(
     (t) => t.origin === "custom" && t.kind === "include" && t.active,
   ).length;
   return library + custom;
@@ -119,15 +119,15 @@ export function profileHandlers(
   deps: BotDeps,
   refresh: () => void = refresher(deps),
 ): ProfileHandlers {
-  const { db } = deps;
+  const { db, profileId } = deps;
   return {
-    get: () => readProfile(db),
+    get: () => readProfile(db, profileId),
     async saveDescription(text) {
       // Lưu lời người dùng trước: LLM lỗi thì lời họ vẫn còn, bối cảnh cũ giữ nguyên.
-      await saveProfile(db, text);
+      await saveProfile(db, profileId, text);
       if (!deps.llm) return { rewritten: false };
       try {
-        await saveProfile(db, text, await describeReader(deps.llm, text));
+        await saveProfile(db, profileId, text, await describeReader(deps.llm, text));
         return { rewritten: true };
       } catch (err) {
         log.warn("viết bối cảnh lỗi", { err: String(err).slice(0, 300) });
@@ -135,15 +135,15 @@ export function profileHandlers(
       }
     },
     async suggest() {
-      const { promptContext } = await readProfile(db);
+      const { promptContext } = await readProfile(db, profileId);
       if (!promptContext) return null;
       const res = await suggestTopics(
-        { db, decider: deps.decider, llm: deps.llm, embedder: deps.embedder },
+        { db, profileId, decider: deps.decider, llm: deps.llm, embedder: deps.embedder },
         promptContext,
       );
       if (!res.ran.library) return null;
       // Chủ đề đang bật luôn tích sẵn, dù ở mức nào: Lưu không được lặng lẽ tắt nó.
-      const followed = (await listLibrary(db)).filter((t) => t.chosen);
+      const followed = (await listLibrary(db, profileId)).filter((t) => t.chosen);
       const chosen = new Set(followed.map((t) => t.id));
       const item =
         (tier: SuggestedTopic["tier"]) =>
@@ -175,7 +175,7 @@ export function profileHandlers(
         // lời họ viết, nên lấy đúng câu radard đã cho họ xem ("tên: vì sao") làm mô tả: họ đã đọc,
         // tích và bấm Lưu, coi như đồng ý với câu đó. Câu tiếng Anh của đề xuất làm `embed_text`.
         try {
-          await addCustomTopic(db, {
+          await addCustomTopic(db, profileId, {
             label: p.label,
             description: `${p.label}: ${p.why}`,
             embedText: p.embedText,
@@ -186,9 +186,9 @@ export function profileHandlers(
           log.warn("không tạo được chủ đề đề xuất", { label: p.label, err: String(err) });
         }
       }
-      const enabled = await setLibraryTopics(db, libraryIds(on), libraryIds(off));
+      const enabled = await setLibraryTopics(db, profileId, libraryIds(on), libraryIds(off));
       if (enabled + created > 0) refresh();
-      return countFollowed(db);
+      return countFollowed(db, profileId);
     },
   };
 }

@@ -5,7 +5,6 @@
 import { type LlmProvider, nfc } from "@radard/core";
 import { type Database, profile } from "@radard/db";
 import { eq } from "drizzle-orm";
-import { PROFILE_ID } from "./topics.ts";
 
 export interface StoredProfile {
   description: string | null;
@@ -13,11 +12,11 @@ export interface StoredProfile {
 }
 
 /** Hồ sơ đang lưu; chưa có dòng nào thì cả hai trống. */
-export async function readProfile(db: Database): Promise<StoredProfile> {
+export async function readProfile(db: Database, profileId: number): Promise<StoredProfile> {
   const [p] = await db
     .select({ description: profile.description, promptContext: profile.promptContext })
     .from(profile)
-    .where(eq(profile.id, PROFILE_ID));
+    .where(eq(profile.id, profileId));
   const description = p?.description?.trim() || null;
   return { description, promptContext: p?.promptContext.trim() ?? "" };
 }
@@ -28,6 +27,7 @@ export async function readProfile(db: Database): Promise<StoredProfile> {
  */
 export async function saveProfile(
   db: Database,
+  profileId: number,
   description: string,
   promptContext?: string,
 ): Promise<void> {
@@ -39,7 +39,7 @@ export async function saveProfile(
   };
   await db
     .insert(profile)
-    .values({ id: PROFILE_ID, description: text, promptContext: promptContext ?? "" })
+    .values({ id: profileId, description: text, promptContext: promptContext ?? "" })
     .onConflictDoUpdate({ target: profile.id, set });
 }
 
