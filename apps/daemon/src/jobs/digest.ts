@@ -31,6 +31,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
+import { recordCandidatePoolSafely } from "./candidate-pool.ts";
 import type { GateCounts, GateDecision } from "./gate-decision.ts";
 import { type RankResult, rankPeriod } from "./rank.ts";
 
@@ -462,8 +463,15 @@ function rankingInfo(
   };
 }
 
-/** Chọn tin và viết nội dung cho khoảng 24 giờ kết thúc ở `slot`. Không ghi gì vào DB. */
-export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPlan> {
+/**
+ * Chọn tin và viết nội dung cho khoảng 24 giờ kết thúc ở `slot`. Tự nó không ghi gì vào DB (CLI
+ * `--dry-run` gọi thẳng); `onRanked` cho nơi gọi móc việc ghi vào ngay sau bước xếp hạng.
+ */
+export async function buildPlan(
+  deps: DigestDeps,
+  slot: Date,
+  onRanked?: (rank: RankResult) => Promise<void>,
+): Promise<DigestPlan> {
   const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
   const rankStarted = Date.now();
   const rank = await rankPeriod(deps.db, period, {
@@ -472,6 +480,7 @@ export async function buildPlan(deps: DigestDeps, slot: Date): Promise<DigestPla
     decider: deps.decider,
   });
   const rankMs = Date.now() - rankStarted;
+  await onRanked?.(rank);
   const [prof] = await deps.db.select().from(profile);
   const docsByEvent = await loadDocs(deps.db, rank);
   const date = vnDate(slot);
@@ -631,7 +640,10 @@ export async function runDigest(
   try {
     let plan = asPlan(row.meta);
     if (!plan) {
-      plan = await buildPlan(deps, slot);
+      // Ghi bể ứng viên (mọi tin qua cổng, kể cả tin không chọn); lỗi ghi bị nuốt, không chặn gửi.
+      plan = await buildPlan(deps, slot, (rank) =>
+        recordCandidatePoolSafely(deps.db, deps.profileId, rank),
+      );
       const [prof] = await deps.db.select({ lang: profile.displayLang }).from(profile);
       await deps.db
         .update(digests)

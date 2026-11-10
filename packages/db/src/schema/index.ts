@@ -1,3 +1,4 @@
+export * from "./candidate-pool.ts";
 export * from "./collected.ts";
 export * from "./delivery.ts";
 export * from "./derived.ts";
