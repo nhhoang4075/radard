@@ -290,7 +290,7 @@ describe("migration 0025 trên dữ liệu có sẵn", () => {
       const journal = JSON.parse(await readFile(journalPath, "utf8")) as {
         entries: Array<{ tag: string }>;
       };
-      journal.entries = journal.entries.filter((e) => !e.tag.startsWith("0025_"));
+      journal.entries = journal.entries.filter((e) => e.tag < "0025_");
       await writeFile(journalPath, JSON.stringify(journal));
       await migrate(mdb, { migrationsFolder: old });
       await mdb.execute(sql`insert into profile (id, prompt_context) values (1, 'x')`);
