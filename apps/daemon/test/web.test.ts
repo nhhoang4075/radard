@@ -205,9 +205,7 @@ describe("GET /o/:token", () => {
   test("không có LINK_SECRET: 404 mọi token, không ghi", async () => {
     const w = makeApp(undefined);
     for (const t of [tokenOf(0), tokenOf(1)]) expect((await open(w, t)).status).toBe(404);
-    expect(
-      (await open(makeApp(""), tokenOf(0))).status,
-    ).toBe(404);
+    expect((await open(makeApp(""), tokenOf(0))).status).toBe(404);
     await w.idle();
     expect(await opens()).toHaveLength(0);
     expect((await w.app.request("/healthz")).status).toBe(200);
