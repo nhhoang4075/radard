@@ -80,8 +80,13 @@ export interface RankResult extends Selection {
   config: RankConfig;
   /** Cụm gu (từ tin 👍) đã dùng để chấm U, gồm cả cụm `pending` chưa tham gia. */
   interestClusters: InterestCluster[];
-  /** Sàn điểm đã dùng và nguồn của nó (cố định hay phân vị). */
+  /**
+   * Sàn THÔNG BÁO (nhắm `notify.floorTargetPerDay` tin/ngày): lớp Telegram lọc bản chụp theo sàn này.
+   * Không dùng trong `select`.
+   */
   floor: FloorResult;
+  /** Sàn FEED (nhắm `feedFloorTargetPerDay` tin/ngày) đã đưa vào `select` (`selectConfig.floorS`). */
+  feedFloor: FloorResult;
   /** Mặt bằng đã dùng, để digest lưu lại và giải thích được vì sao chọn. */
   baselines: {
     metric: string;
@@ -101,6 +106,28 @@ export interface RankResult extends Selection {
 /** Khoảng 24 giờ kết thúc ở `end`. */
 export function periodEndingAt(end: Date, hours = 24): RankPeriod {
   return { start: new Date(end.getTime() - hours * 3_600_000), end };
+}
+
+/**
+ * Chủ đề đang bật của hồ sơ: chỉ loại "quan tâm" mới tính vào R; thứ tự theo lúc chọn, để hoà điểm ra
+ * kết quả như nhau mỗi lần chạy.
+ */
+export async function loadProfileTopics(
+  db: Database,
+  profileId: number,
+): Promise<{ id: number; label: string; note: string | null }[]> {
+  return db
+    .select({ id: topicsTable.id, label: topicsTable.name, note: topicsTable.labelGuide })
+    .from(profileTopics)
+    .innerJoin(topicsTable, eq(topicsTable.id, profileTopics.topicId))
+    .where(
+      and(
+        eq(profileTopics.profileId, profileId),
+        eq(profileTopics.active, true),
+        eq(profileTopics.kind, "include"),
+      ),
+    )
+    .orderBy(profileTopics.id);
 }
 
 export async function rankPeriod(
@@ -146,20 +173,7 @@ export async function rankPeriod(
     coverage: () => baseMap.get(key("coverage", null, null)),
   };
 
-  // Chỉ chủ đề đang bật, loại "quan tâm" mới tính vào R; thứ tự theo lúc chọn, để hoà điểm ra kết quả
-  // như nhau mỗi lần chạy.
-  const topics = await db
-    .select({ id: topicsTable.id, label: topicsTable.name, note: topicsTable.labelGuide })
-    .from(profileTopics)
-    .innerJoin(topicsTable, eq(topicsTable.id, profileTopics.topicId))
-    .where(
-      and(
-        eq(profileTopics.profileId, opts.profileId),
-        eq(profileTopics.active, true),
-        eq(profileTopics.kind, "include"),
-      ),
-    )
-    .orderBy(profileTopics.id);
+  const topics = await loadProfileTopics(db, opts.profileId);
   const topicIds = topics.map((t) => t.id);
 
   // Ứng viên: sự kiện có ít nhất một tài liệu mới trong khoảng.
@@ -215,16 +229,25 @@ export async function rankPeriod(
     }
   }
 
-  // URL của mọi tài liệu đã gửi trong các tin sự kiện, từ trước tới nay (không cắt 7 ngày: tin
-  // đã đọc 16/10 vẫn là đã đọc ngày 09/11). Mốc `end` giữ cho chạy lại một ngày cũ ra đúng kết quả
-  // của ngày đó. Chỉ tin gửi cho CHÍNH hồ sơ này: tin gửi người khác không làm hồ sơ này coi là đã thấy.
+  // URL của mọi tài liệu ĐÃ THẤY, từ trước tới nay (không cắt 7 ngày: tin đã đọc 16/10 vẫn là đã
+  // đọc ngày 09/11). "Đã thấy" = đã gửi trong tin sự kiện, hoặc tin feed đã có lượt hiện (quyết định
+  // 10/11/2026, điểm 5); tin feed chưa cuộn tới vẫn đủ điều kiện hôm sau. Mốc `end` giữ cho chạy lại
+  // một ngày cũ ra đúng kết quả của ngày đó. Chỉ của CHÍNH hồ sơ này.
   const sent = new Set<string>();
   for (const r of await db.execute<{ url: string }>(sql`
     select distinct d.url_canonical as url
     from deliveries dl
     cross join lateral unnest(dl.document_ids) as x(id)
     join documents d on d.id = x.id
-    where dl.profile_id = ${opts.profileId} and dl.kind = 'event' and dl.sent_at < ${period.end}`))
+    where dl.profile_id = ${opts.profileId} and dl.kind = 'event' and dl.sent_at < ${period.end}
+    union
+    select distinct d.url_canonical as url
+    from feed_impressions fi
+    join feed_items it
+      on it.profile_id = fi.profile_id and it.snapshot_id = fi.snapshot_id and it.position = fi.position
+    cross join lateral unnest(it.document_ids) as x(id)
+    join documents d on d.id = x.id
+    where fi.profile_id = ${opts.profileId} and fi.seen_at < ${period.end}`))
     sent.add(r.url);
 
   // Gu: gom lại từ đầu các tin 👍 tại mốc `end` mỗi lần xếp hạng (cụm mới mượn tên cụm lần trước).
@@ -312,16 +335,34 @@ export async function rankPeriod(
       : { event: e, c, S: scoreOf(c, config), gate };
   });
 
-  const floor = await resolveFloor(db, opts.profileId, period, config);
-  log.info("sàn điểm", {
-    profileId: opts.profileId,
-    source: floor.source,
-    value: floor.value,
-    q: floor.q ?? null,
-    n: floor.n ?? null,
-    days: floor.days,
-  });
-  const selectConfig: RankConfig = { ...config, floorS: floor.value };
+  const { feed: feedFloor, notify: floor } = await resolveFloors(
+    db,
+    opts.profileId,
+    period,
+    config,
+  );
+  for (const [kind, f] of [
+    ["feed", feedFloor],
+    ["notify", floor],
+  ] as const) {
+    log.info("sàn điểm", {
+      profileId: opts.profileId,
+      kind,
+      source: f.source,
+      value: f.value,
+      q: f.q ?? null,
+      n: f.n ?? null,
+      days: f.days,
+    });
+  }
+  // `select` chạy MỘT lần cho bản chụp feed: trần K = feedMaxItems, mỗi nguồn feedMaxPerSource, sàn
+  // feed. Cổng, vùng xám, MMR, giữ chỗ, T giữ nguyên.
+  const selectConfig: RankConfig = {
+    ...config,
+    maxItems: config.feedMaxItems,
+    maxPerSource: config.feedMaxPerSource,
+    floorS: feedFloor.value,
+  };
   const selection = select(
     scored,
     selectConfig,
@@ -334,6 +375,7 @@ export async function rankPeriod(
     selectConfig,
     selectSeed: config.temperature > 0 && opts.selectSeed !== undefined ? opts.selectSeed : null,
     floor,
+    feedFloor,
     period,
     candidates: evRows.length,
     passedGate: passing.length,
@@ -386,7 +428,7 @@ async function loadDocVectors(
 }
 
 /**
- * Sàn của lần xếp hạng: phân vị điểm S trong bể của hồ sơ ở [end − 30 ngày, end) (không gồm ngày
+ * Hai sàn của lần xếp hạng (feed và thông báo), cùng một bể: phân vị điểm S trong bể của hồ sơ ở [end − 30 ngày, end) (không gồm ngày
  * đang xếp hạng), bỏ tin đã gửi (`not_new`, N = 0) khỏi cả phân vị lẫn n. Chế độ "fixed" không đọc bể.
  *
  * LƯU Ý THANG ĐIỂM (10/11/2026): các dòng bể cũ có S theo công thức trước khi có U (hệ số ×1,0, không
@@ -394,13 +436,14 @@ async function loadDocVectors(
  * được sửa lại. Trong 14 ngày đầu của bể (`FLOOR_MIN_DAYS`) vẫn dùng sàn cố định 0,59 theo cơ chế
  * hiện có; logic sàn không đổi vì U.
  */
-async function resolveFloor(
+async function resolveFloors(
   db: Database,
   profileId: number,
   period: RankPeriod,
   config: RankConfig,
-): Promise<FloorResult> {
-  if (config.floorMode === "fixed") return { value: config.floorS, source: "fixed", days: 0 };
+): Promise<{ feed: FloorResult; notify: FloorResult }> {
+  const fixed: FloorResult = { value: config.floorS, source: "fixed", days: 0 };
+  if (config.floorMode === "fixed") return { feed: fixed, notify: fixed };
   let rows: Awaited<ReturnType<typeof readCandidateScores>>;
   try {
     rows = await readCandidateScores(db, {
@@ -414,11 +457,27 @@ async function resolveFloor(
       profileId,
       error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
     });
-    return { value: config.floorS, source: "fixed", days: 0 };
+    return { feed: fixed, notify: fixed };
   }
   const days = new Set(rows.map((r) => r.periodEnd.getTime())).size;
   const scores = rows.filter((r) => r.rejectReason !== "not_new" && r.n !== 0).map((r) => r.score);
-  return percentileFloor({ scores, days, fixed: config.floorS });
+  return {
+    // Sàn feed: mục tiêu ~30 tin/ngày; n ≤ mục tiêu (q kẹp = 0) thì không lọc theo sàn.
+    feed: percentileFloor({
+      scores,
+      days,
+      fixed: config.floorS,
+      targetPerDay: config.feedFloorTargetPerDay,
+      noFilterAtZeroQ: true,
+    }),
+    // Sàn thông báo: như sàn phân vị hiện có (~12 tin/ngày).
+    notify: percentileFloor({
+      scores,
+      days,
+      fixed: config.floorS,
+      targetPerDay: config.notify.floorTargetPerDay,
+    }),
+  };
 }
 
 /**

@@ -112,9 +112,12 @@ const deps = (profileId = 1) => ({
   recipient: RECIPIENT,
 });
 
-/** 8 tin tốt (một nguồn: 5 được chọn, 3 vượt hạn mức nguồn) và 1 tin R thấp bị cổng loại. */
+/**
+ * 12 tin tốt một nguồn và 1 tin R thấp bị cổng loại. Bản chụp feed: 10 tin vào (feedMaxPerSource = 10),
+ * 2 vượt hạn mức nguồn. Lớp thông báo: 5 tin (5 tin/nguồn cho 7 tin đầu).
+ */
 async function seedDay() {
-  for (let i = 0; i < 8; i++) await addEvent(0.79);
+  for (let i = 0; i < 12; i++) await addEvent(0.79);
   await addEvent(0.1);
 }
 
@@ -123,10 +126,10 @@ describe("candidate_pool", () => {
     await seedDay();
     await runDigest(deps(), SLOT);
     const rows = await db.select().from(candidatePool);
-    expect(rows).toHaveLength(8);
-    expect(rows.filter((r) => r.selected)).toHaveLength(5);
+    expect(rows).toHaveLength(12);
+    expect(rows.filter((r) => r.selected)).toHaveLength(10);
     const dropped = rows.filter((r) => !r.selected);
-    expect(dropped.map((r) => r.rejectReason)).toEqual(["source_cap", "source_cap", "source_cap"]);
+    expect(dropped.map((r) => r.rejectReason)).toEqual(["source_cap", "source_cap"]);
     expect(dropped.every((r) => r.penalty === null)).toBe(true);
     expect(rows.every((r) => r.profileId === 1 && r.u === 0)).toBe(true);
     expect(rows[0]?.periodEnd.getTime()).toBe(SLOT.getTime());
@@ -164,7 +167,7 @@ describe("candidate_pool", () => {
     const rank = await rankPeriod(db, PERIOD, { profileId: 1 });
     await recordCandidatePool(db, 1, rank);
     await recordCandidatePool(db, 1, rank);
-    expect(await db.select().from(candidatePool)).toHaveLength(8);
+    expect(await db.select().from(candidatePool)).toHaveLength(12);
     // Kết quả mới ít hơn: dòng thừa bị xoá, dòng còn lại được cập nhật.
     await recordCandidatePool(db, 1, { ...rank, picked: rank.picked.slice(0, 2), rejected: [] });
     const rows = await db.select().from(candidatePool);
@@ -179,7 +182,7 @@ describe("candidate_pool", () => {
     await recordCandidatePool(db, 1, rank);
     await recordCandidatePool(db, 2, { ...rank, picked: rank.picked.slice(0, 1), rejected: [] });
     const range = { from: new Date(SLOT.getTime() - 1000), to: new Date(SLOT.getTime() + 1000) };
-    expect(await readCandidateScores(db, { profileId: 1, ...range })).toHaveLength(8);
+    expect(await readCandidateScores(db, { profileId: 1, ...range })).toHaveLength(12);
     const two = await readCandidateScores(db, { profileId: 2, ...range });
     expect(two).toHaveLength(1);
     expect(two[0]?.profileId).toBe(2);

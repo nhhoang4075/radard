@@ -147,8 +147,26 @@ export interface RankConfig {
     dropBelowWeight: number;
     nameCarryMinCosine: number;
   };
+  /**
+   * Trần `select` dùng: số tin tối đa và số tin tối đa mỗi nguồn. Luồng thật (`rankPeriod`) đặt hai
+   * giá trị này bằng `feedMaxItems` / `feedMaxPerSource` khi dựng bản chụp feed.
+   */
   maxItems: number;
   maxPerSource: number;
+  /**
+   * Feed web (quyết định 10/11/2026): `select` chạy MỘT lần với trần K = `feedMaxItems` (là trần,
+   * không phải mục tiêu: hết tin đạt sàn thì dừng) và mỗi nguồn tối đa `feedMaxPerSource` tin.
+   */
+  feedMaxItems: number;
+  feedMaxPerSource: number;
+  /** Số tin/ngày mà sàn phân vị của feed nhắm tới (sàn feed tách khỏi sàn thông báo). */
+  feedFloorTargetPerDay: number;
+  /**
+   * Lớp thông báo (Telegram): lấy tối đa `notify.maxItems` tin ĐẦU của bản chụp có S ≥ sàn thông báo,
+   * mỗi nguồn tối đa `notify.maxPerSource` ("5 cho 7 tin đầu"); sàn thông báo nhắm
+   * `notify.floorTargetPerDay` tin/ngày. Không ảnh hưởng việc chọn feed.
+   */
+  notify: { maxItems: number; maxPerSource: number; floorTargetPerDay: number };
   /** Phạt trùng: từ giống `start` bắt đầu phạt, tới `start + span` thì phạt tối đa `max`. */
   mmr: { start: number; span: number; max: number };
   /**
@@ -159,6 +177,10 @@ export interface RankConfig {
   /** Uy tín của nguồn (A), 0–1, theo `sources.trust_score`. */
   priors: ReadonlyMap<number, number>;
 }
+
+/** Trần K của bản chụp feed và trần mỗi nguồn của feed (quyết định 10/11/2026). */
+const FEED_MAX_ITEMS = 30;
+const FEED_MAX_PER_SOURCE = 10;
 
 /** Hằng số khởi đầu (xep-hang.html), chưa kiểm chứng: chỉnh lại sau tuần đầu theo 👍/👎. */
 export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
@@ -183,9 +205,17 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   floorMode: "percentile",
   neutralP: 0.3,
   followUpF: 0.6,
-  maxItems: 7,
-  // 3 làm digest 12/10 chỉ còn 4 tin dù 5 tin HN vượt sàn; nâng lên 5 (chốt 13/10/2026).
-  maxPerSource: 5,
+  // `select` của luồng thật chạy với trần feed (rankPeriod đặt từ feedMaxItems/feedMaxPerSource).
+  maxItems: FEED_MAX_ITEMS,
+  maxPerSource: FEED_MAX_PER_SOURCE,
+  // Feed web (quyết định 10/11/2026): K = 30 là trần, không phải mục tiêu; 10 tin/nguồn là mặc định
+  // đoán, chưa đo. Sàn feed nhắm ~30 tin/ngày, chỉ dùng phân vị sau FLOOR_MIN_DAYS ngày dữ liệu bể.
+  feedMaxItems: FEED_MAX_ITEMS,
+  feedMaxPerSource: FEED_MAX_PER_SOURCE,
+  feedFloorTargetPerDay: 30,
+  // Lớp thông báo: 7 tin như digest cũ; 5 tin/nguồn (3 làm digest 12/10 chỉ còn 4 tin dù 5 tin HN
+  // vượt sàn; nâng lên 5, chốt 13/10/2026); sàn nhắm ~12 tin/ngày như sàn phân vị hiện có.
+  notify: { maxItems: 7, maxPerSource: 5, floorTargetPerDay: 12 },
   mmr: { start: 0.85, span: 0.1, max: 0.3 },
   // Nhiệt độ T của chọn Gumbel top-k. 0,03 do chủ dự án duyệt 10/11/2026 (chưa đo trên bể thật).
   // Sẽ chỉnh sau tuần đầu có bể, theo tiêu chí: p̂ ≥ 0,05 cho top 12 và trung bình p̂ của 7 tin

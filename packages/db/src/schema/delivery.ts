@@ -11,6 +11,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -18,6 +19,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { feedItems, feedSnapshots } from "./feed.ts";
 import { jsonb } from "./json.ts";
 import { profile } from "./profile.ts";
 
@@ -57,8 +59,16 @@ export const digests = pgTable(
      * chọn lại có thể ra danh sách khác). Kèm điểm, cấu hình, mặt bằng để giải thích vì sao chọn.
      */
     meta: jsonb<Record<string, unknown>>("meta").notNull().default(sql`'{}'::jsonb`),
+    /** Bản chụp feed mà bản thông báo này lấy tin; NULL ở digest trước khi có feed (11/2026). */
+    feedSnapshotId: bigint("feed_snapshot_id", { mode: "number" }),
   },
   (t) => [
+    // Khoá ngoại ghép (bản chụp, hồ sơ): digest của hồ sơ A không thể trỏ vào bản chụp của hồ sơ B.
+    foreignKey({
+      name: "digests_feed_snapshot_fk",
+      columns: [t.feedSnapshotId, t.profileId],
+      foreignColumns: [feedSnapshots.id, feedSnapshots.profileId],
+    }),
     // Một người nhận của một hồ sơ chỉ nhận một digest cho mỗi khoảng: job chạy lại không gửi trùng.
     uniqueIndex("digests_once_uq").on(t.profileId, t.channel, t.recipient, t.periodEnd),
     index("digests_profile_idx").on(t.profileId, t.periodEnd),
@@ -96,8 +106,16 @@ export const deliveries = pgTable(
     body: text("body").notNull(),
     meta: jsonb<Record<string, unknown>>("meta").notNull().default(sql`'{}'::jsonb`),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Tin feed tương ứng (tin sự kiện gửi từ bản chụp); NULL với tin mở đầu, tin thử, tin cũ. */
+    feedItemId: bigint("feed_item_id", { mode: "number" }),
   },
   (t) => [
+    // Khoá ngoại ghép (tin feed, hồ sơ): tin gửi cho hồ sơ A không thể trỏ vào tin feed của hồ sơ B.
+    foreignKey({
+      name: "deliveries_feed_item_fk",
+      columns: [t.feedItemId, t.profileId],
+      foreignColumns: [feedItems.id, feedItems.profileId],
+    }),
     uniqueIndex("deliveries_message_uq").on(t.channel, t.recipient, t.messageId),
     index("deliveries_digest_idx").on(t.digestId),
     // Truy vấn "đã gửi" của xếp hạng: theo hồ sơ, loại tin, mốc gửi.
@@ -138,8 +156,20 @@ export const feedback = pgTable(
     sourceMessageId: text("source_message_id"),
     meta: jsonb<Record<string, unknown>>("meta").notNull().default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Tin feed được phản hồi: phản hồi từ web luôn có; phản hồi Telegram có khi tin gửi từ bản chụp
+     * (`deliveries.feed_item_id`). NULL với phản hồi cũ và góp ý chung.
+     */
+    feedItemId: bigint("feed_item_id", { mode: "number" }),
   },
   (t) => [
+    // Khoá ngoại ghép như deliveries: phản hồi của hồ sơ A không thể trỏ vào tin feed của hồ sơ B.
+    foreignKey({
+      name: "feedback_feed_item_fk",
+      columns: [t.feedItemId, t.profileId],
+      foreignColumns: [feedItems.id, feedItems.profileId],
+    }),
+    index("feedback_feed_item_idx").on(t.feedItemId),
     index("feedback_delivery_idx").on(t.deliveryId),
     index("feedback_created_idx").on(t.createdAt),
     index("feedback_profile_idx").on(t.profileId, t.createdAt),
