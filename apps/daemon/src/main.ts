@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 /**
- * Điểm vào daemon. Một image, nhiều vai trò chọn bằng `SERVICE_ROLE`:
- *   scheduler  đồng bộ lịch cron (chỉ chạy MỘT bản)
- *   worker     chạy job, nhân bản được
- *   bot        nhận lượt bấm 👍/👎 (chỉ MỘT bản cho mỗi bot token)
- *   web        máy chủ HTTP: /healthz, /o/:token (theo dõi lượt mở link), /api (đăng nhập) và giao diện web
- *   all        cả bốn, dùng khi dev và trên Railway ở MVP-0
+ * Daemon entry point. One image, several roles, selected with `SERVICE_ROLE`:
+ *   scheduler  syncs the cron schedule (run ONE instance only)
+ *   worker     runs jobs, can be replicated
+ *   bot        receives 👍/👎 presses (ONE instance per bot token only)
+ *   web        HTTP server: /healthz, /o/:token (tracks link opens), /api (sign-in) and the web UI
+ *   all        all four, used in dev and on Railway in MVP-0
  */
 import { createLogger } from "@radard/core";
 import { runMigrations } from "@radard/db";
@@ -44,8 +44,8 @@ async function main(): Promise<void> {
 
   const stops: Array<() => void | Promise<void>> = [];
   if (runsScheduler) {
-    // Thư viện chủ đề sống trong code: mỗi lần deploy nạp lại, khỏi chạy tay `topics seed`. Chạy lại
-    // nhiều lần không đổi gì. Chỉ vai trò scheduler (một bản duy nhất) làm, để không hai bản cùng ghi.
+    // The topic library lives in code: each deploy reloads it, so `topics seed` need not be run by hand. Running it
+    // many times changes nothing. Only the scheduler role (a single instance) does this, so two instances do not write at the same time.
     log.info("thư viện chủ đề", await seedLibrary(deps.db));
     stops.push(await startScheduler(boss, deps.db));
   }
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
   }
   log.info("đang chạy", { role: env.role });
 
-  // Đo RAM của chính tiến trình để biết nó nằm ở heap JS hay ngoài heap (Railway tính tiền theo RAM).
+  // Measure the process's own RAM to tell whether it sits in the JS heap or outside it (Railway bills by RAM).
   const mb = (n: number) => Math.round(n / 1_048_576);
   const memTimer = setInterval(() => {
     const m = process.memoryUsage();
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
     stopping = true;
     log.info("dừng", { signal });
     for (const stop of stops) await stop();
-    // Chờ job đang chạy làm xong rồi mới đóng; Railway cho khoảng 30 giây sau SIGTERM.
+    // Wait for running jobs to finish before closing; Railway allows about 30 seconds after SIGTERM.
     await boss.stop({ graceful: true, timeout: 25_000 });
     await deps.db.$bun.close();
     process.exit(0);

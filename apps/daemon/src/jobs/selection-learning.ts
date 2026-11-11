@@ -1,20 +1,20 @@
 /**
- * Dữ liệu học của chọn Gumbel top-k (mo-hinh-de-xuat.html, mục "Hai nhịp"): ngay sau khi chọn, chạy
- * lại CHÍNH `select` 10.000 lần với đúng đầu vào của ngày đó (cùng cấu hình gồm T và sàn, cùng
- * bể ứng viên) để ước lượng p_i của từng ứng viên và p_ij của các cặp trong tin đã gửi; lưu cùng
- * logP của danh sách thật, hạt giống chọn và hạt giống mô phỏng.
+ * Learning data of the Gumbel top-k selection (mo-hinh-de-xuat.html, section "Two beats"): right after selecting, run
+ * `select` itself 10.000 times with exactly that day's input (same config including T and floor, same
+ * candidate pool) to estimate p_i of each candidate and p_ij of the pairs in the sent items; store it with
+ * logP of the real list, the selection seed and the simulation seed.
  *
- * Nơi lưu: `digests.meta.learning` (JSON), không thêm bảng. Lý do: dữ liệu gắn đúng một lần digest
- * (đã có `profile_id`, khoá chạy lại, vòng đời chung), chỉ đọc theo lô hằng tuần, vài KB mỗi ngày.
- * Bảng riêng chỉ đáng khi cần truy vấn p theo từng tin qua nhiều ngày; khi đó migration từ JSON dễ.
+ * Where it is stored: `digests.meta.learning` (JSON), no new table. Reason: the data belongs to exactly one digest
+ * (already has `profile_id`, a rerun key, a shared lifecycle), and is only read in weekly batches, a few KB per day.
+ * A separate table is only worth it when p has to be queried per item across many days; then migrating from JSON is easy.
  *
- * Bể = tin ĐÃ gửi + tin qua cổng/sàn nhưng không được chọn (`not_picked`, `source_cap`); tin bị
- * cổng, sàn hay `not_new` loại có p = 0 nên không ghi. p_ij chỉ ghi cho các cặp trong tin đã gửi.
+ * The pool = items SENT + items that passed the gate/floor but were not selected (`not_picked`, `source_cap`); items dropped by
+ * the gate, floor or `not_new` have p = 0 so are not written. p_ij is written only for pairs within the sent items.
  *
- * Từ khi có feed (quyết định 10/11/2026): `select` chọn bản chụp K tin, và "đã gửi" là lớp thông báo
- * (≤ 7 tin đầu của bản chụp qua sàn thông báo, `pickNotify`). Mô phỏng chạy CẢ hai bước (select rồi
- * pickNotify) nên p_i, p_ij vẫn là xác suất được GỬI của đúng 7 tin, như trước. Tin trong bản chụp
- * mà không gửi nằm trong bể với `sent = false`. Học theo vị trí của feed (θk) là việc sau.
+ * Since the feed existed (decision 10/11/2026): `select` picks K items from the snapshot, and "sent" is the notification
+ * layer (the first ≤ 7 items of the snapshot that pass the notification floor, `pickNotify`). The simulation runs BOTH steps (select then
+ * pickNotify) so p_i, p_ij remain the probability of being SENT for exactly 7 items, as before. Snapshot items
+ * that are not sent are in the pool with `sent = false`. Learning by feed position (θk) is for later.
  */
 import {
   deriveSimSeed,
@@ -27,32 +27,32 @@ import {
 } from "@radard/core";
 import type { RankResult } from "./rank.ts";
 
-/** Số lần chạy Monte Carlo mỗi bản tin (duyệt 10/11/2026). */
+/** Number of Monte Carlo runs per digest (approved 10/11/2026). */
 export const SIMULATION_RUNS = 10_000;
 
 export interface SelectionLearning {
   version: 1;
-  /** Hạt giống của lần chọn thật; chạy lại với hạt này ra đúng tập tin đã chọn. */
+  /** Seed of the real selection; re-running with this seed gives exactly the chosen set. */
   selectSeed: number;
-  /** Hạt giống mô phỏng = deriveSimSeed(selectSeed). */
+  /** Simulation seed = deriveSimSeed(selectSeed). */
   simSeed: number;
   temperature: number;
   runs: number;
-  /** ln P của danh sách đã gửi theo Plackett–Luce (xấp xỉ, xem `orderedListLogProb`). */
+  /** ln P of the sent list under Plackett–Luce (approximation, see `orderedListLogProb`). */
   logP: number | null;
-  /** p̂_i của mọi tin trong bể, S giảm dần. */
+  /** p̂_i of every item in the pool, S sorted descending. */
   pool: { eventId: number; S: number; p: number; sent: boolean }[];
-  /** p̂_ij của các cặp trong tin đã gửi (n·(n−1)/2 cặp), a < b. */
+  /** p̂_ij of the pairs in the sent items (n·(n−1)/2 pairs), a < b. */
   pairs: { a: number; b: number; p: number }[];
   ms: number;
 }
 
-/** Hạt giống mạnh (crypto), số nguyên không dấu 32 bit. */
+/** Strong seed (crypto), unsigned 32-bit integer. */
 export function newSelectSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
 }
 
-/** Các sự kiện được báo (gửi) từ một kết quả `select`: vị trí = thứ tự trong `picked`. */
+/** The events notified (sent) from one `select` result: position = order in `picked`. */
 export function notifiedEventIds(selection: Selection, rule: NotifyRule): number[] {
   return pickNotify(
     selection.picked.map((p, i) => ({
@@ -65,7 +65,7 @@ export function notifiedEventIds(selection: Selection, rule: NotifyRule): number
   ).map((x) => x.eventId);
 }
 
-/** Lớp thông báo của một lần xếp hạng: trần của `config.notify` và sàn thông báo `floor`. */
+/** The notification layer of one ranking run: the cap of `config.notify` and the notification floor `floor`. */
 export function notifyRuleOf(rank: RankResult): NotifyRule {
   return {
     floor: rank.floor.value,
@@ -74,7 +74,7 @@ export function notifyRuleOf(rank: RankResult): NotifyRule {
   };
 }
 
-/** Null khi chọn xác định (T = 0, không hạt) hoặc không có tin nào được gửi. */
+/** Null when the selection is deterministic (T = 0, no seed) or no item is sent. */
 export function computeSelectionLearning(rank: RankResult): SelectionLearning | null {
   const seed = rank.selectSeed;
   const cfg = rank.selectConfig;

@@ -1,14 +1,14 @@
 /**
- * Ghi một lượt bấm 👍/👎 vào `feedback`. Chỉ ghi thêm: bấm 👍 rồi đổi ý 👎 là hai dòng, dòng mới
- * nhất là ý kiến hiện tại. Bấm lại đúng nút đang chọn là BỎ CHỌN: ghi một dòng `clear`, ý kiến hiện
- * tại thành "chưa chọn" (quyết định 09/11/2026, thay quyết định 13/10/2026 là bấm lại thì bỏ qua).
- * Khi đếm, mỗi tin lấy dòng mới nhất; `clear` không tính là đã có phản hồi.
+ * Records one 👍/👎 press into `feedback`. Append-only: pressing 👍 then 👎 gives two rows; the newest row
+ * is the current opinion. Pressing the same button again (the one already selected) UNSELECTS it: it writes a `clear` row, making the current
+ * opinion "not selected" (decision 09/11/2026, replacing the decision of 13/10/2026 that a repeat press is ignored).
+ * When counting, each delivery uses its newest row; `clear` does not count as feedback.
  *
- * Bấm lại đúng nút trong vòng `DOUBLE_TAP_MS` kể từ dòng vừa ghi coi là bấm đúp, không bỏ chọn:
- * hai lượt bấm gần như cùng lúc là một ý.
+ * A repeat press of the same button within `DOUBLE_TAP_MS` of the row just written counts as a double tap, not an unselect:
+ * two presses almost at the same time are one opinion.
  *
- * Không ghi trùng khi kênh giao lại cùng lượt bấm: `source_message_id` = id của lượt bấm, và khoá
- * duy nhất (channel, recipient, source_message_id) chặn dòng thứ hai.
+ * No duplicate writes when the channel redelivers the same press: `source_message_id` = the id of the press, and the unique key
+ * (channel, recipient, source_message_id) blocks the second row.
  */
 import type { FeedbackEvent, FeedbackState } from "@radard/core";
 import { createLogger } from "@radard/core";
@@ -22,12 +22,12 @@ const DOUBLE_TAP_MS = 2_000;
 export async function recordFeedback(
   db: Database,
   ev: FeedbackEvent,
-  /** Hồ sơ gán cho phản hồi khi không tìm thấy tin; có tin thì lấy hồ sơ của tin đó. */
+  /** Profile to assign the feedback to when no item is found; if there is an item, use that item's profile. */
   profileId: number,
 ): Promise<{
   recorded: boolean;
   deliveryId: number | null;
-  /** Ý kiến hiện tại của tin sau lượt bấm. */
+  /** The item's current opinion after this press. */
   state: FeedbackState;
   reason?: "replayed" | "unchanged";
 }> {
@@ -45,7 +45,7 @@ export async function recordFeedback(
         eq(deliveries.messageId, ev.messageId),
       ),
     );
-  // Không tìm thấy tin (tin không do radard ghi lại): vẫn giữ phản hồi, `delivery_id` trống.
+  // Item not found (not recorded by radard): still keep the feedback, with `delivery_id` empty.
   const deliveryId = d?.id ?? null;
   let kind: "like" | "dislike" | "clear" = ev.kind;
   if (deliveryId !== null) {
@@ -56,7 +56,7 @@ export async function recordFeedback(
         and(
           eq(feedback.deliveryId, deliveryId),
           eq(feedback.recipient, ev.recipient),
-          // Nhận xét bằng chữ (sau này) không phải "ý kiến hiện tại" về nút.
+          // A text comment (later) is not the "current opinion" about the button.
           inArray(feedback.kind, ["like", "dislike", "clear"]),
         ),
       )
@@ -73,10 +73,10 @@ export async function recordFeedback(
   const rows = await db
     .insert(feedback)
     .values({
-      // Tin đã biết thì phản hồi thuộc đúng hồ sơ của tin, không phụ thuộc người nối dây.
+      // For a known item, the feedback belongs to the item's own profile, regardless of the caller that links it.
       profileId: d?.profileId ?? profileId,
       deliveryId,
-      // Tin gửi từ bản chụp feed: nối phản hồi tới tin feed, để web và Telegram chung một ý kiến.
+      // Item sent from the feed snapshot: link the feedback to the feed item, so web and Telegram share one opinion.
       feedItemId: d?.feedItemId ?? null,
       channel: ev.channel,
       recipient: ev.recipient,

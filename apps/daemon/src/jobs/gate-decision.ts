@@ -1,15 +1,15 @@
 /**
- * Cổng chủ đề bằng model quyết định (Jev): sự kiện có R trong vùng xám [0,5; 0,7) được hỏi "tin
- * này có chủ yếu nói về chủ đề này không", thay cho luật R ≥ 0,6.
+ * Topic gate by the decision model (Jev): an event whose R is in the grey zone [0,5; 0,7) is asked "is this
+ * article mainly about this topic", instead of the rule R ≥ 0,6.
  *
- * Đo 13–16/10/2026 trên tin thật có điểm chủ đề trong vùng này: Jev ở ngưỡng 0,6 khớp nhãn tham
- * chiếu 84%, luật R ≥ 0,6 chỉ 53%; bạn đã xác nhận các nhãn tham chiếu. Câu hỏi và dạng trạng thái
- * giữ đúng như lúc đo. Tên chủ đề và phạm vi đưa cho model bằng tiếng Anh (`topicNameEn`: tên đã
- * đo của thư viện; tên tiếng Việt trong phạm vi được thay bằng tên đó), vì Jev yếu nhất ngoài
- * tiếng Anh.
+ * Measured 13–16/10/2026 on real items whose topic score is in this zone: Jev at threshold 0,6 matches the reference labels
+ * 84%, the rule R ≥ 0,6 only 53%; you confirmed the reference labels. The question and the status form stay exactly as measured.
+ * The topic name and scope are given to the model in English (`topicNameEn`: the name measured in the
+ * library; the Vietnamese name in the scope is replaced with it), because Jev is weakest outside
+ * English.
  *
- * Không có model quyết định, hay lời gọi lỗi: sự kiện đó dùng lại luật R ≥ `gateR` và được đánh
- * dấu `fallback`. Bước xếp hạng không bao giờ hỏng vì model quyết định.
+ * With no decision model, or on a failed call, the event falls back to the rule R ≥ `gateR` and is marked
+ * `fallback`. The ranking step never fails because of the decision model.
  */
 import { createLogger, type DecisionProvider, type RankConfig, type RankEvent } from "@radard/core";
 import { type Database, docText, documents, topics as topicsTable } from "@radard/db";
@@ -18,42 +18,42 @@ import { topicNameEn } from "./topic-overlap.ts";
 
 const log = createLogger("gate");
 
-/** Câu hỏi đúng như lúc đo (thử nghiệm B, 13–16/10/2026). */
+/** The question exactly as measured (experiment B, 13–16/10/2026). */
 export const TOPIC_GATE_QUESTION = "Is this news item mainly about the topic below?";
-/** Số ký tự đầu của văn bản đã embed đưa vào trích đoạn (bắt đầu bằng tiêu đề), như lúc đo. */
+/** Number of leading characters of the embedded text that go into the excerpt (starting with the title), as measured. */
 export const GATE_EXCERPT_CHARS = 400;
-/** Số lời gọi chạy cùng lúc: mỗi lời gọi ~0,6–1 giây. */
+/** Number of calls running at once: each call takes ~0,6–1 seconds. */
 export const GATE_CONCURRENCY = 8;
 
-/** Một sự kiện đã được xét bằng model quyết định (hoặc lẽ ra được hỏi mà không hỏi được). */
+/** An event that was checked by the decision model (or should have been asked but could not be). */
 export interface GateDecision {
   eventId: number;
-  /** Tiêu đề sự kiện, để đọc plan. */
+  /** Event title, for reading the plan. */
   title: string;
   R: number;
   topicId: number;
-  /** Nhãn tiếng Việt của chủ đề, để đọc plan. */
+  /** Vietnamese label of the topic, for reading the plan. */
   topic: string;
-  /** Xác suất "có" của model; `null` khi không hỏi được. */
+  /** The model's "yes" probability; `null` when it could not be asked. */
   probability: number | null;
-  /** Qua cổng hay không: theo xác suất, hoặc theo luật R ≥ `gateR` khi `fallback`. */
+  /** Whether it passes the gate: by probability, or by the rule R ≥ `gateR` when `fallback`. */
   pass: boolean;
-  /** `true`: không có model quyết định hoặc lời gọi lỗi, nên dùng luật R ≥ `gateR`. */
+  /** `true`: no decision model or the call failed, so the rule R ≥ `gateR` is used. */
   fallback: boolean;
 }
 
 export interface GateCounts {
-  /** Số sự kiện có R trong vùng xám. */
+  /** Number of events with R in the grey zone. */
   inBand: number;
-  /** Số lời gọi model có câu trả lời. */
+  /** Number of model calls that returned an answer. */
   asked: number;
   passed: number;
   rejected: number;
-  /** Số sự kiện dùng luật cũ vì không hỏi được. */
+  /** Number of events that used the old rule because they could not be asked. */
   fallback: number;
 }
 
-/** Ứng viên cần hỏi: sự kiện, R, chủ đề cho R và tài liệu cho R (tài liệu khớp chủ đề nhất). */
+/** Candidates to ask: event, R, the topic that gave R and the document that gave R (the most topic-matching document). */
 export interface GateCandidate {
   event: RankEvent;
   R: number;
@@ -84,7 +84,7 @@ export function countGate(decisions: readonly GateDecision[]): GateCounts {
   };
 }
 
-/** Hỏi model quyết định cho từng ứng viên, tối đa `GATE_CONCURRENCY` lời gọi cùng lúc. */
+/** Asks the decision model for each candidate, at most `GATE_CONCURRENCY` calls at once. */
 export async function decideGate(
   db: Database,
   candidates: readonly GateCandidate[],
@@ -146,9 +146,9 @@ async function askOne(decider: DecisionProvider, state: DecideState): Promise<nu
 }
 
 /**
- * Thay tên tiếng Việt của các chủ đề nhắc tới trong phạm vi ("→ Agent AI") bằng tên tiếng Anh. Chỉ
- * thay trọn tên (không dính chữ cái hai bên: nhãn "Agent" không được thay trong "Agents"); tên dài
- * thay trước, để "Model AI: phát hành và hành vi" không bị thay dở bởi một tên ngắn hơn.
+ * Replaces the Vietnamese names of topics mentioned in the scope ("→ Agent AI") with English names. Only
+ * whole names are replaced (no letters stuck to either side: the label "Agent" is not replaced inside "Agents"); long names
+ * are replaced first, so "Model AI: phát hành và hành vi" is not partially replaced by a shorter name.
  */
 export function englishScopeNote(note: string, names: ReadonlyMap<string, string>): string {
   let out = note;
@@ -162,7 +162,7 @@ export function englishScopeNote(note: string, names: ReadonlyMap<string, string
   return out;
 }
 
-/** Mọi chủ đề (để thay tên trong phạm vi), khoá theo id, kèm tên và phạm vi tiếng Anh. */
+/** All topics (to replace names inside scopes), keyed by id, with their English name and scope. */
 async function loadTopics(db: Database): Promise<Map<number, TopicInfo>> {
   const rows = await db
     .select({
@@ -198,7 +198,7 @@ async function loadItems(db: Database, ids: number[]) {
   );
 }
 
-/** Chạy `fn` cho từng phần tử, tối đa `limit` cùng lúc; kết quả giữ đúng thứ tự đầu vào. */
+/** Runs `fn` for each element, at most `limit` at once; results keep the input order. */
 export async function mapLimit<T, R>(
   items: readonly T[],
   limit: number,

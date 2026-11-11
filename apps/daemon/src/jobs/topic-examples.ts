@@ -1,12 +1,12 @@
 /**
- * Tin giả định cho chủ đề (HyDE, Gao và cộng sự 2022): mỗi chủ đề được thêm vài tin ngắn do LLM
- * viết như tin thật, embed như một tài liệu. Một câu mô tả trừu tượng nằm xa tiêu đề cụ thể của
- * tin thật; các tin giả định thì cùng kiểu câu và cùng từ khoá. Điểm R của tin với chủ đề là cosine
- * lớn nhất trong vector mô tả và các vector này (`scoreTopics`).
+ * Hypothetical items for a topic (HyDE, Gao et al. 2022): each topic gets a few short items written by the LLM
+ * as if they were real news, embedded like a document. An abstract description sits far from the specific headlines of
+ * real items; hypothetical items share the same sentence style and keywords. The R score of an item for a topic is the max
+ * cosine between the item vector and these vectors (`scoreTopics`).
  *
- * Làm một lần cho mỗi chủ đề (không làm cho từng tin), không có LLM hay lời gọi lỗi thì chủ đề giữ
- * nguyên cách chấm bằng mô tả, và lượt sau thử lại. Đây là thay đổi cách tính R (đề xuất C trong
- * docs/mo-hinh-de-xuat.html, chủ nhân duyệt 10/11/2026).
+ * Done once per topic (not per item). With no LLM or on a failed call, the topic keeps
+ * its description-based scoring, and the next run retries. This changes how R is computed (proposal C in
+ * docs/mo-hinh-de-xuat.html, approved by the owner 10/11/2026).
  */
 import { createLogger, type EmbeddingProvider, type LlmProvider } from "@radard/core";
 import { type Database, docTopicScores, profileTopics, topicExamples, topics } from "@radard/db";
@@ -14,17 +14,17 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 const log = createLogger("topic-examples");
 
-/** Số tin giả định mỗi chủ đề (đề xuất 3–5). */
+/** Number of hypothetical items per topic (proposal 3–5). */
 export const EXAMPLES_PER_TOPIC = 4;
 const MIN_WORDS = 4;
 const MAX_WORDS = 30;
-/** Ít hơn số này thì coi như chưa có; từ số này trở lên là đủ dùng. */
+/** Fewer than this many means not ready yet; at or above this it is enough to use. */
 export const MIN_EXAMPLES = 3;
-/** Chủ đề vừa lỗi thì chờ chừng này mới thử lại, để không đốt tiền LLM mỗi lượt process. */
+/** A topic that just failed waits this long before retrying, so no LLM money is wasted on every process run. */
 const RETRY_AFTER_MS = 3_600_000;
 const lastFailure = new Map<number, number>();
 
-/** Cho test: xoá nhớ lần lỗi để thử lại ngay. */
+/** For tests: clears the failure memory so it retries immediately. */
 export function resetExampleBackoff(): void {
   lastFailure.clear();
 }
@@ -41,7 +41,7 @@ export function examplesPrompt(name: string, embedText: string): string {
 
 const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
-/** Đọc mảng JSON các chuỗi; bỏ mục sai độ dài và trùng. Không thấy mảng thì lỗi (để thử lại). */
+/** Reads a JSON array of strings; drops items of the wrong length and duplicates. Without an array, throws an error (to retry). */
 export function parseExamples(reply: string): string[] {
   const start = reply.indexOf("[");
   const end = reply.lastIndexOf("]");
@@ -62,8 +62,8 @@ export function parseExamples(reply: string): string[] {
 }
 
 /**
- * Sinh tin giả định cho mọi chủ đề đã có vector mà chưa đủ tin của model hiện tại. Trả về số chủ đề
- * vừa được thêm. Lỗi của một chủ đề không làm hỏng chủ đề khác.
+ * Generates hypothetical items for every topic that has a vector but not yet enough items from the current model. Returns the number
+ * just added. An error on one topic does not break other topics.
  */
 export async function ensureTopicExamples(
   db: Database,
@@ -110,7 +110,7 @@ export async function ensureTopicExamples(
             embeddingModel: embedder.model,
           })),
         );
-        // Cách chấm của chủ đề đổi: điểm cũ (chỉ theo mô tả) không còn đúng, tính lại.
+        // The topic's scoring changed: old scores (description-only) are no longer valid, so recompute.
         await tx.delete(docTopicScores).where(eq(docTopicScores.topicId, t.id));
       });
       lastFailure.delete(t.id);
@@ -127,7 +127,7 @@ export async function ensureTopicExamples(
   return added;
 }
 
-/** Một lời gọi LLM, thử lại đúng một lần khi câu trả lời không đọc được hoặc quá ít tin. */
+/** One LLM call, retried exactly once when the answer cannot be read or has too few items. */
 async function writeExamples(llm: LlmProvider, name: string, embedText: string): Promise<string[]> {
   let error = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -136,7 +136,7 @@ async function writeExamples(llm: LlmProvider, name: string, embedText: string):
         task: "topic_examples",
         system: EXAMPLES_SYSTEM,
         prompt: examplesPrompt(name, embedText),
-        // Model có token suy nghĩ ẩn tính vào trần này: để rộng.
+        // The model has hidden thinking tokens that count toward this cap: keep it generous.
         maxOutputTokens: 3000,
       });
       const texts = parseExamples(reply);

@@ -1,14 +1,14 @@
 /**
- * Gom cụm gu từ tin 👍 trên DB (lõi thuần: packages/core/src/interest.ts) và lưu bộ cụm của lần chạy.
+ * Clusters the user's taste from 👍 items in the DB (pure core: packages/core/src/interest.ts) and stores the cluster set of this run.
  *
- * - Nhãn của một tin là phản hồi MỚI NHẤT của delivery đó (`like`, `dislike`, `clear`; nhận xét
- *   `comment` không phải nhãn). Chỉ `like` vào cụm; `clear` và `dislike` thì không.
- * - Vector của tin: vector cả tài liệu `coalesce(content_embedding, embedding)` của tài liệu đầu
- *   tiên có vector trong `deliveries.document_ids`, chuẩn hoá L2.
- * - Mỗi lần gọi gom lại từ đầu. Cụm mới mượn tên cụm lần trước (bảng `interest_clusters`) theo tâm
- *   gần nhất. Tuổi tính từ `now` (mốc `end` của khoảng xếp hạng), chạy lại ngày cũ ra đúng kết quả
- *   ngày đó; phản hồi sau `now` bị bỏ.
- * - Chưa có cụm 👎 (TODO(spec: ~30 👎)).
+ * - An item's label is the LATEST feedback of that delivery (`like`, `dislike`, `clear`; a text
+ *   `comment` is not a label). Only `like` goes into a cluster; `clear` and `dislike` do not.
+ * - Item vector: the document vector `coalesce(content_embedding, embedding)` of the first document
+ *   with a vector in `deliveries.document_ids`, L2-normalized.
+ * - Each call re-clusters from scratch. A new cluster borrows the name of the previous run's cluster (table `interest_clusters`) by nearest
+ *   centroid. Age is measured from `now` (the `end` of the ranking window), so re-running an old day gives exactly that day's result;
+ *   feedback after `now` is ignored.
+ * - No 👎 clusters yet (TODO(spec: ~30 👎)).
  */
 import {
   clusterInterests,
@@ -28,7 +28,7 @@ function l2(v: number[]): number[] {
   return v.map((x) => x / n);
 }
 
-/** Các tin 👍 (nhãn mới nhất của mỗi delivery là `like`) của hồ sơ trước mốc `now`, kèm vector. */
+/** The 👍 items of the profile before the `now` cutoff (the latest label of each delivery is `like`), with their vectors. */
 export async function loadLikedItems(
   db: Database,
   profileId: number,
@@ -66,7 +66,7 @@ export async function loadLikedItems(
   return items;
 }
 
-/** Bộ cụm đã lưu của lần chạy trước (theo thứ hạng). */
+/** The saved cluster set of the previous run (in rank order). */
 export async function loadStoredClusters(db: Database, profileId: number) {
   const rows = await db
     .select()
@@ -76,7 +76,7 @@ export async function loadStoredClusters(db: Database, profileId: number) {
   return rows.map((r) => ({ name: r.name, center: r.center }));
 }
 
-/** Thay cả bộ cụm của hồ sơ bằng bộ mới, trong một giao dịch. */
+/** Replaces the whole cluster set of the profile with the new set, in one transaction. */
 export async function storeClusters(
   db: Database,
   profileId: number,
@@ -101,8 +101,8 @@ export async function storeClusters(
 }
 
 /**
- * Gom lại từ đầu các tin 👍 của hồ sơ tại mốc `now`; `persist` thì lưu bộ cụm làm "cụm hôm qua"
- * cho lần sau. Lỗi đọc/ghi không được chặn việc xếp hạng: log rồi coi như không có cụm (U = 0).
+ * Re-clusters the profile's 👍 items from scratch at cutoff `now`; `persist` saves the cluster set as "yesterday's clusters"
+ * for the next run. Read/write errors must not block ranking: log them and treat it as no clusters (U = 0).
  */
 export async function computeInterestClusters(
   db: Database,

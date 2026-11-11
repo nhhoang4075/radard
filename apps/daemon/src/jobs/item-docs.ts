@@ -1,15 +1,15 @@
 /**
- * Tài liệu của các tin (digest, tóm tắt chung, "Với tôi?"): đọc từ DB theo `document_ids` đã chụp
- * trong bản chụp feed, đủ để dựng link và đưa cho LLM.
+ * Documents of the items (digest, shared summary, "Với tôi?"): read from the DB by the `document_ids` captured
+ * in the feed snapshot, enough to build the links and give them to the LLM.
  */
 import { type Database, docSignals, docText, docTopicScores, documents, sources } from "@radard/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 
-/** Độ dài trích đoạn mỗi tài liệu đưa cho LLM. */
+/** Length of the excerpt per document given to the LLM. */
 const LLM_EXCERPT_CHARS = 500;
 
-/** Phần của một tin feed mà việc đọc tài liệu cần. */
+/** The part of a feed item that document reading needs. */
 export interface DocsOf {
   eventId: number;
   documentIds: number[];
@@ -23,13 +23,13 @@ export interface ItemDoc {
   kind: string;
   externalId: string;
   title: string | null;
-  /** Giờ đăng của bài (null khi nguồn không cho). */
+  /** Publication time of the article (null when the source does not provide it). */
   publishedAt: Date | null;
   url: string;
   urlCanonical: string;
   excerpt: string;
   signals: Record<string, number>;
-  /** Điểm chủ đề của tài liệu với chủ đề cho R cao nhất của tin. */
+  /** The document's topic score for the item's highest-R topic. */
   topicScore: number;
   engagement: number | null;
 }
@@ -56,7 +56,7 @@ async function loadSignals(
   return out;
 }
 
-/** Điểm chủ đề theo khoá `documentId|topicId`, chỉ cho chủ đề cho R của các tin. */
+/** Topic score keyed by `documentId|topicId`, only for the R-assigned topics of the items. */
 async function loadTopicScores(
   db: Database,
   ids: readonly number[],
@@ -76,7 +76,7 @@ async function loadTopicScores(
   return out;
 }
 
-/** Độ nổi thô do adapter của nguồn tính từ tín hiệu, như bước xếp hạng; không có thì null. */
+/** Raw salience computed by the source adapter from signals, as in the ranking step; null if none. */
 export function engagementOf(kind: string, sig: Record<string, number> | undefined): number | null {
   if (!sig || !kind) return null;
   try {
@@ -87,9 +87,9 @@ export function engagementOf(kind: string, sig: Record<string, number> | undefin
 }
 
 /**
- * Tài liệu của các tin sẽ báo, theo `document_ids` đã chụp trong bản chụp (đúng các tài liệu bước
- * xếp hạng đã xét), đủ để dựng link và đưa cho LLM. Điểm chủ đề lấy theo chủ đề cho R của tin; độ
- * nổi tính lại từ tín hiệu đã lưu bằng adapter của nguồn, như bước xếp hạng.
+ * Documents of the items to report, by the `document_ids` captured in the snapshot (exactly the documents the ranking step
+ * considered), enough to build the links and feed the LLM. The topic score is taken for the item's R-assigned topic; salience
+ * is recomputed from the saved signals with the source's adapter, as in the ranking step.
  */
 export async function loadItemDocs(
   db: Database,
@@ -147,7 +147,7 @@ export async function loadItemDocs(
   return out;
 }
 
-/** Văn bản đã embed bắt đầu bằng tiêu đề: bỏ phần đó, lấy đoạn đầu phần còn lại. */
+/** Embedded text starts with the title: drop that part and take the first paragraph of the rest. */
 function excerptOf(text: string | null, title: string | null): string {
   if (!text) return "";
   let body = text;

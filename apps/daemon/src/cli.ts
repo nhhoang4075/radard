@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * CLI của radard. Lệnh duy nhất gọi model là `process` (embedding, rất rẻ); `run` chỉ gọi
- * API của nguồn.
+ * radard CLI. The only command that calls a model is `process` (embedding, very cheap); `run` only calls
+ * the source APIs.
  *
- * Mỗi lệnh là một hàm trong bảng `COMMANDS`, khoá theo "lệnh" hoặc "lệnh lệnh-con".
+ * Each command is a function in the `COMMANDS` table, keyed by "command" or "command subcommand".
  */
 import { pushFsToR2 } from "@radard/adapters/object-store-r2";
 import {
@@ -186,7 +186,7 @@ function parseSince(v: string): Date {
   return new Date(Date.now() - parseHours(v) * 3600_000);
 }
 
-/** Giá trị cờ dạng `--name=v` hoặc `--name v`; không có thì chuỗi rỗng. */
+/** Value of a flag in the form `--name=v` or `--name v`; empty string if absent. */
 function flagValue(name: string): string {
   const eq = flag(name, "");
   if (eq) return eq;
@@ -195,7 +195,7 @@ function flagValue(name: string): string {
   return next && !next.startsWith("--") ? next : "";
 }
 
-/** `--seed=N` (số nguyên 0 … 2^32−1): bật chọn Gumbel với hạt tường minh khi xem thử. */
+/** `--seed=N` (integer 0 … 2^32−1): enables Gumbel selection with an explicit seed when previewing. */
 function seedOption(): { selectSeed?: number } {
   const raw = flag("seed", "");
   if (!raw) return {};
@@ -208,7 +208,7 @@ function seedOption(): { selectSeed?: number } {
 const since = () => parseSince(flag("since", "24h"));
 const limit = () => Number(flag("limit", "20"));
 
-/** In một plan ở dạng gần với tin trên điện thoại. */
+/** Prints a plan in a form close to a message on the phone. */
 function printPlan(plan: DigestPlan): void {
   const r = plan.ranking;
   console.log(
@@ -230,7 +230,7 @@ function printPlan(plan: DigestPlan): void {
   }
 }
 
-/** Cổng bằng model quyết định: bao nhiêu sự kiện vùng xám, hỏi được bao nhiêu, qua/loại. */
+/** Decision-model gate: how many grey-zone events, how many were asked, and passed or rejected. */
 function printGate(plan: DigestPlan): void {
   const d = plan.ranking.decision;
   if (!d) return;
@@ -329,7 +329,7 @@ const COMMANDS: Record<string, Command> = {
     const promptContext = process.argv[4];
     if (!promptContext) throw new Error('thiếu mô tả: profile set "…"');
     const profileId = cliDefaultProfileId();
-    // Sửa đúng dòng của hồ sơ này, chưa có thì tạo.
+    // Update exactly this profile's row; create it if absent.
     const updated = await db
       .update(profile)
       .set({ promptContext, updatedAt: new Date() })
@@ -539,7 +539,7 @@ const COMMANDS: Record<string, Command> = {
   },
 
   owners: async ({ db }, sub) => {
-    // `owners add|remove` được tách riêng ở dưới; `owners <gì khác>` thì không đoán.
+    // `owners add|remove` are handled separately below; `owners <anything else>` is not guessed.
     if (sub) throw new Error("cách dùng: owners | owners add <email> | owners remove <email>");
     const rows = await listOwners(db);
     if (rows.length === 0) console.log("chưa có owner nào");
@@ -623,8 +623,8 @@ const COMMANDS: Record<string, Command> = {
       ],
     };
     const { messageId } = await n.notifier.send(n.recipient, msg);
-    // Không có digest: delivery `test` đứng riêng, để lượt bấm vẫn nối được về một tin mà không lẫn
-    // vào phản hồi thật (phân tích chỉ lấy `kind = 'event'`).
+    // No digest: the `test` delivery stands alone, so the tap can still be linked back to one item without mixing
+    // it into real feedback (analysis only takes `kind = 'event'`).
     await db.insert(deliveries).values({
       profileId: cliDefaultProfileId(),
       channel: n.notifier.channel,
@@ -679,9 +679,9 @@ const COMMANDS: Record<string, Command> = {
     const period = periodEndingAt(at ? new Date(at) : new Date());
     const r = await rankPeriod(db, period, {
       profileId: cliDefaultProfileId(),
-      // Xem thử: không ghi đè bộ cụm gu đang dùng.
+      // Preview: does not overwrite the taste clusters in use.
       persistInterests: false,
-      // Mặc định T = 0 (xác định); chỉ có nhiễu khi người dùng đưa `--seed N` tường minh.
+      // Default T = 0 (deterministic); noise only appears when the user passes `--seed N` explicitly.
       ...seedOption(),
       ...(process.argv.includes("--refresh") ? { http } : {}),
     });
@@ -754,7 +754,7 @@ const COMMANDS: Record<string, Command> = {
     const total = { considered: 0, ok: 0, blocked: 0, skipped: 0, failed: 0, deferred: 0 };
     for (;;) {
       const out = await fetchPages(deps, { since: from, limit: 500, concurrency: 16 });
-      // Hết URL, hoặc cả đợt đều bị hoãn (không ghi dòng nào nên vòng sau sẽ chọn lại y hệt).
+      // No URLs left, or the whole batch was deferred (no row is written, so the next loop selects exactly the same).
       if (out.considered === out.deferred) break;
       for (const k of Object.keys(total) as (keyof typeof total)[]) total[k] += out[k];
       console.log(new Date().toISOString(), total);
@@ -822,7 +822,7 @@ const COMMANDS: Record<string, Command> = {
         nDocs: events.nDocs,
         lastSeen: events.lastSeenAt,
         title: sql<string>`left(${events.title}, 70)`,
-        // Ghi rõ `events.id`: trong truy vấn con, "id" trần sẽ bị hiểu là id của bảng khác.
+        // Name `events.id` explicitly: in a subquery a bare "id" would be read as another table's id.
         sources: sql<string>`(select string_agg(distinct s.name, ', ') from event_documents ed
           join documents d on d.id = ed.document_id join sources s on s.id = d.source_id
           where ed.event_id = events.id)`,
@@ -835,8 +835,8 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "events rebuild": async (deps) => {
-    // Giữ doc_text (embedding) và điểm chủ đề, chỉ gộp lại sự kiện: không tốn tiền gọi model.
-    // Dừng daemon trước: một lượt process chạy song song sẽ gộp trùng tài liệu.
+    // Keep doc_text (embeddings) and topic scores; only re-merge the events: costs no model money.
+    // Stop the daemon first: a parallel process run would merge duplicate documents.
     const pdeps = createProcessDeps(deps);
     if (!pdeps) throw new Error("chưa cấu hình embedder");
     const decide = process.argv.includes("--decide");
@@ -854,7 +854,7 @@ const COMMANDS: Record<string, Command> = {
 
   reprocess: async ({ db }) => {
     if (process.argv.includes("--pages")) {
-      // Tài liệu embed trước khi có trang (chỉ tiêu đề) mà nay trang đã tải được.
+      // Document embedded before its page existed (title only) that the page can now be fetched for.
       const rows = await db.execute<{ n: number }>(sql`
         with target as (
           select d.id from documents d
@@ -868,7 +868,7 @@ const COMMANDS: Record<string, Command> = {
       console.log(`đã xoá embedding của ${[...rows][0]?.n ?? 0} tài liệu; chạy \`events rebuild\``);
       return;
     }
-    // Xoá hàng chục nghìn dòng (tính lại tốn tiền embed): bắt gõ rõ --all.
+    // Deleting tens of thousands of rows (recomputing costs embedding money): require typing --all explicitly.
     if (!process.argv.includes("--all"))
       throw new Error("lệnh này xoá mọi dữ liệu dẫn xuất: gõ reprocess --all");
     await db.execute(sql`truncate ${eventDocuments}, ${events}, ${docTopicScores}, ${docText}`);
@@ -877,7 +877,7 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "store check": async ({ store }) => {
-    // Key nằm ngoài `raw/` để không lẫn với bản thô thật; ghi lại nhiều lần cũng vô hại.
+    // Key outside `raw/` so it does not mix with real raw copies; writing it several times is harmless.
     const key = "check/radard.txt";
     const body = new TextEncoder().encode(`radard ${new Date().toISOString()}`);
     await store.put(key, body, "text/plain");
@@ -928,7 +928,7 @@ const COMMANDS: Record<string, Command> = {
   },
 };
 
-/** Embed ngay chủ đề vừa chọn hoặc thêm; chưa có embedder thì để lượt process sau. */
+/** Embeds right away the topic just selected or added; with no embedder yet, leave it to the next process run. */
 const RELATION_VI: Record<CloseRelation, string> = {
   same: "trùng",
   narrower: "hẹp hơn",
@@ -1005,7 +1005,7 @@ async function main(): Promise<void> {
   const [cmd, sub] = process.argv.slice(2);
   if (cmd === "db" && sub === "migrate") return runMigrations(env.databaseUrl);
 
-  // "lệnh lệnh-con" trước (vd `sources seed`), rồi tới "lệnh" kèm tham số (vd `run 1`).
+  // "command subcommand" first (e.g. `sources seed`), then "command" with its arguments (e.g. `run 1`).
   const withSub = COMMANDS[`${cmd} ${sub}`];
   const command = withSub ?? (cmd ? COMMANDS[cmd] : undefined);
   if (!command) {

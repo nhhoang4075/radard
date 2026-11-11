@@ -1,18 +1,18 @@
 /**
- * Job điểm tin (digest) mỗi sáng: lớp THÔNG BÁO của feed (quyết định 10/11/2026). Tin lấy từ bản chụp
- * feed của ngày (feed.ts: một bản chụp mỗi hồ sơ mỗi khung, select chạy một lần với trần K); digest
- * chỉ lấy ≤ 7 tin đầu của bản chụp qua sàn thông báo, dùng tóm tắt CHUNG đã chụp trong bản chụp
- * (`feed_items.summary_id`, summaries.ts; không có model tóm tắt riêng), nhờ LLM gán nhãn chủ đề và viết
- * lời mở đầu theo hồ sơ (một lời gọi nhỏ chỉ nhận tiêu đề), gửi qua Notifier. Telegram không ảnh
- * hưởng việc chọn feed.
+ * Daily digest job (the notification layer of the feed, decision 10/11/2026). Items come from the day's feed snapshot
+ * (feed.ts: one snapshot per profile per slot, select runs once with cap K); the digest
+ * takes only the first ≤ 7 items of the snapshot that pass the notification floor, using the SHARED summary captured in the snapshot
+ * (`feed_items.summary_id`, summaries.ts; there is no separate summary model), and an LLM labels the topics and writes
+ * the per-profile opening line (one small call that only receives titles), then sends it via the Notifier. Telegram does not affect
+ * the feed selection.
  *
- * Chạy lại an toàn (tuan-3-thuc-thi.html, bước 6):
- *   1. Mỗi khung giờ (07:00 giờ VN) một dòng `digests`. Đã `sent` thì dừng.
- *   2. Plan (đúng các tin sẽ gửi) lưu vào `digests.meta.plan` TRƯỚC khi gửi tin đầu tiên. Chạy lại
- *      thì đọc plan, không chọn lại: điểm HN đổi thì chọn lại có thể ra danh sách khác.
- *   3. Gửi tin nào ghi `deliveries` tin đó ngay; chạy lại thì bỏ qua vị trí đã có delivery.
- * LLM hỏng thì vẫn gửi bản không tóm tắt (tiêu đề gốc và link). Không có tin nào vượt sàn thì gửi
- * một tin ngắn "hôm nay yên ắng" (D5), để biết radard vẫn chạy.
+ * Safe to re-run (tuan-3-thuc-thi.html, step 6):
+ *    1. Each send slot (07:00 VN) has one `digests` row. If it is already `sent`, stop.
+ *    2. The plan (exactly the items to send) is saved to `digests.meta.plan` BEFORE the first item is sent. Re-running
+ *       reads the plan and does not reselect: if the HN points changed, reselecting could give a different list.
+ *    3. Each item sent is recorded in `deliveries` right away; re-running skips positions that already have a delivery.
+ * If the LLM fails, a digest without summaries is still sent (original titles and links). If no item passes the floor, a
+ * short "quiet day today" message (D5) is sent, so you know radard is still running.
  */
 import {
   createLogger,
@@ -61,21 +61,21 @@ export type { ItemDoc } from "./item-docs.ts";
 
 const log = createLogger("digest");
 
-/** Giờ gửi theo giờ Việt Nam. VN không đổi giờ theo mùa nên lệch UTC cố định +7. */
+/** Send time in Vietnam time. Vietnam does not change clocks seasonally, so the offset from UTC is a fixed +7. */
 export const DIGEST_HOUR_VN = 7;
 const VN_OFFSET_MS = 7 * 3_600_000;
 const DAY_MS = 86_400_000;
 
-/** Số bài "Bài khác" hiện thành link; phần còn lại thành "+N bài". */
+/** Number of "Bài khác" items shown as links; the rest become "+N bài". */
 const MAX_RELATED = 3;
 const ACTIONS: Message["actions"] = [
   { id: "like", label: "👍" },
   { id: "dislike", label: "👎" },
-  // Câu chữ đã duyệt; mọi chuỗi nằm ở FOR_ME_LABELS (packages/core/src/copy.ts).
+  // Approved wording; every string lives in FOR_ME_LABELS (packages/core/src/copy.ts).
   { id: "for_me", label: FOR_ME_LABELS.button },
 ];
 
-/** Khung giờ gửi gần nhất không muộn hơn `now`: mốc kết thúc của khoảng 24 giờ. */
+/** The latest send slot not later than `now`: the end of the 24-hour window. */
 export function digestSlot(now: Date, hourVn = DIGEST_HOUR_VN): Date {
   const vn = new Date(now.getTime() + VN_OFFSET_MS);
   let slot =
@@ -84,7 +84,7 @@ export function digestSlot(now: Date, hourVn = DIGEST_HOUR_VN): Date {
   return new Date(slot);
 }
 
-/** "14/10" theo giờ Việt Nam. */
+/** "14/10" in Vietnam time. */
 export function vnDate(d: Date): string {
   const vn = new Date(d.getTime() + VN_OFFSET_MS);
   const dd = String(vn.getUTCDate()).padStart(2, "0");
@@ -93,18 +93,18 @@ export function vnDate(d: Date): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Plan: dạng lưu trong digests.meta.plan
+// Plan: the shape stored in digests.meta.plan
 
 export interface PlanItem {
-  /** 1…n; tin mở đầu là 0. */
+  /** 1…n; the opening line is 0. */
   position: number;
-  /** Tin feed tương ứng và vị trí của nó trong bản chụp; vắng ở plan trước feed và ở bản xem thử. */
+  /** The matching feed item and its position in the snapshot; absent in plans before the feed and in previews. */
   feedItemId?: number;
   feedPosition?: number;
   eventId: number;
   documentIds: number[];
   message: Message;
-  /** Vì sao chọn: điểm, các thành phần, chủ đề khớp. */
+  /** Why it was chosen: score, components, matched topic. */
   score: {
     S: number;
     penalty: number;
@@ -113,13 +113,13 @@ export interface PlanItem {
     C: number;
     A: number;
     F: number;
-    /** Điểm gu; vắng ở plan trước khi có U (S theo công thức cũ). */
+    /** Taste score; absent in plans before U existed (S by the old formula). */
     U?: number;
     N: number;
   };
-  /** Nhãn hiện trong tin: chủ đề LLM chọn khi đọc tin, hoặc chủ đề embedding khớp nhất. */
+  /** Label shown in the item: the topic the LLM picked when reading the item, or the best-matching embedding topic. */
   topic: string | null;
-  /** Chủ đề embedding khớp nhất (cho R), giữ lại để so với lựa chọn của LLM. */
+  /** Best-matching embedding topic (for R), kept to compare with the LLM's choice. */
   topicByEmbedding: string | null;
   topicSource: "llm" | "embedding";
 }
@@ -130,17 +130,17 @@ export interface DigestPlan {
   period: { start: string; end: string };
   header: Message;
   items: PlanItem[];
-  /** `false`: bản không tóm tắt (LLM lỗi hoặc chưa cấu hình). */
+  /** `false`: the version without summary (LLM failed or not configured). */
   summarized: boolean;
   llm: { model: string; error?: string } | null;
-  /** Xếp hạng của bản chụp feed mà bản tin lấy tin (cấu hình là cấu hình chung, gồm trần feed). */
+  /** Ranking of the feed snapshot the digest takes items from (the config is the shared one, including the feed cap). */
   ranking: RankingInfo;
 }
 
 /**
- * Link của một tin. Bài viết khác nhau = URL khác nhau (5 lượt đăng lại một URL là một bài).
- *   main: bài khớp chủ đề nhất · related: các bài khác, tối đa MAX_RELATED, còn lại "+N bài" ·
- *   discussion: trang thảo luận nhiều người quan tâm nhất, nếu nguồn có (adapter khai báo).
+ * Link of an item. Different articles = different URLs (5 reposts of one URL count as one article).
+ *   main: the article that best matches the topic · related: other articles, at most MAX_RELATED, the rest as "+N bài" ·
+ *   discussion: the discussion page that the most people follow, if the source provides one (declared by the adapter).
  */
 export function buildLinks(docs: readonly ItemDoc[]): { links: Link[]; moreRelated: number } {
   const groups = new Map<string, ItemDoc[]>();
@@ -174,7 +174,7 @@ function discussionUrlOf(d: ItemDoc): string | null {
   }
 }
 
-/** "3 bài từ HN, arXiv" hoặc "HN" khi chỉ một bài. */
+/** "3 bài từ HN, arXiv", or "HN" when there is only one article. */
 export function sourcesLine(docs: readonly ItemDoc[]): string {
   const names = [...new Set(docs.map((d) => d.sourceName))].join(", ");
   const n = new Set(docs.map((d) => d.urlCanonical)).size;
@@ -182,29 +182,29 @@ export function sourcesLine(docs: readonly ItemDoc[]): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// LLM theo hồ sơ: gán nhãn chủ đề và lời mở đầu (một lời gọi nhỏ, chỉ nhận tiêu đề)
+// Per-profile LLM: labels the topics and writes the opening line (one small call, receives titles only)
 //
-// Tóm tắt của từng tin là tóm tắt CHUNG (summaries.ts, quyết định 11/11/2026); chỉ hai việc này giữ
-// theo hồ sơ vì cần chủ đề và bối cảnh của hồ sơ.
+// Each item's summary is the SHARED summary (summaries.ts, decision 11/11/2026); only these two jobs stay
+// per profile, because they need the profile's topics and context.
 
 export interface Labels {
   intro: string;
-  /** Nhãn chủ đề đúng nguyên văn trong danh sách của hồ sơ, theo số thứ tự tin; vắng nếu model chọn sai. */
+  /** Topic label verbatim from the profile's list, by item number; absent if the model picks wrongly. */
   topics: Map<number, string>;
 }
 
-/** Một chủ đề đang bật, như LLM thấy khi gắn nhãn: tên và phạm vi (chủ đề tự thêm chỉ có tên). */
+/** An enabled topic, as the LLM sees it when labelling: its name and scope (self-added topics have only a name). */
 export interface TopicChoice {
   label: string;
   note?: string;
 }
 
 /**
- * `topics`: các chủ đề bạn đang theo dõi, kèm phạm vi. Model chọn nhãn cho từng tin vì nó đọc được
- * tiêu đề tiếng Việt/Anh và hiểu phạm vi chủ đề, còn embedding của tiêu đề 10 chữ hay đoán sai
- * (Janas, "streaming experts from SSD", bị gán RAG; 13/10/2026). Không đưa nhãn embedding vào prompt
- * để model không bám theo nhãn đó. Phạm vi (dòng "Not: …") và hai quy tắc phân xử lấy từ
- * docs/bo-chu-de-moi.html: khoảng 30% tin nằm giữa hai chủ đề, cần luật rõ để nhãn nhất quán.
+ * `topics`: the topics you are following, with their scope. The model picks the label for each item because it reads
+ * Vietnamese and English headlines and understands the topic scope, while an embedding of a 10-word headline often guesses wrong
+ * (Janas, "streaming experts from SSD", was tagged RAG; 13/10/2026). The embedding label is not put in the prompt
+ * so the model does not anchor on it. The scope (the "Not: …" line) and two arbitration rules come from
+ * docs/bo-chu-de-moi.html: about 30% of items sit between two topics, so clear rules are needed for consistent labels.
  */
 export function labelSystem(context: string, lang: string, topics: readonly TopicChoice[]): string {
   const language = LANG_NAMES[lang] ?? lang;
@@ -230,7 +230,7 @@ export function labelPrompt(stories: readonly { n: number; title: string }[]): s
   return stories.map((s) => `Story ${s.n}: ${s.title}`).join("\n");
 }
 
-/** Đọc JSON model trả về; thiếu lời mở đầu thì báo lỗi (để thử lại hoặc bỏ). Nhãn sai/thiếu thì bỏ nhãn đó. */
+/** Reads the JSON the model returns; a missing opening line is an error (retry or drop). A wrong or missing label drops just that label. */
 export function parseLabels(reply: string, topics: readonly string[] = []): Labels {
   const start = reply.indexOf("{");
   const end = reply.lastIndexOf("}");
@@ -243,7 +243,7 @@ export function parseLabels(reply: string, topics: readonly string[] = []): Labe
   const known = new Set(topics);
   const labelled = new Map<number, string>();
   for (const it of data.items as { n?: unknown; topic?: unknown }[]) {
-    // Nhãn sai hoặc thiếu không làm hỏng cả bản: dùng nhãn embedding cho tin đó.
+    // A wrong or missing label does not break the whole digest: use the embedding label for that item.
     if (typeof it.n === "number" && typeof it.topic === "string" && known.has(it.topic.trim())) {
       labelled.set(it.n, it.topic.trim());
     }
@@ -258,7 +258,7 @@ async function labelStories(
   topics: readonly string[],
 ): Promise<{ ok: Labels } | { error: string }> {
   let error = "";
-  // Thử lại đúng một lần: model đôi khi trả JSON thiếu hoặc bị cắt.
+  // Retry exactly once: the model sometimes returns JSON that is missing fields or is truncated.
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const reply = await llm.generateText({
@@ -277,19 +277,19 @@ async function labelStories(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Dựng plan
+// Building the plan
 
 export interface DigestDeps {
   db: Database;
-  /** Hồ sơ nhận digest: xếp hạng và ghi `profile_id` của digest, tin, phản hồi theo giá trị này. */
+  /** The digest's recipient profile: ranking and `profile_id` of the digest; items and feedback are keyed by this value. */
   profileId: number;
   http?: HttpClient;
   llm: LlmProvider | null;
-  /** Model quyết định cho vùng xám của cổng chủ đề; không có thì dùng luật R ≥ gateR. */
+  /** Decision model for the topic gate's grey zone; without it the rule R ≥ gateR is used. */
   decider?: DecisionProvider | null;
 }
 
-/** Một tin của bản thông báo: tin feed đã lưu (có `id`) hoặc tin của bản xem thử (chưa lưu). */
+/** One item of the notification: a saved feed item (has `id`) or a preview item (not saved). */
 type NotifySource = (FeedItem | FeedItemDraft) & { id?: number };
 
 function scoreOfItem(it: NotifySource): PlanItem["score"] {
@@ -308,14 +308,14 @@ function scoreOfItem(it: NotifySource): PlanItem["score"] {
 }
 
 /**
- * Xem thử (CLI `--dry-run`, test): xếp hạng như bản chụp feed (cùng select, trần K) rồi dựng bản
- * thông báo từ các tin được báo, KHÔNG ghi gì vào DB. `onRanked` cho nơi gọi móc việc ghi.
+ * Preview (CLI `--dry-run`, tests): ranks the way the feed snapshot does (same select, cap K), then builds the
+ * notification from the notified items, writing NOTHING to the DB. `onRanked` lets the caller hook in its own writes.
  */
 export async function buildPlan(
   deps: DigestDeps,
   slot: Date,
   onRanked?: (rank: RankResult) => Promise<void>,
-  /** Hạt giống chọn Gumbel top-k. Vắng: chọn xác định (T = 0), như CLI xem thử. */
+  /** Seed of the Gumbel top-k selection. Absent: deterministic selection (T = 0), as in the CLI preview. */
   selectSeed?: number,
 ): Promise<DigestPlan> {
   const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
@@ -337,8 +337,8 @@ export async function buildPlan(
 }
 
 /**
- * Bản thông báo từ các tin được báo của bản chụp (theo thứ tự báo): đọc tài liệu, nhờ LLM tóm tắt,
- * dựng tin. Không chọn lại gì.
+ * The notification from the snapshot's notified items (in notification order): reads documents, asks the LLM for summaries,
+ * builds items. Reselects nothing.
  */
 export async function planFromItems(
   deps: Pick<DigestDeps, "db" | "profileId" | "llm">,
@@ -363,7 +363,7 @@ export async function planFromItems(
     const header: Message = {
       kind: "digest",
       title: `Điểm tin ${date}`,
-      // Câu chữ do bạn chốt 13/10/2026.
+      // Wording approved by you on 13/10/2026.
       lines: [
         "Hôm nay không có tin tức đáng chú ý.",
         ranking.passedGate > 0
@@ -380,9 +380,9 @@ export async function planFromItems(
     docs: docsByEvent.get(p.eventId) ?? [],
   }));
 
-  // Tóm tắt CHUNG của từng tin: bản chụp đã chụp sẵn (`summary_id`). Chỉ tin của bản xem thử (chưa
-  // lưu, không có `id`) mới được viết ở đây; tin của bản chụp thiếu tóm tắt (model lỗi lúc dựng)
-  // giữ nguyên tiêu đề gốc, không gọi model lại: Telegram không có model tóm tắt riêng.
+  // Each item's SHARED summary is pre-captured in the snapshot (`summary_id`). Only preview items (not
+  // saved, no `id`) are written here; a snapshot item missing its summary (the model failed when building)
+  // keeps its original title and does not call the model again: Telegram has no summary model of its own.
   const lang = prof?.displayLang ?? "vi";
   const snapshotSummaries = await loadSummariesById(
     deps.db,
@@ -396,7 +396,7 @@ export async function planFromItems(
   const summaryOf = (p: NotifySource): SharedSummary | undefined =>
     p.summaryId ? snapshotSummaries.get(p.summaryId) : previewSummaries.get(p.eventId);
 
-  // Theo hồ sơ: nhãn chủ đề và lời mở đầu, một lời gọi nhỏ chỉ nhận tiêu đề.
+  // Per profile: topic label and opening line, one small call that only receives titles.
   const titleOf = (p: NotifySource, docs: readonly ItemDoc[]): string =>
     summaryOf(p)?.title ??
     [...docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ??
@@ -425,7 +425,7 @@ export async function planFromItems(
     const labelled = labels?.topics.get(story.n);
     const { links, moreRelated } = buildLinks(story.docs);
     const topic = labelled ?? story.topic;
-    // N < 1: sự kiện đã gửi trước đó và nay có URL mới, nên là tin tiếp diễn (xep-hang.html, tab N).
+    // N < 1: an event sent earlier that now has new URLs, so it is a continuing story (xep-hang.html, tab N).
     const why = [
       p.n < 1 ? "Cập nhật" : null,
       topic ? `Chủ đề: ${topic}` : null,
@@ -471,21 +471,21 @@ export async function planFromItems(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Gửi
+// Sending
 
 export interface SendDeps extends DigestDeps {
   notifier: Notifier;
   recipient: string;
-  /** Có thì link trong tin gửi đi là link theo dõi `<baseUrl>/o/<token>`; DB vẫn lưu link trực tiếp. */
+  /** If set, links in the sent message are tracking links `<baseUrl>/o/<token>`; the DB still stores the direct links. */
   tracking?: { baseUrl: string; secret: string };
-  /** Tính dữ liệu học sau khi chọn bản chụp (mặc định `computeSelectionLearning`); chỉ test thay. */
+  /** Computes the learning data after the snapshot is selected (default `computeSelectionLearning`); only replaced in tests. */
   computeLearning?: (rank: RankResult) => SelectionLearning | null;
 }
 
 export interface DigestOutcome {
   digestId: number;
   status: "sent" | "already_sent";
-  /** Số tin gửi trong lượt này (gồm tin mở đầu). */
+  /** Number of items sent in this run (including the opening line). */
   sentNow: number;
   items: number;
   summarized: boolean;
@@ -496,14 +496,14 @@ function asPlan(meta: Record<string, unknown>): DigestPlan | null {
   return plan?.version === 1 ? plan : null;
 }
 
-/** Phụ thuộc của job digest trước khi gắn người nhận: thiếu `profileId` và `recipient`. */
+/** Dependencies of the digest job before a recipient is attached: missing `profileId` and `recipient`. */
 export type DigestJobDeps = Omit<SendDeps, "profileId" | "recipient">;
 
 /**
- * Mỗi khung 07:00: trước hết dựng (hoặc đọc lại) MỘT bản chụp feed cho mỗi hồ sơ có người nhận đang
- * bật của kênh đang có notifier (`profile_channels`), rồi gửi bản thông báo cho từng người nhận. Kênh
- * chưa có ai thì không làm gì. Một hồ sơ/người lỗi không chặn người khác; xong hết mới ném lỗi (để
- * pg-boss chạy lại; bản chụp đã `ready` và người đã gửi xong thì lượt sau không làm lại).
+ * Each 07:00 slot: first builds (or reads back) ONE feed snapshot for each profile that has an enabled recipient
+ * on a channel with a notifier (`profile_channels`), then sends the notification to each recipient. A channel
+ * with nobody on it does nothing. One failing profile or recipient does not block the others; only after all are done does it throw an error (so
+ * pg-boss re-runs it; a snapshot already `ready` and a recipient already sent to are not redone the next run).
  */
 export async function runDigestAll(
   deps: DigestJobDeps,
@@ -548,9 +548,9 @@ export async function runDigestAll(
 }
 
 /**
- * Gửi điểm tin của khung giờ `slot` (mặc định: khung gần nhất) cho một người nhận. Chạy lại an toàn.
- * Tin lấy từ bản chụp feed của (hồ sơ, khung) (dựng nếu chưa có, dùng lại nếu đã có): các tin có
- * `notify_position`, theo thứ tự đó. Không chọn lại gì ở đây.
+ * Sends the digest of the send slot `slot` (default: the latest slot) to one recipient. Safe to re-run.
+ * Items come from the feed snapshot of (profile, slot) (built if missing, reused if present): the items with
+ * `notify_position`, in that order. Nothing is reselected here.
  */
 export async function runDigest(
   deps: SendDeps,
@@ -590,8 +590,8 @@ export async function runDigest(
   try {
     let plan = asPlan(row.meta);
     if (!plan) {
-      // Bản chụp là nguồn chọn: hạt giống, danh sách và tin được báo đã lưu ở đó (feed.ts). Chạy lại
-      // khi plan chưa kịp lưu thì đọc lại đúng bản chụp, ra đúng các tin cũ.
+      // The snapshot is the source of selection: the seed, list and notified items are saved there (feed.ts). If a re-run
+      // happens before the plan was saved, it reads back exactly that snapshot and gets the same old items.
       const { snapshot, items } = await ensureFeedSnapshot(deps, slot);
       const ranking = snapshotRanking(snapshot);
       if (!ranking) throw new Error(`bản chụp ${snapshot.id} thiếu thông tin xếp hạng`);
@@ -651,8 +651,8 @@ export async function runDigest(
 }
 
 /**
- * Thay `url` của từng link bằng link theo dõi (chỉ số k = vị trí trong `links`, khớp `deliveries.meta.links`).
- * Không cấu hình theo dõi thì trả nguyên tin. Bản lưu trong DB vẫn là tin gốc.
+ * Replaces each link's `url` with a tracking link (index k = position in `links`, matching `deliveries.meta.links`).
+ * With no tracking configured the item is returned unchanged. The DB copy remains the original item.
  */
 export function withTrackedLinks(
   message: Message,
@@ -697,7 +697,7 @@ async function sendMissing(deps: SendDeps, digestId: number, plan: DigestPlan): 
       deps.recipient,
       withTrackedLinks(q.message, deps.tracking, digestId, q.position),
     );
-    // Ghi ngay sau khi gửi: lỗi ở tin sau thì lượt chạy lại không gửi lại tin này.
+    // Written right after sending: if a later item fails, the re-run does not send this item again.
     await deps.db.insert(deliveries).values({
       profileId: deps.profileId,
       digestId,

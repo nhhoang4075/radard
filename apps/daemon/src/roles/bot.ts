@@ -1,6 +1,6 @@
 /**
- * Vai trò bot: nhận lượt bấm 👍/👎 và lệnh chọn chủ đề qua kênh chat (Telegram: long polling).
- * Chỉ MỘT bản được chạy cho mỗi bot token: hai bản cùng long polling thì Telegram trả 409.
+ * Bot role: receives 👍/👎 presses and topic-selection commands via chat (Telegram: long polling).
+ * Only ONE instance runs per bot token: two instances long-polling together make Telegram return 409.
  */
 import {
   type ChatChannel,
@@ -39,19 +39,19 @@ const log = createLogger("bot");
 
 export interface BotDeps {
   db: Database;
-  /** Hồ sơ gán cho phản hồi không nối được về tin nào. */
+  /** Profile assigned to feedback that cannot be linked to any item. */
   profileId: number;
   embedder: EmbeddingProvider | null;
   llm: LlmProvider | null;
-  /** Model ra quyết định: chấm thư viện khi gợi ý chủ đề (/profile). Thiếu thì không gợi ý được. */
+  /** Decision model: scores library topics when suggesting topics (/profile). Without it, no suggestions. */
   decider: DecisionProvider | null;
-  /** Hạn mức "Với tôi?" mỗi hồ sơ mỗi ngày (mặc định ở `for-me.ts`). */
+  /** "Với tôi?" quota per profile per day (default in `for-me.ts`). */
   forMeDailyLimit?: number;
 }
 
 /**
- * Sau khi bật hoặc thêm chủ đề: embed (1 request), chấm điểm (SQL), tính lại mặt bằng, để digest
- * kế tiếp dùng được ngay mà không phải chờ lượt process hay job 06:30. Chạy nền, lần lượt.
+ * After enabling or adding a topic: embed (1 request), score (SQL), recompute baselines, so the next digest
+ * can use it right away without waiting for the process run or the 06:30 job. Runs in the background, one at a time.
  */
 function refresher({ db, embedder }: BotBase) {
   let chain = Promise.resolve();
@@ -109,7 +109,7 @@ export function topicHandlers(deps: BotDeps, refresh: () => void = refresher(dep
   };
 }
 
-/** Số chủ đề đang theo dõi, đếm như danh sách /topics: thư viện đang bật + tự thêm đang bật. */
+/** Number of topics being followed, counted as in the /topics list: enabled library topics + enabled self-added topics. */
 async function countFollowed(db: Database, profileId: number): Promise<number> {
   const library = (await listLibrary(db, profileId)).filter((t) => t.chosen).length;
   const custom = (await listProfileTopics(db, profileId)).filter(
@@ -118,7 +118,7 @@ async function countFollowed(db: Database, profileId: number): Promise<number> {
   return library + custom;
 }
 
-/** Khoá `l:<id>` → id chủ đề thư viện; khoá khác (chủ đề tự thêm) không thuộc gợi ý nên bỏ. */
+/** Key `l:<id>` → library topic id; other keys (self-added topics) are not suggestions, so they are skipped. */
 const libraryIds = (keys: string[]) =>
   keys.filter((k) => /^l:\d+$/.test(k)).map((k) => Number(k.slice(2)));
 
@@ -130,7 +130,7 @@ export function profileHandlers(
   return {
     get: () => readProfile(db, profileId),
     async saveDescription(text) {
-      // Lưu lời người dùng trước: LLM lỗi thì lời họ vẫn còn, bối cảnh cũ giữ nguyên.
+      // Save the user's wording first: if the LLM fails, their wording is still there and the old context stays.
       await saveProfile(db, profileId, text);
       if (!deps.llm) return { rewritten: false };
       try {
@@ -149,7 +149,7 @@ export function profileHandlers(
         promptContext,
       );
       if (!res.ran.library) return null;
-      // Chủ đề đang bật luôn tích sẵn, dù ở mức nào: Lưu không được lặng lẽ tắt nó.
+      // An enabled library topic is always pre-ticked, at whatever level: Save must not silently turn it off.
       const followed = (await listLibrary(db, profileId)).filter((t) => t.chosen);
       const chosen = new Set(followed.map((t) => t.id));
       const item =
@@ -161,8 +161,8 @@ export function profileHandlers(
           checked: tier === "preselect" || chosen.has(s.topicId),
         });
       const suggested = new Set([...res.preselect, ...res.maybe].map((t) => t.topicId));
-      // Chủ đề thư viện đang bật mà không được gợi ý vẫn hiện (nhóm "đang theo dõi"), để tin gợi ý
-      // cho thấy đủ những gì người dùng đang theo dõi. Chủ đề tự thêm thì /topics quản.
+      // An enabled library topic that is not suggested still shows (the "being followed" group), so the suggestions
+      // show everything the user is following. Self-added topics are managed by /topics.
       const kept = followed
         .filter((t) => !suggested.has(t.id))
         .map((t) => item("followed")({ topicId: t.id, label: t.name }));
@@ -178,9 +178,9 @@ export function profileHandlers(
     async apply(on, off, add) {
       let created = 0;
       for (const p of add) {
-        // Chủ đề tự thêm bắt buộc có lời của người dùng (`topics.description`). Đề xuất không phải
-        // lời họ viết, nên lấy đúng câu radard đã cho họ xem ("tên: vì sao") làm mô tả: họ đã đọc,
-        // tích và bấm Lưu, coi như đồng ý với câu đó. Câu tiếng Anh của đề xuất làm `embed_text`.
+        // A self-added topic must have the user's own wording (`topics.description`). A suggestion is not
+        // their wording, so use exactly the sentence radard showed them ("name: why") as the description: they read it,
+        // ticked it and pressed Save, which counts as agreeing with it. The suggestion's English sentence becomes `embed_text`.
         try {
           await addCustomTopic(db, profileId, {
             label: p.label,
@@ -189,7 +189,7 @@ export function profileHandlers(
           });
           created++;
         } catch (err) {
-          // Trùng tên (vừa tự thêm qua /topics chẳng hạn): bỏ qua chủ đề đó, vẫn lưu phần còn lại.
+          // Name clash (e.g. just self-added via /topics): skip that topic, still save the rest.
           log.warn("không tạo được chủ đề đề xuất", { label: p.label, err: String(err) });
         }
       }
@@ -201,9 +201,9 @@ export function profileHandlers(
 }
 
 /**
- * Nút "Với tôi?" trên một tin Telegram. Tin phải là tin radard đã gửi cho CHÍNH hồ sơ này (tra
- * `deliveries` theo kênh, người nhận, id tin VÀ `profile_id`); sự kiện của tin còn phải nằm trong feed
- * của hồ sơ (kiểm lại ở `explainForProfile`). Không tìm thấy thì `not_found`, không gọi model.
+ * "Với tôi?" button on a Telegram message. The message must be a radard message sent to THIS profile (look up
+ * `deliveries` by channel, recipient, item id AND `profile_id`); the item's event must also be in the profile's
+ * feed (re-checked in `explainForProfile`). If not found, return `not_found`, no model call.
  */
 export async function forMeFor(deps: BotDeps, ev: ForMeEvent): Promise<ForMeResult> {
   const [d] = await deps.db
@@ -229,7 +229,7 @@ export async function forMeFor(deps: BotDeps, ev: ForMeEvent): Promise<ForMeResu
   return r.status === "ok" ? { status: "ok", text: r.text } : { status: r.status };
 }
 
-/** Bộ xử lý của MỘT hồ sơ: mọi truy vấn trong đó dùng đúng `profileId` này. */
+/** Handler of ONE profile: every query in it uses exactly this `profileId`. */
 export function handlersFor(deps: BotDeps, refresh: () => void): ChatHandlers {
   return {
     onFeedback: (ev) => recordFeedback(deps.db, ev, deps.profileId),
@@ -239,12 +239,12 @@ export function handlersFor(deps: BotDeps, refresh: () => void): ChatHandlers {
   };
 }
 
-/** Dụng cụ bot dùng chung cho mọi hồ sơ: không có `profileId`, mỗi người nhận tự gắn hồ sơ của mình. */
+/** Shared bot tooling for all profiles: no `profileId`, each recipient attaches its own profile. */
 export type BotBase = Omit<BotDeps, "profileId">;
 
 /**
- * Người nhận (chat id) → bộ xử lý của hồ sơ họ qua `profile_channels`. Không có trong bảng (hay đã
- * tắt) thì `null`: kênh bỏ qua update, người lạ không dùng được bot.
+ * Recipient (chat id) → the handler of their profile via `profile_channels`. If not in the table (or
+ * disabled), `null`: the channel ignores the update, and strangers cannot use the bot.
  */
 export function chatResolver(base: BotBase, channel: string, refresh: () => void) {
   return async (recipient: string): Promise<{ scope: string; handlers: ChatHandlers } | null> => {
@@ -255,8 +255,8 @@ export function chatResolver(base: BotBase, channel: string, refresh: () => void
 }
 
 export async function startBot(base: BotBase, chat: ChatChannel): Promise<() => Promise<void>> {
-  // Một chuỗi làm mới dùng chung (chỉ phụ thuộc db và embedder): bật chủ đề từ /topics và /profile
-  // của bất kỳ ai không chạy embed chồng nhau.
+  // One shared refresh chain (depends only on db and embedder): enabling topics from /topics and /profile
+  // from anyone never runs embeddings concurrently.
   const refresh = refresher(base);
   await chat.start(chatResolver(base, chat.channel, refresh));
   return () => chat.stop();

@@ -1,12 +1,12 @@
 /**
- * Job `pages`: tải trang mà tài liệu link tới (`SourceAdapter.articleUrl`), lưu HTML gốc vào
- * ObjectStore và một dòng `linked_pages`. Job process đợi dòng này (tối đa `PAGE_WAIT_MS`) rồi mới
- * embed, để embed tiêu đề CÙNG nội dung trang thay vì chỉ tiêu đề.
+ * `pages` job: fetches the pages that documents link to (`SourceAdapter.articleUrl`), stores the original HTML in
+ * ObjectStore and one `linked_pages` row. The process job waits for this row (up to `PAGE_WAIT_MS`) before
+ * embedding, so it embeds the title TOGETHER WITH the page content, not the title alone.
  *
- * Lý do (13/10/2026): 91,5% bài HN chỉ có tiêu đề trong bản thô, nên embedding đoán chủ đề từ
- * 10–15 chữ (Janas "streaming experts from SSD" bị gán RAG), và tin có tiêu đề mơ hồ bị bỏ sót.
+ * Reason (13/10/2026): 91,5% of HN stories have only a title in the raw copy, so embedding guessed the topic from
+ * 10–15 words (Janas "streaming experts from SSD" was tagged RAG), and stories with vague titles were missed.
  *
- * Mỗi URL chỉ xét một lần, kể cả khi lỗi: trang trả phí hay chặn bot thì lần sau vẫn vậy.
+ * Each URL is checked only once, even on error: a paywalled or bot-blocking page stays that way on later runs.
  */
 import { createLogger, type ObjectStore, type PageFetcher, rawKey, sha256 } from "@radard/core";
 import { type Database, linkedPages, sources } from "@radard/db";
@@ -15,12 +15,12 @@ import { adapterFor } from "../sources/index.ts";
 
 const log = createLogger("pages");
 
-/** Job process đợi trang tối đa chừng này kể từ lúc lấy tài liệu, rồi embed bằng tiêu đề. */
+/** The process job waits for pages at most this long from the time the document was fetched, then embeds with the title. */
 export const PAGE_WAIT_MS = 30 * 60_000;
 
 /**
- * Mỗi host tối đa chừng này URL trong một lượt chọn: host hỏng robots.txt (URL deferred không có
- * dòng nên lần nào cũng được chọn lại) không chiếm hết đợt và bỏ đói URL cũ hơn của host khoẻ.
+ * Each host gets at most this many URLs in one selection pass: a host with a broken robots.txt (deferred URLs have no
+ * row, so they are selected again every run) must not take the whole batch and starve older URLs of healthy hosts.
  */
 const MAX_PER_HOST = 10;
 
@@ -36,11 +36,11 @@ export interface PagesOutcome {
   blocked: number;
   skipped: number;
   failed: number;
-  /** robots.txt không đọc được: không ghi dòng nào, lần chạy sau thử lại. */
+  /** robots.txt could not be read: no row is written, the next run retries. */
   deferred: number;
 }
 
-/** Kiểu nguồn có trang nội dung riêng (adapter khai báo `articleUrl`). */
+/** Source kind that has its own content page (the adapter declares `articleUrl`). */
 export async function articleKinds(db: Database): Promise<string[]> {
   const kinds = new Set((await db.select({ kind: sources.kind }).from(sources)).map((s) => s.kind));
   return [...kinds].filter((k) => {
@@ -52,7 +52,7 @@ export async function articleKinds(db: Database): Promise<string[]> {
   });
 }
 
-/** Tải trang cho các tài liệu đăng từ `since` chưa có dòng `linked_pages`, mới trước cũ sau. */
+/** Fetches pages for documents posted since `since` that have no `linked_pages` row yet, newest first. */
 export async function fetchPages(
   deps: PagesDeps,
   opts: { since: Date; limit?: number; concurrency?: number },
@@ -99,7 +99,7 @@ export async function fetchPages(
   out.considered = rows.length;
 
   const queue = [...rows];
-  /** Host đã ra `deferred` trong lượt này: các URL còn lại của host đó bỏ qua, khỏi gọi lại. */
+  /** Hosts that returned `deferred` in this run: their remaining URLs are skipped, not requested again. */
   const deferredHosts = new Set<string>();
   const worker = async () => {
     for (let r = queue.shift(); r; r = queue.shift()) {
@@ -140,7 +140,7 @@ async function fetchOne(
   const host = hostOf(target);
   if (deferredHosts.has(host)) return "deferred";
   const res = await deps.fetcher.fetch(target);
-  // Hoãn: không ghi `linked_pages` để câu truy vấn (URL chưa có dòng) chọn lại ở lần chạy sau.
+  // Deferred: do not write `linked_pages`, so the query (URL with no row yet) selects it again in a later run.
   if (res.status === "deferred") {
     deferredHosts.add(host);
     return "deferred";

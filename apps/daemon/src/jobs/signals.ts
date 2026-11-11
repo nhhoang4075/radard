@@ -1,15 +1,15 @@
 /**
- * Lấy lại tín hiệu cộng đồng (điểm, bình luận…) của tài liệu từ API của nguồn, ghi `doc_signals`.
+ * Re-fetches the community signals (points, comments…) of documents from the source's API, writing `doc_signals`.
  *
- * Chạy trước mỗi digest cho các tài liệu ứng viên, và một lần cho 30 ngày để có mặt bằng độ nổi.
- * Chỉ nguồn có `refreshSignals` mới được hỏi; nguồn khác bỏ qua.
+ * Runs before each digest for the candidate documents, and once for 30 days to get a salience baseline.
+ * Only sources with `refreshSignals` are asked; other sources are skipped.
  *
- * Ngoài tín hiệu hỏi từ nguồn còn có tín hiệu TÍNH TẠI CHỖ từ dữ liệu radard đã thu (`LOCAL_SIGNALS`),
- * ví dụ sao tăng 24 giờ từ `repo_stats`. Chúng nằm ở đây chứ không trong adapter vì
- * `SourceAdapter.refreshSignals` cố ý không có DB (adapter chỉ nói chuyện với nguồn), và không nằm
- * trong rank.ts vì rank chỉ đọc `doc_signals` và gọi `engagement` của adapter, không biết nguồn nào
- * có gì. Ghi chung vào `doc_signals` thì mặt bằng, xếp hạng và digest đọc được như mọi tín hiệu
- * khác; adapter quyết định dùng tín hiệu nào trong `engagement`.
+ * Besides the signals asked from the source there are signals COMPUTED LOCALLY from data radard has collected (`LOCAL_SIGNALS`),
+ * e.g. 24-hour star gain from `repo_stats`. They live here rather than in the adapter because
+ * `SourceAdapter.refreshSignals` deliberately has no DB (the adapter only talks to the source), and not
+ * in rank.ts because rank only reads `doc_signals` and calls the adapter's `engagement`, which does not know which source
+ * has what. Writing them into `doc_signals` lets the baselines, ranking and digest read them like any other signal;
+ * the adapter decides which signals to use in `engagement`.
  */
 import { createLogger, type HttpClient, type Signals } from "@radard/core";
 import { type Database, docSignals, documents, sources } from "@radard/db";
@@ -23,11 +23,11 @@ export interface SignalOutcome {
   asked: number;
   updated: number;
   missing: number;
-  /** Số tài liệu có tín hiệu tính tại chỗ (không hỏi nguồn). */
+  /** Number of documents with locally computed signals (no source query). */
   local?: number;
 }
 
-/** Tài liệu cần tín hiệu, đủ để adapter hay bộ tính tại chỗ nhận ra nó. */
+/** Documents that need signals, enough for the adapter or the local calculator to recognize them. */
 export interface DocRef {
   id: number;
   kind: string;
@@ -36,9 +36,9 @@ export interface DocRef {
 }
 
 /**
- * Bộ tính tín hiệu từ dữ liệu trong DB, chạy cho MỌI tài liệu được làm mới, mọi nguồn: tự nhận
- * tài liệu nào thuộc phần mình (repo GitHub nhận cả bài HN link tới repo). Trả documentId → tín hiệu;
- * chưa đủ dữ liệu thì vắng mặt, để `engagement` của adapter dùng cách tạm.
+ * Local signal calculator from data in the DB, run for EVERY refreshed document, every source: each one claims
+ * the documents that belong to its part (a GitHub repo also claims HN posts that link to the repo). Returns documentId → signals;
+ * if there is not enough data, the entry is absent, so the adapter's `engagement` uses a fallback.
  */
 export type LocalSignals = (
   db: Database,
@@ -58,7 +58,7 @@ const rowsOf = (docId: number, s: Signals | undefined, observedAt: Date): Signal
     observedAt,
   }));
 
-/** Hỏi nguồn, theo từng kiểu nguồn có `refreshSignals`. */
+/** Asks the source, per source kind that has `refreshSignals`. */
 async function fromSources(
   http: HttpClient,
   docs: DocRef[],
@@ -98,7 +98,7 @@ async function fromLocal(db: Database, docs: DocRef[], out: SignalOutcome): Prom
   return rows;
 }
 
-/** Lấy lại tín hiệu cho đúng các `documents.id` này. */
+/** Re-fetches signals for exactly these `documents.id`s. */
 export async function refreshSignals(
   db: Database,
   http: HttpClient,
@@ -118,7 +118,7 @@ export async function refreshSignals(
     .where(inArray(documents.id, documentIds));
 
   const rows = [...(await fromSources(http, docs, out)), ...(await fromLocal(db, docs, out))];
-  // Ghi theo lô để câu lệnh không quá dài khi backfill hàng nghìn tài liệu.
+  // Writes in batches so the statement does not get too long when backfilling thousands of documents.
   for (let i = 0; i < rows.length; i += 1000) {
     await db
       .insert(docSignals)
@@ -132,7 +132,7 @@ export async function refreshSignals(
   return out;
 }
 
-/** Lấy lại tín hiệu cho mọi tài liệu của các nguồn có tín hiệu, đăng từ `since`. */
+/** Re-fetches signals for all documents of the sources that have signals, posted since `since`. */
 export async function refreshSince(
   db: Database,
   http: HttpClient,

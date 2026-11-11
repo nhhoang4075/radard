@@ -1,6 +1,6 @@
 /**
- * Hàng đợi job trên chính Postgres (pg-boss). Khai báo queue một chỗ để scheduler và
- * worker luôn thấy cùng một cấu hình.
+ * Job queue on Postgres itself (pg-boss). Queues are declared in one place so the scheduler and
+ * worker always see the same configuration.
  */
 import { PgBoss } from "pg-boss";
 
@@ -14,28 +14,28 @@ export const QUEUE = {
   repoStats: "repo_stats",
 } as const;
 
-/** Job process chạy định kỳ và tự tìm việc còn thiếu, nên một lịch cố định là đủ. */
+/** The process job runs periodically and finds pending work by itself, so one fixed schedule is enough. */
 export const PROCESS_CRON = "*/5 * * * *";
-/** Tải trang được link tới, cùng nhịp với process (process đợi trang tối đa 30 phút). */
+/** Fetches the linked pages, on the same rhythm as process (process waits for pages up to 30 minutes). */
 export const PAGES_CRON = "*/5 * * * *";
 
 /**
- * Chụp số sao repo GitHub lúc 06:20 giờ Việt Nam (23:20 UTC): sau hai nguồn repo (06:00 Search,
- * 06:10 Trending) để repo mới thấy hôm nay có lần đo đầu, trước digest 07:00.
+ * Snapshot the GitHub repo star counts at 06:20 Vietnam time (23:20 UTC): after the two repo sources (06:00 Search,
+ * 06:10 Trending), so new repos get a first measurement today, before the 07:00 digest.
  */
 export const REPO_STATS_CRON = "20 6 * * *";
 
-/** Mặt bằng tính lại mỗi ngày lúc 06:30 giờ Việt Nam, trước digest 07:00. */
+/** Baselines are recomputed daily at 06:30 Vietnam time, before the 07:00 digest. */
 export const BASELINES_CRON = "30 6 * * *";
-/** Giờ Việt Nam cho các lịch theo giờ của bạn (mặt bằng, điểm tin). */
+/** Vietnam time for the hourly schedules (baselines, digest). */
 export const VN_TZ = "Asia/Ho_Chi_Minh";
 
-/** Điểm tin lúc 07:00 giờ Việt Nam (khớp `DIGEST_HOUR_VN` trong jobs/digest.ts). */
+/** Digest at 07:00 Vietnam time (matches `DIGEST_HOUR_VN` in jobs/digest.ts). */
 export const DIGEST_CRON = "0 7 * * *";
 
 export interface FetchJob {
   sourceId: number;
-  /** Số lần đã hẹn lại vì bị giới hạn tốc độ (HTTP 429); bỏ trống = lượt theo lịch. */
+  /** Number of times the job was rescheduled because of rate limiting (HTTP 429); empty = regular scheduled run. */
   rateLimited?: number;
 }
 
@@ -46,8 +46,8 @@ export function createBoss(databaseUrl: string, opts: { schedule: boolean }): Pg
 export async function ensureQueues(boss: PgBoss): Promise<void> {
   await boss.createQueue(QUEUE.fetchDead, { retentionSeconds: 30 * 24 * 3600 });
   await boss.createQueue(QUEUE.fetch, {
-    // `stately`: mỗi nguồn (singletonKey) tối đa một job đang chờ và một job đang chạy.
-    // Nguồn chậm thì lượt cron kế tiếp không chồng thêm job lên.
+    // `stately`: each source (singletonKey) has at most one pending job and one running job.
+    // A slow source does not stack more jobs when the next cron run arrives.
     policy: "stately",
     retryLimit: 3,
     retryDelay: 30,
@@ -56,7 +56,7 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
     deadLetter: QUEUE.fetchDead,
   });
   await boss.createQueue(QUEUE.process, {
-    // Một lượt process tại một thời điểm: hai lượt chạy song song sẽ cùng gộp một tài liệu.
+    // One process run at a time: two parallel runs would merge the same document twice.
     policy: "stately",
     retryLimit: 2,
     retryDelay: 60,
@@ -70,8 +70,8 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
     expireInSeconds: 1200,
   });
   await boss.createQueue(QUEUE.digest, {
-    // Một lượt tại một thời điểm: hai lượt song song sẽ cùng gửi một vị trí.
-    // Thử lại thì gửi tiếp phần thiếu (plan đã lưu), không gửi trùng.
+    // One digest run at a time: two parallel runs would send the same position.
+    // A retry sends only the missing part (saved plan), not duplicates.
     policy: "stately",
     retryLimit: 4,
     retryDelay: 120,
@@ -79,7 +79,7 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
     expireInSeconds: 900,
   });
   await boss.createQueue(QUEUE.repoStats, {
-    // Thử lại an toàn: repo đã chụp trong 12 giờ qua thì lượt sau bỏ qua, không ghi trùng.
+    // Safe retry: if the repo was snapshotted in the last 12 hours, the next run skips it and does not write a duplicate.
     policy: "stately",
     retryLimit: 2,
     retryDelay: 300,

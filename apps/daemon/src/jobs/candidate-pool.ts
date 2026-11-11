@@ -1,8 +1,8 @@
 /**
- * Bể ứng viên: ghi lại mọi sự kiện đã qua cổng của một lần xếp hạng, kèm thành phần điểm và việc
- * có được chọn hay không (bảng `candidate_pool`). Chỉ GHI THÊM, không đổi cách chọn tin.
+ * Candidate pool: records every event that passed the gate in one ranking run, with its score components and whether
+ * it was selected (table `candidate_pool`). APPEND-ONLY in effect: it does not change how items are selected.
  *
- * Dữ liệu này để tính sàn theo phân vị sau này; kế hoạch gửi chỉ giữ điểm của tin đã chọn.
+ * This data is for computing the percentile floor later; the send plan keeps only the scores of the selected items.
  */
 import { type Components, createLogger } from "@radard/core";
 import { candidatePool, type Database } from "@radard/db";
@@ -47,8 +47,8 @@ function rowOf(
 }
 
 /**
- * Các dòng của bể: tin được chọn và mọi tin qua cổng nhưng bị loại sau đó (sàn, tin đã gửi không
- * có gì mới, hạn mức nguồn, không đủ chỗ). Tin bị cổng loại không vào bể.
+ * Rows of the pool: the selected items and every item that passed the gate but was dropped afterwards (floor, already sent with
+ * nothing new, source cap, no room). Items dropped by the gate are not in the pool.
  */
 export function poolRows(profileId: number, rank: RankResult): Row[] {
   const rows = rank.picked.map((p) =>
@@ -64,8 +64,8 @@ export function poolRows(profileId: number, rank: RankResult): Row[] {
 const excluded = (column: string) => sql.raw(`excluded."${column}"`);
 
 /**
- * Ghi bể của một lần xếp hạng. Chạy lại cùng khoảng thì cập nhật dòng cũ và xoá dòng không còn
- * trong kết quả mới, nên không nhân đôi. Ném lỗi nếu ghi hỏng; luồng gửi tin dùng
+ * Writes the pool of one ranking run. Re-running the same range updates the old rows and deletes rows no longer
+ * in the new result, so nothing is duplicated. Throws if the write fails; the send flow uses
  * `recordCandidatePoolSafely`.
  */
 export async function recordCandidatePool(
@@ -83,7 +83,7 @@ export async function recordCandidatePool(
     await tx
       .delete(candidatePool)
       .where(ids.length ? and(scope, notInArray(candidatePool.eventId, ids)) : scope);
-    // Postgres giới hạn số tham số mỗi câu lệnh: chia lô.
+    // Postgres limits the number of parameters per statement: split into batches.
     for (let i = 0; i < rows.length; i += 200) {
       await tx
         .insert(candidatePool)
@@ -113,9 +113,9 @@ export async function recordCandidatePool(
 }
 
 /**
- * Quyết định: ghi bể là việc phụ, KHÔNG được làm hỏng hay chặn việc gửi tin. Lỗi được log rồi
- * nuốt; lần xếp hạng này mất dữ liệu bể (chấp nhận được: sàn theo phân vị tính trên 30 ngày).
- * Việc ghi nằm trong giao dịch riêng, tách khỏi mọi thao tác của luồng gửi.
+ * Decision: writing the pool is a side job and must NOT break or block the sending of items. Errors are logged and
+ * swallowed; this ranking run loses its pool data (acceptable: the percentile floor is computed over 30 days).
+ * The write runs in its own transaction, separate from every operation of the send flow.
  */
 export async function recordCandidatePoolSafely(
   db: Database,
@@ -135,7 +135,7 @@ export async function recordCandidatePoolSafely(
 
 export type CandidateScore = typeof candidatePool.$inferSelect;
 
-/** Đọc các dòng của bể có `period_end` trong [from, to), theo hồ sơ, cũ đến mới. */
+/** Reads the pool rows with `period_end` in [from, to), by profile, oldest to newest. */
 export async function readCandidateScores(
   db: Database,
   q: { profileId: number; from: Date; to: Date },

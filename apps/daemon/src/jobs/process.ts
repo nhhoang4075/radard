@@ -1,19 +1,19 @@
 /**
- * Job `process`: phần xử lý của MVP-0. Ba pha độc lập, mỗi pha tự tìm việc còn thiếu, nên chạy
- * lại, dừng giữa chừng hay đổi chủ đề rồi chạy lại đều an toàn:
+ * Job `process`: the processing part of MVP-0. Three independent phases, each finding its own missing work, so running
+ * it again, stopping midway, or changing topics and running again are all safe:
  *
- *   A. Tài liệu chưa có `doc_text` → rút văn bản, đoán ngôn ngữ, embed. Tài liệu có trang nội
- *      dung riêng (bài HN link sang blog, GitHub…) đợi job `pages` tải trang, tối đa
- *      `PAGE_WAIT_MS`, rồi embed tiêu đề cùng phần chữ chính của trang.
- *   S. Cặp (tài liệu, chủ đề đang bật) chưa có điểm → cosine, ghi `doc_topic_scores` (SQL thuần),
- *      bằng vector có nội dung trang (`content_embedding`) nếu có.
- *   B. Tài liệu chưa thuộc sự kiện nào → gộp: cùng URL trước, rồi theo vector của bản thô
- *      (`embedding`, không có nội dung trang: ngưỡng 0,9 được chỉnh trên vector này). Vùng xám
- *      0,85–0,9 thì hỏi model quyết định "có cùng một tin không" (`DECISION_JOIN_LOW`).
+ *   A. Documents without `doc_text` → extract text, detect language, embed. Documents with their own page content
+ *      (HN posts linking to a blog, GitHub…) wait for the `pages` job to fetch the page, up to
+ *      `PAGE_WAIT_MS`, then embed the title together with the page's main text.
+ *   S. Pairs (document, enabled topic) with no score yet → cosine, written to `doc_topic_scores` (pure SQL),
+ *      using the page-content vector (`content_embedding`) when available.
+ *   B. Documents not yet in any event → merge: same URL first, then by the vector of the raw copy
+ *      (`embedding`, no page content: the 0,9 threshold was tuned on this vector). The grey zone
+ *      0,85–0,9 asks the decision model "are these the same story?" (`DECISION_JOIN_LOW`).
  *
- * Pha A và B KHÔNG đọc hồ sơ người dùng (quyết định D4, 12/10/2026): mọi tài liệu được embed
- * và gộp. Hồ sơ chỉ dùng để chấm điểm (pha S) và để chọn tin ở digest. Trước 12/10, pha B chỉ
- * gộp tài liệu có cosine ≥ 0,58 với một mô tả TẠM, nên pipeline có hai cổng liên quan rời nhau.
+ * Phases A and B do NOT read the user profiles (decision D4, 12/10/2026): every document is embedded
+ * and merged. Profiles are only used for scoring (phase S) and for choosing items in the digest. Before 12/10, phase B only
+ * merged documents with cosine ≥ 0,58 against a TEMPORARY description, so the pipeline had two gates that were loosely related.
  */
 import {
   createLogger,
@@ -43,34 +43,34 @@ import { embedPendingTopics } from "./topics.ts";
 
 const log = createLogger("process");
 
-/** Embedding model có giới hạn đầu vào; phần đầu văn bản đủ nói tài liệu về gì. */
+/** The embedding model has an input limit; the start of the text is enough to say what the document is about. */
 const MAX_TEXT_CHARS = 4000;
 /**
- * Phần chữ của trang được link tới đưa vào embed: cỡ một abstract arXiv (~1.500 ký tự), để tài
- * liệu HN và arXiv được embed từ lượng chữ tương đương.
+ * The main text of the linked page that goes into the embedding: about one arXiv abstract (~1.500 characters), so that
+ * HN and arXiv documents are embedded from a comparable amount of text.
  */
 const PAGE_TEXT_CHARS = 1500;
 
 /**
- * Vùng xám của gộp theo vector: cosine tới tâm sự kiện gần nhất trong [0,85; `thresholds.join`)
- * thì hỏi model quyết định "hai tin có cùng một chuyện không". Đo 13–16/10/2026 trên dữ liệu thật:
- * 42% cặp có cosine 0,85–0,9 là cùng một tin, nên cả ngưỡng 0,9 lẫn hạ ngưỡng đều sai nhiều;
- * trong vùng này cosine gần như không phân biệt được (AUC 0,57), Jev thì phân biệt gần hết (AUC
- * 0,99, khớp nhãn tham chiếu 97% ở ngưỡng 0,5; bạn xác nhận 14/14 nhãn tham chiếu).
+ * Vector-merge grey zone: cosine to the nearest event centroid in [0,85; `thresholds.join`)
+ * asks the decision model "do these two items cover the same story?". Measured 13–16/10/2026 on real data:
+ * 42% of pairs with cosine 0,85–0,9 are the same story, so both the 0,9 threshold and lowering it are often wrong;
+ * in this zone cosine barely separates them (AUC 0,57), while Jev separates nearly all of them (AUC
+ * 0,99, matches the reference labels 97% at threshold 0,5; you confirmed 14/14 reference labels).
  */
 export const DECISION_JOIN_LOW = 0.85;
-/** Xác suất "cùng một tin" tối thiểu để gộp (ngưỡng đã đo, xem `DECISION_JOIN_LOW`). */
+/** Minimum "same story" probability to merge (the measured threshold, see `DECISION_JOIN_LOW`). */
 export const DECISION_JOIN_MIN_P = 0.5;
-/** Câu hỏi đúng như lúc đo (thử nghiệm A, 13–16/10/2026). */
+/** The question exactly as measured (experiment A, 13–16/10/2026). */
 export const SAME_STORY_QUESTION =
   "Do these two items report the same news story or announcement (not merely the same topic)?";
-/** Trích đoạn mỗi tin đưa cho model: 400 ký tự đầu của văn bản đã embed, như lúc đo. */
+/** Excerpt of each item given to the model: the first 400 characters of the embedded text, as measured. */
 const DECISION_EXCERPT_CHARS = 400;
 
 export interface Thresholds {
-  /** Cosine tối thiểu tới tâm cụm để gộp vào sự kiện có sẵn: "cùng một chuyện". */
+  /** Minimum cosine to the cluster centroid to merge into an existing event: "the same story". */
   join: number;
-  /** Chỉ so với sự kiện hoạt động trong chừng này ngày quanh thời điểm tài liệu. */
+  /** Only compared with events active within this many days around the document's time. */
   windowDays: number;
 }
 
@@ -78,23 +78,23 @@ export interface ProcessDeps {
   db: Database;
   store: ObjectStore;
   embedder: EmbeddingProvider;
-  /** Viết tin giả định cho chủ đề (HyDE). Không có thì chủ đề chấm bằng mô tả như trước. */
+  /** Writes placeholder items for the topic (HyDE). Without it, topics are scored by their description, as before. */
   llm?: LlmProvider | null;
   thresholds: Thresholds;
   /**
-   * Model quyết định cho vùng xám của gộp theo vector. Không có (hoặc lỗi) thì gộp như trước khi
-   * có nó: dưới `thresholds.join` là mở sự kiện mới. `events rebuild` mặc định không truyền vào.
+   * Decision model for the grey zone of the vector merge. Without it (or on error), merging works as it did before
+   * the model existed: below `thresholds.join`, a new event opens. `events rebuild` does not pass it by default.
    */
   decider?: DecisionProvider | null;
-  /** Rút chữ chính từ HTML của trang được link tới. Không có thì chỉ embed bản thô của nguồn. */
+  /** Extracts the main text from the HTML of the linked page. Without it, only the source's raw copy is embedded. */
   extractPage?: PageExtractor;
   batchSize?: number;
-  /** Trần số lô embed mỗi lượt; phần còn lại để lượt sau. Không đặt thì chạy tới hết. */
+  /** Cap on embed batches per run; the rest is left for the next run. Unset = run to the end. */
   maxBatches?: number;
   /**
-   * Trần số tài liệu gộp mỗi lượt. Mỗi tài liệu tốn một truy vấn tìm tâm gần nhất (~85 ms khi
-   * quét ~15 nghìn sự kiện, đo 12/10/2026), nên một lượt sau thời gian tắt dài phải chia nhỏ để
-   * xong trước hạn của job. Không đặt thì chạy tới hết (CLI `events rebuild`).
+   * Cap on documents merged per run. Each document costs one nearest-centroid query (~85 ms when
+   * scanning ~15 thousand events, measured 12/10/2026), so a run after a long downtime must be split to
+   * finish before the job's deadline. Unset = run to the end (CLI `events rebuild`).
    */
   maxCluster?: number;
 }
@@ -105,13 +105,13 @@ export interface ProcessOutcome {
   scored: number;
   joinedByUrl: number;
   joinedByVector: number;
-  /** Gộp vì model quyết định trả lời "cùng một tin" (vùng xám). */
+  /** Merged because the decision model answered "same story" (grey zone). */
   joinedByDecision: number;
-  /** Số lần hỏi model quyết định có câu trả lời. */
+  /** Number of decision-model calls that returned an answer. */
   decisionsAsked: number;
-  /** Số lần hỏi lỗi (coi như không cùng tin). */
+  /** Number of failed calls (treated as not the same story). */
   decisionsFailed: number;
-  /** Số tài liệu nằm trong vùng xám mà không hỏi vì không có model quyết định. */
+  /** Number of documents in the grey zone not asked because there is no decision model. */
   decisionsSkipped: number;
   created: number;
 }
@@ -130,7 +130,7 @@ export async function runProcess(deps: ProcessDeps): Promise<ProcessOutcome> {
     created: 0,
   };
   await ensureTopicExamples(deps.db, deps.llm ?? null, deps.embedder);
-  // Pha A theo lô cho tới khi hết việc (hoặc hết trần số lô của lượt này).
+  // Phase A in batches until there is no work left (or this run's batch cap is reached).
   for (let batches = 0; batches < (deps.maxBatches ?? Infinity); batches++) {
     const n = await embedBatch(deps, out);
     if (n === 0) break;
@@ -147,9 +147,9 @@ export async function runProcess(deps: ProcessDeps): Promise<ProcessOutcome> {
 }
 
 /**
- * Xoá mọi sự kiện rồi gộp lại từ đầu; giữ embedding và điểm chủ đề (CLI `events rebuild`). Gộp lại
- * cả lịch sử mà hỏi model quyết định cho mọi tài liệu vùng xám là ~1.700 lời gọi (đo 16/10/2026),
- * nên mặc định KHÔNG hỏi: chỉ hỏi khi `decide`.
+ * Deletes every event and merges again from scratch; keeps embeddings and topic scores (CLI `events rebuild`). Re-merging
+ * the whole history while asking the decision model for every grey-zone document is ~1,700 calls (measured 16/10/2026),
+ * so by default it does NOT ask: it only asks when `decide` is set.
  */
 export async function rebuildEvents(
   deps: ProcessDeps,
@@ -160,8 +160,8 @@ export async function rebuildEvents(
 }
 
 /**
- * Văn bản để embed: adapter nguồn tự rút từ bản thô (không có thì dùng tiêu đề), cộng phần đầu
- * chữ chính của trang được link tới nếu có.
+ * Text to embed: the source adapter extracts it from the raw copy (the title is used if there is none), plus the start
+ * of the main text of the linked page if there is one.
  */
 export function buildText(
   kind: string,
@@ -173,24 +173,24 @@ export function buildText(
   try {
     text = adapterFor(kind).toText?.(body, title) ?? text;
   } catch {
-    // Bản thô hỏng hay kiểu nguồn không còn adapter: tiêu đề vẫn đủ để lọc và gộp.
+    // Broken raw copy, or a source kind with no adapter any more: the title is still enough to filter and merge.
   }
   if (pageText) text = `${text}\n\n${pageText.slice(0, PAGE_TEXT_CHARS)}`;
   return nfc(text).slice(0, MAX_TEXT_CHARS);
 }
 
 /**
- * Pha S: chấm mọi cặp (tài liệu, chủ đề có embedding) còn thiếu điểm, bằng một câu SQL: cosine trên
- * vector đã có, không gọi model. Chấm với MỌI chủ đề (thư viện và tự thêm, bật hay chưa bật), để điểm
- * không phụ thuộc người dùng đang bật gì (D4). Chỉ ghép vector cùng model embedding. Trả về số điểm
- * mới ghi.
+ * Phase S: scores every missing (document, topic with an embedding) pair in one SQL statement: cosine on
+ * vectors already stored, no model call. Scores against ALL topics (library and self-added, enabled or not), so scores
+ * do not depend on what the user has enabled (D4). Only joins vectors from the same embedding model. Returns the number
+ * of new scores written.
  */
 export async function scoreTopics(db: Database, embeddingModel: string): Promise<number> {
   const rows = await db.execute<{ n: number }>(sql`
     with ins as (
       insert into doc_topic_scores (document_id, topic_id, score)
-      -- Chấm bằng vector có nội dung trang nếu có (xem doc_text.content_embedding).
-      -- Điểm là cosine lớn nhất trong vector mô tả và các tin giả định của chủ đề (topic_examples).
+      -- Score with the page-content vector when there is one (see doc_text.content_embedding).
+      -- The score is the max cosine between the description vector and the topic's hypothetical items (topic_examples).
       select dt.document_id, t.id,
         greatest(
           1 - (coalesce(dt.content_embedding, dt.embedding) <=> t.embedding),
@@ -218,7 +218,7 @@ export async function scoreTopics(db: Database, embeddingModel: string): Promise
 async function embedBatch(deps: ProcessDeps, out: ProcessOutcome) {
   const { db, store, embedder } = deps;
   const waitKinds = deps.extractPage ? await articleKinds(db) : [];
-  // Đang đợi trang: nguồn có trang nội dung, job pages chưa xét URL này, tài liệu còn mới.
+  // Waiting for the page: the source has a content page, the pages job has not yet checked this URL, and the document is still recent.
   const waiting = waitKinds.length
     ? and(
         inArray(sources.kind, waitKinds),
@@ -244,8 +244,8 @@ async function embedBatch(deps: ProcessDeps, out: ProcessOutcome) {
     .limit(deps.batchSize ?? 128);
   if (rows.length === 0) return 0;
 
-  // Hai văn bản mỗi tài liệu có trang: bản thô (để gộp sự kiện) và bản thô + trang (để chấm chủ
-  // đề). Embed chung một request.
+  // Two texts for each document with a page: the raw copy (for merging events) and raw copy + page (for scoring topics).
+  // Embedded in one request.
   const texts: string[] = [];
   const contents: (string | null)[] = [];
   for (const r of rows) {
@@ -289,7 +289,7 @@ async function pageTextOf(
   return raw ? deps.extractPage(new TextDecoder().decode(raw), r.url) : null;
 }
 
-/** Tài liệu chờ gộp, đủ để tìm sự kiện và để hỏi model quyết định. */
+/** Documents waiting to merge, enough to find the event and to ask the decision model. */
 interface PendingDoc {
   id: number;
   title: string | null;
@@ -312,8 +312,8 @@ async function clusterPending(deps: ProcessDeps, out: ProcessOutcome): Promise<v
         (v) => new Date(v),
       ),
       embedding: docText.embedding,
-      // `sources.config.vectorJoin = false`: không gộp theo vector, chỉ theo cùng URL. Dùng cho
-      // GitHub releases: Bun 1.4.1 và 1.4.2 gần như trùng vector nhưng là hai lần phát hành.
+      // `sources.config.vectorJoin = false`: no merging by vector, only by the same URL. Used for
+      // GitHub releases: Bun 1.4.1 and 1.4.2 are nearly identical vectors but are two separate releases.
       vectorJoin: sql<boolean>`coalesce((${sources.config}->>'vectorJoin')::boolean, true)`,
       source: sources.name,
       excerpt: sql<string>`left(${docText.text}, ${DECISION_EXCERPT_CHARS})`,
@@ -325,22 +325,22 @@ async function clusterPending(deps: ProcessDeps, out: ProcessOutcome): Promise<v
     .where(
       and(
         isNull(eventDocuments.documentId),
-        // Vector của hai model khác nhau không so được với nhau. Đổi model thì chạy
-        // `bun run cli reprocess --all` để tính lại toàn bộ dữ liệu dẫn xuất.
+        // Vectors from two different models cannot be compared. When changing the model, run
+        // `bun run cli reprocess --all` to recompute all derived data.
         eq(docText.embeddingModel, embedder.model),
       ),
     )
-    // Cũ trước mới sau: sự kiện được mở bởi tài liệu xuất hiện sớm nhất.
+    // Oldest first, newest last: the event is opened by the earliest document.
     .orderBy(sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt})`, asc(documents.id))
     .limit(deps.maxCluster ?? 1_000_000_000);
 
   for (const doc of pending) await clusterOne(deps, doc, out);
 }
 
-/** Gộp một tài liệu: cùng URL, rồi sự kiện gần nhất theo vector (vùng xám thì hỏi), không thì mở mới. */
+/** Merges one document: same URL, then the nearest event by vector (asking in the grey zone), otherwise opens a new one. */
 async function clusterOne(deps: ProcessDeps, doc: PendingDoc, out: ProcessOutcome) {
   const { db } = deps;
-  // 1) Cùng một bài (url_canonical) đã nằm trong sự kiện nào đó: vào đúng sự kiện đó.
+  // 1) The same article (url_canonical) is already in some event: go to that event.
   const [sameUrl] = await db
     .select({ eventId: eventDocuments.eventId })
     .from(eventDocuments)
@@ -353,8 +353,8 @@ async function clusterOne(deps: ProcessDeps, doc: PendingDoc, out: ProcessOutcom
     return;
   }
 
-  // 2) Sự kiện gần nhất theo vector, trong cửa sổ thời gian quanh tài liệu. Từ ngưỡng (0,9) thì
-  //    gộp; vùng xám 0,85–0,9 thì hỏi model quyết định.
+  // 2) Nearest event by vector, within the time window around the document. At or above the threshold (0,9) it
+  //    merges; the grey zone 0,85–0,9 asks the decision model.
   const near = doc.vectorJoin ? await nearestEvent(deps, doc) : undefined;
   const similarity = near ? 1 - Number(near.distance) : -1;
   const how = near ? await joinReason(deps, doc, near.id, similarity, out) : null;
@@ -362,7 +362,7 @@ async function clusterOne(deps: ProcessDeps, doc: PendingDoc, out: ProcessOutcom
     await db
       .update(events)
       .set({
-        // Trọng số là số vector trong tâm, không phải nDocs (xem `events.nVectors`).
+        // The weight is the number of vectors in the centroid, not nDocs (see `events.nVectors`).
         centroid: runningMean(near.centroid, near.nVectors, doc.embedding),
         nVectors: near.nVectors + 1,
         nDocs: sql`${events.nDocs} + 1`,
@@ -375,7 +375,7 @@ async function clusterOne(deps: ProcessDeps, doc: PendingDoc, out: ProcessOutcom
     return;
   }
 
-  // 3) Không khớp gì: mở sự kiện mới.
+  // 3) No match: open a new event.
   const [created] = await db
     .insert(events)
     .values({
@@ -391,9 +391,9 @@ async function clusterOne(deps: ProcessDeps, doc: PendingDoc, out: ProcessOutcom
 }
 
 /**
- * Có gộp vào sự kiện gần nhất không, và vì sao: `vector` (từ ngưỡng), `decision` (vùng xám, model
- * quyết định trả lời cùng một tin), `null` (mở sự kiện mới). Hỏi lỗi thì coi như không gộp: không
- * bao giờ làm hỏng lượt process.
+ * Whether it merges into the nearest event, and why: `vector` (above the threshold), `decision` (grey zone, the model
+ * answered "the same story"), `null` (opens a new event). If the ask fails, treat it as not merged: this never
+ * breaks the process run.
  */
 async function joinReason(
   deps: ProcessDeps,
@@ -424,9 +424,9 @@ async function joinReason(
 }
 
 /**
- * Hỏi "hai tin có cùng một chuyện không": `item_a` là tài liệu mới, `item_b` là tài liệu của sự
- * kiện giống nó nhất (theo vector bản thô). Trả xác suất "có"; `null` khi sự kiện không còn tài
- * liệu nào có văn bản.
+ * Asks "are these two items the same story?": `item_a` is the new document, `item_b` is the document of the event
+ * most similar to it (by raw-copy vector). Returns the probability of "yes"; `null` when the event has no document left
+ * with text.
  */
 async function askSameStory(
   db: Database,
@@ -469,9 +469,9 @@ async function nearestEvent(
   { db, embedder, thresholds }: ProcessDeps,
   doc: { at: Date; embedding: number[] },
 ) {
-  // Cửa sổ hai phía quanh thời điểm tài liệu: sự kiện phải còn hoạt động sau `from` và đã bắt
-  // đầu trước `to`. Chỉ có cận dưới thì một bài cũ đến muộn (arXiv lấy về sau vài ngày) có thể
-  // gộp vào sự kiện của nhiều tuần sau.
+  // Two-sided window around the document's time: the event must still be active after `from` and have started
+  // before `to`. With only a lower bound, a late-arriving old article (arXiv fetched a few days later) could
+  // merge into an event from many weeks later.
   const span = thresholds.windowDays * 86_400_000;
   const from = new Date(doc.at.getTime() - span);
   const to = new Date(doc.at.getTime() + span);
@@ -492,8 +492,8 @@ async function nearestEvent(
 }
 
 /**
- * Nới khoảng thời gian của sự kiện để chứa `at`. Tài liệu không đến theo thứ tự thời gian
- * (bài cũ có thể được lấy về muộn), nên phải cập nhật cả hai đầu.
+ * Extends the event's time span to contain `at`. Documents do not arrive in time order
+ * (an old article may be fetched late), so both ends must be updated.
  */
 function widenSpan(at: Date) {
   return {
@@ -514,8 +514,8 @@ async function attach(
     .values({ eventId, documentId: doc.id, similarity, reason })
     .onConflictDoNothing();
   if (reason === "url") {
-    // Gộp vì cùng bài: không đổi tâm cụm (cùng nội dung) nên cũng không tăng `nVectors`;
-    // chỉ đếm thêm tài liệu và kéo dài thời gian.
+    // Merge of the same article: does not change the cluster centroid (same content), so `nVectors` is not increased either;
+    // it only counts one more document and extends the time span.
     await db
       .update(events)
       .set({

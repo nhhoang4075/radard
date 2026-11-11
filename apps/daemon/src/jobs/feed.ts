@@ -1,13 +1,13 @@
 /**
- * Bản chụp feed mỗi ngày (quyết định 10/11/2026, mo-hinh-de-xuat.html: "feed web là nguồn chính,
- * Telegram chỉ là kênh thông báo"):
+ * Daily feed snapshot (decision 10/11/2026, mo-hinh-de-xuat.html: "the web feed is the main source,
+ * Telegram is only the notification channel"):
  *
- *   1. Lúc 07:00 VN, MỘT bản chụp cho mỗi (hồ sơ, khung): `select` chạy một lần với trần K =
- *      `feedMaxItems`, mỗi nguồn `feedMaxPerSource`, sàn feed; giữ chỗ, MMR, Gumbel top-k giữ nguyên.
- *   2. Hạt giống crypto lưu vào dòng `feed_snapshots` NGAY khi tạo dòng, trước khi chọn; chết giữa
- *      chừng thì lượt sau chọn lại với đúng hạt đó. Đã `ready` thì dùng lại, không dựng lại.
- *   3. Lớp thông báo (≤ 7 tin đầu qua sàn thông báo, `pickNotify`) chỉ ĐÁNH DẤU tin trong bản chụp
- *      (`notify_position`), không đổi bản chụp.
+ *    1. At 07:00 VN, ONE snapshot per (profile, slot): `select` runs once with cap K =
+ *       `feedMaxItems`, per-source cap `feedMaxPerSource`, feed floor; slot reservation, MMR and Gumbel top-k unchanged.
+ *    2. The crypto seed is saved to the `feed_snapshots` row RIGHT when the row is created, before selecting; if the process
+ *       crashes midway, the next run reselects with exactly that seed. If already `ready`, reuse it, do not rebuild.
+ *    3. The notification layer (the first ≤ 7 items through the notification floor, `pickNotify`) only MARKS items in the snapshot
+ *       (`notify_position`), it does not change the snapshot.
  */
 import {
   createLogger,
@@ -39,19 +39,19 @@ import { ensureSharedSummaries } from "./summaries.ts";
 const log = createLogger("feed");
 const DAY_MS = 86_400_000;
 
-/** Thông tin xếp hạng lưu kèm bản chụp và plan digest, để giải thích vì sao chọn. */
+/** Ranking info stored with the snapshot and the digest plan, to explain why items were chosen. */
 export interface RankingInfo {
   candidates: number;
   passedGate: number;
   rejected: Record<string, number>;
   config: Record<string, unknown>;
   baselines: RankResult["baselines"];
-  /** Thời gian cả bước xếp hạng, mili giây (vắng ở plan trước 16/10/2026). */
+  /** Time of the whole ranking step, in milliseconds (absent in plans before 16/10/2026). */
   ms?: number;
   /**
-   * Cổng bằng model quyết định cho các sự kiện có R trong vùng xám: số đếm, từng sự kiện đã xét
-   * (R, chủ đề, xác suất, qua hay không, có dùng luật cũ không) và thời gian hỏi. Vắng ở plan
-   * trước 16/10/2026.
+   * Decision-model gate for events with R in the grey zone: counts, each event checked
+   * (R, topic, probability, passed or not, whether the old rule was used) and the time spent asking. Absent in plans
+   * before 16/10/2026.
    */
   decision?: {
     model: string | null;
@@ -63,7 +63,7 @@ export interface RankingInfo {
 
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 
-/** Cấu hình dạng JSON (priors là Map → đối tượng). */
+/** Config in JSON form (priors is a Map → object). */
 function configJson(cfg: RankResult["config"]): Record<string, unknown> {
   const { priors, ...rest } = cfg;
   return { ...rest, priors: Object.fromEntries(priors) };
@@ -96,7 +96,7 @@ export function rankingInfo(
   };
 }
 
-/** Một tin của bản chụp trước khi ghi (cũng là dạng buildPlan xem thử dùng). */
+/** One snapshot item before writing (also the shape buildPlan uses for previews). */
 export type FeedItemDraft = Omit<
   typeof feedItems.$inferInsert,
   "id" | "snapshotId" | "createdAt"
@@ -109,8 +109,8 @@ export type FeedItemDraft = Omit<
 };
 
 /**
- * Danh sách có thứ tự của bản chụp từ kết quả xếp hạng: vị trí 1..n theo thứ tự `select` trả về
- * (S − phạt giảm dần); tin được báo đánh dấu `notifyPosition` 1..7 theo `pickNotify`.
+ * Ordered list of the snapshot from the ranking result: positions 1..n in the order `select` returns
+ * (S minus the penalty, descending); notified items are marked `notifyPosition` 1..7 by `pickNotify`.
  */
 export function feedItemsOf(rank: RankResult, profileId: number): FeedItemDraft[] {
   const items = rank.picked.map(
@@ -146,7 +146,7 @@ export function feedItemsOf(rank: RankResult, profileId: number): FeedItemDraft[
   return items;
 }
 
-/** Tin được báo của bản chụp, theo thứ tự báo. */
+/** The notified items of the snapshot, in notification order. */
 export function notifiedItems<T extends { notifyPosition: number | null }>(
   items: readonly T[],
 ): T[] {
@@ -161,27 +161,27 @@ export interface FeedDeps {
   http?: HttpClient;
   decider?: DecisionProvider | null;
   /**
-   * Model viết tóm tắt chung (`event_summaries`) cho MỌI tin của bản chụp. Không có (hoặc lỗi) thì
-   * tin không có `summary_id` và hiện tiêu đề gốc; không chặn bản chụp.
+   * Shared summary model (`event_summaries`) for ALL items of the snapshot. If absent (or on error), the
+   * item has no `summary_id` and shows the original title; it does not block the snapshot.
    */
   llm?: LlmProvider | null;
-  /** Tính dữ liệu học sau khi chọn (mặc định `computeSelectionLearning`); chỉ test thay. */
+  /** Computes the learning data after selection (default `computeSelectionLearning`); only replaced in tests. */
   computeLearning?: (rank: RankResult) => SelectionLearning | null;
 }
 
 export interface FeedSnapshotResult {
   snapshot: FeedSnapshot;
   items: FeedItem[];
-  /** `true`: lượt này dựng bản chụp; `false`: dùng lại bản đã lưu. */
+  /** `true`: this run builds the snapshot; `false`: reuse the saved one. */
   built: boolean;
 }
 
-/** Thông tin xếp hạng đã lưu trong bản chụp. */
+/** Ranking info saved in the snapshot. */
 export function snapshotRanking(s: FeedSnapshot): RankingInfo | null {
   return (s.meta.ranking as RankingInfo | undefined) ?? null;
 }
 
-/** Dữ liệu học đã lưu trong bản chụp (null khi không có). */
+/** Learning data saved in the snapshot (null when absent). */
 export function snapshotLearning(s: FeedSnapshot): SelectionLearning | null {
   return (s.meta.learning as SelectionLearning | undefined) ?? null;
 }
@@ -195,9 +195,9 @@ async function loadItems(db: Database, s: FeedSnapshot): Promise<FeedItem[]> {
 }
 
 /**
- * Bảo đảm có tóm tắt chung cho TẤT CẢ tin của bản chụp (quyết định 11/11/2026) và ghi `summary_id`
- * vào từng tin: tóm tắt đúng như lúc dựng bản chụp, ổn định dù sự kiện về sau có thêm bài. Mọi lỗi
- * chỉ làm tin thiếu tóm tắt, không chặn bản chụp.
+ * Ensures a shared summary exists for ALL items of the snapshot (decision 11/11/2026) and writes `summary_id`
+ * to each item: the summary is exactly as it was when the snapshot was built, stable even if the event later gains articles. Any error
+ * only leaves items without a summary; it does not block the snapshot.
  */
 async function attachSharedSummaries(deps: FeedDeps, drafts: FeedItemDraft[]): Promise<void> {
   try {
@@ -226,9 +226,9 @@ async function attachSharedSummaries(deps: FeedDeps, drafts: FeedItemDraft[]): P
 }
 
 /**
- * Bản chụp feed của (hồ sơ, khung `slot`): đã `ready` thì đọc lại; chưa thì dựng với hạt giống đã
- * lưu trong dòng (tạo dòng và hạt nếu chưa có), ghi danh sách và đánh dấu `ready` trong MỘT giao dịch.
- * Hai tiến trình cùng dựng: tiến trình ghi sau thấy `ready` thì bỏ kết quả của mình, đọc bản đã lưu.
+ * The feed snapshot of (profile, `slot`): if already `ready`, read it back; if not, build it with the seed
+ * saved in the row (create the row and seed if not yet there), write the list and mark `ready` in ONE transaction.
+ * If two processes build at once, the one that writes later sees `ready`, discards its own result and reads the saved one.
  */
 export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<FeedSnapshotResult> {
   const { db, profileId } = deps;
@@ -256,7 +256,7 @@ export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<Fe
     selectSeed: row.selectSeed,
   });
   const rankMs = Date.now() - started;
-  // Bể ứng viên: lỗi ghi bị nuốt, không chặn bản chụp.
+  // Candidate pool: write errors are swallowed, they do not block the snapshot.
   await recordCandidatePoolSafely(db, profileId, rank);
   let learning: SelectionLearning | null = null;
   try {
@@ -274,7 +274,7 @@ export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<Fe
     const [locked] = await tx.select().from(feedSnapshots).where(key).for("update");
     if (!locked) throw new Error("dòng feed_snapshots biến mất");
     if (locked.status === "ready") return false;
-    // Lượt trước chết giữa chừng không để lại tin (cùng giao dịch), nhưng xoá cho chắc.
+    // A previous run that crashed midway left no items (same transaction), but delete them anyway to be safe.
     await tx.delete(feedItems).where(eq(feedItems.snapshotId, locked.id));
     for (let i = 0; i < drafts.length; i += 200) {
       await tx

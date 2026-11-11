@@ -1,10 +1,10 @@
 /**
- * Xếp hạng một khoảng digest trên DB: đọc ứng viên, mặt bằng, tín hiệu, rồi gọi các hàm thuần
- * trong `@radard/core` (ranking.ts). Dùng chung cho job digest và CLI `rank`.
+ * Ranks one digest window on the DB: reads candidates, baselines and signals, then calls the pure functions
+ * in `@radard/core` (ranking.ts). Shared by the digest job and the `rank` CLI.
  *
- * Thứ tự để tốn ít request nhất: cổng R tính trên điểm chủ đề đã có (không gọi mạng); sự kiện có
- * R trong vùng xám thì hỏi model quyết định (gate-decision.ts); rồi chỉ lấy lại tín hiệu (điểm HN)
- * cho tài liệu của các sự kiện qua cổng.
+ * Order chosen to make the fewest requests: the R gate is computed on existing topic scores (no network); events with
+ * R in the grey zone are asked of the decision model (gate-decision.ts); then only signals (HN points) are re-fetched
+ * for the documents of the events that pass the gate.
  */
 import {
   type Baseline,
@@ -66,28 +66,28 @@ export interface RankResult extends Selection {
   period: RankPeriod;
   candidates: number;
   passedGate: number;
-  /** Danh sách ứng viên đã chấm đưa vào `select` (cả tin bị cổng/sàn loại), để mô phỏng đúng đầu vào. */
+  /** The scored candidate list fed into `select` (including items dropped by the gate and floor), so the simulation gets the exact input. */
   scored: Scored[];
-  /** Cấu hình đưa vào `select` (đã gồm sàn S và T), để mô phỏng đúng đầu vào. */
+  /** The config fed into `select` (already includes the floors S and T), so the simulation gets the exact input. */
   selectConfig: RankConfig;
-  /** Hạt giống của lần chọn; `null` khi chọn xác định (T = 0, xem thử). */
+  /** Seed of the selection; `null` when the selection is deterministic (T = 0, see preview). */
   selectSeed: number | null;
-  /** Mọi sự kiện có R trong vùng xám: đã hỏi model quyết định, hoặc dùng luật cũ (`fallback`). */
+  /** Every event with R in the grey zone: the decision model was asked, or the old rule was used (`fallback`). */
   gateDecisions: GateDecision[];
   gateCounts: GateCounts;
-  /** Thời gian hỏi model quyết định cho cổng, mili giây. */
+  /** Time spent asking the decision model for the gate, in milliseconds. */
   gateMs: number;
   config: RankConfig;
-  /** Cụm gu (từ tin 👍) đã dùng để chấm U, gồm cả cụm `pending` chưa tham gia. */
+  /** Taste clusters (from 👍 items) used to score U, including `pending` clusters that did not take part. */
   interestClusters: InterestCluster[];
   /**
-   * Sàn THÔNG BÁO (nhắm `notify.floorTargetPerDay` tin/ngày): lớp Telegram lọc bản chụp theo sàn này.
-   * Không dùng trong `select`.
+   * NOTIFICATION floor (targets `notify.floorTargetPerDay` items/day): the Telegram layer filters the snapshot by this floor.
+   * Not used in `select`.
    */
   floor: FloorResult;
-  /** Sàn FEED (nhắm `feedFloorTargetPerDay` tin/ngày) đã đưa vào `select` (`selectConfig.floorS`). */
+  /** FEED floor (targets `feedFloorTargetPerDay` items/day) passed into `select` (`selectConfig.floorS`). */
   feedFloor: FloorResult;
-  /** Mặt bằng đã dùng, để digest lưu lại và giải thích được vì sao chọn. */
+  /** Baselines used, so the digest can store them and explain why items were chosen. */
   baselines: {
     metric: string;
     sourceId: number | null;
@@ -97,20 +97,20 @@ export interface RankResult extends Selection {
     n: number;
   }[];
   topicLabels: Map<number, string>;
-  /** Phạm vi của từng chủ đề đang bật (để LLM gắn nhãn); chủ đề tự thêm không có thì vắng. */
+  /** Scope of each enabled topic (for the LLM to label); self-added topics without one are absent. */
   topicNotes: Map<number, string>;
   sourceNames: Map<number, string>;
   sourceKinds: Map<number, string>;
 }
 
-/** Khoảng 24 giờ kết thúc ở `end`. */
+/** The 24-hour window ending at `end`. */
 export function periodEndingAt(end: Date, hours = 24): RankPeriod {
   return { start: new Date(end.getTime() - hours * 3_600_000), end };
 }
 
 /**
- * Chủ đề đang bật của hồ sơ: chỉ loại "quan tâm" mới tính vào R; thứ tự theo lúc chọn, để hoà điểm ra
- * kết quả như nhau mỗi lần chạy.
+ * Enabled topics of the profile: only "interested" ones count toward R; ordered by selection time, so ties give
+ * the same result on every run.
  */
 export async function loadProfileTopics(
   db: Database,
@@ -134,20 +134,20 @@ export async function rankPeriod(
   db: Database,
   period: RankPeriod,
   opts: {
-    /** Hồ sơ đang xếp hạng: chỉ chủ đề đang bật và tin đã gửi của hồ sơ này được tính. */
+    /** Profile being ranked: only the enabled topics and the sent items of this profile are counted. */
     profileId: number;
     http?: HttpClient;
     config?: Partial<RankConfig>;
-    /** Model quyết định cho vùng xám của cổng; không có thì dùng luật R ≥ `gateR` (test, CLI). */
+    /** Decision model for the gate's grey zone; without it the rule R ≥ `gateR` is used (tests, CLI). */
     decider?: DecisionProvider | null;
     /**
-     * Lưu bộ cụm gu của lần chạy làm "cụm hôm qua" (mặc định có). CLI xem thử (`rank --at …`) đặt
-     * `false` để không ghi đè cụm đang dùng.
+     * Saves the run's taste clusters as "yesterday's clusters" (default on). The CLI preview (`rank --at …`) sets
+     * `false` so it does not overwrite the clusters in use.
      */
     persistInterests?: boolean;
     /**
-     * Hạt giống chọn Gumbel top-k. CÓ hạt: T lấy từ `config` hoặc mặc định (0,03), rng là
-     * mulberry32(hạt). KHÔNG có hạt: T = 0, chọn xác định (xem thử không đổi ngẫu nhiên).
+     * Seed for the Gumbel top-k selection. WITH a seed: T comes from `config` or the default (0,03), and the rng is
+     * mulberry32(seed). WITHOUT a seed: T = 0, deterministic selection (a preview does not change randomly).
      */
     selectSeed?: number;
   },
@@ -176,9 +176,9 @@ export async function rankPeriod(
   const topics = await loadProfileTopics(db, opts.profileId);
   const topicIds = topics.map((t) => t.id);
 
-  // Ứng viên: sự kiện có ít nhất một tài liệu mới trong khoảng.
+  // Candidates: events with at least one new document in the window.
   const at = sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt})`;
-  // Tài liệu nguồn đánh dấu đáng ngờ (repo sao giả…) không vào điểm tin, dù vẫn được lưu và chấm.
+  // Source documents flagged suspicious (inflated repo stars…) do not count toward item scores, though they are still stored and scored.
   const trusted = sql`(${documents.meta}->>'suspicious') is distinct from 'true'`;
   const evIds = (
     await db
@@ -199,8 +199,8 @@ export async function rankPeriod(
         .from(events)
         .where(inArray(events.id, evIds))
     : [];
-  // Tài liệu của sự kiện tính tới hết khoảng (không lấy bài đến sau `end`, để chạy lại một
-  // ngày cũ ra đúng kết quả của ngày đó).
+  // Documents of an event count up to the end of the window (later articles are not taken, so re-running an old
+  // day gives exactly that day's result).
   const docRows = evIds.length
     ? await db
         .select({
@@ -229,10 +229,10 @@ export async function rankPeriod(
     }
   }
 
-  // URL của mọi tài liệu ĐÃ THẤY, từ trước tới nay (không cắt 7 ngày: tin đã đọc 16/10 vẫn là đã
-  // đọc ngày 09/11). "Đã thấy" = đã gửi trong tin sự kiện, hoặc tin feed đã có lượt hiện (quyết định
-  // 10/11/2026, điểm 5); tin feed chưa cuộn tới vẫn đủ điều kiện hôm sau. Mốc `end` giữ cho chạy lại
-  // một ngày cũ ra đúng kết quả của ngày đó. Chỉ của CHÍNH hồ sơ này.
+  // URLs of EVERY document ever SEEN, to date (no 7-day cutoff: an item read on 16/10 is still read on 09/11).
+  // "Seen" = sent in an event item, or a feed item already shown (decision 10/11/2026, score 5); a feed item not yet
+  // scrolled to still qualifies the next day. The `end` cutoff keeps re-running an old day giving that day's exact result.
+  // Only of THIS profile.
   const sent = new Set<string>();
   for (const r of await db.execute<{ url: string }>(sql`
     select distinct d.url_canonical as url
@@ -250,7 +250,7 @@ export async function rankPeriod(
     where fi.profile_id = ${opts.profileId} and fi.seen_at < ${period.end}`))
     sent.add(r.url);
 
-  // Gu: gom lại từ đầu các tin 👍 tại mốc `end` mỗi lần xếp hạng (cụm mới mượn tên cụm lần trước).
+  // Taste: re-clusters the 👍 items from scratch at cutoff `end` on every ranking run (new clusters borrow the previous cluster's name).
   const interests = await computeInterestClusters(db, opts.profileId, period.end, config.interest, {
     persist: opts.persistInterests ?? true,
   });
@@ -302,8 +302,8 @@ export async function rankPeriod(
     return out;
   };
 
-  // Lượt 1: cổng R (không cần tín hiệu), vùng xám hỏi model quyết định. Lượt 2: lấy lại tín hiệu
-  // cho sự kiện qua cổng, chấm đủ.
+  // Pass 1: R gate (no signals needed); grey-zone events are asked of the decision model. Pass 2: re-fetch signals
+  // for the events that pass the gate, then score them fully.
   const first = (await build(new Map())).map((e) => ({
     event: e,
     c: components(e, base, config, period.start, sent),
@@ -311,7 +311,7 @@ export async function rankPeriod(
   const gateStarted = Date.now();
   const gateDecisions = await decideGate(db, grayZone(first, config), opts.decider, config);
   const gateMs = Date.now() - gateStarted;
-  // Chỉ câu trả lời thật của model thay luật; `fallback` thì để `select` dùng R ≥ gateR.
+  // Only the model's real answer replaces the rule; `fallback` leaves it for `select` to use R ≥ gateR.
   const verdicts = new Map(
     gateDecisions.filter((d) => !d.fallback).map((d) => [d.eventId, d.pass] as const),
   );
@@ -322,11 +322,11 @@ export async function rankPeriod(
   const passingDocIds = passing.flatMap((e) => e.docs.map((d) => d.documentId));
   if (opts.http) await refreshSignals(db, opts.http, passingDocIds);
   const signals = await loadSignals(passingDocIds);
-  // Vector tài liệu chỉ nạp khi có cụm active và chỉ cho sự kiện qua cổng (U của tin bị cổng loại
-  // không ai dùng: chúng không vào bể hay kế hoạch).
+  // Document vectors are loaded only when there is an active cluster, and only for events that pass the gate (the U of items dropped
+  // by the gate is not used by anyone: they do not enter the pool or the plan).
   const vectors = hasTaste ? await loadDocVectors(db, passingDocIds) : undefined;
   const full = await build(signals, vectors);
-  // Sự kiện không qua cổng vẫn được chấm (để CLI giải thích vì sao bị loại), không có tín hiệu.
+  // Events that do not pass the gate are still scored (so the CLI can explain why they were dropped), without signals.
   const scored: Scored[] = full.map((e) => {
     const c = components(e, base, config, period.start, sent, interests);
     const gate = gateOf(e.eventId);
@@ -355,8 +355,8 @@ export async function rankPeriod(
       days: f.days,
     });
   }
-  // `select` chạy MỘT lần cho bản chụp feed: trần K = feedMaxItems, mỗi nguồn feedMaxPerSource, sàn
-  // feed. Cổng, vùng xám, MMR, giữ chỗ, T giữ nguyên.
+  // `select` runs ONCE for the feed snapshot: cap K = feedMaxItems, per-source cap feedMaxPerSource, feed
+  // floor. The gate, grey zone, MMR, slot reservation and T stay unchanged.
   const selectConfig: RankConfig = {
     ...config,
     maxItems: config.feedMaxItems,
@@ -384,7 +384,7 @@ export async function rankPeriod(
     gateMs,
     config,
     interestClusters: interests,
-    // Chỉ lưu mặt bằng đã dùng: chủ đề đang bật, cùng mặt bằng tín hiệu và độ phủ.
+    // Only save the baselines used: enabled topics, plus the same signal and coverage baselines.
     baselines: baseRows
       .filter((b) => b.topicId === null || topicIds.includes(b.topicId))
       .map((b) => ({
@@ -404,7 +404,7 @@ export async function rankPeriod(
 
 const DAY_MS = 86_400_000;
 
-/** Vector cả tài liệu (`coalesce(content_embedding, embedding)`), chuẩn hoá L2, để chấm U. */
+/** Document vector (`coalesce(content_embedding, embedding)`), L2-normalized, for scoring U. */
 async function loadDocVectors(
   db: Database,
   ids: readonly number[],
@@ -428,13 +428,13 @@ async function loadDocVectors(
 }
 
 /**
- * Hai sàn của lần xếp hạng (feed và thông báo), cùng một bể: phân vị điểm S trong bể của hồ sơ ở [end − 30 ngày, end) (không gồm ngày
- * đang xếp hạng), bỏ tin đã gửi (`not_new`, N = 0) khỏi cả phân vị lẫn n. Chế độ "fixed" không đọc bể.
+ * The two floors of the ranking run (feed and notification) share one pool: the percentile of score S in the profile's pool over [end − 30 days, end) (excluding
+ * the day being ranked), dropping already-sent items (`not_new`, N = 0) from both the percentile and n. The "fixed" mode does not read the pool.
  *
- * LƯU Ý THANG ĐIỂM (10/11/2026): các dòng bể cũ có S theo công thức trước khi có U (hệ số ×1,0, không
- * có phần U), dòng mới theo công thức 0,9× + 0,10·U. Hai thang pha trộn trong cửa sổ 30 ngày và KHÔNG
- * được sửa lại. Trong 14 ngày đầu của bể (`FLOOR_MIN_DAYS`) vẫn dùng sàn cố định 0,59 theo cơ chế
- * hiện có; logic sàn không đổi vì U.
+ * SCORE SCALE NOTE (10/11/2026): old pool rows have S computed with the formula from before U existed (factor ×1.0, no U part),
+ * new rows use the 0.9× + 0.10·U formula. The two scales are mixed within the 30-day window and are NOT
+ * rescaled. During the first 14 days of the pool (`FLOOR_MIN_DAYS`), the fixed floor 0,59 is still used under the existing mechanism;
+ * the floor logic does not change because of U.
  */
 async function resolveFloors(
   db: Database,
@@ -452,7 +452,7 @@ async function resolveFloors(
       to: period.end,
     });
   } catch (err) {
-    // Bể là dữ liệu phụ: đọc hỏng thì dùng sàn cố định, không chặn việc xếp hạng và gửi tin.
+    // The pool is auxiliary data: if reading it fails, use the fixed floor; this does not block ranking or sending.
     log.warn("không đọc được bể ứng viên, dùng sàn cố định", {
       profileId,
       error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
@@ -462,7 +462,7 @@ async function resolveFloors(
   const days = new Set(rows.map((r) => r.periodEnd.getTime())).size;
   const scores = rows.filter((r) => r.rejectReason !== "not_new" && r.n !== 0).map((r) => r.score);
   return {
-    // Sàn feed: mục tiêu ~30 tin/ngày; n ≤ mục tiêu (q kẹp = 0) thì không lọc theo sàn.
+    // Feed floor: target ~30 items/day; if n ≤ the target (q clamped = 0), no floor filtering.
     feed: percentileFloor({
       scores,
       days,
@@ -470,7 +470,7 @@ async function resolveFloors(
       targetPerDay: config.feedFloorTargetPerDay,
       noFilterAtZeroQ: true,
     }),
-    // Sàn thông báo: như sàn phân vị hiện có (~12 tin/ngày).
+    // Notification floor: same as the existing percentile floor (~12 items/day).
     notify: percentileFloor({
       scores,
       days,
@@ -481,8 +481,8 @@ async function resolveFloors(
 }
 
 /**
- * Sự kiện có R trong vùng xám của cổng, kèm chủ đề và tài liệu cho R, để hỏi model quyết định. Bỏ
- * qua tin đã gửi không có gì mới (N = 0): đằng nào cũng bị loại, hỏi chỉ tốn tiền.
+ * Events with R in the gate's grey zone, with the topic and document that gave R, to ask the decision model. Skips
+ * already-sent items with nothing new (N = 0): they are dropped anyway, so asking would only cost money.
  */
 function grayZone(
   evs: readonly { event: RankEvent; c: Components }[],

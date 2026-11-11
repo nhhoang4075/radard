@@ -1,14 +1,14 @@
 /**
- * Job `baselines`: tính lại mặt bằng mỗi ngày, trước digest (xep-hang.html tab 03).
+ * Job `baselines`: recomputes the baselines daily, before the digest (xep-hang.html tab 03).
  *
- *   relevance   trung vị, mốc 0,1% của điểm chủ đề, theo (nguồn × chủ đề) và theo chủ đề trên
- *               mọi nguồn (mặt bằng chung, `source_id` trống)
- *   engagement  ln(1 + độ nổi thô) theo nguồn, chỉ trên bài đã đăng hơn 24 giờ lúc lấy tín hiệu
- *               (điểm HN còn tăng nhiều trong ngày đầu)
- *   coverage    ln(1 + số bài viết khác nhau) + 0,5 × (số nguồn − 1) của các sự kiện
+ *   relevance   median, the 0,1% quantile of the topic score, by (source × topic) and by topic across
+ *               all sources (the overall baseline, `source_id` empty)
+ *   engagement  ln(1 + raw salience) by source, only for posts older than 24 hours when signals are taken
+ *               (HN scores still rise a lot on the first day)
+ *   coverage    ln(1 + number of distinct articles) + 0,5 × (number of sources − 1) of the events
  *
- * Cửa sổ trượt 30 ngày tính từ `now`. Chỉ giữ bản mới nhất mỗi khoá; digest tự chép lại bản đã
- * dùng. Chạy lại bao nhiêu lần cũng được.
+ * A 30-day sliding window measured from `now`. Only the newest row per key is kept; the digest copies over the one it
+ * uses. Re-running any number of times is fine.
  */
 import { baselineOf, createLogger } from "@radard/core";
 import { type Database, docSignals, documents, sources } from "@radard/db";
@@ -18,7 +18,7 @@ import { adapterFor } from "../sources/index.ts";
 const log = createLogger("baselines");
 
 export const WINDOW_DAYS = 30;
-/** Tín hiệu lấy khi bài mới đăng chưa nói gì: chỉ dùng tín hiệu quan sát sau chừng này giờ. */
+/** Signals taken when a new post has nothing yet: only use signals observed after this many hours. */
 const MATURE_HOURS = 24;
 
 export interface BaselineRow {
@@ -38,7 +38,7 @@ export async function runBaselines(db: Database, now = new Date()): Promise<Base
     ...(await coverageBaselines(db, since)),
   ];
   for (const r of rows) {
-    // Khoá duy nhất là biểu thức (coalesce cột có thể trống), nên viết on conflict bằng SQL.
+    // The unique key is an expression (a column may be null), so write the on-conflict in SQL.
     await db.execute(sql`
       insert into baselines (metric, source_id, topic_id, median, p999, n, window_days, computed_at)
       values (${r.metric}, ${r.sourceId}, ${r.topicId}, ${r.median}, ${r.p999}, ${r.n},
@@ -52,8 +52,8 @@ export async function runBaselines(db: Database, now = new Date()): Promise<Base
 }
 
 async function relevanceBaselines(db: Database, since: Date): Promise<BaselineRow[]> {
-  // grouping sets: một lần quét ra cả (nguồn × chủ đề) lẫn (chủ đề) cho mặt bằng chung. Tính cho mọi
-  // chủ đề có điểm, bật hay chưa bật, để z của các chủ đề so được với nhau.
+  // grouping sets: one scan produces both (source × topic) and (topic) rows for the overall baseline. Computed for every
+  // scored topic, enabled or not, so the z-scores of the topics can be compared with each other.
   const res = await db.execute<{
     source_id: number | null;
     topic_id: number;
@@ -96,8 +96,8 @@ async function engagementBaselines(db: Database, since: Date): Promise<BaselineR
       .where(
         and(
           eq(documents.sourceId, src.id),
-          // Nguồn không có ngày đăng (repo GitHub: "mới" là lúc radard thấy nó) tính từ lúc lấy về,
-          // giống cách xếp hạng chọn khoảng thời gian.
+          // Sources with no publish date (GitHub repos: "new" is when radard first saw it) are measured from fetch time,
+          // the same way ranking picks the time window.
           sql`coalesce(${documents.publishedAt}, ${documents.fetchedAt}) >= ${since}`,
           sql`${docSignals.observedAt} - coalesce(${documents.publishedAt}, ${documents.fetchedAt}) >= make_interval(hours => ${MATURE_HOURS})`,
         ),
