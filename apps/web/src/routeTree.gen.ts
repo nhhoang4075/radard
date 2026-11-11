@@ -13,6 +13,8 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as DesignRouteImport } from './routes/[_]design'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as DesignIndexRouteImport } from './routes/[_]design/index'
+import { Route as DesignFeedRouteImport } from './routes/[_]design/feed'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -33,35 +35,57 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const DesignIndexRoute = DesignIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DesignRoute,
+} as any)
+const DesignFeedRoute = DesignFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => DesignRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/_design': typeof DesignRoute
+  '/_design': typeof DesignRouteWithChildren
   '/login': typeof LoginRoute
+  '/_design/feed': typeof DesignFeedRoute
+  '/_design/': typeof DesignIndexRoute
 }
 export interface FileRoutesByTo {
-  '/_design': typeof DesignRoute
   '/login': typeof LoginRoute
+  '/_design/feed': typeof DesignFeedRoute
   '/': typeof AppIndexRoute
+  '/_design': typeof DesignIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
-  '/_design': typeof DesignRoute
+  '/_design': typeof DesignRouteWithChildren
   '/login': typeof LoginRoute
+  '/_design/feed': typeof DesignFeedRoute
   '/_app/': typeof AppIndexRoute
+  '/_design/': typeof DesignIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/_design' | '/login'
+  fullPaths: '/' | '/_design' | '/login' | '/_design/feed' | '/_design/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/_design' | '/login' | '/'
-  id: '__root__' | '/_app' | '/_design' | '/login' | '/_app/'
+  to: '/login' | '/_design/feed' | '/' | '/_design'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_design'
+    | '/login'
+    | '/_design/feed'
+    | '/_app/'
+    | '/_design/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
-  DesignRoute: typeof DesignRoute
+  DesignRoute: typeof DesignRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -95,6 +119,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_design/': {
+      id: '/_design/'
+      path: '/'
+      fullPath: '/_design/'
+      preLoaderRoute: typeof DesignIndexRouteImport
+      parentRoute: typeof DesignRoute
+    }
+    '/_design/feed': {
+      id: '/_design/feed'
+      path: '/feed'
+      fullPath: '/_design/feed'
+      preLoaderRoute: typeof DesignFeedRouteImport
+      parentRoute: typeof DesignRoute
+    }
   }
 }
 
@@ -108,9 +146,22 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface DesignRouteChildren {
+  DesignFeedRoute: typeof DesignFeedRoute
+  DesignIndexRoute: typeof DesignIndexRoute
+}
+
+const DesignRouteChildren: DesignRouteChildren = {
+  DesignFeedRoute: DesignFeedRoute,
+  DesignIndexRoute: DesignIndexRoute,
+}
+
+const DesignRouteWithChildren =
+  DesignRoute._addFileChildren(DesignRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
-  DesignRoute: DesignRoute,
+  DesignRoute: DesignRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

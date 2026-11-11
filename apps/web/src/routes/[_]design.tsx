@@ -1,19 +1,9 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
+import { createFileRoute, notFound, Outlet } from "@tanstack/react-router";
 
-// Chỉ dev: bản build production không có trang này (nhánh DEV bị loại khi build).
-const Catalog = import.meta.env.DEV
-  ? lazy(() => import("../_design/catalog.tsx").then((m) => ({ default: m.Catalog })))
-  : null;
-
+// Chỉ dev: bản build production không có các trang /_design/*.
 export const Route = createFileRoute("/_design")({
   beforeLoad: () => {
-    if (!Catalog) throw notFound();
+    if (!import.meta.env.DEV) throw notFound();
   },
-  component: () =>
-    Catalog ? (
-      <Suspense fallback={null}>
-        <Catalog />
-      </Suspense>
-    ) : null,
+  component: Outlet,
 });
