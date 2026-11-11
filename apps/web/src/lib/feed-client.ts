@@ -25,8 +25,9 @@ export interface FeedClient {
 
 export const fetchClient: FeedClient = {
   async getFeed({ date, cursor }) {
+    // limit=50 ≥ K (≤ 30): lấy trọn bản chụp một lần, chip chủ đề và số đếm ở banner dùng được ngay.
     const res = await api.feed.$get({
-      query: { ...(date ? { date } : {}), ...(cursor ? { cursor } : {}) },
+      query: { limit: "50", ...(date ? { date } : {}), ...(cursor ? { cursor } : {}) },
     });
     if (!res.ok) throw new HttpError(res.status);
     return res.json();
