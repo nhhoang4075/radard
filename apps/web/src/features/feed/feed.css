@@ -166,7 +166,7 @@
   color: var(--rd-color-text-subtle);
 }
 
-/* panel chi tiết */
+/* detail panel */
 .fd-detail-head {
   padding: 18px;
   background: var(--rd-mesh-violet);

@@ -2,7 +2,7 @@ import { strings } from "./strings.vi.ts";
 
 const VN = "Asia/Ho_Chi_Minh";
 
-/** Ngày hiện tại theo giờ Việt Nam, YYYY-MM-DD. */
+/** Current date in Vietnam time, YYYY-MM-DD. */
 export const todayVN = (now: Date = new Date()): string =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: VN,
@@ -20,10 +20,10 @@ export function dayLabel(date: string, today: string = todayVN()): string {
   return `${strings.format.weekdays[dow]}, ${dm}`;
 }
 
-/** 0,69 (dấu phẩy thập phân kiểu Việt). */
+/** 0,69 (Vietnamese-style decimal comma). */
 export const formatScore = (n: number): string => n.toFixed(2).replace(".", ",");
 
-/** "08:30 · 16/10" theo giờ Việt Nam. */
+/** "08:30 · 16/10" in Vietnam time. */
 export function formatDateTime(iso: string): string {
   const parts = new Intl.DateTimeFormat("vi-VN", {
     timeZone: VN,

@@ -1,4 +1,4 @@
-/** Phía lõi của lệnh chọn chủ đề (`topicHandlers`) và lệnh /profile (`profileHandlers`) trên DB test. */
+/** Core side of the topic selection command (`topicHandlers`) and the /profile command (`profileHandlers`) on the test DB. */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeDecision, fakeLlm } from "@radard/adapters/ai-fake";
 import { createDatabase, profile, runMigrations, topics } from "@radard/db";
@@ -64,7 +64,7 @@ const OLD_CONTEXT = "AI engineering news: agents, RAG, TypeScript, Postgres.";
 const NEW_CONTEXT =
   "The reader is an AI software engineer who builds LLM-integrated systems and agents with Python, TypeScript and Postgres, and wants to learn more about algorithms and machine learning such as ranking, retrieval and clustering.";
 
-/** Xác suất "có" theo khoá thư viện; khoá không có thì 0,1 (không gợi ý). */
+/** Probability of a "có" (yes) answer per library key; a missing key gets 0,1 (no suggestion). */
 const PROBS: Record<string, number> = {
   agents: 0.93,
   llm_apps: 0.95,
@@ -154,7 +154,7 @@ describe("profileHandlers", () => {
 
   test("gợi ý: tích sẵn mức nên theo dõi; chủ đề đang bật luôn hiện và tích; còn lại không hiện", async () => {
     const keys = await idToKey();
-    // Đang bật từ trước: một chủ đề mức "có thể quan tâm" và một chủ đề không được gợi ý.
+    // Already on before: one topic at the "có thể quan tâm" (may be interested) level and one topic not suggested.
     await pickTopics(db, 1, ["multimodal", "robotics"]);
     const { llm, decider } = fakes(keys);
     const p = profileHandlers(deps({ llm, decider }), () => {});
@@ -171,7 +171,7 @@ describe("profileHandlers", () => {
       ["ai_safety", "maybe", false],
       ["ml_foundations", "maybe", false],
       ["multimodal", "maybe", true],
-      // Đang theo dõi, không được gợi ý: nhóm riêng, tích sẵn. ai_products (0,1) chưa bật thì không hiện.
+      // Already followed, not suggested: its own group, pre-checked. ai_products (0,1) is not on, so it is not shown.
       ["robotics", "followed", true],
     ]);
     expect(s.newTopics).toEqual([
@@ -204,11 +204,11 @@ describe("profileHandlers", () => {
       [],
     );
     const chosen = (await listLibrary(db, 1)).filter((t) => t.chosen).map((t) => t.key);
-    // robotics không hiện trong gợi ý: giữ nguyên.
+    // robotics is not shown in the suggestions: left as is.
     expect(new Set(chosen)).toEqual(new Set(["agents", "llm_apps", "robotics"]));
     expect(n).toBe(3);
     expect(refreshed).toBe(1);
-    // Lưu lại y như cũ: không bật mới gì, không làm mới.
+    // Save again with no change: nothing new turned on, no refresh.
     await p.apply([`l:${id("agents")}`], [`l:${id("ai_safety")}`], []);
     expect(refreshed).toBe(1);
   });
@@ -232,10 +232,10 @@ describe("profileHandlers", () => {
     });
     const mine = (await listProfileTopics(db, 1)).find((x) => x.topicId === t?.id);
     expect(mine?.active).toBe(true);
-    // Số đang theo dõi tính cả chủ đề vừa tạo; bật và tạo cùng lúc chỉ làm mới một lần.
+    // The followed count includes the topic just created; turning on and creating together refreshes only once.
     expect(n).toBe(2);
     expect(refreshed).toBe(1);
-    // Trùng tên (đã tạo rồi): bỏ qua, phần còn lại vẫn lưu, không tạo bản thứ hai.
+    // Duplicate name (already created): skipped, the rest is still saved, no second topic is created.
     expect(await p.apply([], [`l:${id("agents")}`], [proposal])).toBe(1);
     expect(await db.select().from(topics).where(eq(topics.origin, "custom"))).toHaveLength(1);
     expect(refreshed).toBe(1);

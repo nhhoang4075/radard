@@ -1,4 +1,4 @@
-/** Hẹn lại fetch khi bị 429: bậc chờ, `Retry-After`, và pg-boss THẬT nhận job hẹn trong lúc job cũ còn chạy. */
+/** Reschedule fetch on 429: backoff steps, `Retry-After`, and the REAL pg-boss accepting a scheduled job while the old job is still running. */
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { HttpError, parseRetryAfter } from "@radard/core";
 import { createDatabase, runMigrations } from "@radard/db";
@@ -51,7 +51,7 @@ test("parseRetryAfter: số giây, ngày giờ HTTP, sai dạng", () => {
 test("pg-boss: gửi job hẹn giờ cùng singletonKey khi job cũ đang chạy", async () => {
   const key = "42";
   await boss.send(QUEUE.fetch, { sourceId: 42 } satisfies FetchJob, { singletonKey: key });
-  const [active] = await boss.fetch<FetchJob>(QUEUE.fetch); // job cũ chuyển sang đang chạy
+  const [active] = await boss.fetch<FetchJob>(QUEUE.fetch); // the old job switches to running
   expect(active?.data.sourceId).toBe(42);
   const id = await boss.send(QUEUE.fetch, { sourceId: 42, rateLimited: 1 } satisfies FetchJob, {
     startAfter: 900,

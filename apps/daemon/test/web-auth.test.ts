@@ -1,7 +1,7 @@
 /**
- * Đăng nhập web: cấu hình (zod), hook Better Auth (mời, nối hồ sơ chủ dự án, fail-closed), middleware
- * 401/403, route `/api/me`, phục vụ file build (SPA fallback). Không gọi mạng: user tạo qua
- * `internalAdapter.createOAuthUser` (đi qua đúng `databaseHooks` như khi GitHub/Google quay về) và phiên
+ * Web sign-in: config (zod), Better Auth hooks (invites, linking the project owner's profile, fail-closed), middleware
+ * 401/403, route `/api/me`, serving the build files (SPA fallback). No network calls: users are created via
+ * `internalAdapter.createOAuthUser` (going through the same `databaseHooks` as when GitHub/Google redirect back), and the session
  * qua plugin `testUtils`.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -38,13 +38,13 @@ const config = (over: Partial<AuthConfig> = {}): AuthConfig => ({
   ...over,
 });
 
-/** Auth có plugin `testUtils` (chỉ test) để dựng phiên mà không qua OAuth thật. */
+/** Auth has a `testUtils` plugin (tests only) to build a session without real OAuth. */
 function makeAuth(over: Partial<AuthConfig> = {}) {
   return createAuth({ db, config: config(over), plugins: [testUtils()] });
 }
 type TestAuth = ReturnType<typeof makeAuth>;
 
-/** Giống lúc GitHub/Google trả về: tạo user + account qua đường có hook. */
+/** Same as when GitHub/Google return: creates user + account through the hooked path. */
 async function oauthSignUp(auth: TestAuth, email: string, opts: { verified?: boolean } = {}) {
   const ctx = await auth.$context;
   const res = await ctx.internalAdapter.createOAuthUser(
@@ -59,7 +59,7 @@ const profileOf = async (userId: string) =>
 const profileCount = async () => (await db.select().from(profile)).length;
 
 async function cookieHeader(auth: TestAuth, userId: string): Promise<Headers> {
-  // `plugins` được nới kiểu ở createAuth nên `ctx.test` không có kiểu; plugin testUtils luôn có mặt ở đây.
+  // `plugins` is loosened in createAuth, so `ctx.test` has no type; the testUtils plugin is always present here.
   const ctx = (await auth.$context) as unknown as {
     test: { login(o: { userId: string }): Promise<{ headers: Headers }> };
   };
@@ -248,12 +248,12 @@ describe("Better Auth: đăng ký qua hook", () => {
   test("lời mời role=owner: ghi user_roles owner, hồ sơ trống mới, không nhận hồ sơ cũ; hai owner cùng tồn tại", async () => {
     await db.insert(profile).values({ id: 1, promptContext: "AI engineer" });
     const auth = makeAuth();
-    const first = await oauthSignUp(auth, OWNER); // bootstrap, nhận hồ sơ 1
+    const first = await oauthSignUp(auth, OWNER); // bootstrap, gets profile 1
     await db.insert(profile).values({ id: 2, promptContext: "chưa chủ" });
     await db.insert(invites).values({ email: "owner2@example.com", role: "owner" });
     const second = await oauthSignUp(auth, "owner2@example.com");
     expect((await profileOf(first.id))?.id).toBe(1);
-    expect((await profileOf(second.id))?.id).toBe(3); // không nhận hồ sơ 2
+    expect((await profileOf(second.id))?.id).toBe(3); // does not get profile 2
     expect(await roleOf(first.id)).toBe("owner");
     expect(await roleOf(second.id)).toBe("owner");
     expect((await db.select().from(profile).where(eq(profile.id, 2)))[0]?.userId).toBeNull();
@@ -279,7 +279,7 @@ describe("Better Auth: đăng ký qua hook", () => {
     expect(roles).toHaveLength(1);
     expect(roles[0]?.role).toBe("owner");
     expect(res.filter((r) => r.status === "fulfilled").length).toBe(1);
-    // Kẻ thua không có hồ sơ, không có phiên (lưới an toàn ở session.create.before).
+    // The loser gets no profile and no session (safety net in session.create.before).
     const loser = (await db.select().from(userTable)).find((u) => u.id !== roles[0]?.userId);
     if (loser) {
       expect(await profileOf(loser.id)).toBeUndefined();
@@ -311,11 +311,11 @@ describe("ensureProfileForUser", () => {
   };
 
   test("thu hồi lời mời: user chưa có hồ sơ mà không còn lời mời thì không nhận hồ sơ mới", async () => {
-    const a = await mkUser("u-a", "a@example.com", false); // user có nhưng không có lời mời
+    const a = await mkUser("u-a", "a@example.com", false); // user exists but has no invite
     await expect(ensureProfileForUser(db, [OWNER], a)).rejects.toThrow();
     expect(await profileCount()).toBe(0);
-    await db.insert(invites).values({ email: "a@example.com", usedAt: new Date() }); // đã dùng vẫn đủ
-    expect(await ensureProfileForUser(db, [OWNER], a)).toBe(1); // bảng trống: id bắt đầu từ 1
+    await db.insert(invites).values({ email: "a@example.com", usedAt: new Date() }); // used is still enough
+    expect(await ensureProfileForUser(db, [OWNER], a)).toBe(1); // empty table: id starts at 1
   });
 
   test("session-hook: user bị xoá lời mời và chưa có hồ sơ thì đăng nhập lại bị từ chối", async () => {
@@ -338,17 +338,17 @@ describe("ensureProfileForUser", () => {
     const guestHeaders = await cookieHeader(auth, guest.id);
     expect((await app.request("/api/me", { headers: guestHeaders })).status).toBe(200);
 
-    // Đã dùng (hook after đánh dấu) nên lời mời không bị xoá, nhưng user thì bị xoá.
+    // Already used (the after hook marked it) so the invite is not deleted, but the user is.
     const r = await revokeInvite(db, "Khach@Example.com");
     expect(r).toEqual({ email: "khach@example.com", inviteRemoved: false, userRemoved: true });
     expect((await app.request("/api/me", { headers: guestHeaders })).status).toBe(401);
     const guestProfile = (await db.select().from(profile).where(eq(profile.id, 2)))[0];
     expect(guestProfile).toBeDefined();
     expect(guestProfile?.userId).toBeNull();
-    // Không đăng nhập lại được: lời mời đã dùng vẫn còn nên có thể đăng ký lại? Không: before-hook đòi chưa dùng.
+    // Cannot sign in again: the used invite still exists so could sign up again? No: the before-hook requires unused.
     await expect(oauthSignUp(auth, "khach@example.com")).rejects.toThrow();
 
-    // Owner: bị chặn, hồ sơ 1 và tài khoản owner không đổi.
+    // Owner: blocked, profile 1 and the owner account unchanged.
     await expect(revokeInvite(db, OWNER.toUpperCase())).rejects.toThrow();
     expect((await db.select().from(userTable).where(eq(userTable.id, owner.id))).length).toBe(1);
     expect((await db.select().from(profile).where(eq(profile.id, 1)))[0]?.userId).toBe(owner.id);
@@ -446,7 +446,7 @@ describe("API: middleware và /api/me", () => {
     await db.insert(invites).values({ email: "khach@example.com" });
     const u = await oauthSignUp(auth, "khach@example.com");
     const headers = await cookieHeader(auth, u.id);
-    await db.delete(profile).where(eq(profile.userId, u.id)); // hồ sơ biến mất sau khi có phiên
+    await db.delete(profile).where(eq(profile.userId, u.id)); // profile disappears after a session exists
     const res = await app.request("/api/me", { headers });
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "no_profile" });
@@ -473,9 +473,9 @@ describe("API: middleware và /api/me", () => {
     const u = await oauthSignUp(auth, "khach@example.com");
     await db.delete(profile).where(eq(profile.userId, u.id));
     await db.execute(sql`update invites set used_at = null`);
-    await cookieHeader(auth, u.id); // tạo phiên → hook session nối lại
+    await cookieHeader(auth, u.id); // create session → session hook re-links
     expect(await profileOf(u.id)).toBeDefined();
-    // Email không xác minh: không nối được thì không có phiên.
+    // Unverified email: cannot link, so no session.
     await db.delete(profile).where(eq(profile.userId, u.id));
     await db.execute(sql`update "user" set email_verified = false where id = ${u.id}`);
     await expect(cookieHeader(auth, u.id)).rejects.toThrow();

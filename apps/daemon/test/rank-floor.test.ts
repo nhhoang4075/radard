@@ -1,6 +1,6 @@
 /**
- * Sàn theo phân vị trong `rankPeriod`: đọc bể `candidate_pool` của hồ sơ, 14 ngày đầu dùng sàn cố
- * định, cửa sổ [end − 30 ngày, end), tin đã gửi không tính. Giá trị kỳ vọng tính tay trong từng test.
+ * Percentile floor in `rankPeriod`: reads the profile's `candidate_pool`; the first 14 days use a fixed
+ * floor, window [end − 30 days, end), already-sent items not counted. Expected values are worked out by hand in each test.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -29,7 +29,7 @@ let hn = 0;
 let topic = 0;
 let seq = 0;
 
-/** Một sự kiện HN có điểm chủ đề 0,79 (R = 0,975), nằm trong khoảng 24 giờ trước END. */
+/** One HN event with a topic score of 0,79 (R = 0,975), within 24 hours before END. */
 async function addEvent(score = 0.79): Promise<number> {
   const id = ++seq;
   const [d] = await db
@@ -73,7 +73,7 @@ async function addEvent(score = 0.79): Promise<number> {
 }
 
 let poolSeq = 0;
-/** Ghi dòng bể: `daysAgo` ngày trước END, mỗi điểm một dòng. */
+/** Write pool rows: `daysAgo` days before END, one row per score. */
 async function seedPool(
   daysAgo: number,
   scores: number[],
@@ -101,7 +101,7 @@ async function seedPool(
   );
 }
 
-/** 40 điểm 0,30; 0,31; …; 0,69. */
+/** 40 scores 0,30; 0,31; …; 0,69. */
 const spread40 = Array.from({ length: 40 }, (_, i) => 0.3 + 0.01 * i);
 const same = (n: number, v: number) => new Array<number>(n).fill(v);
 
@@ -146,7 +146,7 @@ const rank = (config?: Parameters<typeof rankPeriod>[2]["config"]) =>
 describe("sàn theo phân vị", () => {
   test("(a) dưới 14 ngày dữ liệu: sàn cố định, kết quả y hệt floorMode fixed", async () => {
     const id = await addEvent();
-    // 13 ngày × 40 dòng điểm 0,99: nếu dùng phân vị thì sàn là 0,99 và tin bị loại.
+    // 13 days × 40 rows scoring 0,99: if percentiles were used, the floor would be 0,99 and the item would be dropped.
     for (let d = 1; d <= 13; d++) await seedPool(d, same(40, 0.99));
     const pct = await rank();
     const fixed = await rank({ floorMode: "fixed" });
@@ -164,8 +164,8 @@ describe("sàn theo phân vị", () => {
     await addEvent();
     for (let d = 1; d <= 14; d++) await seedPool(d, spread40);
     const r = await rank();
-    // 560 điểm, mỗi giá trị 0,30 + 0,01 i lặp 14 lần. Vị trí 559 × 0,7 = 391,3.
-    // Chỉ số 391 ↔ i = 27 (378..391) → 0,57; chỉ số 392 ↔ i = 28 → 0,58. Nội suy: 0,57 + 0,3 × 0,01.
+    // 560 scores, each value 0,30 + 0,01 i repeated 14 times. Position 559 × 0,7 = 391,3.
+    // Index 391 ↔ i = 27 (378..391) → 0,57; index 392 ↔ i = 28 → 0,58. Interpolation: 0,57 + 0,3 × 0,01.
     expect(r.floor.source).toBe("percentile");
     expect(r.floor.days).toBe(14);
     expect(r.floor.n).toBeCloseTo(40, 9);
@@ -191,7 +191,7 @@ describe("sàn theo phân vị", () => {
       await seedPool(d, same(40, 0.99), { notNew: true });
     }
     const r = await rank();
-    // Nếu tính cả not_new: n = 80, q = 0,85, sàn = 0,99. Đúng: n = 40, q = 0,7, mọi điểm 0,5.
+    // If not_new were counted too: n = 80, q = 0,85, floor = 0,99. Correct: n = 40, q = 0,7, every score 0,5.
     expect(r.floor.n).toBeCloseTo(40, 9);
     expect(r.floor.q).toBeCloseTo(0.7, 9);
     expect(r.floor.value).toBeCloseTo(0.5, 9);
@@ -201,8 +201,8 @@ describe("sàn theo phân vị", () => {
   test("(d) cửa sổ không gồm ngày đang xếp hạng và dữ liệu cũ hơn 30 ngày; chạy lại ra cùng sàn", async () => {
     await addEvent();
     for (let d = 1; d <= 14; d++) await seedPool(d, same(40, 0.5));
-    await seedPool(0, same(40, 0.99)); // chính ngày đang xếp hạng (period_end = END)
-    await seedPool(31, same(40, 0.99)); // ngoài cửa sổ 30 ngày
+    await seedPool(0, same(40, 0.99)); // the ranking day itself (period_end = END)
+    await seedPool(31, same(40, 0.99)); // outside the 30-day window
     await seedPool(45, same(40, 0.99));
     const a = await rank();
     const b = await rank();
@@ -236,7 +236,7 @@ describe("sàn theo phân vị", () => {
     await addEvent();
     const empty = await rank();
     expect(empty.floor).toEqual({ value: 0.59, source: "fixed", days: 0 });
-    // 14 ngày × 10 dòng 0,1 … 1,0: n = 10, 1 − 12/10 = −0,2 → q = 0.
+    // 14 days × 10 rows 0,1 … 1,0: n = 10, 1 − 12/10 = −0,2 → q = 0.
     for (let d = 1; d <= 14; d++) {
       await seedPool(
         d,

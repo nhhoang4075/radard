@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createDwell, createImpressionQueue, type Scheduler } from "../src/lib/impressions.ts";
 
-/** Đồng hồ giả: chạy hẹn giờ theo ý muốn, không chờ thật. */
+/** Fake clock: run timers on demand, no real waiting. */
 function fakeClock() {
   let now = 0;
   let id = 0;
@@ -35,7 +35,7 @@ describe("createDwell", () => {
     const got: string[] = [];
     const d = createDwell((k) => got.push(k), 1000, c.s);
     d.enter("3");
-    d.enter("3"); // vào lại khi đang đếm: không đếm đôi
+    d.enter("3"); // re-enter while counting: not counted twice
     c.tick(999);
     expect(got).toEqual([]);
     c.tick(1);
@@ -72,7 +72,7 @@ describe("createImpressionQueue", () => {
     const q = createImpressionQueue((b) => sent.push(b), { scheduler: c.s });
     expect(q.add(7, 1)).toBe(true);
     expect(q.add(7, 1)).toBe(false);
-    expect(q.add(8, 1)).toBe(true); // snapshot khác thì không trùng
+    expect(q.add(8, 1)).toBe(true); // different snapshot is not a duplicate
     q.flush();
     expect(sent).toEqual([
       [
@@ -80,7 +80,7 @@ describe("createImpressionQueue", () => {
         { snapshotId: 8, position: 1 },
       ],
     ]);
-    // đã gửi rồi vẫn nhớ: không gửi lại ở lô sau
+    // already sent, still remembered: not sent again in a later batch
     expect(q.add(7, 1)).toBe(false);
   });
 

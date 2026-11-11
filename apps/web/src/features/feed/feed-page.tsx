@@ -55,12 +55,12 @@ export function FeedPage({
   );
   const filtering = scope !== "all" || selectedTopics.size > 0;
 
-  // Lọc ở client cần đủ K tin (K ≤ 30): khi có bộ lọc thì tải nốt các trang còn lại.
+  // Client-side filtering needs all K items (K ≤ 30): when a filter is set, load the remaining pages.
   useEffect(() => {
     if (filtering && feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
   }, [filtering, feed.hasNextPage, feed.isFetchingNextPage, feed.fetchNextPage]);
 
-  // Cuộn tới đáy thì tải trang kế (con trỏ).
+  // Scrolling to the bottom loads the next page (cursor).
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !feed.hasNextPage) return;
@@ -96,7 +96,7 @@ export function FeedPage({
   const observe = useImpressions(first?.snapshotId);
   const dateList = dates.data?.dates.map((d) => d.date) ?? [];
   const noSnapshot = feed.isError && feed.error instanceof HttpError && feed.error.status === 404;
-  // Bản chụp hôm nay vừa có (hỏi lại 5 giây của danh sách ngày thấy nó): tải lại Feed đang báo 404.
+  // Today's snapshot just became available (the day list polls every 5 seconds and sees it): reload the Feed that was showing 404.
   const hasToday = dateList.includes(today);
   useEffect(() => {
     if (noSnapshot && hasToday) void feed.refetch();

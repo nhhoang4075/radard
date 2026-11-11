@@ -5,7 +5,7 @@ export type ChipProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-pres
   pressed?: boolean;
 };
 
-/** Bộ lọc dạng nút rời: viền mảnh, chọn = nền xám nhạt. */
+/** Filter as separate buttons: thin border, selected = light grey background. */
 export function Chip({ pressed = false, type = "button", ...rest }: ChipProps) {
   return (
     <button
@@ -29,7 +29,7 @@ export function Seg<T extends string>({
   label: string;
 }) {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: fieldset khó reset kiểu; nhóm nút có aria-label
+    // biome-ignore lint/a11y/useSemanticElements: fieldset is hard to reset styles for; a button group with aria-label
     <div className="rd-seg" role="group" aria-label={label}>
       {options.map((o) => (
         <button

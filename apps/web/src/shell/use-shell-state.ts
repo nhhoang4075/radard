@@ -9,7 +9,7 @@ const read = () => {
   }
 };
 
-/** Trạng thái app shell: sidebar gập (⌘B / Ctrl+B, nhớ trong trình duyệt), ngăn kéo <900px, panel phải <1100px. */
+/** App shell state: collapsed sidebar (⌘B / Ctrl+B, remembered in the browser), drawer <900px, right panel <1100px. */
 export function useShellState() {
   const [collapsed, setCollapsed] = useState(read);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -20,7 +20,7 @@ export function useShellState() {
       try {
         localStorage.setItem(KEY, c ? "0" : "1");
       } catch {
-        /* chế độ riêng tư: bỏ qua */
+        /* private mode: ignore */
       }
       return !c;
     });

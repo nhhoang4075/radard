@@ -1,13 +1,13 @@
 /**
- * Phần thuần của cổng bằng model quyết định: tên và phạm vi tiếng Anh của chủ đề thư viện, chạy
- * song song có giới hạn. Phần đọc DB và hỏi model nằm trong rank.test.ts.
+ * The pure part of the decision-model gate: English names and scopes of library topics, running
+ * with bounded concurrency. The DB reading and model calls are in rank.test.ts.
  */
 import { describe, expect, test } from "bun:test";
 import { englishScopeNote, mapLimit } from "../src/jobs/gate-decision.ts";
 import { topicNameEn } from "../src/jobs/topic-overlap.ts";
 import { TOPIC_LIBRARY } from "../src/topics/library.ts";
 
-/** Chữ có dấu tiếng Việt (như lúc đo, thử nghiệm B): còn sót là còn tên tiếng Việt. */
+/** Text with Vietnamese diacritics (as at measurement time, experiment B): any leftover means a Vietnamese name remains. */
 const VIETNAMESE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 
 describe("tên và phạm vi tiếng Anh", () => {

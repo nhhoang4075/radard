@@ -5,7 +5,7 @@ import "./toast.css";
 type Item = { id: number; text: string };
 const Ctx = createContext<(text: string) => void>(() => {});
 
-/** Bọc app một lần; gọi `useToast()(text)` ở bất kỳ đâu. */
+/** Wraps the app once; call `useToast()(text)` from anywhere. */
 export function ToastProvider({
   children,
   closeLabel,

@@ -1,5 +1,5 @@
 /**
- * Tín hiệu và mặt bằng trên `radard_test`: Algolia giả, dữ liệu dựng tay để biết trước đáp án.
+ * Signals and baselines on `radard_test`: fake Algolia, hand-built data so the expected answers are known in advance.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { baselineOf, type HttpClient } from "@radard/core";
@@ -85,7 +85,7 @@ describe("refreshSignals", () => {
       post: () => Promise.reject(new Error("test này không POST")),
       async get(url) {
         expect(url).toContain("story_1");
-        // Chỉ trả bài 1: bài 2 coi như đã bị xoá khỏi HN.
+        // Return only story 1: story 2 counts as deleted from HN.
         const hits = [{ objectID: "1", points, num_comments: 4, created_at_i: 0 }];
         return {
           status: 200,
@@ -95,7 +95,7 @@ describe("refreshSignals", () => {
       },
     };
     const out = await refreshSignals(db, http, [a, b, x]);
-    // arXiv không có refreshSignals: không hỏi.
+    // arXiv has no refreshSignals: not asked.
     expect(out).toEqual({ asked: 2, updated: 1, missing: 1, local: 0 });
     points = 25;
     await refreshSignals(db, http, [a]);
@@ -147,7 +147,7 @@ describe("runBaselines", () => {
         { documentId: d, metric: "hn_comments", value: c ?? 0, observedAt: NOW },
       ]);
     }
-    // Lấy tín hiệu 1 giờ sau khi đăng: chưa nói gì, phải bị bỏ.
+    // Signal fetched 1 hour after posting: says nothing yet, must be dropped.
     const fresh = await addDoc(hn, posted);
     await db.insert(docSignals).values({
       documentId: fresh,
@@ -174,7 +174,7 @@ describe("runBaselines", () => {
         embeddingModel: "m",
       })
       .returning({ id: events.id });
-    // 3 tài liệu, 2 URL, 2 nguồn → ln(1 + 2) + 0,5 × 1
+    // 3 documents, 2 URLs, 2 sources → ln(1 + 2) + 0,5 × 1
     for (const [src, url] of [
       [hn, "https://a.com"],
       [hn, "https://a.com"],

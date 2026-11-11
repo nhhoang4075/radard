@@ -1,7 +1,7 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 import "./field.css";
 
-/** Ô nhập một dòng. `icon` đứng trước (ví dụ kính lúp). */
+/** Single-line input. `icon` comes first (e.g. a magnifier). */
 export function Field({
   icon,
   ...rest

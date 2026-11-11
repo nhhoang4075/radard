@@ -5,7 +5,7 @@ import fixture from "./fixtures/github-releases.json";
 
 type Reply = Partial<HttpResponse> | Error;
 
-/** HTTP giả trả lời theo repo trong URL, và ghi lại header đã gửi. */
+/** Fake HTTP that answers based on the repo in the URL and records the headers sent. */
 function fakeHttp(replies: Record<string, Reply>) {
   const sent: Array<{ repo: string; headers?: Record<string, string>; etag?: string }> = [];
   const http: HttpClient = {

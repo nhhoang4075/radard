@@ -1,8 +1,8 @@
 /**
- * Soát chủ đề gần giống trên DB test: dữ liệu dựng tay để biết trước tỉ lệ trùng tin. Mỗi chủ đề
- * là một trục của không gian vector; tin nằm giữa các trục thì cả các chủ đề đó cùng bắt. Embedding
- * và model quyết định đều giả, không gọi mạng; model giả quyết định quan hệ theo id chủ đề. Tập so
- * là 10 tin thay vì 300 cho gọn.
+ * Near-duplicate topic check on the test DB: hand-built data so the overlap rate is known in advance. Each topic
+ * is one axis of the vector space; an item between axes is caught by all those topics. Embedding
+ * and the decision model are both fake, no network calls; the fake decision model decides relations by topic id. The comparison set
+ * is 10 items instead of 300 for brevity.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { type FakeDecisionReply, fakeDecision } from "@radard/adapters/ai-fake";
@@ -40,7 +40,7 @@ const NOW = new Date("2026-10-15T00:00:00Z");
 const TOP_N = 10;
 const DRAFT = { label: "Bản nháp", embedText: "Draft topic: zero axis" };
 
-/** Vector có trọng số 1 ở các trục `axes`. */
+/** Vector with weight 1 on the `axes` axes. */
 function vec(...axes: number[]): number[] {
   const v = new Array<number>(EMBED_DIMENSIONS).fill(0);
   for (const a of axes) v[a] = (v[a] ?? 0) + 1;
@@ -49,7 +49,7 @@ function vec(...axes: number[]): number[] {
 
 let embedCalls = 0;
 
-/** Embedder giả trả vector trục 0 cho bản nháp, đếm số lời gọi. */
+/** Fake embedder returns the axis-0 vector for the draft, counting calls. */
 const embedder: EmbeddingProvider = {
   provider: "stub",
   model: MODEL,
@@ -115,11 +115,11 @@ async function addTopicRow(
 }
 
 /**
- * Tập so của bản nháp (trục 0) là đúng 10 tin có thành phần trục 0, theo thứ tự khớp giảm dần:
- * n1–n3 (chỉ trục 0), a1–a4 (trục 0 + 1), ab1–ab3 (trục 0 + 1 + 2). Trục 1 có thêm 3 tin riêng,
- * nên top 10 của trục 1 là 3 tin riêng + a + ab: trùng 7/10. Trục 2 có thêm 7 tin riêng: top 10 là
- * 7 tin riêng + ab: trùng 3/10. ab nằm trong top 10 của cả trục 1 lẫn trục 2. Trục 5 không chung
- * tin nào. Một tin trục 0 cũ 40 ngày phải bị bỏ.
+ * The draft's comparison set (axis 0) is exactly the 10 items with an axis-0 component, in descending match order:
+ * n1–n3 (axis 0 only), a1–a4 (axes 0 + 1), ab1–ab3 (axes 0 + 1 + 2). Axis 1 has 3 extra own items,
+ * so the top 10 of axis 1 is 3 own items + a + ab: 7/10 overlap. Axis 2 has 7 extra own items: the top 10 is
+ * 7 own items + ab: 3/10 overlap. ab is in the top 10 of both axis 1 and axis 2. Axis 5 shares
+ * no items. An axis-0 item 40 days old must be dropped.
  */
 async function seedDocs() {
   for (let i = 1; i <= 3; i++) await addDoc(`n${i}`, vec(0, 0, 0, 0, 0, 0, 0, 0, 0, 100 + i));
@@ -131,7 +131,7 @@ async function seedDocs() {
   await addDoc("old", vec(0), 40);
 }
 
-/** Model quyết định giả: quan hệ theo id chủ đề (câu hỏi `topic_<id>`), mặc định "khác". */
+/** Fake decision model: relation by topic id (question `topic_<id>`), default "khác". */
 function deciderFor(
   answers: Record<number, FakeDecisionReply>,
   seen: { id: string; state: DecisionState; instructions: string }[] = [],
@@ -320,7 +320,7 @@ describe("checkTopicOverlap: bằng chứng", () => {
     const a = await addTopicRow("A", 1);
     const b = await addTopicRow("B", 2);
     await scoreTopics(db, MODEL);
-    // ab1–ab3 nằm trong top 10 của cả A lẫn B: với ngưỡng 2 chủ đề thì là tin chung chung.
+    // ab1–ab3 are in the top 10 of both A and B: with a threshold of 2 topics they are generic items.
     const res = await check(deciderFor({ [a]: "same", [b]: "narrower" }), { hubMinTopics: 2 });
     expect(res.candidates.map((c) => [c.topicId, c.ratio, c.shared, c.onlyNew])).toEqual([
       [a, 0.7, ["a1", "a2", "a3"], ["n1", "n2", "n3"]],
@@ -330,7 +330,7 @@ describe("checkTopicOverlap: bằng chứng", () => {
 
   test("chủ đề chưa được chấm thì tính cosine, ra cùng tỉ lệ", async () => {
     await scoreTopics(db, MODEL);
-    const c = await addTopicRow("C", 1); // thêm sau khi chấm: không có doc_topic_scores
+    const c = await addTopicRow("C", 1); // added after scoring: no doc_topic_scores
     const [n] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(docTopicScores)

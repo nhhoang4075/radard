@@ -1,6 +1,6 @@
 /**
- * Kiểu dữ liệu Feed lấy thẳng từ API Hono (`hc<AppType>`): đổi hợp đồng ở server thì web báo lỗi kiểu lúc build.
- * Chỉ thêm kiểu cục bộ cho thứ không đi qua API.
+ * Feed types taken directly from the Hono API (`hc<AppType>`): if the server contract changes, the web build reports a type error.
+ * Only local types are added here, for things that do not go through the API.
  */
 import type { InferResponseType } from "hono/client";
 import type { api } from "../../lib/api.ts";
@@ -14,7 +14,7 @@ export type FeedbackKind = Exclude<FeedbackState, "none">;
 export type ForMe = { text: string; cached: boolean };
 export type ImpressionInput = { snapshotId: number; position: number };
 
-/** Lỗi "Với tôi?" theo mã HTTP của backend: 429 hết hạn mức, 503 model chưa sẵn sàng. */
+/** "Với tôi?" errors by the backend HTTP code: 429 quota used up, 503 model not ready. */
 export class ForMeError extends Error {
   constructor(readonly kind: "limit" | "unavailable" | "other") {
     super(kind);

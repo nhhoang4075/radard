@@ -1,6 +1,6 @@
 /**
- * Bể ứng viên: mỗi lần digest xếp hạng, mọi sự kiện qua cổng (được chọn hay không) có một dòng
- * trong `candidate_pool`; chạy lại không nhân đôi; hồ sơ không lẫn nhau; lỗi ghi không chặn gửi.
+ * Candidate pool: each digest ranking run, every event that passes the gate (chosen or not) gets one row
+ * in `candidate_pool`; rerunning does not double it; profiles do not mix; a write error does not block sending.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeNotifier } from "@radard/adapters/notify-fake";
@@ -26,7 +26,7 @@ import { addTopic } from "./topic-fixture.ts";
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
 const RECIPIENT = "100000001";
-/** 07:00 giờ VN ngày 06/10. */
+/** 07:00 Vietnam time on 06/10. */
 const SLOT = new Date("2026-10-06T00:00:00Z");
 const PERIOD = { start: new Date(SLOT.getTime() - 86_400_000), end: SLOT };
 const IN = new Date("2026-10-05T12:00:00Z");
@@ -113,8 +113,8 @@ const deps = (profileId = 1) => ({
 });
 
 /**
- * 12 tin tốt một nguồn và 1 tin R thấp bị cổng loại. Bản chụp feed: 10 tin vào (feedMaxPerSource = 10),
- * 2 vượt hạn mức nguồn. Lớp thông báo: 5 tin (5 tin/nguồn cho 7 tin đầu).
+ * 12 good items from one source and 1 item with low R dropped by the gate. Feed snapshot: 10 items in (feedMaxPerSource = 10),
+ * 2 over the per-source cap. Notification layer: 5 items (5 per source for the first 7 items).
  */
 async function seedDay() {
   for (let i = 0; i < 12; i++) await addEvent(0.79);
@@ -168,7 +168,7 @@ describe("candidate_pool", () => {
     await recordCandidatePool(db, 1, rank);
     await recordCandidatePool(db, 1, rank);
     expect(await db.select().from(candidatePool)).toHaveLength(12);
-    // Kết quả mới ít hơn: dòng thừa bị xoá, dòng còn lại được cập nhật.
+    // New result is smaller: extra rows are deleted, remaining rows are updated.
     await recordCandidatePool(db, 1, { ...rank, picked: rank.picked.slice(0, 2), rejected: [] });
     const rows = await db.select().from(candidatePool);
     expect(rows).toHaveLength(2);

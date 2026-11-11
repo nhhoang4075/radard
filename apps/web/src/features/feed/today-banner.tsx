@@ -1,7 +1,7 @@
 import { dayLabel, todayVN } from "../../lib/format.ts";
 import { strings } from "../../lib/strings.vi.ts";
 
-/** Khối "Điểm tin sáng nay". Số lấy từ bản chụp đang xem: tổng từ `total`, còn lại đếm trên các tin đã tải đủ. */
+/** The "Điểm tin sáng nay" block. Numbers come from the snapshot being viewed: the total from `total`, the rest counted over the items fully loaded. */
 export function TodayBanner({
   date,
   total,

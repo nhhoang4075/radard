@@ -1,6 +1,6 @@
 /**
- * Hai nguồn repo GitHub đang nổi: trang Trending (HTML thật lưu ngày 13/10/2026, rút gọn còn 4
- * repo) và Search API (phản hồi tự soạn theo đúng các trường API trả). HTTP giả, không gọi mạng.
+ * Two GitHub repo sources that are trending: the Trending page (real HTML saved on 13/10/2026, cut down to 4
+ * repos) and the Search API (a hand-written response with the exact fields the API returns). Fake HTTP, no network calls.
  */
 import { describe, expect, test } from "bun:test";
 import type { HttpClient } from "@radard/core";
@@ -95,7 +95,7 @@ describe("githubNewReposSource", () => {
       ["owner1/repo1", "https://github.com/owner1/repo1", "owner1/repo1: Repo 1"],
       ["owner3/repo3", "https://github.com/owner3/repo3", "owner3/repo3: Repo 3"],
     ]);
-    // Không đặt published_at: "mới" là lúc radard thấy repo nổi.
+    // published_at is not set: "new" means the time radard saw the repo trending.
     expect(res.items[0]?.publishedAt).toBeUndefined();
   });
 

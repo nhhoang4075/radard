@@ -1,6 +1,6 @@
 /**
- * Máy khách Feed: một giao diện, cài đặt thật dùng `hc<AppType>` (có kiểu). Có thể thay bằng dữ liệu giả
- * (`setFeedClient(fixtureClient)`), chỉ dùng cho trang xem trước dev `/_design/feed` không cần đăng nhập.
+ * Feed client: one interface; the real implementation uses `hc<AppType>` (typed). It can be swapped for fake data
+ * (`setFeedClient(fixtureClient)`), used only for the dev preview page `/_design/feed` that needs no sign-in.
  */
 import type {
   EventDetail,
@@ -17,7 +17,7 @@ export interface FeedClient {
   getFeed(q: { date?: string; cursor?: string | null }): Promise<FeedPage>;
   getDates(): Promise<FeedDates>;
   getEvent(eventId: number): Promise<EventDetail>;
-  /** Bấm lại đúng nút đang chọn thì server bỏ chọn; trả trạng thái mới. */
+  /** Tapping the selected button again makes the server clear it; returns the new state. */
   putFeedback(q: { feedItemId: number; kind: FeedbackKind }): Promise<"like" | "dislike" | "none">;
   postImpressions(batch: ImpressionInput[]): Promise<void>;
   forMe(eventId: number): Promise<ForMe>;
@@ -25,7 +25,7 @@ export interface FeedClient {
 
 export const fetchClient: FeedClient = {
   async getFeed({ date, cursor }) {
-    // limit=50 ≥ K (≤ 30): lấy trọn bản chụp một lần, chip chủ đề và số đếm ở banner dùng được ngay.
+    // limit=50 ≥ K (≤ 30): fetch the whole snapshot at once, so topic chips and the counts in the banner are usable right away.
     const res = await api.feed.$get({
       query: { limit: "50", ...(date ? { date } : {}), ...(cursor ? { cursor } : {}) },
     });

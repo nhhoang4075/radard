@@ -7,8 +7,8 @@ import "./auth.css";
 import { sessionQuery } from "./use-session.ts";
 
 /**
- * `beforeLoad` cho route cần đăng nhập: chưa có phiên (401) → trang đăng nhập. Lỗi khác (kể cả 403,
- * chưa có hồ sơ) được ném tiếp để `errorComponent` của route xử lý.
+ * `beforeLoad` for routes that need sign-in: no session (401) → sign-in page. Other errors (including 403,
+ * no profile yet) are rethrown so the route's `errorComponent` handles them.
  */
 export async function requireSession(queryClient: QueryClient) {
   try {
@@ -19,7 +19,7 @@ export async function requireSession(queryClient: QueryClient) {
   }
 }
 
-/** Lỗi của route cần đăng nhập: 403 hiện thông báo chưa có hồ sơ, còn lại báo lỗi chung. */
+/** Error for routes that need sign-in: 403 shows the no-profile message, otherwise a generic error. */
 export function SessionError({ error }: { error: unknown }) {
   const noProfile = error instanceof HttpError && error.status === 403;
   return (

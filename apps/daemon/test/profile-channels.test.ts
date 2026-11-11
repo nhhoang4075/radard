@@ -1,6 +1,6 @@
 /**
- * Ánh xạ người nhận → hồ sơ (`profile_channels`): tra fail-closed, seed idempotent, khoá duy nhất của
- * digest theo hồ sơ, digest và phản hồi của hai người dùng không lẫn nhau, migration trên dữ liệu có sẵn.
+ * Recipient → profile mapping (`profile_channels`): fail-closed lookup, idempotent seed, the unique key of
+ * the per-profile digest, digests and feedback of two users never mix, migration on existing data.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -35,7 +35,7 @@ import { addTopic } from "./topic-fixture.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
-/** Bọc câu truy vấn drizzle (thenable) thành Promise thật để `rejects` dùng được. */
+/** Wrap a drizzle query (thenable) into a real Promise so `rejects` can be used. */
 const fails = (q: PromiseLike<unknown>) => Promise.resolve().then(() => q);
 const A = "100000001";
 const B = "100000002";
@@ -198,7 +198,7 @@ describe("đa người dùng: digest và phản hồi", () => {
       [1, A, "sent"],
       [2, B, "sent"],
     ]);
-    // Mỗi tin gửi cho recipient nào thì ghi đúng hồ sơ của recipient đó.
+    // Each item sent to a recipient is recorded under that recipient's profile.
     for (const d of await db.select().from(deliveries)) {
       expect(d.profileId).toBe(d.recipient === A ? 1 : 2);
     }
@@ -207,7 +207,7 @@ describe("đa người dùng: digest và phản hồi", () => {
       const pool = await db.select().from(candidatePool).where(eq(candidatePool.profileId, p));
       expect(pool.length).toBeGreaterThan(0);
     }
-    // Chạy lại: không gửi trùng cho ai.
+    // Rerun: nobody gets duplicates.
     const sentBefore = notifier.sent.length;
     await runDigestAll({ db, llm: null, notifier }, SLOT);
     expect(notifier.sent).toHaveLength(sentBefore);
@@ -248,10 +248,10 @@ describe("đa người dùng: digest và phản hồi", () => {
     const b = await resolve(B);
     expect(a?.scope).toBe("1");
     expect(b?.scope).toBe("2");
-    // Hồ sơ trong bộ xử lý: chủ đề bật qua B chỉ hiện ở hồ sơ 2.
+    // Profiles in the processor: a topic turned on via B only shows in profile 2.
     await db.delete(profileTopics);
     const [item] = (await b?.handlers.topics?.list()) ?? [];
-    expect(item).toBeUndefined(); // chưa seed thư viện: danh sách rỗng, không lẫn dữ liệu nơi khác
+    expect(item).toBeUndefined(); // library not seeded: empty list, no data from elsewhere
     const res = await b?.handlers.onFeedback({
       channel: "telegram",
       recipient: B,
@@ -262,7 +262,7 @@ describe("đa người dùng: digest và phản hồi", () => {
     expect(res?.recorded).toBe(true);
     const rows = await db.select().from(feedback);
     expect(rows.map((r) => [r.profileId, r.recipient])).toEqual([[2, B]]);
-    // Người nhận bị tắt thì mất quyền ngay.
+    // A disabled recipient loses access immediately.
     await db
       .update(profileChannels)
       .set({ enabled: false })
@@ -282,8 +282,8 @@ describe("migration 0025 trên dữ liệu có sẵn", () => {
     try {
       await mdb.execute(sql`create extension if not exists vector`);
       await mdb.execute(sql`create extension if not exists pg_trgm`);
-      // Bản sao thư mục migration không có 0025 trở đi = DB ở trạng thái trước khi có bảng (drizzle
-      // chỉ chạy migration mới hơn migration cuối đã chạy, nên phải bỏ cả các migration sau 0025).
+      // A copy of the migration folder without 0025 onward = DB state before the table existed (drizzle
+      // only runs migrations newer than the last applied one, so all migrations after 0025 must be dropped).
       const src = join(import.meta.dir, "../../../packages/db/drizzle");
       const old = await mkdtemp(join(tmpdir(), "mig-"));
       await cp(src, old, { recursive: true });

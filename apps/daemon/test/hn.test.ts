@@ -22,8 +22,8 @@ describe("hitToItem", () => {
 });
 
 /**
- * Algolia giả: hiểu `numericFilters` dạng `created_at_i>lo,created_at_i<=hi`, sắp mới trước,
- * và chỉ cho phân trang tới 1.000 kết quả như API thật. Ghi lại cỡ mỗi cửa sổ được hỏi.
+ * Fake Algolia: understands `numericFilters` in the form `created_at_i>lo,created_at_i<=hi`, sorts newest first,
+ * and only paginates up to 1,000 results like the real API. Records the size of each window queried.
  */
 function fakeAlgolia(times: number[], opts: { failAt?: number } = {}) {
   const urls: string[] = [];
@@ -127,7 +127,7 @@ describe("hnSource.fetch", () => {
     });
     expect(first.behind).toContain("ngân sách");
     expect(first.state.lastCreatedAt).toBeLessThan(nowSec);
-    // Mọi story tới con trỏ đều đã có: không có lỗ hổng phía sau con trỏ.
+    // Every story up to the cursor is already present: no gap behind the cursor.
     const got = new Set(ids(first.items));
     const beforeCursor = api.all.filter((_, i) => (times[i] ?? 0) <= first.state.lastCreatedAt);
     expect(beforeCursor.every((id) => got.has(id))).toBe(true);

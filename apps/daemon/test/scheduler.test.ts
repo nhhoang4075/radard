@@ -1,6 +1,6 @@
 /**
- * Test đồng bộ lịch với pg-boss THẬT trên `radard_test`: pg-boss tự kiểm tra biểu thức cron,
- * nên dùng bản giả sẽ không bắt được đúng hành vi cần kiểm.
+ * Schedule sync test with the REAL pg-boss on `radard_test`: pg-boss validates the cron expression itself,
+ * so a fake would not catch the behaviour being tested.
  */
 import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { createDatabase, runMigrations, sources } from "@radard/db";

@@ -1,6 +1,6 @@
 /**
- * Test tích hợp job `fetch` trên database `radard_test` thật, với adapter nguồn giả.
- * Kiểm những gì làm nên tính idempotent: chạy lại không trùng, lỗi không làm hỏng con trỏ.
+ * Integration test of the `fetch` job on the real `radard_test` database, with a fake source adapter.
+ * Checks what makes it idempotent: rerunning creates no duplicates, errors do not corrupt the cursor.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -23,7 +23,7 @@ const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/rad
 const db = createDatabase(TEST_URL, { max: 2 });
 const root = await mkdtemp(join(tmpdir(), "radard-fetch-"));
 
-/** Adapter giả: trả các mục cho trước, đếm con trỏ, có thể được bảo ném lỗi. */
+/** Fake adapter: returns the given items, counts the cursor, and can be told to throw. */
 function fakeAdapter(items: RawItem[], opts: { fail?: boolean } = {}): SourceAdapter {
   return {
     kind: "fake",

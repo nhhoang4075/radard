@@ -7,8 +7,8 @@ import type { FeedbackKind, FeedbackState } from "./types.ts";
 import { useFeedbackPatch } from "./use-feed.ts";
 
 /**
- * 👍/👎: bấm lại đúng nút đang chọn thì bỏ (server làm việc đó; ở đây tính trước để hiện ngay).
- * Cập nhật lạc quan, hoàn lại nếu lỗi, lấy trạng thái server trả về làm chuẩn; khoá khi đang gửi.
+ * 👍/👎: tapping the selected button again clears it (the server does that; it is computed here first so it shows at once).
+ * Optimistic update, rolled back on error, the server's returned state is the source of truth; locked while sending.
  */
 export function FeedbackButtons({
   feedItemId,
@@ -25,7 +25,7 @@ export function FeedbackButtons({
     onError: (_e, _k, revert) => revert?.(),
   });
   return (
-    // biome-ignore lint/a11y/useSemanticElements: nhóm hai nút icon có aria-label, không cần fieldset
+    // biome-ignore lint/a11y/useSemanticElements: a group of two icon buttons with aria-label, no fieldset needed
     <div className="fb-group" role="group" aria-label={strings.feed.feedback.group}>
       <IconButton
         label={strings.feed.feedback.up}

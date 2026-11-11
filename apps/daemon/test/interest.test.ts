@@ -1,6 +1,6 @@
 /**
- * Điểm gu U nối vào xếp hạng: gom cụm từ tin 👍 (nhãn mới nhất), lưu cụm và mượn tên hôm sau, ghi U
- * vào bể ứng viên. Giá trị kỳ vọng tính tay từ spec: τ = 1,4; ≥ 3 tin mới `active`.
+ * Taste score U feeds into ranking: groups clusters from 👍 items (latest label), stores clusters and reuses names the next day, records U
+ * into the candidate pool. Expected values worked out by hand from the spec: τ = 1,4; ≥ 3 new items `active`.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { DEFAULT_RANK_CONFIG } from "@radard/core";
@@ -39,7 +39,7 @@ let seq = 0;
 let msg = 0;
 let digestId = 0;
 
-/** Vector đơn vị trên trục `axis`. */
+/** Unit vector on axis `axis`. */
 const axis = (i: number) => {
   const v = new Array<number>(1024).fill(0);
   v[i] = 1;
@@ -73,7 +73,7 @@ async function addDoc(vec: number[], inWindow: boolean): Promise<number> {
   return docId;
 }
 
-/** Sự kiện một tài liệu trong khoảng xếp hạng, vector tài liệu trên trục `ax`, R rất cao. */
+/** One-document event in the ranking range, document vector on axis `ax`, very high R. */
 async function addEvent(ax: number): Promise<number> {
   const docId = await addDoc(axis(ax), true);
   const [e] = await db
@@ -93,7 +93,7 @@ async function addEvent(ax: number): Promise<number> {
   return e?.id ?? 0;
 }
 
-/** Tin đã gửi cho tài liệu có vector trên trục `ax`; trả về delivery id. */
+/** Sent item for a document with a vector on axis `ax`; returns the delivery id. */
 async function addDelivery(ax: number): Promise<number> {
   const docId = await addDoc(axis(ax), false);
   const n = ++msg;
@@ -127,7 +127,7 @@ async function react(deliveryId: number, kind: "like" | "dislike" | "clear", at 
   });
 }
 
-/** `n` tin 👍 cùng trục `ax`. */
+/** `n` 👍 items on the same axis `ax`. */
 async function like(ax: number, n: number): Promise<number[]> {
   const ids: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -227,7 +227,7 @@ describe("điểm gu U", () => {
     const b = byId.get(other);
     expect(a?.c.U).toBeCloseTo(1, 6);
     expect(b?.c.U).toBeCloseTo(0, 6);
-    // Hai tin giống hệt thành phần khác; S chênh đúng w_U · ΔU.
+    // Two identical items with different components; S differs by exactly w_U · ΔU.
     expect((a?.S ?? 0) - (b?.S ?? 0)).toBeCloseTo(DEFAULT_RANK_CONFIG.weights.U * 1, 6);
     await recordCandidatePool(db, 1, r);
     const rows = await db.select().from(candidatePool);
@@ -237,16 +237,16 @@ describe("điểm gu U", () => {
 
   test("nhãn mới nhất: 'clear' sau 'like' thì tin không vào cụm; 'like' sau 'clear' thì vào; 👎 không tính", async () => {
     const ids = await like(0, 3);
-    await react(ids[0] as number, "clear"); // còn 2 👍
+    await react(ids[0] as number, "clear"); // 2 👍 left
     const items = await loadLikedItems(db, 1, END);
     expect(items.map((i) => i.id).sort()).toEqual([`d${ids[1]}`, `d${ids[2]}`].sort());
     const dis = await addDelivery(0);
     await react(dis, "dislike");
     expect(await loadLikedItems(db, 1, END)).toHaveLength(2);
-    // Chưa đủ 3 tin 👍 nên chưa active.
+    // Fewer than 3 👍 items, so not active yet.
     const none = await computeInterestClusters(db, 1, END, CFG, { persist: false });
     expect(none.filter((c) => c.status === "active")).toHaveLength(0);
-    // Bấm lại 👍 sau 'clear': tin trở lại, thành 3 → active.
+    // Tap 👍 again after 'clear': the item comes back, making 3 → active.
     await react(ids[0] as number, "like");
     const back = await computeInterestClusters(db, 1, END, CFG, { persist: false });
     expect(back.filter((c) => c.status === "active")).toHaveLength(1);
@@ -286,7 +286,7 @@ describe("điểm gu U", () => {
     expect(first[0]?.profileId).toBe(1);
     expect(first[0]?.name).toBeNull();
     await db.update(interestClusters).set({ name: "Agent AI" });
-    // Hôm sau có thêm 3 👍 trên trục khác và 1 trên trục cũ.
+    // Next day: 3 more 👍 on another axis and 1 on the old axis.
     await like(5, 3);
     await like(0, 1);
     const next = await computeInterestClusters(db, 1, new Date(END.getTime() + 86_400_000), CFG, {

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import "./state.css";
 
-/** Trạng thái rỗng / chờ / hết: tiêu đề đậm nhẹ + một dòng giải thích. */
+/** Empty / loading / end states: a slightly bold title + one line of explanation. */
 export function State({ title, children }: { title?: ReactNode; children?: ReactNode }) {
   return (
     <div className="rd-state">

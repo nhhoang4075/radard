@@ -1,6 +1,6 @@
 /**
- * Job `pages` và cách job process dùng trang được link tới, trên `radard_test` với bộ tải trang
- * giả: mỗi URL tải một lần, Ask HN không đợi, process đợi trang rồi embed tiêu đề cùng nội dung.
+ * The `pages` job and how the process job uses linked pages, on `radard_test` with a page loader
+ * fake: each URL is loaded once, Ask HN does not wait, process waits for the page then embeds the title together with the content.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -37,7 +37,7 @@ const SINCE = new Date("2026-10-01T00:00:00Z");
 let sourceId = 0;
 let seq = 0;
 
-/** Bộ tải giả: URL nào có trong `pages` thì trả HTML đó, không thì 403. */
+/** Fake loader: a URL present in `pages` returns that HTML, otherwise 403. */
 function fakeFetcher(pages: Record<string, string>): PageFetcher & { asked: string[] } {
   const asked: string[] = [];
   return {
@@ -51,7 +51,7 @@ function fakeFetcher(pages: Record<string, string>): PageFetcher & { asked: stri
   };
 }
 
-/** Rút chữ giả: lấy nội dung thẻ <p>. */
+/** Fake text extractor: takes the content of <p> tags. */
 const extractPage = (html: string) => /<p>(.*)<\/p>/s.exec(html)?.[1] ?? null;
 
 async function addStory(title: string, url: string, fetchedAt = new Date("2026-10-12T10:00:00Z")) {
@@ -153,7 +153,7 @@ describe("fetchPages: deferred", () => {
     const first = await fetchPages({ db, store, fetcher }, { since: SINCE });
     expect(first).toEqual({ considered: 1, ok: 0, blocked: 0, skipped: 0, failed: 0, deferred: 1 });
     expect(await db.select().from(linkedPages)).toHaveLength(0);
-    expect(asked).toHaveLength(1); // mỗi lượt chạy chỉ thử một lần
+    expect(asked).toHaveLength(1); // each run tries only once
 
     robotsUp = true;
     const second = await fetchPages({ db, store, fetcher }, { since: SINCE });
@@ -172,7 +172,7 @@ describe("fetchPages: deferred", () => {
 
 describe("fetchPages: host hỏng không làm nghẽn host khác", () => {
   test("host deferred chỉ bị thử một lần mỗi lượt, đủ 10 URL/host, URL cũ của host khoẻ vẫn được tải", async () => {
-    // 25 URL mới của host hỏng, rồi 1 URL cũ hơn của host khoẻ.
+    // 25 new URLs from the broken host, then 1 older URL from the healthy host.
     for (let i = 0; i < 25; i++) await addStory(`bad ${i}`, `https://bad.example/p${i}`);
     await addStory("old good", "https://good.example/a", new Date("2026-10-11T10:00:00Z"));
     const asked: string[] = [];
@@ -229,7 +229,7 @@ describe("runProcess với trang được link tới", () => {
     const janas = await addStory("Janas", "https://github.com/x/janas", recent);
     const ask = await addStory("Ask HN: anyone?", "https://news.ycombinator.com/item?id=2", recent);
 
-    // Chưa có dòng linked_pages, tài liệu còn mới: đợi, không embed.
+    // No linked_pages row yet, document still new: wait, do not embed.
     expect((await runProcess(processDeps())).embedded).toBe(0);
 
     await fetchPages(
@@ -247,7 +247,7 @@ describe("runProcess với trang được link tới", () => {
       (await db.select({ t: docText.text }).from(docText).where(eq(docText.documentId, id)))[0]?.t;
     expect(await text(janas)).toBe("Janas\n\nStreams MoE weights from SSD.");
     expect(await text(ask)).toBe("Ask HN: anyone?");
-    // Hai vector: bản thô để gộp sự kiện, bản có trang để chấm chủ đề.
+    // Two vectors: the raw one to merge events, the one with the page to score topics.
     const vecs = await db
       .select({ id: docText.documentId, e: docText.embedding, c: docText.contentEmbedding })
       .from(docText)

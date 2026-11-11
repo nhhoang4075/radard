@@ -1,4 +1,4 @@
-/** Tạo một chủ đề tự thêm cho hồ sơ 1 và chọn nó; trả về `topics.id` (khoá của điểm và mặt bằng). */
+/** Create a custom topic for profile 1 and select it; returns `topics.id` (the key for scores and baselines). */
 import { type Database, profileTopics, topics } from "@radard/db";
 
 export async function addTopic(

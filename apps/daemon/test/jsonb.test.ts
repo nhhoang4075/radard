@@ -1,7 +1,7 @@
 /**
- * Mọi cột jsonb phải chứa đúng kiểu nó khai, không phải một CHUỖI chứa JSON (lỗi mã hoá hai lần
- * của driver bun-sql, xem packages/db/src/schema/json.ts). Quét TOÀN BỘ cột jsonb chứ không
- * liệt kê tên, để cột thêm sau này ghi sai kiểu cũng tự bị bắt.
+ * Every jsonb column must hold the type it declares, not a STRING containing JSON (the double-encoding bug
+ * of the bun-sql driver, see packages/db/src/schema/json.ts). Scan ALL jsonb columns instead of
+ * listing names, so a column added later that writes the wrong type is also caught.
  */
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createDatabase, documents, runMigrations, sourceState, sources } from "@radard/db";
@@ -12,7 +12,7 @@ const db = createDatabase(TEST_URL, { max: 2 });
 
 beforeAll(async () => {
   await runMigrations(TEST_URL);
-  // Ghi đủ mọi cột jsonb qua Drizzle, như code thật làm.
+  // Write every jsonb column through Drizzle, as the real code does.
   const [s] = await db
     .insert(sources)
     .values({ kind: "hn", name: `jsonb-${Date.now()}`, cadence: "0 * * * *", config: { a: 1 } })

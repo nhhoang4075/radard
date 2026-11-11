@@ -1,7 +1,7 @@
 /**
- * Test tích hợp phần xử lý (job process) trên `radard_test` với embedding GIẢ (băm từ): kiểm
- * chấm điểm theo chủ đề, gộp theo URL, gộp theo vector, mở sự kiện mới và tính chạy lại được. Không kiểm chất lượng: ngưỡng
- * thật phải chỉnh trên model thật.
+ * Integration test of the processing job (process) on `radard_test` with FAKE embeddings (word hashing): checks
+ * topic scoring, merging by URL, merging by vector, opening new events, and rerunnability. It does not check quality: the thresholds
+ * must be tuned on the real model.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -63,7 +63,7 @@ const deps = (): ProcessDeps => ({
 let sourceId = 0;
 let seq = 0;
 
-/** Thêm một story HN giả như job fetch sẽ ghi: bản thô JSON + dòng documents. */
+/** Add a fake HN story as the fetch job would write it: raw JSON + a documents row. */
 async function addStory(title: string, url: string, at = "2026-09-27T10:00:00Z") {
   const id = String(++seq);
   const body = JSON.stringify({ objectID: id, title, url, created_at_i: Date.parse(at) / 1000 });
@@ -158,7 +158,7 @@ describe("tin giả định của chủ đề (HyDE, đề xuất C)", () => {
         return "[]";
       },
     });
-    // Trả về rỗng: lỗi, không lưu gì, điểm cũ giữ nguyên.
+    // Empty result: error, nothing saved, old scores kept.
     await runProcess({ ...deps(), llm: failing });
     expect(await db.select().from(topicExamples)).toHaveLength(0);
     expect(empty).toBeGreaterThan(0);
@@ -192,8 +192,8 @@ describe("runProcess", () => {
       .innerJoin(documents, eq(documents.id, eventDocuments.documentId))
       .orderBy(asc(documents.id));
     expect(links.map((l) => l.reason)).toEqual(["seed", "vector", "url", "seed"]);
-    // Ba bài agents cùng một sự kiện; bài làm vườn là sự kiện riêng (D4: gộp mọi tài liệu, lọc
-    // theo hồ sơ chỉ ở digest).
+    // Three "agents" articles in one event; the gardening article is its own event (D4: merge all documents, filter
+    // by profile only in the digest).
     expect(new Set(links.map((l) => l.event)).size).toBe(2);
     const [ev] = await db.select().from(events).orderBy(asc(events.id));
     expect(ev?.nDocs).toBe(3);
@@ -201,8 +201,8 @@ describe("runProcess", () => {
   });
 
   test("gộp vì cùng URL không làm lệch trọng số tâm cụm", async () => {
-    // seed → cùng URL → vector: tâm phải là trung bình của ĐÚNG 2 vector (A và C), không phải
-    // (2A + C) / 3 như khi lấy nDocs làm trọng số.
+    // seed → same URL → vector: the centroid must be the average of EXACTLY 2 vectors (A and C), not
+    // (2A + C) / 3 as when nDocs is used as the weight.
     await addStory(
       "LLM agents framework for language model tooling",
       "https://a.com/x",
@@ -231,7 +231,7 @@ describe("runProcess", () => {
     const maxDiff = Math.max(
       ...(ev?.centroid ?? []).map((x, i) => Math.abs(x - (expected[i] ?? 0))),
     );
-    // halfvec lưu 16-bit: sai số làm tròn cỡ 1e-3; lệch trọng số sẽ lớn hơn nhiều.
+    // halfvec stores 16-bit: rounding error around 1e-3; a weight mismatch would be much larger.
     expect(maxDiff).toBeLessThan(2e-3);
   });
 
@@ -271,7 +271,7 @@ describe("runProcess", () => {
   });
 
   test("bài cũ đến muộn không gộp vào sự kiện của nhiều tuần sau", async () => {
-    // Như lúc chạy thật: bài mới được xử lý ở lượt trước, bài cũ hơn 26 ngày mới lấy về sau.
+    // As in a real run: new articles are processed in the previous run, articles older than 26 days are fetched later.
     await addStory(
       "LLM agents framework for language model tooling",
       "https://b.com/2",
@@ -334,7 +334,7 @@ describe("runProcess", () => {
     const [agents, garden] = await listProfileTopics(db, 1);
     await setTopicActive(db, 1, garden?.id ?? 0, false);
 
-    // Chủ đề đang tắt vẫn được embed và chấm: điểm không phụ thuộc người dùng bật gì (D4).
+    // Disabled topics are still embedded and scored: scores do not depend on what users turn on (D4).
     const out = await runProcess(deps());
     expect([out.topicsEmbedded, out.scored]).toEqual([2, 4]);
     const agentsScores = await db
@@ -382,8 +382,8 @@ describe("runProcess", () => {
 });
 
 /**
- * Embedding giả đặt được cosine chính xác: văn bản chứa `cos<x>` thành vector đơn vị có cosine
- * đúng bằng x với vector của `cos1` (hai chiều đầu, các chiều còn lại 0).
+ * Fake embedding can set an exact cosine: text containing `cos<x>` becomes a unit vector with cosine
+ * exactly x against the vector of `cos1` (first two dimensions, the rest 0).
  */
 const angleEmbedding: EmbeddingProvider = {
   provider: "fake",
@@ -401,7 +401,7 @@ const angleEmbedding: EmbeddingProvider = {
 };
 
 describe("gộp vùng xám bằng model quyết định", () => {
-  /** Hỏi bao nhiêu lần, trạng thái gì; trả `p` hoặc ném lỗi. */
+  /** How many times it was asked, and what state; returns `p` or throws. */
   function decider(p: number | Error) {
     const states: DecisionState[] = [];
     const calls: UsageEvent[] = [];

@@ -1,6 +1,6 @@
 /**
- * Bảng gửi tin và phản hồi: dữ liệu của người dùng phải sống sót khi dữ liệu dẫn xuất bị dựng lại, và
- * các ràng buộc chặn dữ liệu sai ngay ở DB.
+ * Delivery and feedback tables: user data must survive when derived data is rebuilt, and
+ * constraints block bad data right in the DB.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -21,7 +21,7 @@ const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/rad
 const db = createDatabase(TEST_URL, { max: 2 });
 const recipient = "100000001";
 let deliveryId = 0;
-/** Lệnh của Drizzle chỉ "giống promise"; bọc lại để `expect(...).rejects` dùng được. */
+/** Drizzle queries are only "promise-like"; wrap them so `expect(...).rejects` works. */
 const attempt = (q: PromiseLike<unknown>) => Promise.resolve(q);
 let docId = 0;
 
@@ -189,7 +189,7 @@ describe("deliveries + feedback", () => {
   test("ràng buộc: tin sự kiện phải thuộc digest và sự kiện; tin thử đứng ngoài digest", async () => {
     const base = { channel: "telegram", recipient, body: "x" };
     const [dg] = await db.select({ id: digests.id }).from(digests);
-    // Tin sự kiện không có digest (kiểu notify test cũ) hoặc không có event_id: bị chặn.
+    // Event items with no digest (old notify-test style) or no event_id: blocked.
     await expect(
       attempt(
         db.insert(deliveries).values({ profileId: 1, ...base, messageId: "70", kind: "event" }),
@@ -207,7 +207,7 @@ describe("deliveries + feedback", () => {
         }),
       ),
     ).rejects.toThrow();
-    // Tin thử nằm trong digest: bị chặn. Tin thử đứng riêng: ghi được.
+    // Test item inside a digest: blocked. Standalone test item: allowed.
     await expect(
       attempt(
         db.insert(deliveries).values({

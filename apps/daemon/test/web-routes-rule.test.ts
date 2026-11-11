@@ -1,7 +1,7 @@
 /**
- * Luật giữ bằng máy (docs/cau-truc-web.html mục 6): mọi route dưới `/api` (trừ `/api/auth/*`, route công
- * khai `providers`, và `/o/:token`) phải đi qua middleware phiên. Lưới an toàn chống quên kiểm phiên:
- * liệt kê TOÀN BỘ route Hono đã đăng ký, gọi từng cái không kèm phiên và đòi 401.
+ * Machine-enforced rule (docs/cau-truc-web.html section 6): every route under `/api` (except `/api/auth/*`, the public route
+ * that declares `providers`, and `/o/:token`) must pass through the session middleware. Safety net against forgetting session checks:
+ * list ALL registered Hono routes, call each one without a session, and expect 401.
  */
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
@@ -37,7 +37,7 @@ describe("luật: route /api đi qua middleware phiên", () => {
     const routes = app.routes.filter(
       (r) => r.method !== "ALL" && r.path.startsWith("/api") && !PUBLIC.some((p) => p.test(r.path)),
     );
-    expect(routes.length).toBeGreaterThan(0); // ít nhất /api/me
+    expect(routes.length).toBeGreaterThan(0); // at least /api/me
     for (const r of routes) {
       const path = r.path.replace(/:[A-Za-z]+/g, "1");
       const res = await app.request(path, { method: r.method });
@@ -55,10 +55,10 @@ describe("luật: route /api đi qua middleware phiên", () => {
     const dir = join(import.meta.dir, "../src/web/routes");
     for (const f of readdirSync(dir).filter((n) => n.endsWith(".ts") && n !== "link.ts")) {
       const src = readFileSync(join(dir, f), "utf8");
-      expect(src).not.toMatch(/["'`]\/api\//); // đường dẫn tương đối, do app.ts mount
-      expect(src).not.toMatch(/\.on\(\s*\[/); // không đăng ký nhiều method kiểu tự do
+      expect(src).not.toMatch(/["'`]\/api\//); // relative paths, mounted by app.ts
+      expect(src).not.toMatch(/\.on\(\s*\[/); // no free-form multi-method registration
     }
-    // app.ts: sessionMiddleware phải đứng trước mọi `.route(` của routes/.
+    // app.ts: sessionMiddleware must come before every `.route(` of routes/.
     const appSrc = readFileSync(join(import.meta.dir, "../src/web/app.ts"), "utf8");
     const use = appSrc.indexOf('.use("*", sessionMiddleware(');
     expect(use).toBeGreaterThan(0);

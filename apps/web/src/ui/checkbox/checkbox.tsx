@@ -9,10 +9,10 @@ export function Checkbox(props: Props) {
   );
 }
 
-/** Hàng ô tích + nhãn (+ số đếm bên phải). */
+/** Checkbox row + label (+ count on the right). */
 export function CheckRow({ label, count, ...rest }: Props & { label: ReactNode; count?: number }) {
   return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: ô tích nằm trong label qua <Checkbox/>
+    // biome-ignore lint/a11y/noLabelWithoutControl: the checkbox sits inside the label via <Checkbox/>
     <label className="rd-check">
       <Checkbox {...rest} />
       <span>{label}</span>
@@ -21,14 +21,14 @@ export function CheckRow({ label, count, ...rest }: Props & { label: ReactNode; 
   );
 }
 
-/** Thẻ chọn: chọn = viền đậm hơn (cùng 1px). */
+/** Selectable card: selected = darker border (same 1px). */
 export function CheckCard({
   label,
   dashed,
   ...rest
 }: Props & { label: ReactNode; dashed?: boolean }) {
   return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: ô tích nằm trong label qua <Checkbox/>
+    // biome-ignore lint/a11y/noLabelWithoutControl: the checkbox sits inside the label via <Checkbox/>
     <label className="rd-check-card" data-dashed={dashed ? "" : undefined}>
       <Checkbox {...rest} />
       <span>{label}</span>

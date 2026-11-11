@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-/** j/k đổi tin, o mở bài gốc. Bỏ qua khi đang gõ trong ô nhập hoặc có phím bổ trợ. */
+/** j/k move between items, o opens the original article. Ignored while typing in an input or when a modifier key is held. */
 export function useFeedKeys(h: { next(): void; prev(): void; open(): void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -7,8 +7,8 @@ import { Button, Skeleton } from "../../ui/index.ts";
 import { ForMeError } from "./types.ts";
 
 /**
- * "Với tôi?" (quyết định 11/11/2026): gọi model khi bấm, kết quả ghi rõ là suy luận, có cache phía server
- * (`cached`) và phía client (mở lại hiện ngay). "Tìm hiểu thêm" xám, chưa bấm được ở giai đoạn 1.
+ * "Với tôi?" (decision 11/11/2026): calls the model on tap, the result is clearly labelled as inference, with cache on the server
+ * (`cached`) and on the client (reopening shows it at once). "Tìm hiểu thêm" is greyed out, not clickable in stage 1.
  */
 export function ForMeZone({ eventId }: { eventId: number }) {
   const t = strings.feed.forMe;

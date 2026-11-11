@@ -1,7 +1,7 @@
 /**
- * Route feed của web (docs/cau-truc-web.html mục 4): GET /api/feed, /api/feed/dates, GET /api/events/:id,
- * PUT /api/feedback, POST /api/impressions, và kiểm Origin. Giá trị kỳ vọng lấy từ hợp đồng, dữ liệu
- * dựng thẳng vào DB (hồ sơ A = chủ dự án, hồ sơ B = khách được mời).
+ * Web feed routes (docs/cau-truc-web.html section 4): GET /api/feed, /api/feed/dates, GET /api/events/:id,
+ * PUT /api/feedback, POST /api/impressions, and Origin checks. Expected values come from the contract; data
+ * is built directly into the DB (profile A = project owner, profile B = invited guest).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -31,7 +31,7 @@ const OWNER = "chu.du.an@example.com";
 const GUEST = "khach@example.com";
 const BASE = "http://localhost:8080";
 const DAY = 86_400_000;
-const D10 = new Date("2026-11-10T00:00:00Z"); // 07:00 VN ngày 2026-11-10
+const D10 = new Date("2026-11-10T00:00:00Z"); // 07:00 VN on 2026-11-10
 
 const auth = createAuth({
   db,
@@ -82,7 +82,7 @@ async function snapshot(profileId: number, periodEnd: Date, status = "ready", it
   return s?.id ?? 0;
 }
 
-/** K tin cho (hồ sơ, bản chụp); tin 2 là tin tiếp diễn (n<1) có 2 bài từ 2 nguồn; tin 3 vào digest. */
+/** K items for (profile, snapshot); item 2 is a continuing item (n<1) with 2 articles from 2 sources; item 3 goes into the digest. */
 async function seedItems(
   profileId: number,
   snapshotId: number,
@@ -113,7 +113,7 @@ async function seedItems(
       )[0]?.id ?? 0;
     const docIds = [await mk(1, srcHn, "hn.test")];
     if (i === 2) docIds.push(await mk(2, srcArxiv, "arxiv.test"));
-    if (i === 4) docIds.push(await mk(2, srcHn, "hn.test")); // một nguồn, hai bài
+    if (i === 4) docIds.push(await mk(2, srcHn, "hn.test")); // one source, two articles
     let summaryId: number | null = null;
     if (i === 1) {
       summaryId =
@@ -220,7 +220,7 @@ beforeEach(async () => {
   topicId = t?.id ?? 0;
   await db.insert(profileTopics).values({ topicId, active: true });
 
-  // A: 09/11 (2 tin), 10/11 (5 tin), 11/11 đang dựng (không hiện). B: 10/11 (3 tin), có chung sự kiện 101.
+  // A: 09/11 (2 items), 10/11 (5 items), 11/11 being built (not shown). B: 10/11 (3 items), shares event 101.
   const snap08 = await snapshot(1, new Date(D10.getTime() - 2 * DAY));
   const snap09 = await snapshot(1, new Date(D10.getTime() - DAY), "ready", 2);
   const snap10 = await snapshot(1, D10, "ready", 5);
@@ -229,7 +229,7 @@ beforeEach(async () => {
   const a10 = await seedItems(1, snap10, "a", 100, 5);
   await seedItems(1, snap09, "z", 900, 2);
   const bSnap = await snapshot(profileB, D10, "ready", 3);
-  const b10 = await seedItems(profileB, bSnap, "b", 100, 3); // sự kiện 101..103 trùng với A
+  const b10 = await seedItems(profileB, bSnap, "b", 100, 3); // events 101..103 overlap with A
   A = { snap10, snap09, items: a10.items, events: a10.events };
   B = { snap10: bSnap, snap09: 0, items: b10.items, events: b10.events };
 });
@@ -312,7 +312,7 @@ describe("GET /api/feed", () => {
     } while (cursor);
     expect(seen).toEqual([1, 2, 3, 4, 5]);
     expect(pages).toBe(3);
-    // limit mặc định 10 → một trang, hết.
+    // default limit 10 → one page, done.
     const all = await (await get("/api/feed", hA)).json();
     expect(all.items).toHaveLength(5);
     expect(all.nextCursor).toBeNull();
@@ -425,7 +425,7 @@ describe("GET /api/events/:id", () => {
       expect(`${id} ${res.status}`).toBe(`${id} 404`);
       expect(await res.json()).toEqual({ error: "not_found" });
     }
-    // Sự kiện chỉ có ở feed của B.
+    // Event only present in B's feed.
     await seedItems(profileB, B.snap10, "bx", 700, 0);
     await db.insert(feedItems).values({
       profileId: profileB,
@@ -603,7 +603,7 @@ describe("POST /api/impressions", () => {
 
 describe("cách ly hai hồ sơ", () => {
   test("A không đọc được bản chụp, tin, phản hồi của B (và ngược lại)", async () => {
-    // B thích tin 1 của mình (sự kiện 101 trùng với A).
+    // B likes its own item 1 (event 101 overlaps with A).
     await send("PUT", "/api/feedback", { feedItemId: B.items[0], kind: "like" }, hB);
     const a = await (await get("/api/feed", hA)).json();
     expect(a.snapshotId).toBe(A.snap10);
@@ -619,7 +619,7 @@ describe("cách ly hai hồ sơ", () => {
     const b = await (await get("/api/feed", hB)).json();
     expect(b.total).toBe(3);
     expect(b.items[0]).toMatchObject({ title: "Tin b1", feedback: "like", feedItemId: B.items[0] });
-    // Cursor của B không dùng được cho A (khác bản chụp).
+    // B's cursor cannot be used for A (different snapshot).
     const bc = await (await get("/api/feed?limit=1", hB)).json();
     expect((await get(`/api/feed?cursor=${bc.nextCursor}`, hA)).status).toBe(400);
   });
@@ -637,7 +637,7 @@ describe("cách ly hai hồ sơ", () => {
     );
     expect(imp.status).toBe(400);
     expect(await impressionRows()).toBe(0);
-    // Cũng không giả mạo qua profileId trong thân/truy vấn.
+    // Also cannot be spoofed via profileId in the body/query.
     const forged = await send(
       "PUT",
       "/api/feedback",
@@ -652,7 +652,7 @@ describe("cách ly hai hồ sơ", () => {
 
   test("dates và chi tiết sự kiện cũng tách theo hồ sơ", async () => {
     expect((await (await get("/api/feed/dates", hB)).json()).dates).toHaveLength(1);
-    expect((await get("/api/events/104", hB)).status).toBe(404); // B chỉ có 101..103
+    expect((await get("/api/events/104", hB)).status).toBe(404); // B only has 101..103
     expect((await get("/api/events/104", hA)).status).toBe(200);
   });
 });
