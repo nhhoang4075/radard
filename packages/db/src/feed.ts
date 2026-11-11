@@ -7,8 +7,11 @@
  */
 import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 import type { Database } from "./client.ts";
+import { documents, sources } from "./schema/collected.ts";
 import { deliveries, feedback } from "./schema/delivery.ts";
 import { feedImpressions, feedItems, feedSnapshots } from "./schema/feed.ts";
+import { topics } from "./schema/profile.ts";
+import { eventSummaries } from "./schema/summaries.ts";
 
 export type FeedSnapshot = typeof feedSnapshots.$inferSelect;
 export type FeedItem = typeof feedItems.$inferSelect;
@@ -232,4 +235,215 @@ export async function recordFeedFeedback(
     .returning({ id: feedback.id });
   if (!row) throw new Error("không ghi được phản hồi");
   return { ok: true, feedbackId: row.id, state: kind === "clear" ? "none" : kind };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Đọc cho route /api/feed (mọi hàm bắt buộc `profileId` và lọc theo nó)
+// ---------------------------------------------------------------------------------------------
+
+export type FeedbackState = "like" | "dislike" | "none";
+
+/** Ngày giờ VN (YYYY-MM-DD) của một thời điểm. */
+export function vnDate(d: Date): string {
+  return new Date(d.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+}
+
+const vnDateSql = (col: typeof feedSnapshots.periodEnd) =>
+  sql<string>`to_char(${col} at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')`;
+
+/**
+ * Bản chụp `ready` của hồ sơ có `period_end` rơi vào ngày VN `date` (YYYY-MM-DD); `null` nếu không có.
+ * `date` không phải ngày thật (ví dụ 2026-02-31) cũng là `null`.
+ */
+export async function feedSnapshotOnDate(
+  db: Database,
+  profileId: number,
+  date: string,
+): Promise<FeedSnapshot | null> {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!m) return null;
+  const probe = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (Number.isNaN(probe.getTime()) || probe.toISOString().slice(0, 10) !== date) return null;
+  const [row] = await db
+    .select()
+    .from(feedSnapshots)
+    .where(
+      and(
+        eq(feedSnapshots.profileId, profileId),
+        eq(feedSnapshots.status, "ready"),
+        sql`${vnDateSql(feedSnapshots.periodEnd)} = ${date}`,
+      ),
+    )
+    .orderBy(desc(feedSnapshots.periodEnd))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Các ngày có bản chụp `ready` của hồ sơ, mới nhất trước. */
+export async function feedDates(
+  db: Database,
+  q: { profileId: number; limit?: number },
+): Promise<{ date: string; snapshotId: number; itemCount: number }[]> {
+  const limit = Math.min(Math.max(q.limit ?? 60, 1), 60);
+  const rows = await db
+    .select({
+      date: vnDateSql(feedSnapshots.periodEnd),
+      snapshotId: feedSnapshots.id,
+      itemCount: feedSnapshots.itemCount,
+    })
+    .from(feedSnapshots)
+    .where(and(eq(feedSnapshots.profileId, q.profileId), eq(feedSnapshots.status, "ready")))
+    .orderBy(desc(feedSnapshots.periodEnd))
+    .limit(limit);
+  return rows.map((r) => ({ date: r.date, snapshotId: r.snapshotId, itemCount: r.itemCount ?? 0 }));
+}
+
+/**
+ * Trạng thái phản hồi hiện tại của hồ sơ cho các tin: dòng mới nhất (like/dislike/clear) của từng
+ * `feed_item_id`, bất kể kênh (cùng quy ước `recordFeedFeedback`). Không có dòng thì `none`.
+ */
+export async function feedbackStates(
+  db: Database,
+  profileId: number,
+  feedItemIds: readonly number[],
+): Promise<Map<number, FeedbackState>> {
+  const out = new Map<number, FeedbackState>();
+  if (feedItemIds.length === 0) return out;
+  const rows = await db
+    .selectDistinctOn([feedback.feedItemId], {
+      feedItemId: feedback.feedItemId,
+      kind: feedback.kind,
+    })
+    .from(feedback)
+    .where(
+      and(
+        eq(feedback.profileId, profileId),
+        inArray(feedback.feedItemId, [...feedItemIds]),
+        inArray(feedback.kind, ["like", "dislike", "clear"]),
+      ),
+    )
+    .orderBy(feedback.feedItemId, desc(feedback.id));
+  for (const r of rows) {
+    if (r.feedItemId !== null)
+      out.set(r.feedItemId, r.kind === "clear" ? "none" : (r.kind as "like" | "dislike"));
+  }
+  return out;
+}
+
+export interface FeedItemView {
+  position: number;
+  feedItemId: number;
+  eventId: number;
+  title: string;
+  summary: string | null;
+  topic: string | null;
+  /** Số tên nguồn khác nhau (= sources.length). */
+  sourceCount: number;
+  /** Số bài khác nhau (distinct url_canonical). */
+  articleCount: number;
+  sources: string[];
+  updated: boolean;
+  inDigest: boolean;
+  notifyPosition: number | null;
+  feedback: FeedbackState;
+  score: { s: number; r: number; p: number; c: number; a: number; f: number; u: number; n: number };
+}
+
+/** Tên chủ đề, tóm tắt chung của các dòng feed (chỉ nhận dòng đã lọc theo hồ sơ). */
+async function decorate(
+  db: Database,
+  profileId: number,
+  rows: readonly FeedItem[],
+): Promise<FeedItemView[]> {
+  if (rows.length === 0) return [];
+  const topicIds = [...new Set(rows.flatMap((r) => (r.topicId === null ? [] : [r.topicId])))];
+  const summaryIds = [...new Set(rows.flatMap((r) => (r.summaryId === null ? [] : [r.summaryId])))];
+  const docIds = [...new Set(rows.flatMap((r) => r.documentIds))];
+  const [topicRows, summaryRows, docRows, states] = await Promise.all([
+    topicIds.length
+      ? db
+          .select({ id: topics.id, name: topics.name })
+          .from(topics)
+          .where(inArray(topics.id, topicIds))
+      : [],
+    summaryIds.length
+      ? db
+          .select({ id: eventSummaries.id, summary: eventSummaries.summary })
+          .from(eventSummaries)
+          .where(inArray(eventSummaries.id, summaryIds))
+      : [],
+    docIds.length
+      ? db
+          .select({
+            id: documents.id,
+            urlCanonical: documents.urlCanonical,
+            sourceName: sources.name,
+          })
+          .from(documents)
+          .innerJoin(sources, eq(sources.id, documents.sourceId))
+          .where(inArray(documents.id, docIds))
+      : [],
+    feedbackStates(
+      db,
+      profileId,
+      rows.map((r) => r.id),
+    ),
+  ]);
+  const topicName = new Map(topicRows.map((t) => [t.id, t.name]));
+  const summaryText = new Map(summaryRows.map((s) => [s.id, s.summary]));
+  const docById = new Map(docRows.map((d) => [d.id, d]));
+  return rows.map((r) => {
+    const docs = r.documentIds.flatMap((id) => docById.get(id) ?? []);
+    return {
+      position: r.position,
+      feedItemId: r.id,
+      eventId: r.eventId,
+      title: r.title,
+      summary: r.summaryId === null ? null : (summaryText.get(r.summaryId) ?? null),
+      topic: r.topicId === null ? null : (topicName.get(r.topicId) ?? null),
+      sourceCount: new Set(docs.map((d) => d.sourceName)).size,
+      articleCount: new Set(docs.map((d) => d.urlCanonical)).size,
+      sources: [...new Set(docs.map((d) => d.sourceName))],
+      updated: r.n < 1,
+      inDigest: r.notifyPosition !== null,
+      notifyPosition: r.notifyPosition,
+      feedback: states.get(r.id) ?? "none",
+      score: { s: r.score, r: r.r, p: r.p, c: r.c, a: r.a, f: r.f, u: r.u, n: r.n },
+    };
+  });
+}
+
+/**
+ * Một trang tin của bản chụp để hiện: `feedPage` (đã lọc hồ sơ) kèm tóm tắt chung, nhãn chủ đề, tên
+ * nguồn và phản hồi hiện tại. Bản chụp không thuộc hồ sơ thì rỗng.
+ */
+export async function feedItemsView(
+  db: Database,
+  q: { profileId: number; snapshotId: number; after?: number; limit?: number },
+): Promise<{ items: FeedItemView[]; nextAfter: number | null; done: boolean }> {
+  const page = await feedPage(db, q);
+  return {
+    items: await decorate(db, q.profileId, page.items),
+    nextAfter: page.nextAfter,
+    done: page.done,
+  };
+}
+
+/**
+ * Tin feed MỚI NHẤT của hồ sơ cho một sự kiện (kèm các trường như `feedItemsView`) và các
+ * `documentIds` đã chụp; `null` nếu sự kiện không nằm trong feed của hồ sơ.
+ */
+export async function feedItemForEvent(
+  db: Database,
+  q: { profileId: number; eventId: number },
+): Promise<{ view: FeedItemView; row: FeedItem } | null> {
+  const [row] = await db
+    .select()
+    .from(feedItems)
+    .where(and(eq(feedItems.profileId, q.profileId), eq(feedItems.eventId, q.eventId)))
+    .orderBy(desc(feedItems.id))
+    .limit(1);
+  if (!row) return null;
+  const [view] = await decorate(db, q.profileId, [row]);
+  return view ? { view, row } : null;
 }

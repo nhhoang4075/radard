@@ -450,6 +450,7 @@ describe("hàm thuần", () => {
       kind: "hn",
       externalId: String(id),
       title: `t${id}`,
+      publishedAt: null,
       url: `https://www.${url}`,
       urlCanonical: `https://${url}`,
       excerpt: "",
