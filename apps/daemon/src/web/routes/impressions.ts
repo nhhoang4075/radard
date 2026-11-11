@@ -1,8 +1,8 @@
 /**
- * POST /api/impressions { items: [{ snapshotId, position }] } (tối đa 100) → 204 (kể cả trùng) · 400.
- * Có một mục không thuộc hồ sơ hoặc vị trí không tồn tại thì 400 { error: "invalid", invalid } và không
- * ghi gì. Thân đọc thành JSON bất kể content-type (sendBeacon gửi text/plain), tối đa 16 KB.
- * `seen_at` là giờ máy chủ. Mount sau `sessionMiddleware`.
+ * POST /api/impressions { items: [{ snapshotId, position }] } (max 100) → 204 (duplicates included) · 400.
+ * If an item does not belong to the profile or the position does not exist, return 400 { error: "invalid", invalid } and
+ * write nothing. The body is read as JSON regardless of content-type (sendBeacon sends text/plain), max 16 KB.
+ * `seen_at` is the server time. Mounted after `sessionMiddleware`.
  */
 import { type Database, recordImpressions } from "@radard/db";
 import { Hono } from "hono";

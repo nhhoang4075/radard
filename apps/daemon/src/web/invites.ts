@@ -1,9 +1,9 @@
 /**
- * Quản lý lời mời (CLI `invites add|list|revoke`). Email luôn chuẩn hoá chữ thường.
+ * Invite management (CLI `invites add|list|revoke`). Emails are always lowercased.
  *
- * Thu hồi = xoá lời mời CHƯA dùng và xoá dòng `user` cùng email (FK cascade xoá session/account;
- * `profile.user_id` về NULL nhờ ON DELETE SET NULL, hồ sơ và dữ liệu của nó giữ nguyên). Không bao
- * giờ thu hồi email của user đang có role owner (xem `owners remove`).
+ * Revoke = delete the UNUSED invite and the `user` row with the same email (FK cascade removes sessions and accounts;
+ * `profile.user_id` becomes NULL thanks to ON DELETE SET NULL, while the profile and its data are kept). Never
+ * revokes the email of a user who holds the owner role (see `owners remove`).
  */
 import { type Database, invites, user, userRoles } from "@radard/db";
 import { and, eq, isNull } from "drizzle-orm";
@@ -22,7 +22,7 @@ export function parseRole(v: string): InviteRole {
   throw new Error(`--role phải là owner hoặc member, nhận "${v}"`);
 }
 
-/** Lời mời đã có thì giữ nguyên (kể cả role); `role` trả về là role đang lưu. */
+/** An existing invite is kept as it is (including its role); the returned `role` is the one stored. */
 export async function addInvite(
   db: Database,
   email: string,

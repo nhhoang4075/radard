@@ -1,6 +1,6 @@
 /**
- * Quản lý owner và nối hồ sơ (CLI `owners`, `owners add|remove`, `profiles relink`). Owner nằm trong DB
- * (`user_roles`), không nằm trong biến môi trường. Email luôn chuẩn hoá chữ thường.
+ * Owner management and profile linking (CLI `owners`, `owners add|remove`, `profiles relink`). Owners live in the DB
+ * (`user_roles`), not in environment variables. Emails are always lowercased.
  */
 import { type Database, invites, profile, user, userRoles } from "@radard/db";
 import { and, eq, ne, sql } from "drizzle-orm";
@@ -26,7 +26,7 @@ export type AddOwnerResult =
   | { email: string; kind: "granted" | "already" }
   | { email: string; kind: "invited" | "invite_updated" };
 
-/** User đã có: cấp owner. Chưa có: tạo (hoặc nâng) lời mời role=owner để người đó đăng nhập là thành owner. */
+/** User exists: grant owner. Not yet: create (or upgrade) an invite with role=owner, so that person becomes an owner when signing in. */
 export async function addOwner(db: Database, email: string): Promise<AddOwnerResult> {
   const e = must(email);
   return db.transaction(async (tx) => {
@@ -51,17 +51,17 @@ export async function addOwner(db: Database, email: string): Promise<AddOwnerRes
     }
     if (inv.role === "owner" && inv.usedAt === null)
       return { email: e, kind: "invite_updated" } as const;
-    // Lời mời member, hoặc lời mời đã dùng mà user không còn (đã thu hồi): mở lại với role owner.
+    // A member invite, or a used invite whose user is gone (revoked): reopen it with role owner.
     await tx.update(invites).set({ role: "owner", usedAt: null }).where(eq(invites.id, inv.id));
     return { email: e, kind: "invite_updated" } as const;
   });
 }
 
-/** Xoá dòng role owner (không xoá user). Từ chối khi đó là owner cuối cùng. */
+/** Deletes the owner role row (does not delete the user). Refuses when this is the last owner. */
 export async function removeOwner(db: Database, email: string): Promise<{ email: string }> {
   const e = must(email);
   return db.transaction(async (tx) => {
-    // Khoá mọi dòng owner: hai lệnh gỡ đồng thời không cùng thấy "còn người khác".
+    // Lock every owner row: two concurrent removals must not both see "someone else still remains".
     const owners = await tx
       .select({ userId: userRoles.userId, email: user.email })
       .from(userRoles)
@@ -80,16 +80,16 @@ export interface RelinkPlan {
   profileId: number;
   email: string;
   userId: string;
-  /** User đang giữ hồ sơ này (sẽ bị gỡ); null nếu hồ sơ chưa có chủ. */
+  /** The user currently holding this profile (will be unlinked); null if the profile has no owner. */
   previousUser: { id: string; email: string | null } | null;
-  /** Hồ sơ đã thuộc đúng user đó rồi: không có gì để đổi. */
+  /** The profile already belongs to that exact user: nothing to change. */
   noop: boolean;
   applied: boolean;
 }
 
 /**
- * Đặt `profile.user_id` = user có email đó. Hồ sơ phải tồn tại; user phải tồn tại và chưa có hồ sơ khác.
- * `apply=false` chỉ trả điều sẽ xảy ra. User cũ của hồ sơ bị gỡ (hồ sơ cũ của họ không còn chủ).
+ * Sets `profile.user_id` to the user with that email. The profile must exist; the user must exist and not yet have another profile.
+ * `apply=false` only reports what would happen. The profile's previous user is removed from it (their old profile then has no owner).
  */
 export async function relinkProfile(
   db: Database,

@@ -1,17 +1,17 @@
 /**
- * Repo GitHub đang nổi (github-theo-doi.html, quyết định 11/10/2026): hai nguồn PHÁT HIỆN repo.
+ * GitHub repos currently trending (github-theo-doi.html, decision 11/10/2026): two sources that DISCOVER repos.
  *
- *   github_new_repos  Search API: repo tạo trong N ngày đã có nhiều sao. Có luật lọc rác (6A).
- *   github_trending   Trang github.com/trending (HTML). robots.txt của GitHub cấm `?since=…`
- *                     (đọc 13/10/2026), nên chỉ đọc `/trending`, tức bảng theo ngày.
+ *   github_new_repos  Search API: repos created within N days that already have many stars. Has a spam filter (6A).
+ *   github_trending   The github.com/trending page (HTML). GitHub's robots.txt forbids `?since=…`
+ *                     (read 13/10/2026), so only `/trending` is read, i.e. the per-day table.
  *
- * Mỗi repo là một tài liệu: `external_id` = `owner/repo`, `url` = trang repo. Repo cũng được đăng
- * trên HN thì tự vào cùng sự kiện nhờ trùng URL. README không lấy ở đây: job `pages` tải trang repo
- * (`articleUrl`) như với link của bài HN, job process embed mô tả cùng phần chữ của README.
+ * Each repo is one document: `external_id` = `owner/repo`, `url` = the repo page. A repo also posted
+ * on HN joins the same event automatically thanks to the matching URL. The README is not fetched here: the `pages` job downloads the repo page
+ * (`articleUrl`) just like the link of an HN story; the process job embeds the same text as the README description.
  *
- * `published_at` để trống: với repo, "mới" là lúc radard thấy nó nổi, không phải ngày tạo repo
- * (repo tạo 5 ngày trước, hôm nay mới đủ sao, vẫn là tin của hôm nay). Lần sau thấy lại cùng repo
- * thì không thêm tài liệu, nên một repo chỉ vào điểm tin một lần.
+ * `published_at` is left empty: for repos, "new" means when radard saw it trending, not the repo creation date
+ * (a repo created 5 days ago that only just got enough stars is still today's news). A repo seen again later
+ * adds no document, so a repo enters the news only once.
  */
 import type { HttpClient, RawItem, RepoObservation, Signals, SourceAdapter } from "@radard/core";
 import { parseHTML } from "linkedom";
@@ -35,9 +35,9 @@ const repoTitle = (fullName: string, description: string | null | undefined) =>
   description?.trim() ? `${fullName}: ${description.trim()}` : fullName;
 
 /**
- * Dấu hiệu rác (github-theo-doi.html tab 04, 11/10/2026: 11/60 repo mới khớp): chỉ có README
- * (dưới 10 KB), không ai fork, mà đã 300 sao trở lên, tức sao bị bơm. Vẫn lưu, nhưng
- * `meta.suspicious` để không vào điểm tin. `size` của GitHub tính bằng KB.
+ * Spam signal (github-theo-doi.html tab 04, 11/10/2026: 11/60 new repos matched): only a README
+ * (under 10 KB), no forks, yet 300 or more stars, i.e. stars were inflated. Still stored, but
+ * `meta.suspicious` keeps it out of the news score. GitHub's `size` is in KB.
  */
 export function isSuspicious(r: { size: number; forks: number; stars: number }): boolean {
   return r.size < 10 && r.forks === 0 && r.stars >= 300;
@@ -61,11 +61,11 @@ const ageDays = (createdAt: string, now: number) =>
 // github_new_repos
 
 export interface NewReposConfig {
-  /** Repo tạo trong chừng này ngày. */
+  /** Repos created within this many days. */
   createdDays?: number;
-  /** Ít nhất chừng này sao mới tính là "nổi". */
+  /** At least this many stars to count as "trending". */
   minStars?: number;
-  /** Lấy tối đa chừng này repo nhiều sao nhất mỗi lượt (100 mỗi trang Search API). */
+  /** Fetches at most this many of the most-starred repos per run (100 per Search API page). */
   maxRepos?: number;
 }
 
@@ -106,7 +106,7 @@ export function newRepoToItem(r: SearchRepo): RawItem {
   };
 }
 
-/** Số sao mới nhất và tuổi repo, một request mỗi repo (chỉ gọi cho repo đã qua cổng chủ đề). */
+/** Latest star count and repo age, one request per repo (only called for repos that passed the topic gate). */
 async function repoSignals(externalIds: string[], http: HttpClient): Promise<Map<string, Signals>> {
   const out = new Map<string, Signals>();
   const now = Date.now();
@@ -120,7 +120,7 @@ async function repoSignals(externalIds: string[], http: HttpClient): Promise<Map
       };
       out.set(id, { gh_stars: r.stargazers_count, gh_age_days: ageDays(r.created_at, now) });
     } catch {
-      // Repo bị xoá hay đổi tên: vắng mặt, công thức dùng độ nổi trung tính.
+      // Repo deleted or renamed: absent, so the formula uses a neutral trending score.
     }
   }
   return out;
@@ -148,8 +148,8 @@ export const githubNewReposSource: SourceAdapter<NewReposConfig, Record<string, 
   toText: readmeText,
   refreshSignals: repoSignals,
   /**
-   * Sao tăng trong 24 giờ do radard tự đo (`repo_stats`) nếu đã có; chưa có thì sao mỗi ngày kể từ
-   * khi tạo: repo mới nên tổng sao chia tuổi gần đúng tốc độ hiện tại. Hai cách cùng đơn vị sao/ngày.
+   * Stars gained in the last 24 hours, measured by radard itself (`repo_stats`) if available; otherwise stars per day since
+   * creation: a new repo's total stars divided by its age approximates its current rate. Both are in stars per day.
    */
   engagement(s) {
     const gain = measuredGain(s);
@@ -168,19 +168,19 @@ export interface TrendingRepo {
   description: string | null;
   language: string | null;
   stars: number;
-  /** `null`: dòng không có link fork (repo chưa ai fork thì GitHub có thể ẩn). */
+  /** `null`: the row has no fork link (GitHub may hide it for a repo nobody has forked). */
   forks: number | null;
   starsToday: number;
-  /** HTML gốc của dòng trên trang Trending: parser đổi thì đọc lại được. */
+  /** Original HTML of the row on the Trending page: if the parser changes, it can still be re-read. */
   html: string;
 }
 
 const num = (text: string | null | undefined) => Number((text ?? "").replace(/[^\d]/g, ""));
 
 /**
- * Đọc trang Trending. Kiểm tra hợp lý mỗi lượt (github-theo-doi.html tab 02: go-trending từng
- * đọc nhầm tổng sao thành "stars today" mà không báo lỗi): có ít nhất một repo, repo nào cũng có
- * "N stars today", và số đó không quá tổng sao. Sai thì ném lỗi, không lưu dữ liệu sai.
+ * Reads the Trending page. Sanity checks on every run (github-theo-doi.html tab 02: go-trending once
+ * misread total stars as "stars today" without reporting an error): there must be at least one repo, every repo must have
+ * "N stars today", and that number must not exceed the total stars. If not, throw an error and do not store wrong data.
  */
 export function parseTrending(html: string): TrendingRepo[] {
   const { document } = parseHTML(html);
@@ -234,10 +234,10 @@ async function getTrending(http: HttpClient): Promise<TrendingRepo[]> {
 }
 
 /**
- * Một lần đo cho mỗi repo trên trang, kể cả repo đã là tài liệu từ trước (fetch không thêm tài liệu
- * cho chúng, nhưng số đo hôm nay vẫn cần). Ghi lúc fetch chứ không ở `refreshSignals`: fetch chạy
- * đúng một lần mỗi ngày theo lịch và thấy cả trang, còn `refreshSignals` chỉ chạy lúc xếp hạng, cho
- * vài tài liệu ứng viên, và không có DB.
+ * One measurement per repo on the page, including repos that were already documents (fetch adds no document
+ * for them, but today's measurement is still needed). Recorded at fetch time rather than in `refreshSignals`: fetch runs
+ * exactly once a day on schedule and sees the whole page, while `refreshSignals` only runs at ranking time, for
+ * a few candidate documents, and has no DB.
  */
 export function trendingToStats(r: TrendingRepo): RepoObservation {
   return {
@@ -261,7 +261,7 @@ export const githubTrendingSource: SourceAdapter<Record<string, never>, Record<s
     };
   },
   toText: readmeText,
-  /** Đọc lại trang Trending (1 request): repo còn trên trang thì có số sao tăng hôm nay mới nhất. */
+  /** Re-reads the Trending page (1 request): repos still on it get the most recent stars-today figure. */
   async refreshSignals(externalIds, http) {
     const wanted = new Set(externalIds);
     const out = new Map<string, Signals>();
@@ -270,18 +270,18 @@ export const githubTrendingSource: SourceAdapter<Record<string, never>, Record<s
     }
     return out;
   },
-  /** Sao tăng 24 giờ tự đo nếu đã có, không thì số GitHub báo ("N stars today"). */
+  /** Stars gained in 24 hours as measured by radard if available, otherwise the number GitHub reports ("N stars today"). */
   engagement: (s) => measuredGain(s) ?? s.gh_stars_today ?? null,
   articleUrl: (_id, url) => url,
 };
 
 // ---------------------------------------------------------------------------------------------
-// Chụp số sao (job repo_stats)
+// Star snapshot (repo_stats job)
 
 /**
- * Tín hiệu `gh_gain_24h` (và `gh_accel_24h`) không do adapter lấy mà do job signals tính từ
- * `repo_stats` (xem `repoStatsSignals` trong jobs/repo-stats.ts): adapter không có DB. Số âm (bị bỏ
- * sao) tính là 0, vì độ nổi phải cộng được và không âm.
+ * The `gh_gain_24h` signal (and `gh_accel_24h`) is not fetched by the adapter but computed by the signals job from
+ * `repo_stats` (see `repoStatsSignals` in jobs/repo-stats.ts): the adapter has no DB. Negative numbers (lost stars) count as
+ * 0, because the trending score must be additive and non-negative.
  */
 function measuredGain(s: Signals): number | null {
   return s.gh_gain_24h === undefined ? null : Math.max(0, s.gh_gain_24h);
@@ -296,12 +296,12 @@ export interface StarCount {
 }
 
 /**
- * Số sao và fork hiện tại của nhiều repo qua GraphQL API: mỗi request một truy vấn có bí danh
- * (`r0: repository(owner:, name:) {…}`) cho tối đa `batchSize` repo, nên ~1.800 repo chỉ tốn ~18
- * request (github-theo-doi.html tab 06). Cần `GITHUB_TOKEN`: GraphQL không cho gọi ẩn danh.
+ * Current star and fork counts for many repos via the GraphQL API: each request is one aliased query
+ * (`r0: repository(owner:, name:) {…}`) for up to `batchSize` repos, so ~1.800 repos cost only ~18
+ * requests (github-theo-doi.html tab 06). Needs `GITHUB_TOKEN`: GraphQL does not allow anonymous calls.
  *
- * Repo bị xoá hay đổi tên thì GraphQL trả `null` cho bí danh đó kèm một mục trong `errors`: vắng
- * mặt trong kết quả, không làm hỏng cả lô. Lô không có `data` (token sai, truy vấn hỏng) thì ném lỗi.
+ * A deleted or renamed repo makes GraphQL return `null` for its alias, with an entry in `errors`: it is absent
+ * from the results and does not break the whole batch. A batch with no `data` (bad token, broken query) throws an error.
  */
 export async function fetchStarCounts(
   repos: string[],
@@ -314,7 +314,7 @@ export async function fetchStarCounts(
     const batch = valid.slice(i, i + batchSize);
     const fields = batch.map((r, j) => {
       const [, owner, name] = REPO_NAME.exec(r) ?? [];
-      // Chuỗi JSON cũng là chuỗi GraphQL hợp lệ, nên JSON.stringify đủ để escape.
+      // A JSON string is also a valid GraphQL string, so JSON.stringify is enough for escaping.
       return `r${j}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { stargazerCount forkCount }`;
     });
     const res = await http.post(GRAPHQL_URL, JSON.stringify({ query: `{ ${fields.join(" ")} }` }), {

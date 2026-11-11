@@ -1,9 +1,9 @@
 /**
- * Feed web (docs/cau-truc-web.html mục 4). Mount SAU `sessionMiddleware`; `profileId` chỉ lấy từ context
- * phiên. Không có SQL ở đây: mọi truy vấn là hàm của @radard/db nhận `profileId` bắt buộc.
+ * Web feed (docs/cau-truc-web.html section 4). Mounted AFTER `sessionMiddleware`; `profileId` is taken only from the session context
+ * session. No SQL here: every query is a function in @radard/db that requires `profileId`.
  *
  *   GET /api/feed?date=&cursor=&limit=  → 200 { snapshotId, date, total, items[], nextCursor } · 404 no_snapshot · 400
- *   GET /api/feed/dates                 → 200 { dates: [{ date, snapshotId, itemCount }] } (tối đa 60)
+ *   GET /api/feed/dates                 → 200 { dates: [{ date, snapshotId, itemCount }] } (max 60)
  */
 import {
   type Database,
@@ -31,7 +31,7 @@ const query = z.object({
     .optional(),
 });
 
-/** Con trỏ không trong suốt với client: gắn với bản chụp để không dùng nhầm sang ngày khác. */
+/** The cursor is not transparent to the client: it is bound to a snapshot so it cannot be used for another day by mistake. */
 export function encodeCursor(snapshotId: number, after: number): string {
   return Buffer.from(`c1:${snapshotId}:${after}`).toString("base64url");
 }

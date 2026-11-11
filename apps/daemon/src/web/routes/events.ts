@@ -1,11 +1,11 @@
 /**
- * POST /api/events/:id/for-me: câu "Với tôi?" của sự kiện cho hồ sơ của phiên (quyết định 11/11/2026).
- * Mount SAU `sessionMiddleware`. `profileId` chỉ lấy từ context phiên, không từ request; sự kiện phải
- * nằm trong feed của chính hồ sơ đó (`explainForProfile` kiểm), không thì 404 và không gọi model.
+ * POST /api/events/:id/for-me: the event's "Với tôi?" text for the session's profile (decision 11/11/2026).
+ * Mounted AFTER `sessionMiddleware`. `profileId` is taken only from the session context, never from the request; the event must
+ * be in that profile's own feed (checked by `explainForProfile`), otherwise return 404 and do not call the model.
  *
- *   GET /api/events/:id → 200 chi tiết sự kiện (chỉ khi nằm trong feed của hồ sơ) · 404 not_found
+ *   GET /api/events/:id → 200 event details (only if in the profile's feed) · 404 not_found
  *
- *   200 { text, cached } · 404 không thuộc hồ sơ · 429 hết hạn mức · 503 chưa cấu hình model / model lỗi
+ *   200 { text, cached } · 404 not in the profile · 429 quota exceeded · 503 model not configured / model error
  */
 import type { LlmProvider } from "@radard/core";
 import { type Database, feedItemForEvent } from "@radard/db";
@@ -39,7 +39,7 @@ export function eventsRoute(deps: {
           ])
         ).get(eventId) ?? []
       ).slice(0, MAX_DOCS);
-      // Dòng "vì sao" như digest.ts dựng, không dùng model.
+      // The "why" line built the same way as digest.ts, without using a model.
       const why = [
         view.updated ? "Cập nhật" : null,
         view.topic ? `Chủ đề: ${view.topic}` : null,

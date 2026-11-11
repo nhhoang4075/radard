@@ -1,26 +1,26 @@
 /**
- * Hacker News qua API Algolia (`search_by_date`), lấy mọi story mới từ lần chạy trước.
+ * Hacker News via the Algolia API (`search_by_date`), fetching every new story since the last run.
  *
- * Lấy hết chứ không lọc theo từ khoá ở đây: lọc là việc của job process (embedding), và lọc sớm
- * bằng từ khoá sẽ bỏ sót những bài về AI mà tiêu đề không chứa từ nào trong danh sách.
- * Khoảng 30 story mỗi giờ, nên lưu hết vẫn rẻ.
+ * Fetch everything here without keyword filtering: filtering is the job of the process job (embedding), and filtering early
+ * by keyword would drop AI stories whose titles contain none of the listed words.
+ * About 30 stories per hour, so storing them all is still cheap.
  */
 import { type RawItem, type Signals, type SourceAdapter, walkWindows } from "@radard/core";
 
 export interface HnConfig {
-  /** Lần chạy đầu lấy lùi bao nhiêu giờ. */
+  /** How many hours back the first run looks. */
   backfillHours?: number;
-  /** `story` (mặc định), hoặc `show_hn`, `ask_hn`… theo tag của Algolia. */
+  /** `story` (default), or `show_hn`, `ask_hn`… by Algolia tag. */
   tag?: string;
-  /** Trần số story mỗi lượt khi bắt kịp sau thời gian tắt. Mặc định 10.000 (~100 request). */
+  /** Upper bound on stories per run when catching up after downtime. Default 10.000 (~100 requests). */
   maxPerRun?: number;
 }
 
 export interface HnState {
   /**
-   * Mọi story có `created_at_i` tới mốc này (giây Unix) đã được lấy đủ. KHÔNG phải "story
-   * mới nhất đã thấy": con trỏ kiểu đó nhảy qua lỗ hổng khi một lượt chạm giới hạn 1.000
-   * kết quả (đã mất 7.367 story khi daemon tắt 28/09–06/10).
+   * Every story with `created_at_i` up to this mark (Unix seconds) has been fully fetched. NOT "the latest
+   * story seen": a cursor like that skips gaps when a run hits the 1.000-result limit
+   * (7.367 stories were lost while the daemon was down, 28/09–06/10).
    */
   lastCreatedAt: number;
 }
@@ -45,15 +45,15 @@ interface HnSearch {
 
 const API = "https://hn.algolia.com/api/v1/search_by_date";
 const SEARCH_API = "https://hn.algolia.com/api/v1/search";
-/** Lấy lại điểm theo lô id: `tags=story,(story_1,story_2,…)`, 50 id mỗi request. */
+/** Re-fetches points for a batch of ids: `tags=story,(story_1,story_2,…)`, 50 ids per request. */
 export const SIGNAL_BATCH = 50;
 const PAGE_SIZE = 100;
-/** Algolia chỉ cho phân trang tới 1.000 kết quả mỗi truy vấn: cửa sổ nào nhiều hơn thì thu hẹp. */
+/** Algolia pages through at most 1.000 results per query: a window with more is split into smaller ones. */
 const WINDOW_CAP = 1000;
 const DEFAULT_MAX = 10_000;
 /**
- * Lùi con trỏ một chút: story đăng sát lúc lượt trước chạy có thể chưa kịp vào index của
- * Algolia. Trùng thì khoá (source_id, external_id) tự bỏ.
+ * Move the cursor back a bit: a story posted just before the previous run may not yet be in the
+ * Algolia index. Duplicates are dropped by the (source_id, external_id) key.
  */
 const OVERLAP_SECONDS = 300;
 
@@ -65,7 +65,7 @@ export function hitToItem(hit: HnHit): RawItem {
   const discussion = hnItemUrl(hit.objectID);
   return {
     externalId: hit.objectID,
-    // Ask HN không có link ngoài: lấy chính trang thảo luận.
+    // Ask HN has no external link: use the discussion page itself.
     url: hit.url || discussion,
     title: hit.title ?? undefined,
     publishedAt: new Date(hit.created_at_i * 1000),
@@ -80,7 +80,7 @@ export function hitToItem(hit: HnHit): RawItem {
   };
 }
 
-/** Bỏ thẻ HTML và giải mã vài thực thể thường gặp trong `story_text` của Ask/Show HN. */
+/** Strips HTML tags and decodes a few common entities in the `story_text` of Ask/Show HN. */
 function stripHtml(html: string): string {
   return html
     .replace(/<[^>]+>/g, " ")
@@ -93,7 +93,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/** URL lấy lại điểm và bình luận mới nhất cho một lô story id. */
+/** URL that re-fetches points and the latest comments for a batch of story ids. */
 export function signalsUrl(ids: string[]): string {
   const params = new URLSearchParams({
     tags: `story,(${ids.map((id) => `story_${id}`).join(",")})`,
@@ -119,19 +119,19 @@ export const hnSource: SourceAdapter<HnConfig, HnState> = {
     return out;
   },
   /**
-   * Điểm + 0,5 × bình luận. Bình luận là tín hiệu "đang được bàn", khác "thấy hay", nhưng dễ bị
-   * thổi phồng bởi tranh cãi, nên chỉ tính nửa (xep-hang.html tab 02).
+   * Points + 0.5 × comments. Comments signal that a story is "being discussed", which differs from "found it good", but
+   * they can be inflated by controversy, so only half counts (xep-hang.html tab 02).
    */
   engagement(s) {
     return (s.hn_points ?? 0) + 0.5 * (s.hn_comments ?? 0);
   },
   discussionUrl(externalId, url) {
     const item = hnItemUrl(externalId);
-    // Ask HN: bài gốc đã là trang thảo luận.
+    // Ask HN: the original post is already the discussion page.
     return url === item ? null : item;
   },
   articleUrl(externalId, url) {
-    // 13/10/2026: 91,5% bài HN chỉ có tiêu đề để embed; nội dung nằm ở trang được link tới.
+    // 13/10/2026: 91.5% of HN stories have only a title to embed; the content is on the linked page.
     return url === hnItemUrl(externalId) ? null : url;
   },
   toText(body, title) {
@@ -170,7 +170,7 @@ export const hnSource: SourceAdapter<HnConfig, HnState> = {
         return hits.map(hitToItem);
       },
     });
-    // Không lùi con trỏ: lượt đầu không có gì thì giữ mốc cũ (hoặc mốc bắt đầu).
+    // Do not move the cursor: if the first run finds nothing, keep the old mark (or the start mark).
     const covered = Math.max(walked.coveredUntil, state?.lastCreatedAt ?? start);
     return {
       items: walked.items,

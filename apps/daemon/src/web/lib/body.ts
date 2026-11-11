@@ -1,6 +1,6 @@
 /**
- * Đọc thân request thành JSON bất kể content-type (`navigator.sendBeacon` có thể gửi text/plain),
- * có giới hạn kích thước: quá giới hạn thì dừng đọc ngay, không gom hết vào bộ nhớ.
+ * Reads the request body as JSON regardless of content-type (`navigator.sendBeacon` may send text/plain),
+ * with a size limit: once over the limit, reading stops immediately rather than buffering everything in memory.
  */
 import type { Context } from "hono";
 

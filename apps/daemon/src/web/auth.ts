@@ -1,15 +1,15 @@
 /**
- * Đăng nhập web bằng Better Auth (1.6.23): adapter Drizzle trên Postgres, GitHub và Google.
- * Owner nằm trong DB (`user_roles`), không nằm trong biến môi trường (quyết định 11/11/2026).
+ * Web sign-in with Better Auth (1.6.23): Drizzle adapter on Postgres, GitHub and Google.
+ * Owners live in the DB (`user_roles`), not in environment variables (decision 11/11/2026).
  *
- * Hai hook của `databaseHooks`, cả hai FAIL-CLOSED (lỗi hay không rõ thì từ chối):
- *  - `user.create.before`: chỉ email đã xác minh VÀ (có lời mời chưa dùng, HOẶC nằm trong
- *    `BOOTSTRAP_OWNER_EMAILS` và DB chưa có owner nào) mới được tạo user.
- *  - `user.create.after` (và `session.create.before` làm lưới an toàn, vì hook "after" chạy sau giao
- *    dịch nên có thể hỏng riêng): bảo đảm user có hồ sơ, trong một giao dịch dưới khoá tư vấn.
- *    Đường bootstrap (chưa có owner): gán role owner và nhận hồ sơ chưa có chủ nhỏ nhất (tạo mới nếu
- *    không có). Đường lời mời: role lấy từ `invites.role`, luôn một hồ sơ trống MỚI. Không bao giờ nhận
- *    hồ sơ đã có `user_id`.
+ * Two hooks of `databaseHooks`, both FAIL-CLOSED (on error or unclear result they reject):
+ *  - `user.create.before`: only a verified email AND (an unused invite, OR an email listed in
+ *    `BOOTSTRAP_OWNER_EMAILS` while the DB has no owner) may create a user.
+ *  - `user.create.after` (and `session.create.before` as a safety net, since the "after" hook runs after the transaction and can fail on its own):
+ *    ensures the user has a profile, in one transaction under an advisory lock.
+ *    Bootstrap path (no owner yet): assign the owner role and take the smallest unowned profile (create one if none
+ *    exists). Invite path: the role comes from `invites.role`, always a NEW empty profile. Never takes
+ *    a profile that already has a `user_id`.
  */
 import { createLogger } from "@radard/core";
 import {
@@ -32,7 +32,7 @@ import { PROFILE_LOCK_KEY } from "./profile-lock.ts";
 
 const log = createLogger("web:auth");
 
-/** Mã lỗi ngắn để log (thông điệp của driver kèm tham số truy vấn, có email). */
+/** Short error code for the log (the driver message includes query parameters, including the email). */
 function errCode(err: unknown): string {
   const cause = (err as { cause?: { code?: unknown } } | null)?.cause;
   return typeof cause?.code === "string" ? cause.code : err instanceof Error ? err.name : "unknown";
@@ -44,12 +44,12 @@ export interface HookUser {
   emailVerified?: unknown;
 }
 
-/** Từ chối việc tạo user (fail-closed). Không nêu lý do cụ thể ra ngoài. */
+/** Rejects user creation (fail-closed). The specific reason is not disclosed outside. */
 export class SignUpDenied extends Error {}
 
 type Executor = Pick<Database, "select">;
 
-/** Đã có ít nhất một owner trong DB chưa. Lỗi (thiếu bảng...) thì ném, người gọi từ chối. */
+/** Whether the DB has at least one owner yet. An error (e.g. missing table) throws, and the caller rejects. */
 async function hasOwner(q: Executor): Promise<boolean> {
   const [row] = await q
     .select({ userId: userRoles.userId })
@@ -60,8 +60,8 @@ async function hasOwner(q: Executor): Promise<boolean> {
 }
 
 /**
- * Cho phép tạo user khi email đã xác minh và (được mời, hoặc nằm trong `bootstrapOwnerEmails` khi chưa có
- * owner nào). Mọi nhánh còn lại, kể cả lỗi truy vấn hay thiếu bảng, đều ném `SignUpDenied`.
+ * Allows creating a user when the email is verified and (invited, or listed in `bootstrapOwnerEmails` while there is no
+ * owner). Every other branch, including query errors or a missing table, throws `SignUpDenied`.
  */
 export async function assertMaySignUp(
   db: Database,
@@ -87,12 +87,12 @@ export async function assertMaySignUp(
 }
 
 /**
- * Bảo đảm user có hồ sơ (idempotent). Trả id hồ sơ. Role và hồ sơ được ghi trong cùng một giao dịch.
- *  - Đã có hồ sơ gắn user này: trả luôn.
- *  - Trong giao dịch (khoá tư vấn, kiểm lại bên trong): email nằm trong `bootstrapOwnerEmails` VÀ chưa có
- *    owner nào → gán owner, nhận hồ sơ chưa có chủ (`user_id` NULL) có id nhỏ nhất, không có thì tạo mới.
- *  - Ngược lại cần lời mời (đã dùng hay chưa đều được; bị thu hồi thì không): role lấy từ `invites.role`,
- *    luôn tạo hồ sơ trống MỚI (id = max + 1), không bao giờ nhận hồ sơ cũ.
+ * Ensures the user has a profile (idempotent). Returns the profile id. The role and profile are written in the same transaction.
+ *  - Already has a profile linked to this user: return it.
+ *  - Inside the transaction (advisory lock, rechecked inside): the email is in `bootstrapOwnerEmails` AND there is no
+ *    owner yet → assign owner, take the unowned profile (`user_id` NULL) with the smallest id, create one if none exists.
+ *  - Otherwise an invite is required (used or unused both work; revoked does not): the role comes from `invites.role`,
+ *    always create a NEW empty profile (id = max + 1), never take an old profile.
  */
 export async function ensureProfileForUser(
   db: Database,
@@ -129,7 +129,7 @@ export async function ensureProfileForUser(
     let role: "owner" | "member";
     let profileId: number | null = null;
     if (bootstrapOwnerEmails.includes(email) && !(await hasOwner(tx))) {
-      // Đường bootstrap: nhận hồ sơ chưa có chủ nhỏ nhất.
+      // Bootstrap path: take the smallest unowned profile.
       role = "owner";
       const [free] = await tx
         .select({ id: profile.id })
@@ -143,9 +143,9 @@ export async function ensureProfileForUser(
         profileId = free.id;
       }
     } else {
-      // Đường lời mời: lời mời phải còn trong bảng (đã dùng hay chưa đều được); bị thu hồi thì không.
+      // Invite path: the invite must still be in the table (used or unused both work); a revoked invite does not.
       if (!inv) throw new Error("không có lời mời cho email này, không tạo hồ sơ");
-      // Quyền owner chỉ lấy từ lời mời CHƯA dùng: lời mời đã dùng không được cấp lại owner (vd. sau `owners remove` + `profiles relink`).
+      // Owner rights come only from an UNUSED invite: a used invite must never re-grant owner (e.g. after `owners remove` + `profiles relink`).
       role = inv.role === "owner" && inv.usedAt === null ? "owner" : "member";
     }
     if (profileId === null) {
@@ -172,7 +172,7 @@ export async function ensureProfileForUser(
 export interface CreateAuthOptions {
   db: Database;
   config: AuthConfig;
-  /** Chỉ test: plugin phụ (ví dụ `testUtils`). Không bao giờ truyền ở luồng thật. */
+  /** Tests only: extra plugins (e.g. `testUtils`). Never passed in the real flow. */
   plugins?: NonNullable<Parameters<typeof betterAuth>[0]>["plugins"];
 }
 
@@ -195,7 +195,7 @@ export function createAuth({ db, config, plugins }: CreateAuthOptions) {
       schema: { user: userTable, session, account, verification },
     }),
     socialProviders,
-    // Lỗi đăng nhập (ví dụ chưa được mời) quay về trang đăng nhập kèm `?error=…`.
+    // Sign-in errors (e.g. not invited) redirect to the sign-in page with `?error=…`.
     onAPIError: { errorURL: `${config.baseURL}/login` },
     advanced: {
       useSecureCookies: https,
@@ -218,8 +218,8 @@ export function createAuth({ db, config, plugins }: CreateAuthOptions) {
       },
       session: {
         create: {
-          // Lưới an toàn: user đã tạo nhưng bước "after" hỏng thì lần đăng nhập sau nối lại hồ sơ.
-          // Nối không được thì không cấp phiên.
+          // Safety net: the user was created but the "after" step failed, so the next sign-in re-links the profile.
+          // If linking fails, do not issue a session.
           before: async (s) => {
             try {
               const [u] = await db

@@ -1,2 +1,2 @@
-/** Khoá tư vấn: tạo, nối hồ sơ và đổi owner chạy tuần tự, nên hai lần đăng nhập đồng thời không nối trùng. */
+/** Advisory lock: creating, linking and changing owners run sequentially, so two concurrent sign-ins cannot link the same profile twice. */
 export const PROFILE_LOCK_KEY = 7_302_419;
