@@ -1,8 +1,8 @@
 /**
- * Bảng đăng nhập của Better Auth (bản 1.6.23): user, session, account, verification.
- * Tên bảng và trường theo đúng schema thư viện sinh ra (adapter Drizzle tra theo tên trường), nên
- * KHÔNG đổi tên ở đây. `user.id` là chuỗi do thư viện tạo, không liên quan `profile.id`.
- * Nối user với hồ sơ qua `profile.user_id` (xem `profile.ts`), không qua bảng này.
+ * Better Auth login tables (version 1.6.23): user, session, account, verification.
+ * Table and field names follow exactly the schema the library generates (the Drizzle adapter looks up by field name), so
+ * do NOT rename them here. `user.id` is a string created by the library, unrelated to `profile.id`.
+ * A user is linked to a profile via `profile.user_id` (see `profile.ts`), not through this table.
  */
 import { sql } from "drizzle-orm";
 import { boolean, check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
@@ -70,9 +70,9 @@ export const verification = pgTable(
 );
 
 /**
- * Vai trò của user (quyết định 11/11/2026: owner nằm trong DB, không nằm trong biến môi trường).
- * Chưa có dòng = thành viên thường; dòng `owner` = chủ dự án (có thể nhiều người). Gỡ user thì dòng
- * này mất theo (cascade); người cấp vai trò bị xoá thì `granted_by_user_id` về NULL.
+ * User role (decision 11/11/2026: owner lives in the DB, not in an environment variable).
+ * No row = regular member; an `owner` row = project owner (can be several people). Removing a user makes the row
+ * go too (cascade); if the user who granted a role is deleted, `granted_by_user_id` becomes NULL.
  */
 export const userRoles = pgTable(
   "user_roles",

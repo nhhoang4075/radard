@@ -1,8 +1,8 @@
 /**
- * ObjectStore ghi ra đĩa. Dùng khi dev và trong test; trên Railway thay bằng R2.
+ * ObjectStore writes to disk. Used in dev and tests; on Railway it is replaced by R2.
  *
- * Nội dung được nén gzip ở đây chứ không ở lõi, vì R2 có thể muốn nén khác (hoặc để
- * Cloudflare tự nén). Key đã có đuôi `.gz` nên hai adapter vẫn đọc được bản của nhau.
+ * Content is gzip-compressed here rather than in the core, because R2 may want to compress differently (or to let
+ * Cloudflare do it itself). Keys already carry the `.gz` suffix, so both adapters can still read each other's copies.
  */
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";

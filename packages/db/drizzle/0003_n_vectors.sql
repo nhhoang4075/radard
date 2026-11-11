@@ -1,7 +1,7 @@
 ALTER TABLE "events" ADD COLUMN "n_vectors" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
 
--- Sự kiện đã có: đếm lại số vector đã góp vào tâm (seed + gộp theo vector), bỏ gộp vì cùng URL.
--- Tâm của các sự kiện này đã tính với trọng số n_docs (có thể lệch); `layer2 recluster` dựng lại đúng.
+-- Existing events: recount the vectors contributed to the centroid (seed + merged by vector), drop the merge for the same URL.
+-- Centroids of these events were computed with n_docs weights (may be off); `layer2 recluster` rebuilds them correctly.
 UPDATE "events" e
    SET "n_vectors" = c.n
   FROM (SELECT "event_id", count(*)::int AS n

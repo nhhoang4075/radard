@@ -1,8 +1,8 @@
 /**
- * Dữ liệu thu thập. Chỉ ghi thêm; không bảng nào ở đây bị sửa bởi xử lý phía sau.
+ * Collected data. Append-only; no table here is modified by later processing.
  *
- * `documents` giữ metadata; nội dung gốc nằm trong ObjectStore theo `raw_key`. Như vậy
- * Postgres gọn, và xử lý lại chỉ cần đọc lại bản thô chứ không cào lại nguồn.
+ * `documents` holds metadata; the original content lives in ObjectStore under `raw_key`. This way
+ * Postgres stays lean, and reprocessing only needs to re-read the raw copy instead of re-crawling the source.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -24,16 +24,16 @@ export const sources = pgTable("sources", {
   kind: text("kind").notNull(),
   name: text("name").notNull().unique(),
   config: jsonb("config").notNull().default(sql`'{}'::jsonb`),
-  /** Biểu thức cron, giờ UTC. */
+  /** Cron expression, UTC time. */
   cadence: text("cadence").notNull(),
   enabled: boolean("enabled").notNull().default(true),
-  /** Vai trò mặc định của tài liệu từ nguồn này: primary | technical | press | community | aggregator. */
+  /** Default role of documents from this source: primary | technical | press | community | aggregator. */
   defaultRole: text("default_role").notNull().default("community"),
   trustScore: real("trust_score").notNull().default(0.5),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Trạng thái do adapter tự quản (con trỏ, ETag…), lõi không đọc bên trong. */
+/** State managed by the adapter itself (cursors, ETags…); the core does not read inside it. */
 export const sourceState = pgTable("source_state", {
   sourceId: integer("source_id")
     .primaryKey()
@@ -53,13 +53,13 @@ export const fetchRuns = pgTable(
       .references(() => sources.id, { onDelete: "cascade" }),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
-    /** running | ok | not_modified | behind (chưa bắt kịp hiện tại, xem `note`) | error */
+    /** running | ok | not_modified | behind (not caught up to the latest, see `note`) | error */
     status: text("status").notNull().default("running"),
     httpStatus: integer("http_status"),
     nFetched: integer("n_fetched").notNull().default(0),
     nNew: integer("n_new").notNull().default(0),
     error: text("error"),
-    /** Ghi chú không phải lỗi, ví dụ vì sao lượt này chưa bắt kịp hiện tại. */
+    /** A note that is not an error, e.g. why this run has not caught up to the latest yet. */
     note: text("note"),
   },
   (t) => [index("fetch_runs_source_started_idx").on(t.sourceId, t.startedAt)],
@@ -75,9 +75,9 @@ export const documents = pgTable(
     externalId: text("external_id").notNull(),
     url: text("url").notNull(),
     urlCanonical: text("url_canonical").notNull(),
-    /** Tiêu đề ở ngôn ngữ gốc. */
+    /** Title in the original language. */
     title: text("title"),
-    /** Ngôn ngữ gốc (job process điền). Dữ liệu dẫn xuất luôn bằng tiếng Anh. */
+    /** Original language (filled in by the process job). Derived data is always in English. */
     lang: text("lang"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
@@ -95,23 +95,23 @@ export const documents = pgTable(
 );
 
 /**
- * Trang được tài liệu link tới (`SourceAdapter.articleUrl`), mỗi URL một dòng: năm lượt đăng lại
- * cùng một bài trên HN chỉ tải một lần. HTML gốc nằm trong ObjectStore theo `raw_key`; phần chữ
- * chính được rút lại mỗi lần embed (dữ liệu dẫn xuất), nên đổi bộ rút chữ không phải tải lại.
- * Tài liệu nối về đây qua `documents.url_canonical`, không cần khoá ngoại.
+ * Pages linked to by documents (`SourceAdapter.articleUrl`), one row per URL: five re-posts of
+ * the same article on HN are fetched only once. The original HTML lives in ObjectStore under `raw_key`; the text
+ * body is re-extracted at each embed (derived data), so changing the text extractor does not require re-fetching.
+ * Documents link here via `documents.url_canonical`; no foreign key needed.
  *
- * Trang không có nội dung riêng (Ask HN) cũng có một dòng `skipped`, để job process biết đã xét
- * xong và không chờ nữa.
+ * Pages with no content of their own (Ask HN) also get a `skipped` row, so the process job knows they were checked
+ * and stops waiting for them.
  */
 export const linkedPages = pgTable(
   "linked_pages",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
     urlCanonical: text("url_canonical").notNull().unique(),
-    /** Địa chỉ đã gửi request (của tài liệu đầu tiên link tới). */
+    /** Address the request was sent to (of the first document that linked to it). */
     url: text("url").notNull(),
     finalUrl: text("final_url"),
-    /** ok | blocked (robots.txt) | skipped (không phải HTML, hoặc không có trang ngoài) | failed */
+    /** ok | blocked (robots.txt) | skipped (not HTML, or no external page) | failed */
     status: text("status").notNull(),
     httpStatus: integer("http_status"),
     contentType: text("content_type"),
@@ -127,13 +127,13 @@ export const linkedPages = pgTable(
 );
 
 /**
- * Số sao của repo GitHub theo thời gian (github-theo-doi.html tab 05), mỗi lần đo một dòng, chỉ ghi
- * thêm. Không nằm trong `documents`: khoá (source_id, external_id) giữ một dòng mỗi repo, trong khi
- * số sao đổi mỗi ngày và cần giữ mọi lần đo để tính tăng trong 24 giờ và tăng tốc.
+ * GitHub repo star counts over time (github-theo-doi.html tab 05), one row per measurement, written
+ * only (append). Not in `documents`: the key (source_id, external_id) keeps one row per repo, while
+ * star counts change daily and every measurement must be kept to compute the 24-hour gain and acceleration.
  *
- * `repo` là `owner/repo` viết thường (GitHub không phân biệt hoa thường), để repo thấy qua Search,
- * Trending hay link trong bài HN là một. Không khoá ngoại sang `documents`: một repo có thể đến từ
- * nhiều tài liệu của nhiều nguồn.
+ * `repo` is `owner/repo` in lowercase (GitHub is case-insensitive), so a repo seen via Search,
+ * Trending or a link in an HN post is the same. No foreign key to `documents`: one repo can come from
+ * many documents from many sources.
  */
 export const repoStats = pgTable(
   "repo_stats",
@@ -142,11 +142,11 @@ export const repoStats = pgTable(
     repo: text("repo").notNull(),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
     stars: integer("stars").notNull(),
-    /** Dòng trên trang Trending có thể thiếu số fork, nên để trống được. */
+    /** Rows on the Trending page may lack the fork count, so it can be left empty. */
     forks: integer("forks"),
-    /** github_stars (radard tự chụp qua GraphQL) | trending_daily (đọc trang Trending) */
+    /** github_stars (radard captures it itself via GraphQL) | trending_daily (read from the Trending page) */
     source: text("source").notNull(),
-    /** Số tăng do nguồn tự báo ("N stars today" của Trending); radard tự chụp thì trống. */
+    /** Increase reported by the source itself ("N stars today" on Trending); empty when radard captures it itself. */
     reportedGain: integer("reported_gain"),
   },
   (t) => [

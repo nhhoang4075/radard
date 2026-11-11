@@ -1,15 +1,15 @@
 /**
- * Bảng giá model của Vercel AI Gateway, dùng để ƯỚC TÍNH chi phí khi Gateway không báo số
- * tiền của một lời gọi. Bình thường chi phí ghi vào `llm_calls` là số Gateway báo
- * (`providerMetadata.gateway.cost`); đây chỉ là dự phòng.
+ * Model price table of Vercel AI Gateway, used to ESTIMATE cost when Gateway does not report the
+ * money of a call. Normally the cost written to `llm_calls` is the number Gateway reports
+ * (`providerMetadata.gateway.cost`); this is only a fallback.
  *
- * Giá không phải một con số: chia bậc theo độ dài prompt (Haiku 5.5 gấp 5 lần từ 100 nghìn
- * token, gpt-6-luna từ 272 nghìn), có giá riêng cho token đọc/ghi cache. Nên đọc bảng giá thật
- * từ `GET /v1/models` (công khai, không cần khoá) thay vì cấu hình tay: đổi model là giá tự đúng.
+ * A price is not a single number: tiered by prompt length (Haiku 5.5 is 5x from 100 thousand
+ * tokens, gpt-6-luna from 272 thousand), with separate prices for cache read/write tokens. So read the real price table
+ * from `GET /v1/models` (public, no key needed) instead of configuring it by hand: changing the model gets the price right automatically.
  */
 
 export interface PriceTier {
-  /** USD mỗi token (chuỗi trong API, đổi sang số khi đọc). */
+  /** USD per token (a string in the API, converted to a number when read). */
   cost: number;
   min?: number;
   max?: number;
@@ -23,11 +23,11 @@ export interface ModelPrice {
 }
 
 export interface TokenUsage {
-  /** Tổng token đầu vào (gồm cả phần đọc/ghi cache): quyết định bậc giá. */
+  /** Total input tokens (including the cache read/write parts): decides the price tier. */
   input: number;
   cacheRead?: number;
   cacheWrite?: number;
-  /** Gồm cả token suy nghĩ ẩn: tính theo giá output. */
+  /** Includes hidden reasoning tokens: priced at the output rate. */
   output?: number;
 }
 
@@ -48,7 +48,7 @@ function tiers(raw: RawPrice, key: string): PriceTier[] {
   return typeof flat === "string" ? [{ cost: Number(flat) }] : [];
 }
 
-/** Đọc một mục `pricing` của `/v1/models` thành dạng dùng được. */
+/** Reads one `pricing` entry of `/v1/models` into a usable form. */
 export function parsePrice(raw: RawPrice): ModelPrice {
   return {
     input: tiers(raw, "input"),
@@ -59,8 +59,8 @@ export function parsePrice(raw: RawPrice): ModelPrice {
 }
 
 /**
- * Chọn bậc theo số token đầu vào của lời gọi. API ghi `max` của bậc dưới bằng `min` của bậc
- * trên (ví dụ 100001), nên coi `max` là cận trên không tính.
+ * Picks the tier by the call's input token count. The API writes the `max` of the lower tier equal to the `min` of the
+ * tier above (e.g. 100001), so `max` is treated as an exclusive upper bound.
  */
 function pick(list: PriceTier[], inputTokens: number): number {
   if (list.length === 0) return 0;
@@ -70,7 +70,7 @@ function pick(list: PriceTier[], inputTokens: number): number {
   return (hit ?? list[list.length - 1])?.cost ?? 0;
 }
 
-/** Chi phí ước tính (USD). Cùng một bậc cho đầu vào, đầu ra và cache, theo độ dài prompt. */
+/** Estimated cost (USD). One tier applies to input, output and cache, by prompt length. */
 export function estimateCost(price: ModelPrice, u: TokenUsage): number {
   const cacheRead = u.cacheRead ?? 0;
   const cacheWrite = u.cacheWrite ?? 0;
@@ -84,13 +84,13 @@ export function estimateCost(price: ModelPrice, u: TokenUsage): number {
 }
 
 export interface PriceBook {
-  /** `null` khi không có bảng giá (mạng lỗi, model lạ): lời gọi ghi chi phí là chưa biết. */
+  /** `null` when there is no price table (network error, unknown model): the call's cost is recorded as unknown. */
   estimate(model: string, usage: TokenUsage): Promise<number | null>;
 }
 
 const CATALOG = "https://ai-gateway.vercel.sh/v1/models";
 
-/** Bảng giá đọc từ Gateway, giữ trong bộ nhớ `ttlMs` (mặc định 1 ngày). */
+/** Price table read from Gateway, kept in memory for `ttlMs` (default 1 day). */
 export function gatewayPriceBook(opts: { ttlMs?: number; fetchFn?: typeof fetch } = {}): PriceBook {
   const ttl = opts.ttlMs ?? 86_400_000;
   const fetchFn = opts.fetchFn ?? fetch;
@@ -107,7 +107,7 @@ export function gatewayPriceBook(opts: { ttlMs?: number; fetchFn?: typeof fetch 
       cache = { at: Date.now(), prices };
       return prices;
     } catch {
-      // Lỗi mạng: dùng bảng cũ nếu có, nếu không thì chịu (chi phí ghi là chưa biết).
+      // Network error: use the old table if there is one, otherwise accept it (the cost is recorded as unknown).
       return cache?.prices ?? null;
     }
   }

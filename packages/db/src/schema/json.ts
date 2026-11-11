@@ -1,27 +1,27 @@
 /**
- * Cột JSONB. KHÔNG dùng `jsonb()` của Drizzle trực tiếp với driver `bun-sql`.
+ * JSONB columns. Do NOT use Drizzle's `jsonb()` directly with the `bun-sql` driver.
  *
- * `jsonb()` gọi `JSON.stringify` khi dựng tham số, rồi driver `bun-sql` stringify LẦN NỮA, nên
- * cột nhận về một CHUỖI chứa JSON (`"{\"a\":1}"`) thay vì object (`{"a": 1}`). Postgres không
- * kêu vì chuỗi cũng là JSON hợp lệ; Drizzle đọc ra thì parse lại, nên code TypeScript vẫn chạy
- * đúng. Cái hỏng là mọi thứ chạm cột bằng SQL, và hỏng IM LẶNG:
+ * `jsonb()` calls `JSON.stringify` when building the parameter, then the `bun-sql` driver stringifies AGAIN, so
+ * the column gets a STRING containing JSON (`"{\"a\":1}"`) instead of an object (`{"a": 1}`). Postgres does not
+ * complain, because a string is also valid JSON; Drizzle parses it again when reading, so TypeScript code still runs
+ * correctly. What breaks is anything touching the column with SQL, and it breaks SILENTLY:
  *
- *   config->>'minRelevance'        NULL, đáng lẽ 0.55
- *   config || '{"a":1}'::jsonb     ra một MẢNG rác, không báo lỗi
+ *   config->>'minRelevance'        NULL, should be 0.55
+ *   config || '{"a":1}'::jsonb     produces a junk ARRAY, with no error
  *
- * Đã dính ở radard ngày 28/09/2026: ngưỡng riêng theo nguồn đọc bằng SQL không có tác dụng.
- * Cùng lỗi và cùng cách sửa với `seongon-content` (`packages/db/src/schema/_common.ts`).
+ * Hit radard on 28/09/2026: per-source thresholds read via SQL had no effect.
+ * Same bug and same fix as `seongon-content` (`packages/db/src/schema/_common.ts`).
  *
- * `toDriver` để giá trị đi thẳng, driver serialize đúng MỘT lần. `fromDriver` nhận cả hai dạng
- * cho an toàn. Test `apps/daemon/test/jsonb.test.ts` canh không cột nào còn chứa chuỗi.
+ * `toDriver` passes the value straight through so the driver serializes exactly ONCE. `fromDriver` accepts both forms
+ * for safety. The test `apps/daemon/test/jsonb.test.ts` checks that no column still contains a string.
  */
 import { customType } from "drizzle-orm/pg-core";
 
 /**
- * Postgres từ chối hai thứ trong jsonb dù JavaScript và JSON đều chấp nhận: byte NUL và nửa lẻ
- * của cặp surrogate (sinh ra khi cắt chuỗi UTF-16 giữa một emoji). Cả hai đến từ nội dung web.
+ * Postgres rejects two things in jsonb even though JavaScript and JSON accept them: NUL bytes and lone
+ * surrogate halves (produced when a UTF-16 string is cut in the middle of an emoji). Both come from web content.
  */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: bắt đúng byte NUL là mục đích của regex này
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching exactly the NUL byte is the purpose of this regex
 const UNSAFE = /\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 
 export function jsonSafe<T>(value: T): T {

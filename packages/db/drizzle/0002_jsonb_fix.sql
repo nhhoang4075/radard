@@ -1,13 +1,13 @@
--- Sửa dữ liệu jsonb bị mã hoá hai lần (driver bun-sql + jsonb() của Drizzle): cột chứa CHUỖI JSON
--- thay vì object. Xem packages/db/src/schema/json.ts. Chỉ chạm các dòng đang sai kiểu.
+-- Fixes jsonb data encoded twice (bun-sql driver + Drizzle's jsonb()): columns that hold a JSON STRING
+-- instead of an object. See packages/db/src/schema/json.ts. Only touches rows with the wrong type.
 
--- Chuỗi JSON → giá trị JSON thật.
+-- JSON string → real JSON value.
 UPDATE "sources"      SET "config" = ("config" #>> '{}')::jsonb WHERE jsonb_typeof("config") = 'string';--> statement-breakpoint
 UPDATE "source_state" SET "state"  = ("state"  #>> '{}')::jsonb WHERE jsonb_typeof("state")  = 'string';--> statement-breakpoint
 UPDATE "documents"    SET "meta"   = ("meta"   #>> '{}')::jsonb WHERE jsonb_typeof("meta")   = 'string';--> statement-breakpoint
 
--- Mảng rác do nối `chuỗi || object` bằng SQL khi cột còn sai kiểu: [ "<chuỗi JSON>", {…} ].
--- Ghép lại thành một object: phần tử đầu (đã giải mã) cộng phần tử thứ hai.
+-- Junk array from concatenating `string || object` in SQL while the column still has the wrong type: [ "<JSON string>", {…} ].
+-- Merge back into one object: the first element (already decoded) plus the second element.
 UPDATE "sources"
    SET "config" = ("config" ->> 0)::jsonb || coalesce("config" -> 1, '{}'::jsonb)
  WHERE jsonb_typeof("config") = 'array' AND jsonb_typeof("config" -> 0) = 'string';

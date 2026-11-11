@@ -1,12 +1,12 @@
 /**
- * Hồ sơ người dùng: bối cảnh và các chủ đề quan tâm.
+ * User profile: context and the topics of interest.
  *
- * KHÁC dữ liệu dẫn xuất: đây là dữ liệu của người dùng (họ đã chọn gì, đã viết gì), không tạo lại được, nên
- * `reprocess --all` không xoá các bảng này. Chỉ phần dẫn xuất (`topics.embedding`) được tính lại
- * khi đổi model embedding.
+ * UNLIKE derived data: this is user data (what they chose, what they wrote) that cannot be recreated, so
+ * `reprocess --all` does not delete these tables. Only the derived part (`topics.embedding`) is recomputed
+ * when the embedding model changes.
  *
- * Thuật ngữ thống nhất: "chủ đề" (topic). `topics` chứa mọi chủ đề (thư viện radard soạn sẵn và chủ
- * đề người dùng tự thêm) cùng embedding; `profile_topics` là lựa chọn của người dùng.
+ * Unified term: "topic". `topics` holds every topic (the radard library, pre-written, and user-
+ * added topics) with embeddings; `profile_topics` is the user's selection.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -24,22 +24,22 @@ import { user } from "./auth.ts";
 import { EMBED_DIMENSIONS } from "./derived.ts";
 
 /**
- * Một người dùng ở MVP-0 (id = 1).
+ * One user in MVP-0 (id = 1).
  *
- * `promptContext` là BỐI CẢNH của người dùng bằng tiếng Anh (nghề, stack, đang làm gì), dùng trong
- * prompt digest để viết câu "vì sao đáng chú ý với bạn". Không dùng để lọc: mức liên quan tính theo
- * các chủ đề đang bật trong `profile_topics` (từ 12/10/2026). `description` là lời người dùng tự viết
- * về mình, giữ nguyên ngôn ngữ họ viết (trống cho tới khi họ viết).
+ * `promptContext` is the user's CONTEXT in English (job, stack, what they are working on), used in the
+ * digest prompt to write the line "why this is worth your attention". Not used for filtering: relevance is computed from
+ * the enabled topics in `profile_topics` (since 12/10/2026). `description` is what the user wrote
+ * about themselves, kept in the language they wrote it in (empty until they write it).
  */
 export const profile = pgTable("profile", {
   id: integer("id").primaryKey().default(1),
   promptContext: text("prompt_context").notNull(),
-  /** Lời người dùng tự viết về mình; không dùng trong prompt. */
+  /** What the user wrote about themselves; not used in the prompt. */
   description: text("description"),
   displayLang: text("display_lang").notNull().default("vi"),
   /**
-   * Tài khoản đăng nhập web của hồ sơ (`user.id`). Duy nhất: một user một hồ sơ. Trống cho tới khi
-   * người đó đăng nhập lần đầu (owner khởi tạo (`BOOTSTRAP_OWNER_EMAILS`) nhận hồ sơ chưa có chủ nhỏ nhất).
+   * Web login account of the profile (`user.id`). Unique: one user, one profile. Empty until
+   * that person logs in for the first time (the bootstrap owner (`BOOTSTRAP_OWNER_EMAILS`) gets the smallest-id profile that has no user yet).
    */
   userId: text("user_id")
     .unique()
@@ -48,49 +48,49 @@ export const profile = pgTable("profile", {
 });
 
 /**
- * Mọi chủ đề, mỗi chủ đề một dòng: chủ đề thư viện (radard soạn, `topics seed`) và chủ đề người dùng tự
- * thêm (`origin = custom`, thuộc một hồ sơ). Embedding nằm ở đây, nên mọi tài liệu được chấm với mọi
- * chủ đề, không phụ thuộc người dùng đang bật gì (D4). Người dùng chọn gì nằm ở `profile_topics`.
+ * All topics, one row each: library topics (written by radard, `topics seed`) and user-
+ * added topics (`origin = custom`, belonging to one profile). Embeddings live here, so every document is scored against every
+ * topic, regardless of what any user has enabled (D4). What users select lives in `profile_topics`.
  */
 export const topics = pgTable(
   "topics",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-    /** Khoá ổn định trong code (`agents`, `llm_apps`…), chỉ chủ đề thư viện có. */
+    /** Stable key in code (`agents`, `llm_apps`…), only library topics have one. */
     key: text("key").unique(),
-    /** Nhóm hiển thị trong thư viện; chủ đề tự thêm không có. */
+    /** Display group in the library; user-added topics have none. */
     groupName: text("group_name"),
-    /** Tên hiển thị: thư viện soạn sẵn, hoặc tên người dùng đặt. */
+    /** Display name: the library's pre-written name, or the name the user chose. */
     name: text("name").notNull(),
-    /** Câu dùng để embed: tiếng Anh, có ví dụ cụ thể (tự thêm: LLM viết từ lời người dùng). */
+    /** Text used for embedding: English, with concrete examples (user-added: the LLM writes it from the user's words). */
     embedText: text("embed_text").notNull(),
     /**
-     * Phạm vi chủ đề bằng tiếng Anh (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
-     * đưa cho LLM khi gắn nhãn tin trong điểm tin; không embed. Thư viện lấy từ code; chủ đề tự
-     * thêm thì trống (LLM chỉ thấy tên).
+     * Topic scope in English (what it includes, what it excludes, which topic a spill-over item belongs to), only
+     * given to the LLM when labeling items in the digest; not embedded. The library takes it from code; user-
+     * added topics leave it empty (the LLM sees only the name).
      */
     labelGuide: text("label_guide"),
-    /** Lời của người dùng, giữ nguyên ngôn ngữ họ viết; chỉ chủ đề tự thêm có. */
+    /** The user's words, kept in the language they wrote; only user-added topics have it. */
     description: text("description"),
     /** library | custom */
     origin: text("origin").notNull().default("library"),
-    /** Hồ sơ đã tự thêm chủ đề này; chủ đề thư viện thì trống. */
+    /** The profile that added this topic; empty for library topics. */
     ownerProfileId: integer("owner_profile_id").references(() => profile.id, {
       onDelete: "cascade",
     }),
-    /** Thứ tự hiển thị trong thư viện. */
+    /** Display order in the library. */
     position: integer("position").notNull().default(0),
-    /** `false`: rút khỏi thư viện (không hiện để chọn); người đã chọn vẫn giữ. */
+    /** `false`: removed from the library (not shown to pick); users who already picked it keep it. */
     active: boolean("active").notNull().default(true),
-    /** Trống = chưa embed (vừa thêm, vừa sửa mô tả, hoặc đổi model): job process sẽ tính. */
+    /** Empty = not embedded yet (just added, description just edited, or model changed): the process job will compute it. */
     embedding: halfvec("embedding", { dimensions: EMBED_DIMENSIONS }),
     embeddingModel: text("embedding_model"),
-    /** Cách tạo vector (chỉ dẫn nhiệm vụ…); khác giá trị hiện hành thì job process embed lại. */
+    /** How the vector is made (task instruction…); if it differs from the current value, the process job re-embeds. */
     embeddingRecipe: text("embedding_recipe"),
   },
   (t) => [
     check("topics_origin_ck", sql`${t.origin} in ('library', 'custom')`),
-    // Thư viện: có khoá, không thuộc hồ sơ nào. Tự thêm: không khoá, thuộc một hồ sơ, có lời người dùng.
+    // Library: has a key, belongs to no profile. User-added: no key, belongs to one profile, has the user's words.
     check(
       "topics_source_ck",
       sql`(${t.origin} = 'library') = (${t.key} is not null)
@@ -104,9 +104,9 @@ export const topics = pgTable(
 );
 
 /**
- * Tin giả định của chủ đề (HyDE): vài tin ngắn LLM viết như tin thật của chủ đề, embed như một tài
- * liệu. Điểm R của một tin với chủ đề là cosine lớn nhất trong vector mô tả và các vector này
- * (`scoreTopics`). Dẫn xuất từ `topics.embed_text`: mô tả đổi thì xoá đi sinh lại.
+ * Hypothetical items for a topic (HyDE): a few short items the LLM writes as if they were real items of the topic, embedded like a
+ * document. The R score of an item for a topic is the largest cosine among the description vector and these vectors
+ * (`scoreTopics`). Derived from `topics.embed_text`: when the description changes, delete and regenerate.
  */
 export const topicExamples = pgTable(
   "topic_examples",
@@ -125,8 +125,8 @@ export const topicExamples = pgTable(
 );
 
 /**
- * Lựa chọn của người dùng: chủ đề nào (thư viện hoặc tự thêm, đều nằm ở `topics`), đang bật hay tắt,
- * quan tâm hay không quan tâm. Chỉ chủ đề đang bật, `kind = include` mới tính vào mức liên quan R.
+ * The user's choice: which topics (library or user-added, both in `topics`), enabled or disabled,
+ * interested or not interested. Only enabled topics with `kind = include` count toward relevance R.
  */
 export const profileTopics = pgTable(
   "profile_topics",
@@ -140,17 +140,17 @@ export const profileTopics = pgTable(
       .notNull()
       .references(() => topics.id, { onDelete: "cascade" }),
     /**
-     * include | exclude. `exclude` = "không quan tâm": tuần 3 chỉ lưu, chưa dùng khi chấm điểm
-     * (quyết định D3, 12/10/2026).
+     * include | exclude. `exclude` = "not interested": week 3 only stores it, not yet used when scoring
+     * (decision D3, 12/10/2026).
      */
     kind: text("kind").notNull().default("include"),
-    /** Tắt thì không tính vào R, nhưng không xoá: bật lại được ngay. */
+    /** When off, not counted in R, but not deleted: can be turned back on immediately. */
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // Mỗi chủ đề chỉ được chọn một lần; chọn lại là bật lại dòng cũ.
+    // Each topic can be selected only once; selecting it again re-enables the old row.
     uniqueIndex("profile_topics_topic_uq").on(t.profileId, t.topicId),
     check("profile_topics_kind_ck", sql`${t.kind} in ('include', 'exclude')`),
   ],

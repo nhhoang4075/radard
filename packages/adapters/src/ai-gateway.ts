@@ -1,9 +1,9 @@
 /**
- * Adapter AI qua Vercel AI Gateway (AI SDK 7). Truyền model dạng chuỗi `provider/model`,
- * AI SDK tự đi qua Gateway khi có `AI_GATEWAY_API_KEY`.
+ * AI adapter via Vercel AI Gateway (AI SDK 7). Pass the model as a `provider/model` string,
+ * the AI SDK routes through Gateway automatically when `AI_GATEWAY_API_KEY` is set.
  *
- * Nơi duy nhất import `ai`: đổi sang gọi thẳng provider hay model local chỉ cần một adapter
- * khác cùng interface.
+ * The only place that imports `ai`: switching to calling a provider directly or a local model needs only another adapter
+ * with the same interface.
  */
 import {
   type AiTask,
@@ -29,11 +29,11 @@ const PROVIDER = "vercel-gateway";
 const log = createLogger("ai-gateway");
 
 /**
- * Gateway trả lỗi rate limit kèm "Retry after Ns" (gói miễn phí: 5 request/phút cho model
- * embedding, đo 06/10/2026). AI SDK tự thử lại sau 2–4 giây rồi bỏ cuộc, quá ngắn; ở đây
- * chờ đúng thời gian Gateway yêu cầu. Lỗi khác thì thử lại 2 lần như AI SDK.
+ * Gateway returns a rate-limit error with "Retry after Ns" (free tier: 5 requests/min for models
+ * embedding, measured 06/10/2026). The AI SDK retries after 2–4 seconds and then gives up, which is too short; here we
+ * wait the exact time Gateway asks for. Other errors are retried 2 times, as in the AI SDK.
  */
-/** Số giây phải chờ nếu `err` là lỗi rate limit của Gateway; `null` nếu là lỗi khác. */
+/** Seconds to wait if `err` is a Gateway rate-limit error; `null` if it is another error. */
 export function rateLimitWait(err: unknown): number | null {
   const msg = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : "";
@@ -44,7 +44,7 @@ export function rateLimitWait(err: unknown): number | null {
 async function withRetry<T>(
   call: () => Promise<T>,
   label: string,
-  /** Số lần thử lại khi gặp lỗi không phải rate limit. */
+  /** Number of retries on errors that are not rate limits. */
   otherRetries = 2,
 ): Promise<T> {
   let rateLimited = 0;
@@ -62,9 +62,9 @@ async function withRetry<T>(
 }
 
 /**
- * Chi phí thật Gateway báo trong `providerMetadata.gateway.cost` (USD, dạng chuỗi). Giá chia
- * bậc theo độ dài prompt (Haiku 5.5: gấp 5 lần từ 100k token), cache, vùng, service tier, nên
- * tự tính từ một đơn giá cố định sẽ sai khi đổi model hoặc prompt dài. Không có thì `null`.
+ * The real cost Gateway reports in `providerMetadata.gateway.cost` (USD, as a string). Prices are split
+ * into tiers by prompt length (Haiku 5.5: 5x from 100k tokens), cache, region, service tier, so
+ * computing it from a fixed unit price would be wrong when the model changes or a prompt is long. If absent: `null`.
  */
 export function reportedCost(meta: unknown): { cost: number; generationId?: string } | null {
   const g = (meta as { gateway?: { cost?: unknown; generationId?: unknown } } | undefined)?.gateway;
@@ -74,8 +74,8 @@ export function reportedCost(meta: unknown): { cost: number; generationId?: stri
 }
 
 /**
- * Chi phí của một lời gọi: số Gateway báo nếu có (`gateway`); không thì ước tính từ bảng giá
- * có bậc (`estimate`); không có cả bảng giá thì 0 và `unknown`, để `costs` thấy là thiếu số.
+ * Cost of one call: the number Gateway reports if present (`gateway`); otherwise estimated from the tiered price table
+ * (`estimate`); with no price table either, 0 and `unknown`, so `costs` shows that the number is missing.
  */
 async function costOf(meta: unknown, model: string, usage: TokenUsage, book?: PriceBook) {
   const r = reportedCost(meta);
@@ -86,7 +86,7 @@ async function costOf(meta: unknown, model: string, usage: TokenUsage, book?: Pr
     : { costUsd: est, costSource: "estimate" as const };
 }
 
-/** Giãn nhịp: mỗi lời gọi cách lời gọi trước ít nhất `ms`. */
+/** Pacing: each call is at least `ms` after the previous call. */
 function pacer(ms: number) {
   let last = 0;
   return async () => {
@@ -100,9 +100,9 @@ export function gatewayEmbedding(opts: {
   model: string;
   dimensions: number;
   sink: UsageSink;
-  /** Dự phòng khi Gateway không báo chi phí. */
+  /** Fallback when Gateway does not report the cost. */
   priceBook?: PriceBook;
-  /** Khoảng cách tối thiểu giữa hai request (ms), để không chạm hạn mức của tài khoản. */
+  /** Minimum gap between two requests (ms), so the account's quota is not hit. */
   minIntervalMs?: number;
 }): EmbeddingProvider {
   const pace = pacer(opts.minIntervalMs ?? 0);
@@ -115,8 +115,8 @@ export function gatewayEmbedding(opts: {
       try {
         const res = await withRetry(async () => {
           await pace();
-          // maxParallelCalls 1: AI SDK có thể tách lô thành nhiều request song song, mỗi
-          // request đều tính vào hạn mức.
+          // maxParallelCalls 1: the AI SDK may split a batch into several parallel requests, each
+          // request counts toward the quota.
           return embedMany({
             model: opts.model,
             values: texts,
@@ -126,7 +126,7 @@ export function gatewayEmbedding(opts: {
         }, `embed ${opts.model}`);
         const bad = res.embeddings.find((e) => e.length !== opts.dimensions);
         if (bad) {
-          // Chặn ngay ở đây: ghi vector sai số chiều vào cột halfvec(n) sẽ hỏng cả lô.
+          // Block it right here: writing a vector of the wrong dimension into the halfvec(n) column would break the whole batch.
           throw new Error(`model trả ${bad.length} chiều, cấu hình là ${opts.dimensions}`);
         }
         await opts.sink({
@@ -157,7 +157,7 @@ export function gatewayEmbedding(opts: {
 export function gatewayLlm(opts: {
   model: string;
   sink: UsageSink;
-  /** Dự phòng khi Gateway không báo chi phí. */
+  /** Fallback when Gateway does not report the cost. */
   priceBook?: PriceBook;
 }): LlmProvider {
   return {
@@ -199,7 +199,7 @@ export function gatewayLlm(opts: {
   };
 }
 
-/** Câu trả lời thô của AI SDK, trước khi đổi sang kiểu của lõi. */
+/** Raw AI SDK answer, before conversion to the core's type. */
 interface RawDecisionAnswer {
   type: string;
   probability?: number;
@@ -208,8 +208,8 @@ interface RawDecisionAnswer {
 }
 
 /**
- * Đổi câu trả lời của AI SDK sang kiểu của lõi. Câu `choice` luôn có đủ xác suất cho mọi phương
- * án: provider không trả phân bố thì coi phương án được chọn là 1, còn lại 0.
+ * Converts the AI SDK answer to the core's type. A `choice` answer always has probabilities for each
+ * option: if the provider returns no distribution, the chosen option gets 1 and the rest 0.
  */
 export function toDecisionAnswer(q: DecisionQuestion, a: RawDecisionAnswer | undefined) {
   if (!a || a.type !== q.type) throw new Error(`câu trả lời sai kiểu: ${JSON.stringify(a)}`);
@@ -223,14 +223,14 @@ export function toDecisionAnswer(q: DecisionQuestion, a: RawDecisionAnswer | und
 }
 
 /**
- * Model ra quyết định (Jev…) qua AI Gateway, bằng `experimental_decide` của AI SDK. Gateway xếp
- * các model này loại "evaluation", chỉ tính giá token vào (token ra miễn phí). `model` là id dạng
- * `provider/model`, hoặc một model AI SDK dựng sẵn (test dùng model giả của `ai/test`).
+ * Decision model (Jev…) via AI Gateway, using the AI SDK's `experimental_decide`. Gateway classifies
+ * these models as "evaluation", counting only input token prices (output tokens are free). `model` is an id of the form
+ * `provider/model`, or a built-in AI SDK model (tests use the fake model of `ai/test`).
  */
 export function gatewayDecision(opts: {
   model: Experimental_DecisionModel;
   sink: UsageSink;
-  /** Dự phòng khi Gateway không báo chi phí. */
+  /** Fallback when Gateway does not report the cost. */
   priceBook?: PriceBook;
 }): DecisionProvider {
   const modelId = typeof opts.model === "string" ? opts.model : opts.model.modelId;
@@ -246,8 +246,8 @@ export function gatewayDecision(opts: {
               model: opts.model,
               state: state as Experimental_DecisionState,
               questions: questions as Record<string, Experimental_DecisionQuestion>,
-              // Lỗi tạm thời để AI SDK tự thử lại; model từ chối hay câu trả lời sai kiểu thì
-              // thử lại cũng vô ích, nên ngoài này chỉ chờ rate limit.
+              // A transient error so the AI SDK retries it itself; if the model refuses or the answer has the wrong type, then
+              // retrying is useless, so outside this only the rate limit is waited on.
               maxRetries: 2,
             }),
           `decide ${modelId}`,

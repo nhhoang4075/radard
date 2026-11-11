@@ -1,13 +1,13 @@
 /**
- * Adapter Telegram (grammY): gửi tin có nút 👍/👎 (`Notifier`) và nhận lượt bấm (`ChatChannel`).
+ * Telegram adapter (grammY): sends messages with 👍/👎 buttons (`Notifier`) and receives presses (`ChatChannel`).
  *
- * Chỉ thư mục `packages/adapters` được import grammY (radard-thiet-ke.html, quy tắc 1). Giải thích
- * Bot API và các lựa chọn ở đây: docs/notifier-telegram.html.
+ * Only the `packages/adapters` folder may import grammY (radard-thiet-ke.html, rule 1). Explains
+ * the Bot API and the choices made here: docs/notifier-telegram.html.
  *
- *   - Nút chỉ mang `fb:like` / `fb:dislike`, không mang id delivery: lúc gửi chưa có id đó.
- *     Lượt bấm luôn kèm `message_id` và `chat.id`, đủ để tìm lại tin.
- *   - Lọc người lạ một lần ở đầu chuỗi middleware, trước mọi truy vấn DB hay lời gọi LLM.
- *   - Token nằm trong URL của Bot API: log chỉ ghi tên phương thức và mô tả lỗi, không ghi URL.
+ *   - Buttons carry only `fb:like` / `fb:dislike`, not the delivery id: that id does not exist yet when sending.
+ *     A press always comes with `message_id` and `chat.id`, enough to find the message again.
+ *   - Strangers are filtered once at the start of the middleware chain, before any DB query or LLM call.
+ *   - The token is in the Bot API URL: logs record only the method name and error description, never the URL.
  */
 import { autoRetry } from "@grammyjs/auto-retry";
 import {
@@ -44,12 +44,12 @@ import type { UserFromGetMe } from "grammy/types";
 const CHANNEL = "telegram";
 const log = createLogger("telegram");
 
-/** Telegram cho bot gửi khoảng 1 tin/giây vào một chat. */
+/** Telegram lets a bot send about 1 message/second to one chat. */
 const MIN_INTERVAL_MS = 1000;
-/** Giới hạn 4.096 ký tự của một tin (tính sau khi bỏ thẻ); chừa chỗ cho tiêu đề và link. */
+/** Limit of 4.096 characters per message (counted after removing tags); leave room for the title and link. */
 const MAX_TEXT = 3800;
 
-/** Escape cho `parse_mode: "HTML"`: `&` trước, nếu không sẽ thay hỏng kết quả của các dòng sau. */
+/** Escape for `parse_mode: "HTML"`: `&` first, otherwise it would corrupt the results of the later replacements. */
 export function escapeHtml(s: string): string {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
@@ -59,9 +59,9 @@ function anchor(l: Link): string {
 }
 
 /**
- * Message trung lập → HTML của Telegram. Không có `<br>`/`<p>`: xuống dòng bằng `\n`.
- * Link trình bày theo vai trò: link chính một dòng, các bài khác gộp một dòng ngăn bằng " · ",
- * trang thảo luận một dòng. Chữ hiện ra là nhãn; bấm vào mở `url` đầy đủ.
+ * Neutral message → Telegram HTML. No `<br>`/`<p>`: line breaks use `\n`.
+ * Links are laid out by role: the main link on one line, other articles grouped on one line separated by " · ",
+ * the discussion page on one line. The visible text is a label; tapping opens the full `url`.
  */
 export function render(msg: Message): string {
   let body = msg.lines.join("\n\n");
@@ -83,21 +83,21 @@ export function render(msg: Message): string {
 
 const LABELS: Record<FeedbackKind, string> = { like: "👍", dislike: "👎" };
 
-/** Dữ liệu của nút "Với tôi?": không mang id tin, lượt bấm kèm `message_id` và `chat.id` là đủ. */
+/** Data of the "Với tôi?" button: carries no item id; the press's `message_id` and `chat.id` are enough. */
 const FOR_ME_DATA = "fm:ask";
-/** Giới hạn độ dài một tin Telegram (ký tự), chừa chỗ cho dấu cắt. */
+/** Length limit of a Telegram message (characters), leaving room for the truncation mark. */
 const MAX_REPLY_CHARS = 4000;
 
 /**
- * Dấu "đang chọn": ✓ đơn sắc (U+2713, hiện như chữ), không dùng emoji màu như ✅ (yêu cầu
- * 13/10/2026). Đi kèm màu nút (`style` của Bot API: success xanh lá, primary xanh dương, danger
- * đỏ); bản Telegram cũ không hiện màu vẫn phân biệt được nhờ dấu ✓.
+ * The "đang chọn" mark: ✓ monochrome (U+2713, shown like text), not a colour emoji such as ✅ (requested
+ * 13/10/2026). Paired with button colours (`style` of the Bot API: success green, primary blue, danger
+ * red); older Telegram clients that do not show colours still tell them apart by the ✓ mark.
  */
 const CHECK = "✓";
 
 /**
- * Bộ nút 👍/👎; nút đang chọn có dấu ✓ để bạn thấy mình đã chọn gì. Bấm nút kia để đổi ý, bấm lại
- * đúng nút đang chọn để bỏ chọn (không truyền `chosen` thì cả hai nút đều chưa chọn).
+ * The 👍/👎 button set; the selected button has a ✓ so you can see what you picked. Press the other button to change your mind, press
+ * the selected button again to deselect (without passing `chosen`, both buttons are unselected).
  */
 export function feedbackKeyboard(
   actions: NonNullable<Message["actions"]>,
@@ -120,7 +120,7 @@ export function feedbackKeyboard(
   return kb;
 }
 
-/** Danh sách chủ đề thành nút bật tắt, hai nút một hàng; cuối cùng là "Tự thêm chủ đề", "Xong". */
+/** Topic list as on/off buttons, two per row; the last ones are "Tự thêm chủ đề" and "Xong". */
 export function topicsKeyboard(items: TopicItem[]): InlineKeyboard {
   const kb = new InlineKeyboard();
   items.forEach((t, i) => {
@@ -133,8 +133,8 @@ export function topicsKeyboard(items: TopicItem[]): InlineKeyboard {
 }
 
 /**
- * Lời trong tin gọi digest là "điểm tin", không dùng "digest" (từ kỹ thuật; bạn chọn 13/10/2026).
- * "digest" chỉ còn là tên trong code và DB.
+ * The message wording calls the digest "điểm tin", not "digest" (a technical term; you chose on 13/10/2026).
+ * "digest" is now only a name in code and DB.
  */
 const TOPICS_TEXT =
   "Chọn chủ đề bạn muốn theo dõi. Bấm để bật hoặc tắt (✓ là đang bật). Điểm tin mỗi sáng chỉ lấy tin thuộc các chủ đề đang bật.";
@@ -147,7 +147,7 @@ const ADD_PROMPT = [
   "pgvector, index vector, HNSW, tìm kiếm kết hợp từ khoá và vector trong Postgres",
 ].join("\n");
 
-/** Tách tin người dùng gửi: dòng đầu là tên, phần còn lại là mô tả (thiếu thì dùng luôn tên). */
+/** Splits the user's message: the first line is the name, the rest is the description (if missing, the name is used). */
 export function parseTopicInput(text: string): { label: string; description: string } | null {
   const lines = text
     .split("\n")
@@ -167,7 +167,7 @@ function draftText(d: CustomTopicDraft): string {
   ].join("\n\n");
 }
 
-/** Mô tả lỗi an toàn để log: không bao giờ có URL (chứa token). */
+/** Error description safe to log: never contains a URL (it holds the token). */
 export function describeError(err: unknown): Record<string, unknown> {
   if (err instanceof GrammyError) {
     return { method: err.method, code: err.error_code, description: err.description };
@@ -178,13 +178,13 @@ export function describeError(err: unknown): Record<string, unknown> {
 
 export interface TelegramOptions {
   token: string;
-  /** Thay mọi lời gọi Bot API (test). Không đặt thì gọi api.telegram.org thật. */
+  /** Replaces every Bot API call (tests). If not set, calls the real api.telegram.org. */
   transformer?: Transformer;
 }
 
 function withRetry<A extends { config: { use(t: Transformer): void } }>(api: A, t?: Transformer) {
   if (t) api.config.use(t);
-  // 429: chờ đúng retry_after; 5xx: thử lại vài lần. 4xx khác là lỗi của ta, không thử lại.
+  // 429: wait exactly retry_after; 5xx: retry a few times. Other 4xx are our error and are not retried.
   else api.config.use(autoRetry({ maxRetryAttempts: 3, maxDelaySeconds: 60 }));
   return api;
 }
@@ -200,7 +200,7 @@ export function telegramNotifier(opts: TelegramOptions): Notifier {
       try {
         const sent = await api.sendMessage(recipient, render(msg), {
           parse_mode: "HTML",
-          // Không tắt thì 7 tin mỗi sáng có 7 khung xem trước link to, rất dài.
+          // Without disabling it, each of the 7 morning messages gets a very long link preview.
           link_preview_options: { is_disabled: true },
           ...(msg.actions?.length ? { reply_markup: feedbackKeyboard(msg.actions) } : {}),
         });
@@ -215,22 +215,22 @@ export function telegramNotifier(opts: TelegramOptions): Notifier {
   };
 }
 
-/** Bấm lại đúng nút đã chọn thì bộ nút không đổi: Telegram báo "message is not modified". */
+/** Pressing the already-selected button again leaves the button set unchanged: Telegram reports "message is not modified". */
 function ignoreNotModified(err: unknown): void {
   if (!(err instanceof GrammyError && err.description.includes("message is not modified")))
     throw err;
 }
 
 /**
- * Chat nào đang chờ người dùng gõ chữ, và chữ đó cho luồng nào: "Tự thêm chủ đề" hay "Sửa mô tả".
- * Dùng chung một Map để bấm luồng này thì luồng kia thôi chờ (chữ gõ sau chỉ thuộc một luồng).
+ * Which chat is waiting for the user to type text, and which flow that text belongs to: "Tự thêm chủ đề" or "Sửa mô tả".
+ * One shared Map: starting one flow stops the other from waiting (text typed next belongs to one flow only).
  */
 type Awaiting = Map<string, "topic" | "profile">;
 
-/** Lệnh chọn chủ đề: /start, /topics, nút bật tắt, và luồng "Tự thêm chủ đề" hai bước. */
+/** Topic selection commands: /start, /topics, on/off buttons, and the two-step "Tự thêm chủ đề" flow. */
 function registerTopicCommands(bot: Bot, topics: TopicHandlers, awaiting: Awaiting): void {
-  // Trạng thái hội thoại "Tự thêm chủ đề" chỉ giữ trong bộ nhớ: bot khởi động lại thì làm lại từ
-  // đầu, không mất gì đã lưu. Một người dùng nên một Map là đủ.
+  // The "Tự thêm chủ đề" conversation state is kept only in memory: if the bot restarts, it starts over from
+  // the beginning; nothing saved is lost. One Map per user is enough.
   const drafts = new Map<string, CustomTopicDraft>();
 
   const showTopics = async (ctx: Context) => {
@@ -326,7 +326,7 @@ const SUGGEST_UNAVAILABLE = "Gợi ý chủ đề tạm thời chưa dùng đư�
 
 const SUGGEST_EXPIRED = "Gợi ý này đã cũ, gõ /profile để xem lại";
 
-/** Lời /profile hiện ra: lời người dùng; chưa có thì bối cảnh cũ (tiếng Anh) và lời mời tự viết. */
+/** Text shown by /profile: the user's words; if none yet, the old context (English) and an invitation to write one. */
 export function profileText(p: ProfileView): string {
   const cut = (s: string) => (s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT - 1)}…` : s);
   if (p.description) {
@@ -346,15 +346,15 @@ export function profileText(p: ProfileView): string {
   return "Bạn chưa có mô tả. Bấm Sửa mô tả để viết vài câu về bạn.";
 }
 
-/** [Sửa mô tả] [Gợi ý chủ đề]; chưa có bối cảnh thì chưa gợi ý được, chỉ còn nút đầu. */
+/** [Sửa mô tả] [Gợi ý chủ đề]; without context no suggestion is possible, so only the first button remains. */
 export function profileKeyboard(p: ProfileView): InlineKeyboard {
   const kb = new InlineKeyboard().text("Sửa mô tả", "pf:edit").primary();
   return p.promptContext ? kb.text("Gợi ý chủ đề", "pf:sug").primary() : kb;
 }
 
 /**
- * Trạng thái một tin gợi ý: lựa chọn đang tích dở, cả chủ đề thư viện lẫn chủ đề mới (chưa tạo gì
- * cho tới khi bấm Lưu). Chỉ giữ trong bộ nhớ.
+ * State of one suggestion message: the in-progress selection, both library topics and new topics (nothing created
+ * until Lưu is pressed). Kept in memory only.
  */
 export interface SuggestState {
   topics: SuggestedTopic[];
@@ -362,12 +362,12 @@ export interface SuggestState {
   expiresAt: number;
 }
 
-/** Tin gợi ý cũ quá thời gian này thì nút không dùng được nữa (gõ /profile để gợi ý lại). */
+/** Suggestion messages older than this have dead buttons (type /profile to get suggestions again). */
 export const SUGGEST_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Lời của tin gợi ý. Bộ nút Telegram không có tiêu đề nhóm, nên lời tin nói nhóm nào gồm chủ đề nào;
- * bộ nút xếp đúng thứ tự đó (nên theo dõi, có thể quan tâm, đang theo dõi; mỗi nhóm một hàng mới).
+ * Text of the suggestion message. The Telegram button set has no group titles, so the text says which group holds which topics;
+ * the buttons follow that same order (should follow, may interest, following; each group starts a new row).
  */
 export function suggestText(s: Pick<SuggestState, "topics" | "newTopics">): string {
   const names = (tier: SuggestedTopic["tier"]) =>
@@ -400,7 +400,7 @@ export function suggestText(s: Pick<SuggestState, "topics" | "newTopics">): stri
   return parts.join("\n\n");
 }
 
-/** Nút của tin gợi ý: chủ đề hai nút một hàng theo nhóm, mỗi chủ đề mới một hàng, cuối cùng là Lưu. */
+/** Buttons of a suggestion message: topics two per row by group, each new topic on its own row, Lưu last. */
 export function suggestKeyboard(s: Pick<SuggestState, "topics" | "newTopics">): InlineKeyboard {
   const kb = new InlineKeyboard();
   for (const tier of ["preselect", "maybe", "followed"] as const) {
@@ -412,7 +412,7 @@ export function suggestKeyboard(s: Pick<SuggestState, "topics" | "newTopics">): 
     });
   }
   s.newTopics.forEach((t, i) => {
-    // Bật tắt như các chủ đề khác; chủ đề chỉ được tạo khi bấm Lưu.
+    // On/off like other topics; a topic is created only when Lưu is pressed.
     if (t.checked) kb.text(`${CHECK} ${t.label}`, `pf:n:${i}`).success();
     else kb.text(`Thêm "${t.label}"`, `pf:n:${i}`);
     kb.row();
@@ -420,11 +420,11 @@ export function suggestKeyboard(s: Pick<SuggestState, "topics" | "newTopics">): 
   return kb.text("Lưu", "pf:save").success();
 }
 
-/** Lệnh /profile: xem và sửa mô tả, gợi ý chủ đề; và /start của người dùng mới. */
+/** /profile command: view and edit the description, suggest topics; and /start for new users. */
 function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: Awaiting): void {
-  // Lựa chọn đang tích dở của từng tin gợi ý, theo message_id (mỗi lần gợi ý là một tin mới, tin cũ
-  // vẫn bấm được tới khi hết hạn). Chỉ giữ trong bộ nhớ như bản nháp "Tự thêm chủ đề": bot khởi
-  // động lại thì gợi ý lại, không mất gì đã lưu. Chỉ một chat được dùng bot nên message_id là đủ.
+  // In-progress selection of each suggestion message, keyed by message_id (each suggestion is a new message; old ones
+  // stay tappable until they expire). Kept in memory like the "Tự thêm chủ đề" draft: if the bot restarts,
+  // suggestions are made again, nothing saved is lost. Only one chat uses the bot, so message_id is enough.
   const states = new Map<number, SuggestState>();
   const recall = (id: number | undefined) => {
     if (id === undefined) return undefined;
@@ -523,11 +523,11 @@ function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: A
       await ctx.answerCallbackQuery({ text: SUGGEST_EXPIRED });
       return;
     }
-    // Bỏ trạng thái trước khi ghi: bấm Lưu hai lần liền nhau cũng chỉ tạo chủ đề mới một lần.
+    // Clear the state before writing: pressing Lưu twice in a row also creates the new topic only once.
     states.delete(id);
     let n: number;
     try {
-      // Chỉ đụng tới chủ đề hiện trong tin: chủ đề thư viện khác (chưa theo dõi) giữ nguyên.
+      // Only touches topics shown in the message: other library topics (not followed) stay unchanged.
       n = await profile.apply(
         s.topics.filter((t) => t.checked).map((t) => t.key),
         s.topics.filter((t) => !t.checked).map((t) => t.key),
@@ -566,22 +566,22 @@ function registerProfileCommands(bot: Bot, profile: ProfileHandlers, awaiting: A
 
 export interface TelegramChatOptions extends TelegramOptions {
   /**
-   * Chế độ một bộ xử lý cố định: chỉ xử lý update từ chat này; mọi chat khác bị bỏ qua, im lặng.
-   * Không đặt thì `createTelegramBot` từ chối mọi chat (fail-closed); đa người dùng dùng
-   * `createTelegramRouter` / `start(resolver)` thay vì tuỳ chọn này.
+   * Single fixed-handler mode: only handles updates from this chat; every other chat is silently ignored.
+   * Without it, `createTelegramBot` rejects every chat (fail-closed); multi-user uses
+   * `createTelegramRouter` / `start(resolver)` instead of this option.
    */
   allowedChatId?: string;
-  /** Có sẵn thì Bot không gọi `getMe` lúc khởi động (test). */
+  /** If set, the Bot does not call `getMe` at startup (tests). */
   botInfo?: UserFromGetMe;
 }
 
-/** Dựng Bot với đủ middleware; tách riêng để test đưa update giả vào bằng `handleUpdate`. */
+/** Builds the Bot with all middleware; kept separate so tests can feed fake updates via `handleUpdate`. */
 export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandlers): Bot {
   const bot = new Bot(opts.token, opts.botInfo ? { botInfo: opts.botInfo } : {});
   withRetry(bot.api, opts.transformer);
 
   bot.use(async (ctx, next) => {
-    // ctx.chat gom chat id của mọi loại update (tin nhắn, lượt bấm) về một chỗ.
+    // ctx.chat gathers the chat id of every update type (messages, presses) in one place.
     if (opts.allowedChatId !== undefined && String(ctx.chat?.id) === opts.allowedChatId) {
       await next();
     }
@@ -605,7 +605,7 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
     await ctx.answerCallbackQuery({
       text: state === "none" ? "Đã bỏ chọn" : `Đã ghi nhận ${LABELS[state]}`,
     });
-    // Giữ nút "Với tôi?" nếu tin đang có nó (tin cũ trước khi có nút thì không thêm).
+    // Keep the "Với tôi?" button if the message has it (old messages from before the button existed get none).
     const hasForMe =
       "reply_markup" in message &&
       Boolean(
@@ -624,14 +624,14 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
     await ctx.editMessageReplyMarkup({ reply_markup: kb }).catch(ignoreNotModified);
   });
 
-  // "Với tôi?": lõi tra tin về hồ sơ của chat này (chat lạ đã bị chặn từ đầu chuỗi middleware).
+  // "Với tôi?": the core looks up the message's profile for this chat (unknown chats were blocked at the start of the middleware chain).
   bot.callbackQuery(FOR_ME_DATA, async (ctx) => {
     const message = ctx.callbackQuery.message;
     if (!message || !handlers.onForMe) {
       await ctx.answerCallbackQuery();
       return;
     }
-    // Trả lời ngay để nút không quay vòng trong lúc model viết.
+    // Answer right away so the button does not spin while the model writes.
     await ctx.answerCallbackQuery({ text: FOR_ME_LABELS.working });
     let res: ForMeResult;
     try {
@@ -661,29 +661,29 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
   });
 
   const awaiting: Awaiting = new Map();
-  // /profile đăng ký trước: nó bắt /start của người dùng mới, còn lại chuyển cho /topics.
+  // /profile is registered first: it catches /start for new users, the rest passes to /topics.
   if (handlers.profile) registerProfileCommands(bot, handlers.profile, awaiting);
   const topics = handlers.topics;
   if (topics) registerTopicCommands(bot, topics, awaiting);
 
-  // Tin nhắn thường (chưa có tính năng nhận xét bằng chữ): chỉ dẫn lệnh, không ghi gì.
+  // Regular messages (no written-comment feature yet): only point to commands, write nothing.
   bot.on("message:text", (ctx) =>
     ctx.reply(topics ? "Gõ /topics để chọn chủ đề theo dõi." : "radard chưa nhận tin nhắn chữ."),
   );
 
-  // Nút lạ (tin cũ, phiên bản trước): trả lời để nút trên điện thoại không quay vòng mãi.
+  // Unknown button (old message, previous version): answer so the button on the phone does not spin forever.
   bot.on("callback_query:data", (ctx) => ctx.answerCallbackQuery());
 
-  // Không có bot.catch thì một lỗi (DB rớt mạng một giây) làm dừng cả bot.
+  // Without bot.catch, one error (the DB dropping its network for a second) would stop the whole bot.
   bot.catch((err) => log.error("xử lý update lỗi", describeError(err.error)));
   return bot;
 }
 
 /**
- * Đa người dùng: một Bot "cổng" nhận mọi update, tra chat → bộ xử lý của hồ sơ qua `resolve`.
- * `null` (chat không có quyền): bỏ qua, im lặng, không gọi handler nào. Có quyền: chuyển update cho
- * một Bot con của đúng chat đó (lưu theo chat + `scope` hồ sơ; đổi hồ sơ thì dựng lại), nên trạng thái
- * hội thoại (đang chờ nhập mô tả…) cũng tách theo chat.
+ * Multi-user: one "gate" Bot receives every update and looks up the chat → the profile's handler via `resolve`.
+ * `null` (chat with no rights): ignored silently, no handler is called. With rights: the update is passed to
+ * a child Bot for that exact chat (stored by chat + profile `scope`; a profile change rebuilds it), so conversation state
+ * (waiting for a description…) is also kept per chat.
  */
 export function createTelegramRouter(opts: TelegramChatOptions, resolve: ChatResolver): Bot {
   const gate = new Bot(opts.token, opts.botInfo ? { botInfo: opts.botInfo } : {});
@@ -713,10 +713,10 @@ export function createTelegramRouter(opts: TelegramChatOptions, resolve: ChatRes
 }
 
 /**
- * Chạy `start` (long polling, chỉ trả về khi dừng) và chạy lại khi nó dừng vì lỗi, chờ 5, 10, 20…
- * giây, tối đa `maxDelayMs`. Lỗi 409 "terminated by other getUpdates request" xảy ra lúc chuyển giữa
- * hai bản deploy (13/10/2026: bot dừng hẳn 17 giây sau khi bản mới lên, lượt bấm không được ghi).
- * `onStarted` gọi khi polling chạy được, để đặt lại thời gian chờ. Dừng hẳn khi `stopped()` đúng.
+ * Runs `start` (long polling, returns only when stopped) and reruns it when it stops because of an error, waiting 5, 10, 20…
+ * seconds, up to `maxDelayMs`. Error 409 "terminated by other getUpdates request" happens when switching between
+ * two deploys (13/10/2026: the bot stopped for 17 seconds after the new version went up, and presses were not recorded).
+ * `onStarted` is called when polling runs, to reset the wait time. Stops for good when `stopped()` returns true.
  */
 export function keepPolling(opts: {
   start: (onStarted: () => void) => Promise<void>;
@@ -755,7 +755,7 @@ export function telegramChat(opts: TelegramChatOptions): ChatChannel {
       const b = resolver ? createTelegramRouter(opts, handlers) : createTelegramBot(opts, handlers);
       bot = b;
       if (resolver || handlers.topics) {
-        // Menu lệnh khi gõ "/". Tên lệnh tiếng Anh, mô tả tiếng Việt (quyết định 12/10/2026).
+        // Command menu shown when typing "/". Command names in English, descriptions in Vietnamese (decision 12/10/2026).
         await b.api
           .setMyCommands([
             { command: "topics", description: "Chọn chủ đề theo dõi" },
@@ -766,8 +766,8 @@ export function telegramChat(opts: TelegramChatOptions): ChatChannel {
           ])
           .catch((err) => log.warn("không đặt được menu lệnh", describeError(err)));
       }
-      // Không await: bot.start() chỉ trả về khi bot dừng. Không dùng drop_pending_updates: nó
-      // xoá cả lượt 👍 bạn bấm lúc bot tắt; khoá "cb:" + id đã lo phần giao lại.
+      // Not awaited: bot.start() returns only when the bot stops. Do not use drop_pending_updates: it
+      // also deletes the 👍 presses made while the bot was off; the "cb:" + id key already handles redelivery.
       keepPolling({
         start: (onStarted) =>
           b.start({
@@ -784,7 +784,7 @@ export function telegramChat(opts: TelegramChatOptions): ChatChannel {
     },
     async stop() {
       stopping = true;
-      // Xác nhận offset cuối với Telegram rồi đóng kết nối.
+      // Confirm the last offset with Telegram, then close the connection.
       await bot?.stop();
     },
   };

@@ -1,14 +1,14 @@
 /**
- * ObjectStore trên Cloudflare R2 (qua API tương thích S3 của `Bun.S3Client`). Dùng khi deploy;
- * khi dev và trong test dùng bản ghi đĩa.
+ * ObjectStore on Cloudflare R2 (via the S3-compatible API of `Bun.S3Client`). Used when deployed;
+ * in dev and tests the disk store is used.
  *
- * Nội dung được nén gzip giống hệt bản ghi đĩa, với cùng key `raw/ab/<sha>.gz`. Vì vậy chuyển dữ
- * liệu từ máy lên chỉ là chép nguyên các file trong `data/` lên bucket, không phải nén lại.
+ * Content is gzip-compressed exactly like the disk store, with the same key `raw/ab/<sha>.gz`. So moving data
+ * from a machine up is just copying the files in `data/` to the bucket as they are, without recompressing.
  */
 import type { ObjectStore } from "@radard/core";
 
 export interface R2Options {
-  /** `https://<account-id>.r2.cloudflarestorage.com`, hoặc `http://localhost:9000` với MinIO. */
+  /** `https://<account-id>.r2.cloudflarestorage.com`, or `http://localhost:9000` with MinIO. */
   endpoint: string;
   bucket: string;
   accessKeyId: string;
@@ -16,7 +16,7 @@ export interface R2Options {
 }
 
 export function r2ObjectStore(opts: R2Options): ObjectStore {
-  // R2 không có vùng; "auto" là giá trị Cloudflare yêu cầu cho chữ ký S3.
+  // R2 has no regions; "auto" is the value Cloudflare requires for S3 signatures.
   const s3 = new Bun.S3Client({ ...opts, region: "auto" });
   return {
     async put(key, body) {
@@ -37,8 +37,8 @@ export function r2ObjectStore(opts: R2Options): ObjectStore {
 }
 
 /**
- * Chép nguyên các file đã nén trong `root/raw` (bản ghi đĩa) lên bucket, cùng key. Key đã có trên
- * bucket thì bỏ qua, nên chạy lại sau khi đứt giữa chừng là an toàn.
+ * Copies the already-compressed files in `root/raw` (disk store) to the bucket, same keys. Keys already on
+ * the bucket are skipped, so re-running after an interruption is safe.
  */
 export async function pushFsToR2(
   root: string,

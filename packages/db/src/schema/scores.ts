@@ -1,9 +1,9 @@
 /**
- * Điểm và mặt bằng dùng để xếp hạng digest (xep-hang.html).
+ * Scores and baselines used to rank the digest (xep-hang.html).
  *
- * Dẫn xuất, tính lại được: điểm chủ đề là cosine trên vector đã có (SQL, không gọi model), tín
- * hiệu lấy lại từ API của nguồn, mặt bằng tính lại mỗi ngày. Nằm riêng khỏi `derived.ts` vì
- * xếp hạng đọc chúng theo hồ sơ người dùng.
+ * Derived and recomputable: topic scores are cosine over existing vectors (SQL, no model call), signals
+ * re-fetched from the source's API, baselines recomputed daily. Kept separate from `derived.ts` because
+ * ranking reads them per user profile.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -21,9 +21,9 @@ import { documents, sources } from "./collected.ts";
 import { topics } from "./profile.ts";
 
 /**
- * Cosine giữa mỗi tài liệu và MỌI chủ đề có embedding (thư viện và tự thêm), bật hay chưa bật. Tính một
- * lần sau khi embed. Xếp hạng chỉ đọc điểm của chủ đề đang bật; điểm còn lại cho biết tài liệu hợp
- * chủ đề nào nhất trong toàn thư viện.
+ * Cosine between each document and ALL topics that have an embedding (library and user-added), enabled or not. Computed once
+ * after embedding. Ranking reads only the scores of enabled topics; the rest show which topic a document fits
+ * best across the whole library.
  */
 export const docTopicScores = pgTable(
   "doc_topic_scores",
@@ -43,9 +43,9 @@ export const docTopicScores = pgTable(
 );
 
 /**
- * Tín hiệu cộng đồng mới nhất của tài liệu (điểm, bình luận HN…), lấy lại từ API của nguồn
- * ngay trước khi xếp hạng. Số lưu lúc lấy bài thì vô dụng: bài HN mới đăng gần như luôn 1 điểm
- * (trung bình 1,6, đo 11/10/2026). Chỉ giữ giá trị mới nhất.
+ * Latest community signal of the document (points, HN comments…), re-fetched from the source's API
+ * right before ranking. A number stored when the item was fetched is useless: a new HN post almost always has 1 point
+ * (average 1,6, measured 11/10/2026). Only the latest value is kept.
  */
 export const docSignals = pgTable(
   "doc_signals",
@@ -53,7 +53,7 @@ export const docSignals = pgTable(
     documentId: bigint("document_id", { mode: "number" })
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
-    /** `hn_points`, `hn_comments`… adapter nguồn tự đặt tên. */
+    /** `hn_points`, `hn_comments`… named by the source adapter. */
     metric: text("metric").notNull(),
     value: real("value").notNull(),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
@@ -62,12 +62,12 @@ export const docSignals = pgTable(
 );
 
 /**
- * Mặt bằng để chuẩn hoá: trung vị và mốc 0,1% cao nhất trên 30 ngày (xep-hang.html tab 03).
- * Chỉ giữ bản mới nhất cho mỗi khoá; digest chép lại bản đã dùng vào `digests.meta`.
+ * Baselines for normalization: the median and the top 0,1% mark over 30 days (xep-hang.html tab 03).
+ * Only the latest row per key is kept; the digest copies the version it used into `digests.meta`.
  *
- *   metric = relevance   source × chủ đề (source trống = mặt bằng chung của chủ đề)
- *   metric = engagement  theo nguồn, chủ đề trống
- *   metric = coverage    của sự kiện, cả nguồn lẫn chủ đề trống
+ *   metric = relevance   source × topic (empty source = the topic's shared baseline)
+ *   metric = engagement  per source, topic empty
+ *   metric = coverage    of the event, both source and topic empty
  */
 export const baselines = pgTable(
   "baselines",
@@ -80,7 +80,7 @@ export const baselines = pgTable(
     }),
     median: real("median").notNull(),
     p999: real("p999").notNull(),
-    /** Số mẫu: quyết định phần mặt bằng riêng w = n / (n + 1000) khi trộn với mặt bằng chung. */
+    /** Sample count: sets the weight of the own baseline w = n / (n + 1000) when blended with the shared baseline. */
     n: integer("n").notNull(),
     windowDays: integer("window_days").notNull(),
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),

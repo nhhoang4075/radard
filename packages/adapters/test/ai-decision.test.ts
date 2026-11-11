@@ -1,6 +1,6 @@
 /**
- * Hợp đồng của DecisionProvider: adapter Gateway (chạy trên model giả của `ai/test`, không gọi
- * mạng) và bản giả cho test. Cả hai phải trả cùng một dạng câu trả lời và ghi chi phí vào sink.
+ * Contract of DecisionProvider: the Gateway adapter (runs on the fake model of `ai/test`, without calling
+ * the network) and the fake for tests. Both must return the same answer shape and record cost into the sink.
  */
 import { describe, expect, test } from "bun:test";
 import type { DecisionProvider, UsageEvent } from "@radard/core";

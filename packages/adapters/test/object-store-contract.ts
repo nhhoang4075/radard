@@ -1,5 +1,5 @@
 /**
- * Bộ test chung cho mọi ObjectStore: adapter đĩa và adapter R2 phải cư xử giống hệt nhau.
+ * Shared test suite for every ObjectStore: the disk adapter and the R2 adapter must behave identically.
  */
 import { expect, test } from "bun:test";
 import type { ObjectStore } from "@radard/core";

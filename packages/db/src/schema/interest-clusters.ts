@@ -1,8 +1,8 @@
 /**
- * Cụm gu của một hồ sơ: kết quả gom cụm tin 👍 (packages/core/src/interest.ts) của LẦN CHẠY GẦN NHẤT.
+ * Taste clusters of a profile: the result of clustering 👍 messages (packages/core/src/interest.ts) from the LATEST RUN.
  *
- * Mỗi lần xếp hạng gom lại từ đầu rồi thay cả bộ cụm của hồ sơ (xoá hết, ghi mới trong một giao
- * dịch), nên bảng chỉ giữ "cụm hôm qua" để cụm hôm nay mượn tên theo tâm gần nhất, không giữ lịch sử.
+ * Each ranking run re-clusters from scratch and replaces the profile's whole cluster set (delete all, write new in one
+ * transaction), so the table keeps only "yesterday's clusters" so today's clusters borrow names from the nearest centroid, with no history kept.
  */
 import {
   bigint,
@@ -22,12 +22,12 @@ export const interestClusters = pgTable(
     profileId: integer("profile_id")
       .notNull()
       .references(() => profile.id),
-    /** Thứ hạng trong lần chạy (0 = quan trọng nhất), khớp thứ tự `clusterInterests` trả về. */
+    /** Rank in the run (0 = most important), matches the order returned by `clusterInterests`. */
     position: integer("position").notNull(),
-    /** `active` | `pending`, như `InterestCluster.status`. */
+    /** `active` | `pending`, same as `InterestCluster.status`. */
     status: text("status").notNull(),
     name: text("name"),
-    /** Tâm cụm, đã chuẩn hoá L2 (cùng số chiều với vector tài liệu). */
+    /** Cluster centroid, L2-normalized (same number of dimensions as the document vectors). */
     center: doublePrecision("center").array().notNull(),
     importance: doublePrecision("importance").notNull(),
     medoid: text("medoid").notNull(),

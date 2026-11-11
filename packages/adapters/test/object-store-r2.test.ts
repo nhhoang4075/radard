@@ -1,13 +1,13 @@
 /**
- * Chạy bộ test chung với một bucket S3 thật. Mặc định bỏ qua; muốn chạy thì bật SeaweedFS local
- * (Docker Hub đã ngừng phát hành image MinIO):
+ * Runs the shared test suite against a real S3 bucket. Skipped by default; to run it, start a local SeaweedFS
+ * (Docker Hub no longer publishes MinIO images):
  *
  *   docker run -d --name radard-s3 -p 8333:8333 chrislusf/seaweedfs server -dir=/data -s3 -s3.port=8333
  *   curl -X PUT localhost:8333/radard-test
  *   R2_TEST_ENDPOINT=http://localhost:8333 bun test object-store-r2
  *
- * SeaweedFS chưa cấu hình khoá thì không kiểm chữ ký, nên test này kiểm hành vi đọc ghi, không kiểm
- * khoá. Khoá R2 thật được kiểm bằng `cli store check` trên server.
+ * SeaweedFS without access keys configured does not check signatures, so this test checks read/write behaviour, not
+ * access keys. Real R2 keys are checked with `cli store check` on the server.
  */
 import { describe } from "bun:test";
 import { r2ObjectStore } from "../src/object-store-r2.ts";
