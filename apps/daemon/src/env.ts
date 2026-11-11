@@ -46,7 +46,7 @@ export const env = {
       (process.env.NODE_ENV === "production"
         ? undefined
         : `http://localhost:${num(process.env.PORT, 8080)}`),
-    ownerEmail: process.env.OWNER_EMAIL || undefined,
+    bootstrapOwnerEmails: process.env.BOOTSTRAP_OWNER_EMAILS || undefined,
     githubClientId: process.env.GITHUB_CLIENT_ID || undefined,
     githubClientSecret: process.env.GITHUB_CLIENT_SECRET || undefined,
     googleClientId: process.env.GOOGLE_CLIENT_ID || undefined,

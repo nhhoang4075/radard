@@ -75,8 +75,8 @@ import {
   createProcessDeps,
 } from "./runtime.ts";
 import { DEFAULT_PROFILE, DEFAULT_SOURCES } from "./sources/index.ts";
-import { normalizeEmail } from "./web/email.ts";
-import { addInvite, listInvites, revokeInvite } from "./web/invites.ts";
+import { addInvite, listInvites, parseRole, revokeInvite } from "./web/invites.ts";
+import { addOwner, listOwners, relinkProfile, removeOwner } from "./web/owners.ts";
 
 const USAGE = `
 radard — CLI
@@ -113,9 +113,17 @@ radard — CLI
                              từ chối mọi chat
 
   invites                    Danh sách email được mời đăng nhập web
-  invites add <email>        Mời một email (chữ thường); chạy lại không đổi gì
+  invites add <email> [--role owner|member]
+                             Mời một email (chữ thường), mặc định role member; chạy lại không đổi gì
   invites revoke <email>     Thu hồi: xoá lời mời chưa dùng và xoá tài khoản web cùng email (phiên hết
-                             hiệu lực, hồ sơ và dữ liệu giữ nguyên); không áp dụng cho OWNER_EMAIL
+                             hiệu lực, hồ sơ và dữ liệu giữ nguyên); TỪ CHỐI nếu email đang là owner
+
+  owners                     Danh sách owner (chủ dự án) kèm email; owner nằm trong DB, không trong env
+  owners add <email>         User đã có: cấp role owner. Chưa có: tạo lời mời role=owner
+  owners remove <email>      Gỡ role owner (không xoá user); TỪ CHỐI nếu là owner cuối cùng
+  profiles relink <hồ sơ> <email> [--yes]
+                             Đặt chủ của hồ sơ là user có email đó (user phải tồn tại và chưa có hồ sơ
+                             khác); user cũ của hồ sơ bị gỡ. Không có --yes thì chỉ in điều sẽ xảy ra
 
   topics                     Thư viện chủ đề (✓ = đã chọn) và chủ đề của bạn
   topics seed                Nạp/cập nhật thư viện chủ đề từ code
@@ -512,17 +520,67 @@ const COMMANDS: Record<string, Command> = {
   },
 
   "invites add": async ({ db }) => {
-    const res = await addInvite(db, process.argv[4] ?? "");
-    console.log(res.added ? `đã mời ${res.email}` : `${res.email} đã được mời, không đổi`);
+    const role = parseRole(flagValue("role") || "member");
+    const res = await addInvite(db, process.argv[4] ?? "", role);
+    console.log(
+      res.added
+        ? `đã mời ${res.email} (role ${res.role})`
+        : `${res.email} đã được mời (role ${res.role}), không đổi`,
+    );
   },
 
   "invites revoke": async ({ db }) => {
-    const r = await revokeInvite(db, normalizeEmail(env.auth.ownerEmail), process.argv[4] ?? "");
+    const r = await revokeInvite(db, process.argv[4] ?? "");
     const invite = r.inviteRemoved ? "đã xoá lời mời chưa dùng" : "không có lời mời chưa dùng";
     const usr = r.userRemoved
       ? "đã xoá tài khoản web (phiên hết hiệu lực, hồ sơ giữ nguyên)"
       : "không có tài khoản web";
     console.log(`${r.email}: ${invite}; ${usr}`);
+  },
+
+  owners: async ({ db }, sub) => {
+    // `owners add|remove` được tách riêng ở dưới; `owners <gì khác>` thì không đoán.
+    if (sub) throw new Error("cách dùng: owners | owners add <email> | owners remove <email>");
+    const rows = await listOwners(db);
+    if (rows.length === 0) console.log("chưa có owner nào");
+    else console.table(rows.map((r) => ({ email: r.email, tên: r.name, từ: r.since })));
+  },
+
+  "owners add": async ({ db }) => {
+    const r = await addOwner(db, process.argv[4] ?? "");
+    const msg = {
+      granted: "đã cấp role owner",
+      already: "đã là owner, không đổi",
+      invited: "chưa có tài khoản: đã tạo lời mời role owner (đăng nhập lần đầu sẽ thành owner)",
+      invite_updated: "chưa có tài khoản: lời mời được đặt role owner",
+    }[r.kind];
+    console.log(`${r.email}: ${msg}`);
+  },
+
+  "owners remove": async ({ db }) => {
+    const r = await removeOwner(db, process.argv[4] ?? "");
+    console.log(`${r.email}: đã gỡ role owner (tài khoản giữ nguyên)`);
+  },
+
+  "profiles relink": async ({ db }) => {
+    const [profileArg, email] = process.argv.slice(4);
+    if (!profileArg || !email || email.startsWith("--"))
+      throw new Error("cách dùng: profiles relink <hồ sơ> <email> [--yes]");
+    const yes = process.argv.includes("--yes");
+    const r = await relinkProfile(db, Number(profileArg), email, yes);
+    if (r.noop) return console.log(`hồ sơ ${r.profileId} đã thuộc ${r.email}, không đổi`);
+    const prev = r.previousUser
+      ? `user cũ ${r.previousUser.email ?? r.previousUser.id} sẽ mất hồ sơ này`
+      : "hồ sơ hiện chưa có chủ";
+    if (!r.applied) {
+      console.log(
+        `sẽ nối hồ sơ ${r.profileId} với ${r.email}; ${prev}. Chạy lại kèm --yes để thực hiện`,
+      );
+      return;
+    }
+    console.log(
+      `đã nối hồ sơ ${r.profileId} với ${r.email}; ${prev.replace("sẽ mất", "đã bị gỡ khỏi")}`,
+    );
   },
 
   "notify test": async ({ db }) => {

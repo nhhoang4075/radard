@@ -5,8 +5,8 @@
  * `web-routes-rule.test.ts` giữ luật đó. Hàm xử lý chỉ đọc `profileId` từ context, không từ request.
  */
 import { createLogger } from "@radard/core";
-import { type Database, profile } from "@radard/db";
-import { eq } from "drizzle-orm";
+import { type Database, profile, userRoles } from "@radard/db";
+import { and, eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Auth } from "../auth.ts";
 
@@ -19,6 +19,8 @@ export interface SessionEnv {
     userName: string;
     userEmail: string;
     emailVerified: boolean;
+    /** Có dòng `user_roles` role `owner`, tra DB mỗi request (không cache trong phiên). */
+    isOwner: boolean;
   };
 }
 
@@ -26,6 +28,7 @@ export const sessionMiddleware = (deps: { db: Database; auth: Auth }) =>
   createMiddleware<SessionEnv>(async (c, next) => {
     let session: Awaited<ReturnType<Auth["api"]["getSession"]>>;
     let row: { id: number } | undefined;
+    let isOwner = false;
     try {
       session = await deps.auth.api.getSession({ headers: c.req.raw.headers });
       if (!session) return c.json({ error: "unauthenticated" }, 401);
@@ -34,6 +37,12 @@ export const sessionMiddleware = (deps: { db: Database; auth: Auth }) =>
         .from(profile)
         .where(eq(profile.userId, session.user.id))
         .limit(1);
+      const [role] = await deps.db
+        .select({ userId: userRoles.userId })
+        .from(userRoles)
+        .where(and(eq(userRoles.userId, session.user.id), eq(userRoles.role, "owner")))
+        .limit(1);
+      isOwner = role !== undefined;
     } catch (err) {
       // Không xác định được người dùng thì không cho qua.
       log.error("đọc phiên lỗi", { err: err instanceof Error ? err.name : "unknown" });
@@ -45,5 +54,6 @@ export const sessionMiddleware = (deps: { db: Database; auth: Auth }) =>
     c.set("userName", session.user.name);
     c.set("userEmail", session.user.email);
     c.set("emailVerified", session.user.emailVerified === true);
+    c.set("isOwner", isOwner);
     await next();
   });

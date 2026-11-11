@@ -39,7 +39,7 @@ export const profile = pgTable("profile", {
   displayLang: text("display_lang").notNull().default("vi"),
   /**
    * Tài khoản đăng nhập web của hồ sơ (`user.id`). Duy nhất: một user một hồ sơ. Trống cho tới khi
-   * người đó đăng nhập lần đầu (hồ sơ 1 của chủ dự án được nối qua `OWNER_EMAIL`).
+   * người đó đăng nhập lần đầu (owner khởi tạo (`BOOTSTRAP_OWNER_EMAILS`) nhận hồ sơ chưa có chủ nhỏ nhất).
    */
   userId: text("user_id")
     .unique()

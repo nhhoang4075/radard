@@ -3,9 +3,9 @@
  *
  * Thu hồi = xoá lời mời CHƯA dùng và xoá dòng `user` cùng email (FK cascade xoá session/account;
  * `profile.user_id` về NULL nhờ ON DELETE SET NULL, hồ sơ và dữ liệu của nó giữ nguyên). Không bao
- * giờ thu hồi email `OWNER_EMAIL`.
+ * giờ thu hồi email của user đang có role owner (xem `owners remove`).
  */
-import { type Database, invites, user } from "@radard/db";
+import { type Database, invites, user, userRoles } from "@radard/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { normalizeEmail } from "./email.ts";
 
@@ -15,31 +15,45 @@ function must(email: string): string {
   return e;
 }
 
+export type InviteRole = "owner" | "member";
+
+export function parseRole(v: string): InviteRole {
+  if (v === "owner" || v === "member") return v;
+  throw new Error(`--role phải là owner hoặc member, nhận "${v}"`);
+}
+
+/** Lời mời đã có thì giữ nguyên (kể cả role); `role` trả về là role đang lưu. */
 export async function addInvite(
   db: Database,
   email: string,
-): Promise<{ email: string; added: boolean }> {
+  role: InviteRole = "member",
+): Promise<{ email: string; added: boolean; role: InviteRole }> {
   const e = must(email);
   const rows = await db
     .insert(invites)
-    .values({ email: e })
+    .values({ email: e, role })
     .onConflictDoNothing()
     .returning({ id: invites.id });
-  return { email: e, added: rows.length > 0 };
+  if (rows.length > 0) return { email: e, added: true, role };
+  const [cur] = await db.select({ role: invites.role }).from(invites).where(eq(invites.email, e));
+  return { email: e, added: false, role: cur?.role === "owner" ? "owner" : "member" };
 }
 
 export const listInvites = (db: Database) => db.select().from(invites).orderBy(invites.id);
 
 export async function revokeInvite(
   db: Database,
-  ownerEmail: string | null,
   email: string,
 ): Promise<{ email: string; inviteRemoved: boolean; userRemoved: boolean }> {
   const e = must(email);
-  if (ownerEmail && e === ownerEmail) {
-    throw new Error("không thu hồi được email chủ dự án (OWNER_EMAIL)");
-  }
   return db.transaction(async (tx) => {
+    const [owner] = await tx
+      .select({ id: user.id })
+      .from(user)
+      .innerJoin(userRoles, eq(userRoles.userId, user.id))
+      .where(and(eq(user.email, e), eq(userRoles.role, "owner")))
+      .limit(1);
+    if (owner) throw new Error(`${e} là owner: gỡ vai trò bằng "owners remove" trước`);
     const inv = await tx
       .delete(invites)
       .where(and(eq(invites.email, e), isNull(invites.usedAt)))

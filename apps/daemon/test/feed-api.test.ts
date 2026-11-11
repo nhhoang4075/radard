@@ -38,7 +38,7 @@ const auth = createAuth({
   config: {
     secret: "khoa-thu-nghiem-0123456789-0123456789",
     baseURL: BASE,
-    ownerEmail: OWNER,
+    bootstrapOwnerEmails: [OWNER],
     providers: {},
   },
   plugins: [testUtils()],

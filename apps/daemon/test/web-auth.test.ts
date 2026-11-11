@@ -14,6 +14,7 @@ import {
   invites,
   profile,
   runMigrations,
+  userRoles,
   user as userTable,
 } from "@radard/db";
 import { testUtils } from "better-auth/plugins";
@@ -32,7 +33,7 @@ const SECRET = "khoa-thu-nghiem-0123456789-0123456789";
 const config = (over: Partial<AuthConfig> = {}): AuthConfig => ({
   secret: SECRET,
   baseURL: "http://localhost:8080",
-  ownerEmail: OWNER,
+  bootstrapOwnerEmails: [OWNER],
   providers: {},
   ...over,
 });
@@ -90,16 +91,16 @@ describe("normalizeEmail", () => {
 describe("loadAuthConfig", () => {
   const base = { secret: SECRET, baseURL: "https://radard.example.com/" };
 
-  test("đủ cấu hình: bỏ dấu / cuối, chuẩn hoá OWNER_EMAIL, chỉ bật provider đủ cặp", () => {
+  test("đủ cấu hình: bỏ dấu / cuối, chuẩn hoá BOOTSTRAP_OWNER_EMAILS, chỉ bật provider đủ cặp", () => {
     const { config: c } = loadAuthConfig({
       ...base,
-      ownerEmail: " Chu.Du.An@Example.com",
+      bootstrapOwnerEmails: " Chu.Du.An@Example.com, ,b@example.com,chu.du.an@example.com,sai",
       githubClientId: "id",
       githubClientSecret: "sec",
       googleClientId: "chi-id",
     });
     expect(c?.baseURL).toBe("https://radard.example.com");
-    expect(c?.ownerEmail).toBe(OWNER);
+    expect(c?.bootstrapOwnerEmails).toEqual([OWNER, "b@example.com"]);
     expect(Object.keys(c?.providers ?? {})).toEqual(["github"]);
   });
 
@@ -111,40 +112,61 @@ describe("loadAuthConfig", () => {
     expect(loadAuthConfig({}).problems.length).toBeGreaterThan(0);
   });
 
-  test("thiếu OWNER_EMAIL: ownerEmail null kèm cảnh báo", () => {
+  test("thiếu BOOTSTRAP_OWNER_EMAILS: danh sách rỗng kèm cảnh báo", () => {
     const r = loadAuthConfig(base);
-    expect(r.config?.ownerEmail).toBeNull();
-    expect(r.problems.some((p) => p.includes("OWNER_EMAIL"))).toBe(true);
+    expect(r.config?.bootstrapOwnerEmails).toEqual([]);
+    expect(r.problems.some((p) => p.includes("BOOTSTRAP_OWNER_EMAILS"))).toBe(true);
   });
 });
 
 describe("assertMaySignUp (trước khi tạo user)", () => {
   test("email không có trong invites bị chặn", async () => {
     await expect(
-      assertMaySignUp(db, OWNER, { email: "la@example.com", emailVerified: true }),
+      assertMaySignUp(db, [OWNER], { email: "la@example.com", emailVerified: true }),
     ).rejects.toThrow();
   });
 
   test("email được mời (khác hoa/thường) được phép; email chưa xác minh thì không", async () => {
     await db.insert(invites).values({ email: "khach@example.com" });
-    await assertMaySignUp(db, OWNER, { email: "Khach@Example.com", emailVerified: true });
+    await assertMaySignUp(db, [OWNER], { email: "Khach@Example.com", emailVerified: true });
     await expect(
-      assertMaySignUp(db, OWNER, { email: "khach@example.com", emailVerified: false }),
+      assertMaySignUp(db, [OWNER], { email: "khach@example.com", emailVerified: false }),
     ).rejects.toThrow();
   });
 
   test("lời mời đã dùng không dùng lại được", async () => {
     await db.insert(invites).values({ email: "khach@example.com", usedAt: new Date() });
     await expect(
-      assertMaySignUp(db, OWNER, { email: "khach@example.com", emailVerified: true }),
+      assertMaySignUp(db, [OWNER], { email: "khach@example.com", emailVerified: true }),
     ).rejects.toThrow();
   });
 
-  test("OWNER_EMAIL luôn được phép; thiếu OWNER_EMAIL thì email đó thành người lạ", async () => {
-    await assertMaySignUp(db, OWNER, { email: OWNER.toUpperCase(), emailVerified: true });
+  test("email bootstrap được phép khi chưa có owner; danh sách rỗng thì là người lạ", async () => {
+    await assertMaySignUp(db, [OWNER], { email: OWNER.toUpperCase(), emailVerified: true });
+    await expect(assertMaySignUp(db, [], { email: OWNER, emailVerified: true })).rejects.toThrow();
+  });
+
+  test("đã có owner thì email bootstrap không mời cũng bị từ chối; có lời mời thì vẫn qua", async () => {
+    await db
+      .insert(userTable)
+      .values({ id: "u-o", name: "o", email: "o@example.com", emailVerified: true });
+    await db.insert(userRoles).values({ userId: "u-o", role: "owner" });
     await expect(
-      assertMaySignUp(db, null, { email: OWNER, emailVerified: true }),
+      assertMaySignUp(db, [OWNER], { email: OWNER, emailVerified: true }),
     ).rejects.toThrow();
+    await db.insert(invites).values({ email: OWNER });
+    await assertMaySignUp(db, [OWNER], { email: OWNER, emailVerified: true });
+  });
+
+  test("fail-closed: thiếu bảng user_roles thì email bootstrap bị từ chối", async () => {
+    await db.execute(sql`alter table user_roles rename to user_roles_tam`);
+    try {
+      await expect(
+        assertMaySignUp(db, [OWNER], { email: OWNER, emailVerified: true }),
+      ).rejects.toThrow();
+    } finally {
+      await db.execute(sql`alter table user_roles_tam rename to user_roles`);
+    }
   });
 
   test("fail-closed: truy vấn lỗi hoặc không có bảng thì từ chối", async () => {
@@ -154,13 +176,13 @@ describe("assertMaySignUp (trước khi tạo user)", () => {
       },
     } as unknown as Database;
     await expect(
-      assertMaySignUp(broken, OWNER, { email: "khach@example.com", emailVerified: true }),
+      assertMaySignUp(broken, [OWNER], { email: "khach@example.com", emailVerified: true }),
     ).rejects.toThrow();
 
     await db.execute(sql`alter table invites rename to invites_tam`);
     try {
       await expect(
-        assertMaySignUp(db, OWNER, { email: "khach@example.com", emailVerified: true }),
+        assertMaySignUp(db, [OWNER], { email: "khach@example.com", emailVerified: true }),
       ).rejects.toThrow();
     } finally {
       await db.execute(sql`alter table invites_tam rename to invites`);
@@ -168,12 +190,15 @@ describe("assertMaySignUp (trước khi tạo user)", () => {
   });
 
   test("dữ liệu lạ (thiếu email, emailVerified không phải true) bị từ chối", async () => {
-    await expect(assertMaySignUp(db, OWNER, {})).rejects.toThrow();
+    await expect(assertMaySignUp(db, [OWNER], {})).rejects.toThrow();
     await expect(
-      assertMaySignUp(db, OWNER, { email: OWNER, emailVerified: "true" }),
+      assertMaySignUp(db, [OWNER], { email: OWNER, emailVerified: "true" }),
     ).rejects.toThrow();
   });
 });
+
+const roleOf = async (userId: string) =>
+  (await db.select().from(userRoles).where(eq(userRoles.userId, userId)))[0]?.role;
 
 describe("Better Auth: đăng ký qua hook", () => {
   test("email chưa mời: createOAuthUser bị từ chối, không tạo user nào, không tạo hồ sơ", async () => {
@@ -183,47 +208,98 @@ describe("Better Auth: đăng ký qua hook", () => {
     expect(await profileCount()).toBe(0);
   });
 
-  test("OWNER_EMAIL: nối vào hồ sơ số 1 sẵn có, giữ nguyên dữ liệu, KHÔNG tạo hồ sơ mới", async () => {
-    await db.insert(profile).values({ id: 1, promptContext: "AI engineer", description: "mô tả" });
-    const auth = makeAuth();
-    const u = await oauthSignUp(auth, "Chu.Du.An@Example.com");
-    expect(await profileCount()).toBe(1);
-    const p = await profileOf(u.id);
-    expect(p).toMatchObject({ id: 1, promptContext: "AI engineer", description: "mô tả" });
+  test("bootstrap: owner nhận hồ sơ chưa-chủ nhỏ nhất, giữ dữ liệu, không tạo hồ sơ mới, không cướp hồ sơ đã có chủ", async () => {
+    await db
+      .insert(userTable)
+      .values({ id: "u-x", name: "x", email: "x@example.com", emailVerified: true });
+    await db.insert(profile).values({ id: 3, promptContext: "đã có chủ", userId: "u-x" });
+    await db.insert(profile).values({ id: 5, promptContext: "AI engineer", description: "mô tả" });
+    await db.insert(profile).values({ id: 7, promptContext: "khác" });
+    const u = await oauthSignUp(makeAuth(), "Chu.Du.An@Example.com");
+    expect(await profileCount()).toBe(3);
+    expect(await profileOf(u.id)).toMatchObject({
+      id: 5,
+      promptContext: "AI engineer",
+      description: "mô tả",
+    });
+    expect(await roleOf(u.id)).toBe("owner");
+    expect((await db.select().from(profile).where(eq(profile.id, 3)))[0]?.userId).toBe("u-x");
+    expect((await db.select().from(profile).where(eq(profile.id, 7)))[0]?.userId).toBeNull();
   });
 
-  test("người được mời nhận hồ sơ trống mới (id >= 2), lời mời được đánh dấu đã dùng", async () => {
+  test("bootstrap khi DB không có hồ sơ chưa chủ: tạo mới, id bắt đầu từ 1 (bảng trống)", async () => {
+    const u = await oauthSignUp(makeAuth(), OWNER);
+    expect((await profileOf(u.id))?.id).toBe(1);
+    expect(await roleOf(u.id)).toBe("owner");
+  });
+
+  test("người được mời: role member, hồ sơ trống MỚI (max+1), không nhận hồ sơ chưa chủ có sẵn, lời mời đã dùng", async () => {
     await db.insert(profile).values({ id: 1, promptContext: "AI engineer" });
     await db.insert(invites).values({ email: "khach@example.com" });
-    const auth = makeAuth();
-    const u = await oauthSignUp(auth, "khach@example.com");
+    const u = await oauthSignUp(makeAuth(), "khach@example.com");
     expect(await profileCount()).toBe(2);
-    const p = await profileOf(u.id);
-    expect(p).toMatchObject({ id: 2, promptContext: "", description: null });
+    expect(await profileOf(u.id)).toMatchObject({ id: 2, promptContext: "", description: null });
+    expect(await roleOf(u.id)).toBeUndefined();
     const [inv] = await db.select().from(invites);
     expect(inv?.usedAt).not.toBeNull();
-    // Hồ sơ số 1 không bị đụng tới.
     expect((await db.select().from(profile).where(eq(profile.id, 1)))[0]?.userId).toBeNull();
   });
 
-  test("thiếu OWNER_EMAIL: email chủ dự án không vào được, hồ sơ số 1 không bị nối", async () => {
+  test("lời mời role=owner: ghi user_roles owner, hồ sơ trống mới, không nhận hồ sơ cũ; hai owner cùng tồn tại", async () => {
     await db.insert(profile).values({ id: 1, promptContext: "AI engineer" });
-    const auth = makeAuth({ ownerEmail: null });
+    const auth = makeAuth();
+    const first = await oauthSignUp(auth, OWNER); // bootstrap, nhận hồ sơ 1
+    await db.insert(profile).values({ id: 2, promptContext: "chưa chủ" });
+    await db.insert(invites).values({ email: "owner2@example.com", role: "owner" });
+    const second = await oauthSignUp(auth, "owner2@example.com");
+    expect((await profileOf(first.id))?.id).toBe(1);
+    expect((await profileOf(second.id))?.id).toBe(3); // không nhận hồ sơ 2
+    expect(await roleOf(first.id)).toBe("owner");
+    expect(await roleOf(second.id)).toBe("owner");
+    expect((await db.select().from(profile).where(eq(profile.id, 2)))[0]?.userId).toBeNull();
+  });
+
+  test("có owner rồi: email bootstrap không mời bị từ chối, hồ sơ chưa chủ không bị nối", async () => {
+    const auth = makeAuth({ bootstrapOwnerEmails: [OWNER, "b@example.com"] });
+    await oauthSignUp(auth, OWNER);
+    await db.insert(profile).values({ id: 9, promptContext: "x" });
+    await expect(oauthSignUp(auth, "b@example.com")).rejects.toThrow();
+    expect((await db.select().from(profile).where(eq(profile.id, 9)))[0]?.userId).toBeNull();
+    expect(await db.select().from(userRoles)).toHaveLength(1);
+  });
+
+  test("hai email bootstrap đăng nhập đồng thời: chỉ một người thành owner", async () => {
+    await db.insert(profile).values({ id: 1, promptContext: "x" });
+    const auth = makeAuth({ bootstrapOwnerEmails: ["a@example.com", "b@example.com"] });
+    const res = await Promise.allSettled([
+      oauthSignUp(auth, "a@example.com"),
+      oauthSignUp(auth, "b@example.com"),
+    ]);
+    const roles = await db.select().from(userRoles);
+    expect(roles).toHaveLength(1);
+    expect(roles[0]?.role).toBe("owner");
+    expect(res.filter((r) => r.status === "fulfilled").length).toBe(1);
+    // Kẻ thua không có hồ sơ, không có phiên (lưới an toàn ở session.create.before).
+    const loser = (await db.select().from(userTable)).find((u) => u.id !== roles[0]?.userId);
+    if (loser) {
+      expect(await profileOf(loser.id)).toBeUndefined();
+      await expect(cookieHeader(auth, loser.id)).rejects.toThrow();
+    }
+    expect(await profileCount()).toBe(1);
+  });
+
+  test("danh sách bootstrap rỗng: email chủ dự án không vào được, hồ sơ không bị nối", async () => {
+    await db.insert(profile).values({ id: 1, promptContext: "AI engineer" });
+    const auth = makeAuth({ bootstrapOwnerEmails: [] });
     await expect(oauthSignUp(auth, OWNER)).rejects.toThrow();
     expect((await db.select().from(profile))[0]?.userId).toBeNull();
   });
 
-  test("email chưa xác minh bị từ chối, kể cả khi trùng OWNER_EMAIL", async () => {
+  test("email chưa xác minh bị từ chối, kể cả khi nằm trong danh sách bootstrap", async () => {
     await db.insert(profile).values({ id: 1, promptContext: "AI engineer" });
     const auth = makeAuth();
     await expect(oauthSignUp(auth, OWNER, { verified: false })).rejects.toThrow();
     expect((await db.select().from(profile))[0]?.userId).toBeNull();
-  });
-
-  test("DB chưa có hồ sơ số 1: chủ dự án đăng nhập đầu tiên tạo đúng hồ sơ id 1", async () => {
-    const auth = makeAuth();
-    const u = await oauthSignUp(auth, OWNER);
-    expect((await profileOf(u.id))?.id).toBe(1);
   });
 });
 
@@ -236,10 +312,10 @@ describe("ensureProfileForUser", () => {
 
   test("thu hồi lời mời: user chưa có hồ sơ mà không còn lời mời thì không nhận hồ sơ mới", async () => {
     const a = await mkUser("u-a", "a@example.com", false); // user có nhưng không có lời mời
-    await expect(ensureProfileForUser(db, OWNER, a)).rejects.toThrow();
+    await expect(ensureProfileForUser(db, [OWNER], a)).rejects.toThrow();
     expect(await profileCount()).toBe(0);
     await db.insert(invites).values({ email: "a@example.com", usedAt: new Date() }); // đã dùng vẫn đủ
-    expect(await ensureProfileForUser(db, OWNER, a)).toBe(2);
+    expect(await ensureProfileForUser(db, [OWNER], a)).toBe(1); // bảng trống: id bắt đầu từ 1
   });
 
   test("session-hook: user bị xoá lời mời và chưa có hồ sơ thì đăng nhập lại bị từ chối", async () => {
@@ -263,7 +339,7 @@ describe("ensureProfileForUser", () => {
     expect((await app.request("/api/me", { headers: guestHeaders })).status).toBe(200);
 
     // Đã dùng (hook after đánh dấu) nên lời mời không bị xoá, nhưng user thì bị xoá.
-    const r = await revokeInvite(db, OWNER, "Khach@Example.com");
+    const r = await revokeInvite(db, "Khach@Example.com");
     expect(r).toEqual({ email: "khach@example.com", inviteRemoved: false, userRemoved: true });
     expect((await app.request("/api/me", { headers: guestHeaders })).status).toBe(401);
     const guestProfile = (await db.select().from(profile).where(eq(profile.id, 2)))[0];
@@ -273,7 +349,7 @@ describe("ensureProfileForUser", () => {
     await expect(oauthSignUp(auth, "khach@example.com")).rejects.toThrow();
 
     // Owner: bị chặn, hồ sơ 1 và tài khoản owner không đổi.
-    await expect(revokeInvite(db, OWNER, OWNER.toUpperCase())).rejects.toThrow();
+    await expect(revokeInvite(db, OWNER.toUpperCase())).rejects.toThrow();
     expect((await db.select().from(userTable).where(eq(userTable.id, owner.id))).length).toBe(1);
     expect((await db.select().from(profile).where(eq(profile.id, 1)))[0]?.userId).toBe(owner.id);
   });
@@ -282,10 +358,11 @@ describe("ensureProfileForUser", () => {
     expect(await addInvite(db, " Moi@Example.com ")).toEqual({
       email: "moi@example.com",
       added: true,
+      role: "member",
     });
     expect((await addInvite(db, "moi@example.com")).added).toBe(false);
     expect(await listInvites(db)).toHaveLength(1);
-    expect(await revokeInvite(db, OWNER, "moi@example.com")).toEqual({
+    expect(await revokeInvite(db, "moi@example.com")).toEqual({
       email: "moi@example.com",
       inviteRemoved: true,
       userRemoved: false,
@@ -294,27 +371,26 @@ describe("ensureProfileForUser", () => {
     await expect(addInvite(db, "khong-phai-email")).rejects.toThrow();
   });
 
-  test("không cướp hồ sơ số 1 đã thuộc user khác", async () => {
-    const a = await mkUser("u-a", OWNER);
+  test("không cướp hồ sơ đã có chủ: owner khởi tạo nhận hồ sơ mới", async () => {
+    const a = await mkUser("u-a", "a@example.com");
     await db.insert(profile).values({ id: 1, promptContext: "x", userId: a.id });
-    await db.execute(sql`update "user" set email = 'khac@example.com' where id = 'u-a'`);
-    const b = await mkUser("u-b", "chu.moi@example.com");
-    // u-b mang email trùng OWNER_EMAIL mới: hồ sơ 1 đã có chủ → từ chối, không tạo hồ sơ.
-    await expect(ensureProfileForUser(db, "chu.moi@example.com", b)).rejects.toThrow();
-    expect(await profileCount()).toBe(1);
+    const b = await mkUser("u-b", OWNER, false);
+    expect(await ensureProfileForUser(db, [OWNER], b)).toBe(2);
+    expect((await db.select().from(profile).where(eq(profile.id, 1)))[0]?.userId).toBe(a.id);
+    expect(await roleOf("u-b")).toBe("owner");
   });
 
   test("idempotent: gọi lại trả cùng hồ sơ, không tạo thêm", async () => {
     await db.insert(profile).values({ id: 1, promptContext: "x" });
     const a = await mkUser("u-a", "a@example.com");
-    const first = await ensureProfileForUser(db, OWNER, a);
-    expect(await ensureProfileForUser(db, OWNER, a)).toBe(first);
+    const first = await ensureProfileForUser(db, [OWNER], a);
+    expect(await ensureProfileForUser(db, [OWNER], a)).toBe(first);
     expect(await profileCount()).toBe(2);
   });
 
   test("chưa xác minh email: ném lỗi, không tạo hồ sơ", async () => {
     await expect(
-      ensureProfileForUser(db, OWNER, { id: "u-x", email: OWNER, emailVerified: false }),
+      ensureProfileForUser(db, [OWNER], { id: "u-x", email: OWNER, emailVerified: false }),
     ).rejects.toThrow();
     expect(await profileCount()).toBe(0);
   });
@@ -326,8 +402,8 @@ describe("ensureProfileForUser", () => {
       mkUser("u-b", "b@example.com"),
     ]);
     const ids = await Promise.all([
-      ensureProfileForUser(db, OWNER, a),
-      ensureProfileForUser(db, OWNER, b),
+      ensureProfileForUser(db, [OWNER], a),
+      ensureProfileForUser(db, [OWNER], b),
     ]);
     expect(new Set(ids).size).toBe(2);
     expect(ids.every((i) => i >= 2)).toBe(true);

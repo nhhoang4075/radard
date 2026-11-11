@@ -549,7 +549,7 @@ describe("POST /api/events/:id/for-me", () => {
     config: {
       secret: "khoa-thu-nghiem-0123456789-0123456789",
       baseURL: "http://localhost:8080",
-      ownerEmail: OWNER,
+      bootstrapOwnerEmails: [OWNER],
       providers: {},
     },
     plugins: [testUtils()],

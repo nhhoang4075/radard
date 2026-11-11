@@ -1,5 +1,5 @@
 /**
- * Danh sách mời: chỉ email có ở đây (hoặc trùng `OWNER_EMAIL`) mới đăng ký được. Hook "trước khi
+ * Danh sách mời: chỉ email có ở đây (hoặc email trong `BOOTSTRAP_OWNER_EMAILS` khi chưa có owner) mới đăng ký được. Hook "trước khi
  * tạo user" của Better Auth tra bảng này và từ chối khi không thấy hoặc khi lỗi (fail-closed).
  *
  * `email` luôn chữ thường (ràng buộc CHECK) để so sánh không phụ thuộc cách gõ hoa/thường.
@@ -20,6 +20,11 @@ export const invites = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Lúc người được mời đăng ký xong; trống = chưa dùng. */
     usedAt: timestamp("used_at", { withTimezone: true }),
+    /** Vai trò cấp khi người được mời đăng ký: `member` (mặc định) hoặc `owner`. */
+    role: text("role").notNull().default("member"),
   },
-  (t) => [check("invites_email_lower_ck", sql`${t.email} = lower(${t.email})`)],
+  (t) => [
+    check("invites_email_lower_ck", sql`${t.email} = lower(${t.email})`),
+    check("invites_role_ck", sql`${t.role} in ('owner', 'member')`),
+  ],
 );

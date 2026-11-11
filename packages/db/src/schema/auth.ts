@@ -4,7 +4,8 @@
  * KHÔNG đổi tên ở đây. `user.id` là chuỗi do thư viện tạo, không liên quan `profile.id`.
  * Nối user với hồ sơ qua `profile.user_id` (xem `profile.ts`), không qua bảng này.
  */
-import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -66,4 +67,22 @@ export const verification = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
+);
+
+/**
+ * Vai trò của user (quyết định 11/11/2026: owner nằm trong DB, không nằm trong biến môi trường).
+ * Chưa có dòng = thành viên thường; dòng `owner` = chủ dự án (có thể nhiều người). Gỡ user thì dòng
+ * này mất theo (cascade); người cấp vai trò bị xoá thì `granted_by_user_id` về NULL.
+ */
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    grantedByUserId: text("granted_by_user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("user_roles_role_ck", sql`${t.role} in ('owner', 'member')`)],
 );

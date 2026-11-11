@@ -15,8 +15,11 @@ export interface AuthConfig {
   secret: string;
   /** Địa chỉ công khai của web, không có dấu `/` cuối; `https` thì cookie có `Secure`. */
   baseURL: string;
-  /** Email chủ dự án (chuẩn hoá chữ thường); trống thì không ai được nối vào hồ sơ số 1. */
-  ownerEmail: string | null;
+  /**
+   * Email được phép KHỞI TẠO owner đầu tiên (chuẩn hoá chữ thường, bỏ trùng và rỗng). Chỉ có tác dụng
+   * khi DB chưa có owner nào; có owner rồi thì danh sách này bị bỏ qua. Trống = không có đường khởi tạo.
+   */
+  bootstrapOwnerEmails: string[];
   providers: Partial<Record<SocialProviderId, { clientId: string; clientSecret: string }>>;
 }
 
@@ -24,7 +27,8 @@ export interface AuthConfig {
 export interface RawAuthEnv {
   secret?: string;
   baseURL?: string;
-  ownerEmail?: string;
+  /** Danh sách email phân tách dấu phẩy (`BOOTSTRAP_OWNER_EMAILS`). */
+  bootstrapOwnerEmails?: string;
   githubClientId?: string;
   githubClientSecret?: string;
   googleClientId?: string;
@@ -36,6 +40,19 @@ const schema = z.object({
   baseURL: z
     .url({ protocol: /^https?$/, error: "BETTER_AUTH_URL phải là địa chỉ http(s)" })
     .transform((u) => u.replace(/\/+$/, "")),
+});
+
+/** Danh sách email phân tách dấu phẩy: chuẩn hoá chữ thường, bỏ rỗng, bỏ trùng. Phần tử sai trả về ở `invalid`. */
+const emailList = z.string().transform((raw) => {
+  const emails: string[] = [];
+  const invalid: string[] = [];
+  for (const part of raw.split(",")) {
+    if (!part.trim()) continue;
+    const e = normalizeEmail(part);
+    if (!e) invalid.push(part.trim());
+    else if (!emails.includes(e)) emails.push(e);
+  }
+  return { emails, invalid };
 });
 
 export interface LoadResult {
@@ -55,14 +72,14 @@ export function loadAuthConfig(raw: RawAuthEnv): LoadResult {
     return { config: null, problems };
   }
 
-  let ownerEmail: string | null = null;
-  if (raw.ownerEmail) {
-    ownerEmail = normalizeEmail(raw.ownerEmail);
-    if (!ownerEmail)
-      problems.push(
-        "OWNER_EMAIL không phải email hợp lệ: bỏ qua, không ai được nối vào hồ sơ số 1",
-      );
-  } else problems.push("chưa đặt OWNER_EMAIL: không ai được nối vào hồ sơ số 1");
+  const list = emailList.parse(raw.bootstrapOwnerEmails ?? "");
+  const bootstrapOwnerEmails = list.emails;
+  for (const bad of list.invalid)
+    problems.push(`BOOTSTRAP_OWNER_EMAILS: "${bad}" không phải email hợp lệ, bỏ qua`);
+  if (bootstrapOwnerEmails.length === 0)
+    problems.push(
+      "chưa đặt BOOTSTRAP_OWNER_EMAILS: không có đường khởi tạo owner (chỉ đăng nhập bằng lời mời)",
+    );
 
   const providers: AuthConfig["providers"] = {};
   const pairs: Array<[SocialProviderId, string | undefined, string | undefined]> = [
@@ -77,5 +94,5 @@ export function loadAuthConfig(raw: RawAuthEnv): LoadResult {
   if (Object.keys(providers).length === 0)
     problems.push("không có provider đăng nhập nào được bật");
 
-  return { config: { ...parsed.data, ownerEmail, providers }, problems };
+  return { config: { ...parsed.data, bootstrapOwnerEmails, providers }, problems };
 }

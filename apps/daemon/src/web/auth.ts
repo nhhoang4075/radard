@@ -1,12 +1,15 @@
 /**
  * Đăng nhập web bằng Better Auth (1.6.23): adapter Drizzle trên Postgres, GitHub và Google.
+ * Owner nằm trong DB (`user_roles`), không nằm trong biến môi trường (quyết định 11/11/2026).
  *
  * Hai hook của `databaseHooks`, cả hai FAIL-CLOSED (lỗi hay không rõ thì từ chối):
- *  - `user.create.before`: chỉ email đã xác minh VÀ (trùng `OWNER_EMAIL` hoặc có trong `invites`
- *    chưa dùng) mới được tạo user.
+ *  - `user.create.before`: chỉ email đã xác minh VÀ (có lời mời chưa dùng, HOẶC nằm trong
+ *    `BOOTSTRAP_OWNER_EMAILS` và DB chưa có owner nào) mới được tạo user.
  *  - `user.create.after` (và `session.create.before` làm lưới an toàn, vì hook "after" chạy sau giao
- *    dịch nên có thể hỏng riêng): bảo đảm user có hồ sơ. Email chủ dự án nối vào hồ sơ số 1, không tạo
- *    hồ sơ mới; người khác nhận một hồ sơ trống mới. Không bao giờ nối vào hồ sơ đã thuộc user khác.
+ *    dịch nên có thể hỏng riêng): bảo đảm user có hồ sơ, trong một giao dịch dưới khoá tư vấn.
+ *    Đường bootstrap (chưa có owner): gán role owner và nhận hồ sơ chưa có chủ nhỏ nhất (tạo mới nếu
+ *    không có). Đường lời mời: role lấy từ `invites.role`, luôn một hồ sơ trống MỚI. Không bao giờ nhận
+ *    hồ sơ đã có `user_id`.
  */
 import { createLogger } from "@radard/core";
 import {
@@ -15,22 +18,19 @@ import {
   invites,
   profile,
   session,
+  userRoles,
   user as userTable,
   verification,
 } from "@radard/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { AuthConfig } from "./auth-config.ts";
 import { normalizeEmail } from "./email.ts";
+import { PROFILE_LOCK_KEY } from "./profile-lock.ts";
 
 const log = createLogger("web:auth");
-
-/** Hồ sơ của chủ dự án (dữ liệu có trước khi có web). */
-export const OWNER_PROFILE_ID = 1;
-/** Khoá tư vấn: tạo/nối hồ sơ chạy tuần tự, nên hai lần đăng nhập đồng thời không nối trùng. */
-const PROFILE_LOCK_KEY = 7_302_419;
 
 /** Mã lỗi ngắn để log (thông điệp của driver kèm tham số truy vấn, có email). */
 function errCode(err: unknown): string {
@@ -47,25 +47,38 @@ export interface HookUser {
 /** Từ chối việc tạo user (fail-closed). Không nêu lý do cụ thể ra ngoài. */
 export class SignUpDenied extends Error {}
 
+type Executor = Pick<Database, "select">;
+
+/** Đã có ít nhất một owner trong DB chưa. Lỗi (thiếu bảng...) thì ném, người gọi từ chối. */
+async function hasOwner(q: Executor): Promise<boolean> {
+  const [row] = await q
+    .select({ userId: userRoles.userId })
+    .from(userRoles)
+    .where(eq(userRoles.role, "owner"))
+    .limit(1);
+  return row !== undefined;
+}
+
 /**
- * Cho phép tạo user khi email đã xác minh và (là chủ dự án hoặc đã được mời). Mọi nhánh còn lại,
- * kể cả lỗi truy vấn hay thiếu bảng, đều ném `SignUpDenied`.
+ * Cho phép tạo user khi email đã xác minh và (được mời, hoặc nằm trong `bootstrapOwnerEmails` khi chưa có
+ * owner nào). Mọi nhánh còn lại, kể cả lỗi truy vấn hay thiếu bảng, đều ném `SignUpDenied`.
  */
 export async function assertMaySignUp(
   db: Database,
-  ownerEmail: string | null,
+  bootstrapOwnerEmails: readonly string[],
   u: HookUser,
 ): Promise<void> {
   try {
     const email = normalizeEmail(u.email);
     if (!email || u.emailVerified !== true) throw new SignUpDenied("email chưa xác minh");
-    if (ownerEmail && email === ownerEmail) return;
     const [row] = await db
       .select({ id: invites.id })
       .from(invites)
       .where(and(eq(invites.email, email), isNull(invites.usedAt)))
       .limit(1);
-    if (!row) throw new SignUpDenied("email chưa được mời");
+    if (row) return;
+    if (bootstrapOwnerEmails.includes(email) && !(await hasOwner(db))) return;
+    throw new SignUpDenied("email chưa được mời");
   } catch (err) {
     if (!(err instanceof SignUpDenied))
       log.error("kiểm lời mời lỗi, từ chối", { code: errCode(err) });
@@ -74,15 +87,16 @@ export async function assertMaySignUp(
 }
 
 /**
- * Bảo đảm user có hồ sơ (idempotent). Trả id hồ sơ.
+ * Bảo đảm user có hồ sơ (idempotent). Trả id hồ sơ. Role và hồ sơ được ghi trong cùng một giao dịch.
  *  - Đã có hồ sơ gắn user này: trả luôn.
- *  - Email đã xác minh trùng `ownerEmail`: nối vào hồ sơ số 1 (tạo hồ sơ số 1 nếu DB chưa có, không bao
- *    giờ tạo hồ sơ khác). Hồ sơ số 1 đã thuộc user khác thì ném lỗi, không cướp.
- *  - Còn lại: tạo hồ sơ trống, id mới lớn hơn mọi id hiện có (và >= 2, để không ai chiếm số 1).
+ *  - Trong giao dịch (khoá tư vấn, kiểm lại bên trong): email nằm trong `bootstrapOwnerEmails` VÀ chưa có
+ *    owner nào → gán owner, nhận hồ sơ chưa có chủ (`user_id` NULL) có id nhỏ nhất, không có thì tạo mới.
+ *  - Ngược lại cần lời mời (đã dùng hay chưa đều được; bị thu hồi thì không): role lấy từ `invites.role`,
+ *    luôn tạo hồ sơ trống MỚI (id = max + 1), không bao giờ nhận hồ sơ cũ.
  */
 export async function ensureProfileForUser(
   db: Database,
-  ownerEmail: string | null,
+  bootstrapOwnerEmails: readonly string[],
   u: HookUser,
 ): Promise<number> {
   if (typeof u.id !== "string" || !u.id) throw new Error("user không có id");
@@ -96,7 +110,6 @@ export async function ensureProfileForUser(
 
   const email = normalizeEmail(u.email);
   if (!email || u.emailVerified !== true) throw new Error("email chưa xác minh, không tạo hồ sơ");
-  const isOwner = ownerEmail !== null && email === ownerEmail;
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${PROFILE_LOCK_KEY})`);
@@ -107,34 +120,45 @@ export async function ensureProfileForUser(
       .limit(1);
     if (again) return again.id;
 
-    let profileId: number;
-    if (isOwner) {
-      const [p1] = await tx
-        .select({ userId: profile.userId })
+    const [inv] = await tx
+      .select({ id: invites.id, role: invites.role })
+      .from(invites)
+      .where(eq(invites.email, email))
+      .limit(1);
+
+    let role: "owner" | "member";
+    let profileId: number | null = null;
+    if (bootstrapOwnerEmails.includes(email) && !(await hasOwner(tx))) {
+      // Đường bootstrap: nhận hồ sơ chưa có chủ nhỏ nhất.
+      role = "owner";
+      const [free] = await tx
+        .select({ id: profile.id })
         .from(profile)
-        .where(eq(profile.id, OWNER_PROFILE_ID))
-        .limit(1);
-      if (!p1) {
-        await tx.insert(profile).values({ id: OWNER_PROFILE_ID, promptContext: "", userId });
-      } else {
-        if (p1.userId !== null) throw new Error("hồ sơ số 1 đã thuộc user khác");
-        await tx.update(profile).set({ userId }).where(eq(profile.id, OWNER_PROFILE_ID));
+        .where(isNull(profile.userId))
+        .orderBy(asc(profile.id))
+        .limit(1)
+        .for("update");
+      if (free) {
+        await tx.update(profile).set({ userId }).where(eq(profile.id, free.id));
+        profileId = free.id;
       }
-      profileId = OWNER_PROFILE_ID;
     } else {
-      // Hồ sơ MỚI cho người không phải chủ dự án: lời mời phải còn trong bảng (đã dùng hay chưa đều
-      // được). Lời mời bị thu hồi thì không nhận được hồ sơ, kể cả khi user đã tồn tại.
-      const [inv] = await tx
-        .select({ id: invites.id })
-        .from(invites)
-        .where(eq(invites.email, email))
-        .limit(1);
+      // Đường lời mời: lời mời phải còn trong bảng (đã dùng hay chưa đều được); bị thu hồi thì không.
       if (!inv) throw new Error("không có lời mời cho email này, không tạo hồ sơ");
+      role = inv.role === "owner" ? "owner" : "member";
+    }
+    if (profileId === null) {
       const [next] = await tx
-        .select({ id: sql<number>`greatest(coalesce(max(${profile.id}), 0) + 1, 2)::int` })
+        .select({ id: sql<number>`coalesce(max(${profile.id}), 0) + 1` })
         .from(profile);
-      profileId = next?.id ?? 2;
+      profileId = Number(next?.id ?? 1);
       await tx.insert(profile).values({ id: profileId, promptContext: "", userId });
+    }
+    if (role === "owner") {
+      await tx
+        .insert(userRoles)
+        .values({ userId, role: "owner" })
+        .onConflictDoUpdate({ target: userRoles.userId, set: { role: "owner" } });
     }
     await tx
       .update(invites)
@@ -181,13 +205,13 @@ export function createAuth({ db, config, plugins }: CreateAuthOptions) {
         create: {
           before: async (u) => {
             try {
-              await assertMaySignUp(db, config.ownerEmail, u);
+              await assertMaySignUp(db, config.bootstrapOwnerEmails, u);
             } catch {
               deny();
             }
           },
           after: async (u) => {
-            await ensureProfileForUser(db, config.ownerEmail, u ?? {});
+            await ensureProfileForUser(db, config.bootstrapOwnerEmails, u ?? {});
           },
         },
       },
@@ -203,7 +227,7 @@ export function createAuth({ db, config, plugins }: CreateAuthOptions) {
                 .where(eq(userTable.id, String(s.userId)))
                 .limit(1);
               if (!u) deny();
-              await ensureProfileForUser(db, config.ownerEmail, u);
+              await ensureProfileForUser(db, config.bootstrapOwnerEmails, u);
             } catch (err) {
               if (!(err instanceof APIError))
                 log.error("nối hồ sơ lỗi, từ chối phiên", { code: errCode(err) });

@@ -24,7 +24,7 @@ const auth = createAuth({
   config: {
     secret: "khoa-thu-nghiem-0123456789-0123456789",
     baseURL: "http://localhost:8080",
-    ownerEmail: null,
+    bootstrapOwnerEmails: [],
     providers: {},
   },
 });
@@ -69,21 +69,21 @@ describe("luật: route /api đi qua middleware phiên", () => {
 });
 
 describe("ownerOnly", () => {
-  const mk = (ownerEmail: string | null, email: string, verified: boolean) => {
+  const mk = (isOwner: boolean, email = "a@x.com") => {
     const app = new Hono<SessionEnv>();
     app.use("*", async (c, next) => {
       c.set("userEmail", email);
-      c.set("emailVerified", verified);
+      c.set("emailVerified", true);
+      c.set("isOwner", isOwner);
       await next();
     });
-    app.use("*", ownerOnly(ownerEmail));
+    app.use("*", ownerOnly());
     app.get("/x", (c) => c.text("ok"));
     return app;
   };
-  test("chỉ email chủ đã xác minh qua; thiếu OWNER_EMAIL thì không ai qua", async () => {
-    expect((await mk("a@x.com", "A@X.com", true).request("/x")).status).toBe(200);
-    expect((await mk("a@x.com", "b@x.com", true).request("/x")).status).toBe(403);
-    expect((await mk("a@x.com", "a@x.com", false).request("/x")).status).toBe(403);
-    expect((await mk(null, "a@x.com", true).request("/x")).status).toBe(403);
+  test("chỉ isOwner qua; email không quyết định gì", async () => {
+    expect((await mk(true).request("/x")).status).toBe(200);
+    expect((await mk(false).request("/x")).status).toBe(403);
+    expect((await mk(false, "chu@x.com").request("/x")).status).toBe(403);
   });
 });
