@@ -121,7 +121,7 @@ export async function ensureProfileForUser(
     if (again) return again.id;
 
     const [inv] = await tx
-      .select({ id: invites.id, role: invites.role })
+      .select({ id: invites.id, role: invites.role, usedAt: invites.usedAt })
       .from(invites)
       .where(eq(invites.email, email))
       .limit(1);
@@ -145,7 +145,8 @@ export async function ensureProfileForUser(
     } else {
       // Đường lời mời: lời mời phải còn trong bảng (đã dùng hay chưa đều được); bị thu hồi thì không.
       if (!inv) throw new Error("không có lời mời cho email này, không tạo hồ sơ");
-      role = inv.role === "owner" ? "owner" : "member";
+      // Quyền owner chỉ lấy từ lời mời CHƯA dùng: lời mời đã dùng không được cấp lại owner (vd. sau `owners remove` + `profiles relink`).
+      role = inv.role === "owner" && inv.usedAt === null ? "owner" : "member";
     }
     if (profileId === null) {
       const [next] = await tx
