@@ -22,6 +22,7 @@ import { createWebApp } from "../src/web/app.ts";
 import { assertMaySignUp, createAuth, ensureProfileForUser } from "../src/web/auth.ts";
 import { type AuthConfig, loadAuthConfig } from "../src/web/auth-config.ts";
 import { normalizeEmail } from "../src/web/email.ts";
+import { addInvite, listInvites, revokeInvite } from "../src/web/invites.ts";
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 4 });
@@ -227,10 +228,71 @@ describe("Better Auth: đăng ký qua hook", () => {
 });
 
 describe("ensureProfileForUser", () => {
-  const mkUser = async (id: string, email: string) => {
+  const mkUser = async (id: string, email: string, invited = true) => {
     await db.insert(userTable).values({ id, name: id, email, emailVerified: true });
+    if (invited) await db.insert(invites).values({ email }).onConflictDoNothing();
     return { id, email, emailVerified: true };
   };
+
+  test("thu hồi lời mời: user chưa có hồ sơ mà không còn lời mời thì không nhận hồ sơ mới", async () => {
+    const a = await mkUser("u-a", "a@example.com", false); // user có nhưng không có lời mời
+    await expect(ensureProfileForUser(db, OWNER, a)).rejects.toThrow();
+    expect(await profileCount()).toBe(0);
+    await db.insert(invites).values({ email: "a@example.com", usedAt: new Date() }); // đã dùng vẫn đủ
+    expect(await ensureProfileForUser(db, OWNER, a)).toBe(2);
+  });
+
+  test("session-hook: user bị xoá lời mời và chưa có hồ sơ thì đăng nhập lại bị từ chối", async () => {
+    const auth = makeAuth();
+    await db.insert(invites).values({ email: "khach@example.com" });
+    const u = await oauthSignUp(auth, "khach@example.com");
+    await db.delete(profile).where(eq(profile.userId, u.id));
+    await db.delete(invites).where(eq(invites.email, "khach@example.com"));
+    await expect(cookieHeader(auth, u.id)).rejects.toThrow();
+    expect(await profileCount()).toBe(0);
+  });
+
+  test("thu hồi: phiên cũ → 401, hồ sơ còn nguyên (user_id NULL); owner không thu hồi được", async () => {
+    await db.insert(profile).values({ id: 1, promptContext: "AI engineer" });
+    const auth = makeAuth();
+    const app = createWebApp({ db, secret: undefined, auth: { auth, providers: [] } }).app;
+    await db.insert(invites).values({ email: "khach@example.com" });
+    const owner = await oauthSignUp(auth, OWNER);
+    const guest = await oauthSignUp(auth, "khach@example.com");
+    const guestHeaders = await cookieHeader(auth, guest.id);
+    expect((await app.request("/api/me", { headers: guestHeaders })).status).toBe(200);
+
+    // Đã dùng (hook after đánh dấu) nên lời mời không bị xoá, nhưng user thì bị xoá.
+    const r = await revokeInvite(db, OWNER, "Khach@Example.com");
+    expect(r).toEqual({ email: "khach@example.com", inviteRemoved: false, userRemoved: true });
+    expect((await app.request("/api/me", { headers: guestHeaders })).status).toBe(401);
+    const guestProfile = (await db.select().from(profile).where(eq(profile.id, 2)))[0];
+    expect(guestProfile).toBeDefined();
+    expect(guestProfile?.userId).toBeNull();
+    // Không đăng nhập lại được: lời mời đã dùng vẫn còn nên có thể đăng ký lại? Không: before-hook đòi chưa dùng.
+    await expect(oauthSignUp(auth, "khach@example.com")).rejects.toThrow();
+
+    // Owner: bị chặn, hồ sơ 1 và tài khoản owner không đổi.
+    await expect(revokeInvite(db, OWNER, OWNER.toUpperCase())).rejects.toThrow();
+    expect((await db.select().from(userTable).where(eq(userTable.id, owner.id))).length).toBe(1);
+    expect((await db.select().from(profile).where(eq(profile.id, 1)))[0]?.userId).toBe(owner.id);
+  });
+
+  test("revoke lời mời chưa dùng: xoá cả lời mời; add chuẩn hoá chữ thường và idempotent", async () => {
+    expect(await addInvite(db, " Moi@Example.com ")).toEqual({
+      email: "moi@example.com",
+      added: true,
+    });
+    expect((await addInvite(db, "moi@example.com")).added).toBe(false);
+    expect(await listInvites(db)).toHaveLength(1);
+    expect(await revokeInvite(db, OWNER, "moi@example.com")).toEqual({
+      email: "moi@example.com",
+      inviteRemoved: true,
+      userRemoved: false,
+    });
+    expect(await listInvites(db)).toHaveLength(0);
+    await expect(addInvite(db, "khong-phai-email")).rejects.toThrow();
+  });
 
   test("không cướp hồ sơ số 1 đã thuộc user khác", async () => {
     const a = await mkUser("u-a", OWNER);

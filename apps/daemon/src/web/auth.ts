@@ -122,6 +122,14 @@ export async function ensureProfileForUser(
       }
       profileId = OWNER_PROFILE_ID;
     } else {
+      // Hồ sơ MỚI cho người không phải chủ dự án: lời mời phải còn trong bảng (đã dùng hay chưa đều
+      // được). Lời mời bị thu hồi thì không nhận được hồ sơ, kể cả khi user đã tồn tại.
+      const [inv] = await tx
+        .select({ id: invites.id })
+        .from(invites)
+        .where(eq(invites.email, email))
+        .limit(1);
+      if (!inv) throw new Error("không có lời mời cho email này, không tạo hồ sơ");
       const [next] = await tx
         .select({ id: sql<number>`greatest(coalesce(max(${profile.id}), 0) + 1, 2)::int` })
         .from(profile);
