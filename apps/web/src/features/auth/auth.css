@@ -1,0 +1,13 @@
+.auth-page {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 3rem 16px;
+}
+.auth-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.auth-error {
+  color: var(--rd-color-danger);
+}

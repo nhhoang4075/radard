@@ -1,0 +1,73 @@
+.rd-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--rd-color-border-strong);
+  border-radius: 5px;
+  background: var(--rd-color-surface-panel) center / 16px no-repeat;
+  cursor: pointer;
+  transition:
+    background-color var(--rd-duration-fast),
+    border-color var(--rd-duration-fast);
+}
+.rd-checkbox:hover:not(:checked):not(:indeterminate) {
+  border-color: var(--rd-color-text-subtle);
+}
+.rd-checkbox:checked {
+  background-color: var(--rd-color-action);
+  border-color: var(--rd-color-action);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5 6.75 11.25 12 5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.rd-checkbox:indeterminate {
+  background-color: var(--rd-color-action);
+  border-color: var(--rd-color-action);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8h7' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.rd-checkbox:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rd-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.rd-check-n {
+  margin-left: auto;
+  font-family: var(--rd-font-mono);
+  font-size: 12px;
+  color: var(--rd-color-text-subtle);
+}
+.rd-check-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--rd-color-border);
+  border-radius: 12px;
+  padding: 7px 14px 7px 10px;
+  background: var(--rd-color-surface-panel);
+  cursor: pointer;
+  font-size: 14px;
+  transition:
+    background-color var(--rd-duration-fast),
+    border-color var(--rd-duration-fast);
+}
+.rd-check-card:hover {
+  background: var(--rd-color-surface-hover);
+}
+.rd-check-card:has(input:checked) {
+  border-color: var(--rd-color-action);
+}
+.rd-check-card:has(input:focus-visible) {
+  outline: 2px solid var(--rd-color-info);
+  outline-offset: 2px;
+}
+.rd-check-card[data-dashed] {
+  border-style: dashed;
+}

@@ -1,0 +1,34 @@
+.ds {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+.ds h1 {
+  font-size: 26px;
+  font-weight: 500;
+}
+.ds h2 {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 28px 0 10px;
+}
+.ds h3 {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 14px 0 6px;
+  color: var(--rd-color-text-muted);
+}
+.ds-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.ds-pad {
+  padding: 14px 16px;
+}

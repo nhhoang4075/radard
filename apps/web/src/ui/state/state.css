@@ -1,0 +1,12 @@
+.rd-state {
+  padding: 28px 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--rd-color-text-subtle);
+}
+.rd-state b {
+  display: block;
+  color: var(--rd-color-text-muted);
+  font-weight: 500;
+  margin-bottom: 4px;
+}

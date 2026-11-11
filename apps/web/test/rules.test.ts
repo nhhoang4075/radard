@@ -37,4 +37,29 @@ describe("apps/web", () => {
       expect(readFileSync(f, "utf8")).not.toMatch(/prefers-color-scheme:\s*dark/);
     }
   });
+
+  test("ui/, shell/, features/ không đọc token tầng 1 (--rd-gray-*, --rd-blue-*...)", () => {
+    const tier1 = /var\(\s*--rd-(gray|green|amber|red|blue|violet|white|ink)-/;
+    for (const f of files.filter((f) => /\.(css|tsx?)$/.test(f) && !f.endsWith("tokens.css"))) {
+      expect([rel(f), tier1.test(readFileSync(f, "utf8"))]).toEqual([rel(f), false]);
+    }
+  });
+
+  test("ui/ không biết nghiệp vụ: không import features/, shell/, routes/", () => {
+    for (const f of files.filter((f) => rel(f).startsWith("ui/") && /\.tsx?$/.test(f))) {
+      expect([
+        rel(f),
+        /from\s+"\.\.\/\.\.\/(features|shell|routes)\//.test(readFileSync(f, "utf8")),
+      ]).toEqual([rel(f), false]);
+    }
+  });
+
+  test("không đổ bóng và không bóng chữ ngoài tokens.css (phong cách phẳng)", () => {
+    for (const f of files.filter((f) => f.endsWith(".css") && !f.endsWith("tokens.css"))) {
+      expect([rel(f), /box-shadow\s*:\s*(?!none)/.test(readFileSync(f, "utf8"))]).toEqual([
+        rel(f),
+        false,
+      ]);
+    }
+  });
 });

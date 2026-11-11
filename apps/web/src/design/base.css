@@ -1,41 +1,56 @@
-/* PLACEHOLDER tối thiểu (xem tokens.css). */
+/* Reset, chữ mặc định, vòng focus, giảm chuyển động. Chỉ đọc token tầng 2. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: var(--rd-bg);
-  color: var(--rd-text);
+  background: var(--rd-color-surface-page);
+  color: var(--rd-color-text);
+  font-family: var(--rd-font-sans);
+  font-size: 14.5px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
-
-.page {
-  max-width: 28rem;
-  margin: 0 auto;
-  padding: 3rem 1rem;
-}
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.muted {
-  color: var(--rd-muted);
-}
-
-.error {
-  color: var(--rd-error);
-}
-
-button {
+button,
+input,
+textarea,
+select {
   font: inherit;
-  padding: 0.6rem 1rem;
-  border: 1px solid var(--rd-border);
-  border-radius: 6px;
-  background: var(--rd-bg);
-  color: var(--rd-text);
-  cursor: pointer;
+  color: inherit;
 }
-
-button:hover {
-  background: var(--rd-hover);
+:focus-visible {
+  outline: 2px solid var(--rd-color-info);
+  outline-offset: 2px;
+}
+.rd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.rd-mono {
+  font-family: var(--rd-font-mono);
+}
+.rd-muted {
+  color: var(--rd-color-text-muted);
+}
+.rd-subtle {
+  color: var(--rd-color-text-subtle);
+}
+.rd-label {
+  font-family: var(--rd-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rd-color-text-subtle);
 }

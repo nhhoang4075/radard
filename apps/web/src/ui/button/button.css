@@ -1,0 +1,49 @@
+.rd-btn {
+  --rd-btn-bg: var(--rd-color-action);
+  --rd-btn-fg: var(--rd-color-action-text);
+  --rd-btn-border: var(--rd-color-action);
+  --rd-btn-hover: var(--rd-btn-bg);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--rd-control-height);
+  padding: 0 13px;
+  border-radius: var(--rd-control-radius);
+  background: var(--rd-btn-bg);
+  color: var(--rd-btn-fg);
+  border: 1px solid var(--rd-btn-border);
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--rd-duration-fast);
+}
+.rd-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.rd-btn[data-variant="secondary"] {
+  --rd-btn-bg: var(--rd-color-surface-panel);
+  --rd-btn-fg: var(--rd-color-text);
+  --rd-btn-border: var(--rd-color-border-strong);
+  --rd-btn-hover: var(--rd-color-surface-sunken);
+}
+.rd-btn[data-variant="ghost"] {
+  --rd-btn-bg: transparent;
+  --rd-btn-fg: var(--rd-color-text-muted);
+  --rd-btn-border: transparent;
+  --rd-btn-hover: var(--rd-color-surface-hover);
+}
+.rd-btn:hover:not(:disabled) {
+  background: var(--rd-btn-hover);
+}
+.rd-btn[data-variant="primary"]:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.rd-btn[data-size="sm"] {
+  font-size: 13.5px;
+}
+.rd-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

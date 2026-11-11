@@ -1,0 +1,51 @@
+.rd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 1px 9px 1px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.rd-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.rd-badge[data-s="ok"] {
+  background: var(--rd-color-success-soft);
+  color: var(--rd-color-success);
+}
+.rd-badge[data-s="warn"] {
+  background: var(--rd-color-warning-soft);
+  color: var(--rd-color-warning);
+}
+.rd-badge[data-s="bad"] {
+  background: var(--rd-color-danger-soft);
+  color: var(--rd-color-danger);
+}
+.rd-badge[data-s="off"] {
+  background: var(--rd-color-surface-sunken);
+  color: var(--rd-color-text-muted);
+  border-color: var(--rd-color-border);
+}
+.rd-badge[data-s="run"] {
+  background: var(--rd-color-info-soft);
+  color: var(--rd-color-info);
+}
+.rd-badge[data-s="run"]::before {
+  animation: rd-pulse 1.6s ease-in-out infinite;
+}
+@keyframes rd-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd-badge[data-s="run"]::before {
+    animation: none;
+  }
+}

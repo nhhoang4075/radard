@@ -1,11 +1,106 @@
-/* PLACEHOLDER tối thiểu cho khung đăng nhập. Phiên giao diện (radard-ui) thay thế bằng token thật.
-   Nơi duy nhất được có mã màu thô; chỉ giao diện sáng. */
+/* Token 3 tầng, chỉ giao diện sáng. NƠI DUY NHẤT được có mã màu thô (test/rules.test.ts).
+   Tầng 1 (primitive, --rd-gray-*...): chỉ file này đọc. Tầng 2 (semantic, --rd-color-*): ui/, shell/, features/ đọc.
+   Tầng 3 (component-local, ví dụ --rd-btn-bg): khai trong css của từng component. */
 :root {
   color-scheme: light;
-  --rd-bg: #ffffff;
-  --rd-text: #1a1a1a;
-  --rd-muted: #5c5c5c;
-  --rd-error: #a31515;
-  --rd-border: #1a1a1a;
-  --rd-hover: #f0f0f0;
+
+  /* 1. primitive */
+  --rd-gray-0: #ffffff;
+  --rd-gray-50: #fbfbfb;
+  --rd-gray-100: #f7f7f8;
+  --rd-gray-150: #f2f2f2;
+  --rd-gray-175: #ebebed;
+  --rd-gray-200: #e4e4e7;
+  --rd-gray-300: #d4d4d8;
+  --rd-gray-500: #71717a;
+  --rd-gray-600: #52525b;
+  --rd-gray-900: #111111;
+  --rd-green-700: #16794c;
+  --rd-green-100: #e3f4ea;
+  --rd-amber-700: #9a5b00;
+  --rd-amber-100: #fbefd9;
+  --rd-red-700: #b4321f;
+  --rd-red-100: #fbe5e1;
+  --rd-blue-700: #2f5da8;
+  --rd-blue-100: #e3ecfb;
+  --rd-violet-700: #5b46b5;
+  --rd-violet-100: #e4dcfa;
+  --rd-blue-400: #8fc1f7;
+  --rd-violet-400: #b9a5f2;
+  --rd-white-a72: rgb(255 255 255 / 0.72);
+  --rd-white-a75: rgb(255 255 255 / 0.75);
+  --rd-ink-a28: rgb(17 17 17 / 0.28);
+  --rd-ink-a08: rgb(17 17 17 / 0.08);
+
+  /* 2. semantic */
+  --rd-color-text: var(--rd-gray-900);
+  --rd-color-text-muted: var(--rd-gray-600);
+  --rd-color-text-subtle: var(--rd-gray-500);
+  --rd-color-text-inverse: var(--rd-gray-0);
+  --rd-color-surface-page: var(--rd-gray-150);
+  --rd-color-surface-panel: var(--rd-gray-0);
+  --rd-color-surface-sunken: var(--rd-gray-100);
+  --rd-color-surface-sidebar: var(--rd-gray-50);
+  --rd-color-surface-hover: var(--rd-gray-175);
+  --rd-color-surface-selected: var(--rd-gray-200);
+  --rd-color-surface-glass: var(--rd-white-a72);
+  --rd-color-surface-glass-strong: var(--rd-white-a75);
+  --rd-color-scrim: var(--rd-ink-a28);
+  --rd-color-hairline: var(--rd-ink-a08);
+  --rd-color-border: var(--rd-gray-200);
+  --rd-color-border-strong: var(--rd-gray-300);
+  --rd-color-action: var(--rd-gray-900);
+  --rd-color-action-text: var(--rd-gray-0);
+  --rd-color-success: var(--rd-green-700);
+  --rd-color-success-soft: var(--rd-green-100);
+  --rd-color-warning: var(--rd-amber-700);
+  --rd-color-warning-soft: var(--rd-amber-100);
+  --rd-color-danger: var(--rd-red-700);
+  --rd-color-danger-soft: var(--rd-red-100);
+  --rd-color-info: var(--rd-blue-700);
+  --rd-color-info-soft: var(--rd-blue-100);
+  --rd-color-about: var(--rd-violet-700);
+  --rd-color-about-soft: var(--rd-violet-100);
+  --rd-color-brand-a: var(--rd-blue-400);
+  --rd-color-brand-b: var(--rd-violet-400);
+
+  --rd-font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
+  --rd-font-serif: "Source Serif 4", Georgia, serif;
+  --rd-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --rd-radius-sm: 6px;
+  --rd-radius-md: 10px;
+  --rd-radius-lg: 16px;
+  --rd-radius-xl: 24px;
+  --rd-shadow-sm: none; /* phong cách phẳng: không đổ bóng */
+  --rd-shadow-frame: none;
+  --rd-duration-fast: 120ms;
+  --rd-duration-base: 200ms;
+
+  --rd-control-height: 32px; /* nút, ô nhập, chip, ô tìm kiếm cùng chiều cao */
+  --rd-control-radius: 10px;
+  --rd-shell-sidebar-width: 232px;
+  --rd-shell-rail-width: 48px;
+  --rd-shell-panel-width: 380px;
+  --rd-shell-inset-gap: 10px;
+  --rd-z-menu: 30;
+  --rd-z-overlay: 50;
+
+  /* nền lưới màu (Điểm tin, đầu panel chi tiết) */
+  --rd-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --rd-mesh-blue:
+    var(--rd-grain), radial-gradient(92% 95% at 6% 6%, #8fc1f7 0%, rgb(143 193 247 / 0) 66%),
+    radial-gradient(70% 78% at 96% 2%, #cdebf4 0%, rgb(205 235 244 / 0) 60%),
+    radial-gradient(82% 76% at 92% 96%, #ddd7f8 0%, rgb(221 215 248 / 0) 62%), #eaf1fa;
+  --rd-mesh-violet:
+    var(--rd-grain), radial-gradient(80% 88% at 92% 8%, #b9a5f2 0%, rgb(185 165 242 / 0) 60%),
+    radial-gradient(72% 80% at 4% 4%, #c3dcf8 0%, rgb(195 220 248 / 0) 60%),
+    radial-gradient(84% 80% at 6% 98%, #f6d9ec 0%, rgb(246 217 236 / 0) 62%), #efeaf8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rd-duration-fast: 0ms;
+    --rd-duration-base: 0ms;
+  }
 }

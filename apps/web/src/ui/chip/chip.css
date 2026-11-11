@@ -1,0 +1,29 @@
+.rd-chip,
+.rd-seg button {
+  height: var(--rd-control-height);
+  padding: 0 14px;
+  border-radius: var(--rd-control-radius);
+  border: 1px solid var(--rd-color-border);
+  background: var(--rd-color-surface-panel);
+  color: var(--rd-color-text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--rd-duration-fast),
+    color var(--rd-duration-fast);
+}
+.rd-chip:hover,
+.rd-seg button:hover {
+  background: var(--rd-color-surface-sunken);
+}
+.rd-chip[aria-pressed="true"],
+.rd-seg button[aria-pressed="true"] {
+  background: var(--rd-color-surface-page);
+  color: var(--rd-color-text);
+}
+.rd-seg {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

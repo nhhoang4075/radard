@@ -1,0 +1,26 @@
+.rd-icon-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--rd-control-height);
+  height: var(--rd-control-height);
+  padding: 0;
+  border-radius: var(--rd-control-radius);
+  border: 1px solid var(--rd-color-border);
+  background: var(--rd-color-surface-panel);
+  color: var(--rd-color-text-muted);
+  cursor: pointer;
+  transition: background var(--rd-duration-fast);
+}
+.rd-icon-btn:hover {
+  background: var(--rd-color-surface-sunken);
+}
+.rd-icon-btn[aria-pressed="true"] {
+  background: var(--rd-color-action);
+  border-color: var(--rd-color-action);
+  color: var(--rd-color-action-text);
+}
+.rd-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}

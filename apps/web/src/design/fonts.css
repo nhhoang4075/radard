@@ -1,0 +1,6 @@
+/* Font tự lưu (@fontsource), có subset vietnamese. Geist: chữ chính; Source Serif 4: tóm tắt; IBM Plex Mono: số, nhãn. */
+@import "@fontsource-variable/geist/wght.css";
+@import "@fontsource/source-serif-4/400.css";
+@import "@fontsource/source-serif-4/500.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";

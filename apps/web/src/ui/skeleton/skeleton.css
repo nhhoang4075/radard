@@ -1,0 +1,17 @@
+.rd-skeleton {
+  display: block;
+  background: var(--rd-color-surface-selected);
+  border-radius: 8px;
+  height: 12px;
+  animation: rd-sk 1.4s ease-in-out infinite;
+}
+@keyframes rd-sk {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd-skeleton {
+    animation: none;
+  }
+}
