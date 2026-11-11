@@ -1,16 +1,16 @@
 /**
- * Cấu hình deploy của radard trên Railway (Infrastructure as Code, thay `railway.json` từ 13/10/2026).
+ * Radard deploy configuration on Railway (Infrastructure as Code, replaces `railway.json` since 13/10/2026).
  *
- * File này quản lý service `radard` và `backup` (sao lưu Postgres lên R2 mỗi đêm, xem ops/backup).
- * Service `postgres` (template của Railway) và mọi biến môi
- * trường do Railway giữ (`variables.managed: false`), nên khoá bí mật không bao giờ nằm trong repo.
- * Xem trước bằng `railway config plan`, áp dụng bằng `railway config apply`.
+ * This file manages the `radard` and `backup` services (nightly Postgres backup to R2, see ops/backup).
+ * The `postgres` service (a Railway template) and every environment
+ * variable are held by Railway (`variables.managed: false`), so secrets never live in the repo.
+ * Preview with `railway config plan`, apply with `railway config apply`.
  *
- * Hai điểm lạ đã kiểm bằng API (13/10/2026, CLI 5.66.0):
- * - `plan` luôn báo đổi `restartPolicyType`/`restartPolicyMaxRetries` (CLI đọc lại null), dù trên
- *   service đã đúng ON_FAILURE / 10.
- * - API ghi builder là RAILPACK (enum của API không có DOCKERFILE), nhưng log build vẫn là
- *   "load build definition from Dockerfile": có `dockerfilePath` thì Railway build bằng Dockerfile.
+ * Two oddities checked against the API (13/10/2026, CLI 5.66.0):
+ * - `plan` always reports a change to `restartPolicyType`/`restartPolicyMaxRetries` (the CLI reads back null), although
+ *   the service is already ON_FAILURE / 10.
+ * - The API records the builder as RAILPACK (the API enum has no DOCKERFILE), yet the build log still says
+ *   "load build definition from Dockerfile": with `dockerfilePath` set, Railway builds with the Dockerfile.
  */
 import { defineRailway, github, project, service } from "railway/iac";
 
@@ -22,7 +22,7 @@ export default defineRailway(() => {
     build: {
       builder: "DOCKERFILE",
       dockerfilePath: "Dockerfile",
-      // Chỉ deploy khi code hoặc cấu hình build đổi; sửa docs không deploy.
+      // Deploy only when code or build config changes; docs edits do not deploy.
       watchPatterns: [
         "apps/**",
         "packages/**",
@@ -35,19 +35,19 @@ export default defineRailway(() => {
       ],
     },
     deploy: {
-      // Bản cũ dừng hẳn rồi bản mới mới chạy: không bao giờ có hai bot cùng nhận lượt bấm (lỗi 409).
+      // The old version stops completely before the new one starts: never two bots receiving button presses (error 409).
       overlapSeconds: 0,
-      // Daemon chờ job đang chạy tối đa 25 giây sau SIGTERM (main.ts).
+      // The daemon waits up to 25 seconds for a running job after SIGTERM (main.ts).
       drainingSeconds: 30,
       restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 10,
     },
-    // Một bản duy nhất (scheduler và bot chỉ được chạy một bản), cùng khu vực với Postgres.
+    // A single copy (scheduler and bot may run only once), in the same region as Postgres.
     replicas: { "asia-southeast1-eqsg3a": 1 },
   });
 
-  // Chạy một lần mỗi đêm rồi thoát (Railway Cron): 20:00 UTC = 03:00 giờ VN. Không thử lại khi lỗi:
-  // lượt hỏng báo trong log, đêm sau chạy tiếp; thử lại liên tục sẽ tải đi tải lại cả DB.
+  // Runs once a night then exits (Railway Cron): 20:00 UTC = 03:00 Vietnam time. No retry on failure:
+  // a failed run is reported in the log and the next night runs again; endless retries would pull the whole DB again and again.
   const backup = service("backup", {
     source: github("nhhoang4075/radard", { branch: "main", checkSuites: false }),
     build: {
@@ -59,7 +59,7 @@ export default defineRailway(() => {
       cronSchedule: "0 20 * * *",
       restartPolicyType: "NEVER",
     },
-    // Cùng khu vực với Postgres: kéo cả DB mỗi đêm không phải đi xa.
+    // Same region as Postgres: pulling the whole DB every night should not travel far.
     replicas: { "asia-southeast1-eqsg3a": 1 },
   });
 

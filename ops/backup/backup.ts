@@ -1,20 +1,20 @@
 /**
- * Sao lưu Postgres lên R2, chạy một lần rồi thoát (Railway Cron gọi mỗi đêm).
+ * Postgres backup to R2, runs once then exits (Railway Cron calls it every night).
  *
- * `pg_dump -Fc` (nén, restore được bằng pg_restore) → kiểm tra file → tải lên
- * `<BACKUP_PREFIX>radard-YYYYMMDD-HHMMSS.dump` → so kích thước → xoá bản cũ, giữ `BACKUP_KEEP` bản
- * mới nhất (mặc định 14). Chỉ xoá sau khi bản mới đã lên và kiểm tra xong; lỗi ở bước nào cũng
- * thoát mã khác 0 để Railway ghi nhận lượt chạy hỏng và không xoá gì.
+ * `pg_dump -Fc` (compressed, restorable with pg_restore) → check the file → upload as
+ * `<BACKUP_PREFIX>radard-YYYYMMDD-HHMMSS.dump` → compare size → delete old ones, keeping the `BACKUP_KEEP` newest
+ * (default 14). Deletes only after the new copy is uploaded and checked; a failure at any step
+ * exits non-zero so Railway records a failed run and nothing is deleted.
  *
- * Biến môi trường: DATABASE_URL, R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY;
- * tuỳ chọn BACKUP_PREFIX (mặc định `backup/`), BACKUP_KEEP (mặc định 14).
+ * Environment: DATABASE_URL, R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY;
+ * optional BACKUP_PREFIX (default `backup/`), BACKUP_KEEP (default 14).
  */
 import { S3Client } from "bun";
 
 const DEFAULT_KEEP = 14;
 const NAME = /radard-\d{8}-\d{6}\.dump$/;
 
-/** `radard-20261109-200000.dump`: giờ UTC, sắp theo tên là sắp theo thời gian. */
+/** `radard-20261109-200000.dump`: UTC time, so sorting by name is sorting by time. */
 export function backupName(now: Date): string {
   const p = now
     .toISOString()
@@ -24,7 +24,7 @@ export function backupName(now: Date): string {
   return `radard-${p}.dump`;
 }
 
-/** Các key phải xoá để còn `keep` bản mới nhất. Chỉ đụng file đúng tên sao lưu, không xoá gì khác. */
+/** Keys to delete so only the `keep` newest remain. Touches only files named like backups, nothing else. */
 export function keysToDelete(keys: string[], keep: number): string[] {
   const backups = keys.filter((k) => NAME.test(k)).sort();
   return backups.slice(0, Math.max(0, backups.length - keep));
