@@ -1,13 +1,13 @@
 /**
- * Xếp hạng digest: hàm thuần, không đọc DB hay mạng (thiết kế: docs/xep-hang.html).
+ * Digest ranking: pure functions, no DB or network reads (design: docs/xep-hang.html).
  *
- * Mọi thành phần điểm đều về thang 0–1 bằng cách so với MẶT BẰNG của chính nguồn đó (và chủ đề
- * đó): trung vị ứng với 0 (bình thường như mọi bài), mốc 0,1% cao nhất ứng với 1 (hiếm có).
+ * Every score component is scaled to 0–1 by comparing it with the BASELINE of its own source (and topic
+ * ): the median maps to 0 (normal, like any post), the top-0.1% mark maps to 1 (rare).
  */
 import { type InterestCluster, interestScore } from "./interest.ts";
 import { cosine } from "./vector.ts";
 
-/** Mặt bằng của một tín hiệu: trung vị, mốc 0,1% cao nhất, và số mẫu đã dùng để tính. */
+/** Baseline of one signal: median, top-0.1% mark, and the number of samples used to compute it. */
 export interface Baseline {
   median: number;
   p999: number;
@@ -15,8 +15,8 @@ export interface Baseline {
 }
 
 /**
- * Phần vị nội suy tuyến tính, giống `percentile_cont` của Postgres: vị trí (n − 1) × p trong
- * dãy đã sắp tăng dần, nội suy giữa hai phần tử kề nhau. `sorted` phải sắp sẵn.
+ * Linear-interpolated percentile, same as Postgres `percentile_cont`: position (n − 1) × p in the
+ * ascending-sorted array, interpolating between the two adjacent elements. `sorted` must already be sorted.
  */
 export function percentileCont(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) return Number.NaN;
@@ -28,7 +28,7 @@ export function percentileCont(sorted: readonly number[], p: number): number {
   return a + (b - a) * (pos - lo);
 }
 
-/** Mặt bằng từ một mảng giá trị bất kỳ. */
+/** Baseline from any array of values. */
 export function baselineOf(values: readonly number[]): Baseline {
   const sorted = [...values].sort((x, y) => x - y);
   return {
@@ -39,14 +39,14 @@ export function baselineOf(values: readonly number[]): Baseline {
 }
 
 /**
- * Hằng số trộn: cần khoảng chừng này mẫu thì mặt bằng riêng của nguồn mới chiếm một nửa.
- * Mốc 0,1% của n mẫu là mẫu cao thứ n/1.000, nên dưới ~1.000 mẫu nó chính là mẫu cao nhất.
+ * Blending constant: this many samples are needed before the source's own baseline counts for half.
+ * The 0.1% mark of n samples is the (n/1,000)-th highest, so below ~1,000 samples it is simply the highest sample.
  */
 export const BLEND_K = 1000;
 
 /**
- * Trộn mặt bằng riêng của nguồn với mặt bằng chung, theo w = n / (n + 1000), áp cho cả trung vị
- * lẫn mốc 0,1%. Nguồn mới (n = 0) dùng hẳn mặt bằng chung rồi chuyển dần, không có điểm gãy.
+ * Blends the source's own baseline with the global baseline, with w = n / (n + 1000), applied to both the median
+ * and the 0.1% mark. A new source (n = 0) uses the global baseline entirely, then shifts gradually, with no breakpoint.
  */
 export function blendBaseline(own: Baseline | undefined, global: Baseline | undefined): Baseline {
   if (!own) {
@@ -62,12 +62,12 @@ export function blendBaseline(own: Baseline | undefined, global: Baseline | unde
   };
 }
 
-/** Ép x vào [lo, hi]. */
+/** Clamps x into [lo, hi]. */
 export function clamp(x: number, lo = 0, hi = 1): number {
   return Math.min(hi, Math.max(lo, x));
 }
 
-/** z = clamp((x − trung vị) / (mốc 0,1% − trung vị)): 0 = bình thường, 1 = hiếm có. */
+/** z = clamp((x − median) / (0.1% mark − median)): 0 = normal, 1 = rare. */
 export function normalize(x: number, b: Baseline): number {
   const span = b.p999 - b.median;
   if (!(span > 0)) return x > b.median ? 1 : 0;
@@ -75,23 +75,23 @@ export function normalize(x: number, b: Baseline): number {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Sáu thành phần và điểm S (xep-hang.html tab 04)
+// Six components and the score S (xep-hang.html tab 04)
 
-/** Một tài liệu của sự kiện, đủ thông tin để chấm điểm. */
+/** One document of the event, with enough information to score it. */
 export interface RankDoc {
   documentId: number;
   sourceId: number;
   urlCanonical: string;
-  /** Cosine với từng chủ đề đang bật (`profile_topic_id` → điểm). */
+  /** Cosine with each enabled topic (`profile_topic_id` → score). */
   topicScores: ReadonlyMap<number, number>;
   /**
-   * Độ nổi thô do adapter nguồn tính (`SourceAdapter.engagement`), dạng cộng được. `null`: nguồn
-   * không có tín hiệu (arXiv, releases), hoặc chưa lấy được tín hiệu.
+   * Raw engagement computed by the source adapter (`SourceAdapter.engagement`), additive. `null`: the source
+   * has no signal (arXiv, releases), or the signal could not be fetched yet.
    */
   engagement: number | null;
   /**
-   * Vector cả tài liệu (đã chuẩn hoá L2) để chấm điểm gu U; vắng thì tài liệu không góp vào U.
-   * Chỉ cần nạp khi có cụm gu active.
+   * Whole-document vector (L2-normalized) for the taste score U; if absent, the document does not contribute to U.
+   * Only needs to be loaded when there are active taste clusters.
    */
   vector?: readonly number[];
 }
@@ -104,9 +104,9 @@ export interface RankEvent {
   docs: readonly RankDoc[];
 }
 
-/** Mặt bằng đã tra sẵn từ bảng `baselines`. */
+/** Baseline pre-looked-up from the `baselines` table. */
 export interface Baselines {
-  /** Theo (nguồn, chủ đề) và mặt bằng chung của chủ đề (khoá nguồn `null`). */
+  /** By (source, topic) and the topic's global baseline (source key `null`). */
   relevance(sourceId: number | null, topicId: number): Baseline | undefined;
   engagement(sourceId: number): Baseline | undefined;
   coverage(): Baseline | undefined;
@@ -115,29 +115,29 @@ export interface Baselines {
 export interface RankConfig {
   weights: { R: number; P: number; C: number; A: number; F: number; U: number };
   /**
-   * Cổng: chỉ xét sự kiện có R ≥ ngưỡng này ("có thuộc chủ đề của bạn không"). Sự kiện có R trong
-   * vùng `decision` thì hỏi model quyết định thay cho luật này; luật chỉ còn dùng khi không hỏi được.
+   * Gate: only events with R ≥ this threshold are considered ("does it belong to your topics?"). Events with R in the
+   * `decision` zone are asked of the decision model instead of this rule; the rule is only used when the model cannot be asked.
    */
   gateR: number;
   /**
-   * Vùng xám của cổng: R ∈ [low, high) thì hỏi model quyết định "tin này có chủ yếu nói về chủ đề
-   * không", xác suất ≥ `minP` thì qua. R ≥ high qua luôn, R < low bị loại luôn.
+   * Gate gray zone: R ∈ [low, high) asks the decision model "is this item mainly about the topic or not", with
+   * probability ≥ `minP` passing. R ≥ high always passes, R < low is always rejected.
    */
   decision: { low: number; high: number; minP: number };
-  /** Sàn: không lấy tin có S dưới mức này, kể cả khi chưa đủ số tin ("có đủ đáng đọc không"). */
+  /** Floor: do not take items with S below this, even if the count is not met ("is it worth reading at all?"). */
   floorS: number;
   /**
-   * Nguồn của sàn: "fixed" luôn dùng `floorS`; "percentile" dùng phân vị 30 ngày (floor.ts) khi
-   * bể có đủ 14 ngày dữ liệu, chưa đủ thì vẫn dùng `floorS`.
+   * Floor source: "fixed" always uses `floorS`; "percentile" uses the 30-day percentile (floor.ts) when the
+   * pool has 14 days of data, and still uses `floorS` before that.
    */
   floorMode: "fixed" | "percentile";
-  /** Độ nổi góp bởi nguồn không có tín hiệu (chốt 12/10/2026: 0,3). */
+  /** Engagement contributed by a source with no signal (fixed on 12/10/2026: 0.3). */
   neutralP: number;
-  /** F khi sự kiện bắt đầu trước khoảng digest, nay có tin mới. */
+  /** F when the event started before the digest window but has new items now. */
   followUpF: number;
   /**
-   * Gom cụm gu từ tin 👍 (interest.ts). `distanceThreshold` là τ của Ward (đo 10/11/2026 trên 👍
-   * thật, chủ dự án duyệt τ = 1,4). Mỗi tham số ở đây truyền thẳng xuống `clusterInterests`.
+   * Builds taste clusters from 👍 items (interest.ts). `distanceThreshold` is the Ward τ (measured 10/11/2026 on real
+   * 👍 items; the project owner approved τ = 1.4). Each parameter here is passed straight down to `clusterInterests`.
    */
   interest: {
     distanceThreshold: number;
@@ -148,44 +148,44 @@ export interface RankConfig {
     nameCarryMinCosine: number;
   };
   /**
-   * Trần `select` dùng: số tin tối đa và số tin tối đa mỗi nguồn. Luồng thật (`rankPeriod`) đặt hai
-   * giá trị này bằng `feedMaxItems` / `feedMaxPerSource` khi dựng bản chụp feed.
+   * Caps used by `select`: maximum number of items and maximum items per source. The real flow (`rankPeriod`) sets these
+   * two values to `feedMaxItems` / `feedMaxPerSource` when building the feed snapshot.
    */
   maxItems: number;
   maxPerSource: number;
   /**
-   * Feed web (quyết định 10/11/2026): `select` chạy MỘT lần với trần K = `feedMaxItems` (là trần,
-   * không phải mục tiêu: hết tin đạt sàn thì dừng) và mỗi nguồn tối đa `feedMaxPerSource` tin.
+   * Web feed (decision 10/11/2026): `select` runs ONCE with the cap K = `feedMaxItems` (a cap, not a target:
+   * stop when no items reach the floor) and at most `feedMaxPerSource` items per source.
    */
   feedMaxItems: number;
   feedMaxPerSource: number;
-  /** Số tin/ngày mà sàn phân vị của feed nhắm tới (sàn feed tách khỏi sàn thông báo). */
+  /** Items/day the feed's percentile floor targets (separate from the notification floor). */
   feedFloorTargetPerDay: number;
   /**
-   * Lớp thông báo (Telegram): lấy tối đa `notify.maxItems` tin ĐẦU của bản chụp có S ≥ sàn thông báo,
-   * mỗi nguồn tối đa `notify.maxPerSource` ("5 cho 7 tin đầu"); sàn thông báo nhắm
-   * `notify.floorTargetPerDay` tin/ngày. Không ảnh hưởng việc chọn feed.
+   * Notification layer (Telegram): takes at most `notify.maxItems` items FROM THE START of the snapshot with S ≥ the notification floor,
+   * at most `notify.maxPerSource` per source ("5 of the first 7 items"); the notification floor targets
+   * `notify.floorTargetPerDay` items/day. Does not affect feed selection.
    */
   notify: { maxItems: number; maxPerSource: number; floorTargetPerDay: number };
-  /** Phạt trùng: từ giống `start` bắt đầu phạt, tới `start + span` thì phạt tối đa `max`. */
+  /** Duplicate penalty: starts at similarity `start`, reaching at most `max` at `start + span`. */
   mmr: { start: number; span: number; max: number };
   /**
-   * Nhiệt độ T của chọn Gumbel top-k: khoá chọn là S + T·G (G ~ Gumbel(0,1)). T = 0: chọn xác
-   * định như trước. Cổng, sàn và loại tin đã gửi luôn tính trên S thật, không nhiễu.
+   * Temperature T of Gumbel top-k selection: the selection key is S + T·G (G ~ Gumbel(0,1)). T = 0: deterministic
+   * selection as before. The gate, floor and already-sent filtering always use the true S, without noise.
    */
   temperature: number;
-  /** Uy tín của nguồn (A), 0–1, theo `sources.trust_score`. */
+  /** Source reputation (A), 0–1, from `sources.trust_score`. */
   priors: ReadonlyMap<number, number>;
 }
 
-/** Trần K của bản chụp feed và trần mỗi nguồn của feed (quyết định 10/11/2026). */
+/** Cap K of the feed snapshot and per-source cap of the feed (decision 10/11/2026). */
 const FEED_MAX_ITEMS = 30;
 const FEED_MAX_PER_SOURCE = 10;
 
-/** Hằng số khởi đầu (xep-hang.html), chưa kiểm chứng: chỉnh lại sau tuần đầu theo 👍/👎. */
+/** Starting constants (xep-hang.html), not yet validated: retune after the first week using 👍/👎. */
 export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
-  // Duyệt 10/11/2026: hệ số cũ (0,40/0,25/0,15/0,10/0,10) nhân 0,9, cộng w_U = 0,10; tổng = 1.
-  // Chuẩn hoá lại L1 sau khi fit hằng tuần là việc sau.
+  // Approved 10/11/2026: old weights (0.40/0.25/0.15/0.10/0.10) multiplied by 0.9, plus w_U = 0.10; sum = 1.
+  // Re-normalizing L1 after the weekly fit is a later task.
   weights: { R: 0.36, P: 0.225, C: 0.135, A: 0.09, F: 0.09, U: 0.1 },
   interest: {
     distanceThreshold: 1.4,
@@ -193,33 +193,33 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
     minMembers: 3,
     halfLifeDays: 60,
     dropBelowWeight: 0.1,
-    // Cụm mới chỉ nhận tên cụm cũ khi tâm hai cụm có cosine >= mức này. 0,8 = chọn của người
-    // triển khai (spec bắt buộc có mức, chưa đo): đủ gần để coi là "cùng sở thích".
+    // A new cluster inherits an old cluster's name only when the centers' cosine >= this level. 0.8 = the implementer's
+    // choice (the spec requires a level but gives none yet, not measured): close enough to count as "same taste".
     nameCarryMinCosine: 0.8,
   },
   gateR: 0.6,
-  // Đo 13–16/10/2026 trên tin thật có R trong [0,5; 0,7): Jev ở ngưỡng 0,6 khớp nhãn tham chiếu
-  // 84%, luật cũ (R ≥ 0,6) chỉ 53%; bạn đã xác nhận các nhãn tham chiếu.
+  // Measured 13–16/10/2026 on real items with R in [0.5, 0.7): Jev at threshold 0.6 matches the reference labels
+  // 84%, the old rule (R ≥ 0.6) only 53%; the project owner has confirmed the reference labels.
   decision: { low: 0.5, high: 0.7, minP: 0.6 },
   floorS: 0.59,
   floorMode: "percentile",
   neutralP: 0.3,
   followUpF: 0.6,
-  // `select` của luồng thật chạy với trần feed (rankPeriod đặt từ feedMaxItems/feedMaxPerSource).
+  // The real flow's `select` runs with the feed cap (rankPeriod is set from feedMaxItems/feedMaxPerSource).
   maxItems: FEED_MAX_ITEMS,
   maxPerSource: FEED_MAX_PER_SOURCE,
-  // Feed web (quyết định 10/11/2026): K = 30 là trần, không phải mục tiêu; 10 tin/nguồn là mặc định
-  // đoán, chưa đo. Sàn feed nhắm ~30 tin/ngày, chỉ dùng phân vị sau FLOOR_MIN_DAYS ngày dữ liệu bể.
+  // Web feed (decision 10/11/2026): K = 30 is a cap, not a target; 10 items/source is a guessed default,
+  // not measured. The feed floor targets ~30 items/day, and uses percentiles only after FLOOR_MIN_DAYS days of pool data.
   feedMaxItems: FEED_MAX_ITEMS,
   feedMaxPerSource: FEED_MAX_PER_SOURCE,
   feedFloorTargetPerDay: 30,
-  // Lớp thông báo: 7 tin như digest cũ; 5 tin/nguồn (3 làm digest 12/10 chỉ còn 4 tin dù 5 tin HN
-  // vượt sàn; nâng lên 5, chốt 13/10/2026); sàn nhắm ~12 tin/ngày như sàn phân vị hiện có.
+  // Notification layer: 7 items like the old digest; 5 items/source (3 made the 12/10 digest only 4 items even though 5 HN items
+  // passed the floor; raised to 5, fixed 13/10/2026); the floor targets ~12 items/day like the existing percentile floor.
   notify: { maxItems: 7, maxPerSource: 5, floorTargetPerDay: 12 },
   mmr: { start: 0.85, span: 0.1, max: 0.3 },
-  // Nhiệt độ T của chọn Gumbel top-k. 0,03 do chủ dự án duyệt 10/11/2026 (chưa đo trên bể thật).
-  // Sẽ chỉnh sau tuần đầu có bể, theo tiêu chí: p̂ ≥ 0,05 cho top 12 và trung bình p̂ của 7 tin
-  // gửi ≥ ~0,5. T > 0 cần rng tiêm từ ngoài có hạt giống; nơi xem thử đặt T = 0 hoặc đưa hạt giống.
+  // Temperature T of Gumbel top-k selection. 0.03 approved by the project owner 10/11/2026 (not yet measured on a real pool).
+  // Retune after the first week with a pool, against the criteria: p̂ ≥ 0.05 for the top 12 and mean p̂ of the 7
+  // sent items ≥ ~0.5. T > 0 needs an rng injected from outside with a seed; for trial runs set T = 0 or pass a seed.
   temperature: 0.03,
 };
 
@@ -229,24 +229,24 @@ export interface Components {
   C: number;
   A: number;
   F: number;
-  /** Điểm gu: 0 khi chưa có cụm active (hoặc không có vector tài liệu). */
+  /** Taste score: 0 when there are no active clusters (or no document vector). */
   U: number;
   N: number;
-  /** Chủ đề cho R cao nhất: lý do "vì sao chọn" hiện trong digest. */
+  /** Topic with the highest R: the "why chosen" reason shown in the digest. */
   topicId: number | null;
-  /** Nguồn của tài liệu cho R cao nhất: dùng cho giữ chỗ và hạn mức theo nguồn. */
+  /** Source of the document with the highest R: used for reservations and per-source quotas. */
   sourceId: number;
-  /** Tài liệu cho R cao nhất: đưa cho model quyết định khi R nằm trong vùng xám của cổng. */
+  /** Document with the highest R: given to the decision model when R falls in the gate's gray zone. */
   documentId: number | null;
 }
 
 /**
- * Tính sáu thành phần của một sự kiện.
+ * Computes the six components of one event.
  *
- * `periodStart`: đầu khoảng digest (24 giờ trước). `sentUrls`: `url_canonical` của mọi tài liệu đã
- * nằm trong các tin đã gửi, không giới hạn thời gian (`deliveries.document_ids`), để tính N.
- * `interests`: cụm gu active của hồ sơ (interest.ts); vắng hoặc rỗng thì U = 0. U của sự kiện là
- * U lớn nhất trên các tài liệu có vector.
+ * `periodStart`: start of the digest window (24 hours ago). `sentUrls`: `url_canonical` of every document already
+ * in sent items, no time limit (`deliveries.document_ids`), to compute N.
+ * `interests`: the profile's active taste clusters (interest.ts); absent or empty means U = 0. The event's U is the
+ * largest U over the documents that have vectors.
  */
 export function components(
   ev: RankEvent,
@@ -271,14 +271,14 @@ export function components(
   };
 }
 
-/** U: `interestScore` lớn nhất trên các tài liệu có vector; không có cụm active thì 0. */
+/** U: the largest `interestScore` over documents with vectors; 0 when there are no active clusters. */
 function tasteOf(ev: RankEvent, interests: readonly InterestCluster[]): number {
   let u = 0;
   for (const d of ev.docs) if (d.vector) u = Math.max(u, interestScore(d.vector, interests));
   return u;
 }
 
-/** R: lớn nhất trên mọi cặp (tài liệu, chủ đề), sau chuẩn hoá theo mặt bằng của nguồn × chủ đề. */
+/** R: the largest over all (document, topic) pairs, after normalizing by the baseline of the source × topic. */
 function relevanceOf(ev: RankEvent, base: Baselines) {
   let best = {
     R: 0,
@@ -300,12 +300,12 @@ function relevanceOf(ev: RankEvent, base: Baselines) {
 }
 
 /**
- * P: mỗi NGUỒN có mặt trong sự kiện góp một giá trị; P là giá trị lớn nhất (quyết định 13/10).
- *   - nguồn có tín hiệu: cộng độ nổi các tài liệu của nguồn đó (5 lần đăng lại = 5 nhóm người
- *     cùng chú ý), lấy ln, chuẩn hoá theo mặt bằng của CHÍNH nguồn đó;
- *   - nguồn không có tín hiệu (hoặc chưa lấy được): trung tính.
- * Không nguồn nào được đối xử riêng; và được một nguồn đo được nhắc tới (dù ít điểm) không bao
- * giờ làm P thấp hơn khi không được nhắc.
+ * P: each SOURCE present in the event contributes one value; P is the maximum (decision 13/10).
+ *   - source with a signal: sum the engagement of that source's documents (5 reposts = 5 groups of people
+ *     paying attention), take ln, normalize by the baseline of that SAME source;
+ *   - source without a signal (or not fetched yet): neutral.
+ * No source is special-cased; a measurable source being mentioned (even with low engagement) never lowers P
+ * compared with it not being mentioned.
  */
 function popularityOf(ev: RankEvent, base: Baselines, neutralP: number): number {
   const bySource = new Map<number, number | null>();
@@ -321,7 +321,7 @@ function popularityOf(ev: RankEvent, base: Baselines, neutralP: number): number 
   return P;
 }
 
-/** C: số BÀI VIẾT khác nhau (URL), không đếm lượt đăng lại; nguồn độc lập cùng nói thì thưởng. */
+/** C: number of DISTINCT ARTICLES (URLs), reposts not counted; independent sources reporting the same story are rewarded. */
 function coverageOf(ev: RankEvent, base: Baselines): number {
   const urls = new Set(ev.docs.map((d) => d.urlCanonical)).size;
   const nSources = new Set(ev.docs.map((d) => d.sourceId)).size;
@@ -330,9 +330,9 @@ function coverageOf(ev: RankEvent, base: Baselines): number {
 }
 
 /**
- * N: đã gửi mà không có gì mới thì loại (0); có tin mới thì giảm theo tỉ lệ đã gửi. "Mới" tính theo
- * URL chuẩn hoá, không theo tài liệu: một bài HN đăng lại cùng bài arXiv đã gửi là tài liệu mới
- * nhưng không phải tin mới (quyết định 09/11/2026, vụ Next-Concept Modeling gửi 3 lần).
+ * N: already sent with nothing new → dropped (0); with new items, reduced by the proportion already sent. "New" is judged by
+ * canonical URL, not by document: an HN post re-sharing an arXiv paper already sent is a new document
+ * but not a new item (decision 09/11/2026, the Next-Concept Modeling case sent 3 times).
  */
 function noveltyOf(ev: RankEvent, sentUrls: ReadonlySet<string>): number {
   const urls = new Set(ev.docs.map((d) => d.urlCanonical));
@@ -342,22 +342,22 @@ function noveltyOf(ev: RankEvent, sentUrls: ReadonlySet<string>): number {
   return fresh === 0 ? 0 : 0.5 + 0.5 * fresh;
 }
 
-/** S = N × (0,36·R + 0,225·P + 0,135·C + 0,09·A + 0,09·F + 0,10·U) (duyệt 10/11/2026). */
+/** S = N × (0.36·R + 0.225·P + 0.135·C + 0.09·A + 0.09·F + 0.10·U) (approved 10/11/2026). */
 export function scoreOf(c: Components, cfg: Pick<RankConfig, "weights">): number {
   const w = cfg.weights;
   return c.N * (w.R * c.R + w.P * c.P + w.C * c.C + w.A * c.A + w.F * c.F + w.U * c.U);
 }
 
 // ---------------------------------------------------------------------------------------------
-// Chọn ≤ 7 tin (xep-hang.html tab 06)
+// Select ≤ 7 items (xep-hang.html tab 06)
 
 export interface Scored {
   event: RankEvent;
   c: Components;
   S: number;
   /**
-   * Câu trả lời của model quyết định cho cổng (R trong vùng xám): `true` qua, `false` loại. Vắng
-   * khi không hỏi (R ngoài vùng xám) hoặc không hỏi được: khi đó dùng luật R ≥ `gateR`.
+   * The decision model's answer for the gate (R in the gray zone): `true` passes, `false` rejects. Absent
+   * when not asked (R outside the gray zone) or the model could not be asked: then the rule R ≥ `gateR` is used.
    */
   gate?: boolean;
 }
@@ -366,7 +366,7 @@ export interface Rejected {
   event: RankEvent;
   c: Components;
   S: number;
-  /** `decision_reject`: R trong vùng xám và model quyết định trả lời "không thuộc chủ đề". */
+  /** `decision_reject`: R in the gray zone and the decision model answered "not about the topic". */
   reason: "gate" | "decision_reject" | "floor" | "not_new" | "source_cap" | "not_picked";
 }
 
@@ -375,12 +375,12 @@ export interface Selection {
   rejected: Rejected[];
 }
 
-/** Phạt trùng: 0 khi giống dưới `start`, tăng tuyến tính tới `max` khi giống ≥ `start + span`. */
+/** Duplicate penalty: 0 when similar below `start`, rising linearly to `max` when similarity ≥ `start + span`. */
 export function mmrPenalty(maxSim: number, mmr: RankConfig["mmr"]): number {
   return mmr.max * clamp((maxSim - mmr.start) / mmr.span);
 }
 
-/** Nhiễu Gumbel(0,1) từ một số U ∈ [0,1): −ln(−ln U), U kẹp vào (ε, 1−ε) để không ra vô hạn. */
+/** Gumbel(0,1) noise from a number U ∈ [0,1): −ln(−ln U), U clamped into (ε, 1−ε) to avoid infinities. */
 export function gumbelNoise(u: number): number {
   const eps = 1e-12;
   const x = Math.min(1 - eps, Math.max(eps, u));
@@ -388,14 +388,14 @@ export function gumbelNoise(u: number): number {
 }
 
 /**
- * Chọn tin: cổng R, sàn S, loại tin đã gửi không có gì mới; giữ một chỗ cho mỗi nguồn có ứng
- * viên vượt sàn; phần còn lại chọn từng tin một theo khoá trừ phạt trùng với tin đã chọn (MMR,
- * Carbonell & Goldstein 1998), mỗi nguồn tối đa `maxPerSource` tin. Kết quả sắp theo S − phạt.
+ * Selects items: gate R, floor S, drop already-sent items with nothing new; reserve one slot for each source that has
+ * candidates above the floor; the rest are chosen one at a time by key minus the duplicate penalty against the already-chosen
+ * items (MMR, Carbonell & Goldstein 1998), at most `maxPerSource` items per source. The result is sorted by S − penalty.
  *
- * Khoá chọn là S khi `cfg.temperature` = 0 (xác định, không gọi `rng`); khi T > 0 là S + T·G với
- * G ~ Gumbel(0,1) rút MỘT LẦN cho mỗi ứng viên của pool trong mỗi lần gọi, dùng cho cả bước giữ
- * chỗ lẫn bước MMR (Gumbel top-k). Khoá nhiễu chỉ quyết định tin nào vào danh sách: phạt trùng
- * trả về và thứ tự kết quả vẫn theo S thật. `rng` trả số trong [0,1); T > 0 mà thiếu `rng` là lỗi.
+ * The selection key is S when `cfg.temperature` = 0 (deterministic, does not call `rng`); when T > 0 it is S + T·G with
+ * G ~ Gumbel(0,1) drawn ONCE per pool candidate on each call, used for both the reservation step
+ * and the MMR step (Gumbel top-k). The noisy key only decides which items enter the list; the returned duplicate penalty
+ * and the result order still use the true S. `rng` returns a number in [0,1); T > 0 without `rng` is an error.
  */
 export function select(
   scored: readonly Scored[],
@@ -409,7 +409,7 @@ export function select(
   const keyOf = new Map<Scored, number>();
   for (const s of pool)
     keyOf.set(s, noisy && rng ? s.S + cfg.temperature * gumbelNoise(rng()) : s.S);
-  // pool đã sắp theo S; sắp lại theo khoá (sort ổn định, T = 0 giữ nguyên thứ tự cũ).
+  // Pool already sorted by S; re-sort by key (stable sort; T = 0 keeps the old order).
   const order = noisy ? [...pool].sort((a, b) => (keyOf.get(b) ?? 0) - (keyOf.get(a) ?? 0)) : pool;
   const picked: Selection["picked"] = [];
   const perSource = new Map<number, number>();
@@ -419,7 +419,7 @@ export function select(
   };
   const isPicked = (s: Scored) => picked.some((p) => p.event.eventId === s.event.eventId);
 
-  // Giữ chỗ: tin có khoá cao nhất của mỗi nguồn (order đã sắp theo khoá, gặp trước là tốt nhất).
+  // Reservation: the highest-key item of each source (order is sorted by key, so the first encountered is the best).
   const seen = new Set<number>();
   for (const s of order) {
     if (picked.length >= cfg.maxItems) break;
@@ -428,7 +428,7 @@ export function select(
     take(s, 0, true);
   }
 
-  // Phần còn lại: từng tin một, khoá trừ phạt trùng với tin đã chọn giống nó nhất.
+  // Remainder: one item at a time, by key minus the duplicate penalty against the already-chosen item it most resembles.
   while (picked.length < cfg.maxItems) {
     const open = order.filter(
       (s) => !isPicked(s) && (perSource.get(s.c.sourceId) ?? 0) < cfg.maxPerSource,
@@ -442,18 +442,18 @@ export function select(
     const capped = (perSource.get(s.c.sourceId) ?? 0) >= cfg.maxPerSource;
     rejected.push({ ...s, reason: capped ? "source_cap" : "not_picked" });
   }
-  // Gửi theo điểm SAU phạt, không theo S: sắp theo S thì tin bị phạt vì trùng (vd hai tin Nvidia)
-  // lại đứng ngay cạnh tin nó trùng, đúng điều bước phạt muốn tránh.
+  // Sorted by the score AFTER penalty, not by S: sorting by S would put a penalized duplicate (e.g. two Nvidia items)
+  // right next to the item it duplicates, exactly what the penalty step is meant to avoid.
   picked.sort((a, b) => b.S - b.penalty - (a.S - a.penalty));
   return { picked, rejected };
 }
 
-/** R nằm trong vùng xám của cổng: cần hỏi model quyết định. */
+/** R in the gate's gray zone: the decision model must be asked. */
 export function needsDecision(R: number, cfg: Pick<RankConfig, "decision">): boolean {
   return R >= cfg.decision.low && R < cfg.decision.high;
 }
 
-/** Qua cổng: theo câu trả lời của model quyết định nếu có, không thì R ≥ `gateR`. */
+/** Passes the gate: by the decision model's answer if present, otherwise R ≥ `gateR`. */
 export function passesGate(
   s: { c: Pick<Components, "R">; gate?: boolean },
   cfg: Pick<RankConfig, "gateR">,
@@ -461,7 +461,7 @@ export function passesGate(
   return s.gate ?? s.c.R >= cfg.gateR;
 }
 
-/** Cổng (R hoặc model quyết định), tin đã gửi không có gì mới, sàn S; phần còn lại sắp theo S. */
+/** Gate (R or decision model), already-sent items with nothing new, floor S; the rest sorted by S. */
 function screen(scored: readonly Scored[], cfg: RankConfig) {
   const rejected: Rejected[] = [];
   const pool: Scored[] = [];

@@ -7,15 +7,15 @@ import {
   interestScore,
 } from "../src/interest.ts";
 
-const R = Math.SQRT1_2; // 1/căn 2
+const R = Math.SQRT1_2; // 1/sqrt 2
 
-// Nhóm A quanh (R, R, 0): tổng 0,6+0,8+R theo x bằng tổng theo y nên tâm = (R, R, 0).
+// Group A around (R, R, 0): sum 0,6+0,8+R along x equals the sum along y, so the center = (R, R, 0).
 const A: InterestItem[] = [
   { id: "a1", vector: [0.6, 0.8, 0], ageDays: 0 },
   { id: "a2", vector: [0.8, 0.6, 0], ageDays: 0 },
   { id: "a3", vector: [R, R, 0], ageDays: 0 },
 ];
-// Nhóm B quanh (0, -R, -R), cách A khoảng ~1,73.
+// Group B around (0, -R, -R), roughly 1,73 away from A.
 const B: InterestItem[] = [
   { id: "b1", vector: [0, -0.6, -0.8], ageDays: 0 },
   { id: "b2", vector: [0, -0.8, -0.6], ageDays: 0 },
@@ -82,8 +82,8 @@ describe("gom cụm Ward", () => {
   });
 
   test("công thức Ward: 3 điểm trên đường thẳng cắt đúng chỗ", () => {
-    // Điểm 0, 1 và 10 trên trục x (không cần chuẩn hoá để thử khoảng cách).
-    // Ward: gộp (0,1) ở chiều cao 1; sau đó gộp với 10: sqrt(2·2·1/3)·|0,5−10| = sqrt(4/3)·9,5 ≈ 10,97.
+    // Points 0, 1 and 10 on the x axis (no normalization needed to test distances).
+    // Ward: merge (0,1) at height 1; then merge with 10: sqrt(2·2·1/3)·|0,5−10| = sqrt(4/3)·9,5 ≈ 10,97.
     const pts: InterestItem[] = [0, 1, 10].map((x, i) => ({
       id: `x${i}`,
       vector: [x, 0, 0],
@@ -118,7 +118,7 @@ describe("gom cụm Ward", () => {
   });
 
   test("trọng số theo tuổi vào center và importance", () => {
-    // (1,0,0) trọng số 1 và (0,1,0) trọng số 0,5: tổng (1; 0,5; 0), chuẩn hoá chia sqrt(1,25).
+    // (1,0,0) with weight 1 and (0,1,0) with weight 0,5: sum (1; 0,5; 0), normalized by sqrt(1,25).
     const out = clusterInterests(
       [
         { id: "u", vector: [1, 0, 0], ageDays: 0 },
@@ -135,7 +135,7 @@ describe("gom cụm Ward", () => {
 
   test("sắp theo importance giảm dần, hoà thì theo id thành viên nhỏ nhất", () => {
     const out = clusterInterests([...B, ...A], { distanceThreshold: 0.5 });
-    expect(out[0]?.memberIds[0]).toBe("a1"); // hoà importance 3 và 3
+    expect(out[0]?.memberIds[0]).toBe("a1"); // tie on importance 3 and 3
     const heavy = clusterInterests([...A, ...B.map((b) => ({ ...b, ageDays: 60 }))], {
       distanceThreshold: 0.5,
     });
@@ -167,7 +167,7 @@ describe("interestScore", () => {
   });
 
   test("lấy max theo cụm", () => {
-    // Vector (R, R, 0): cos với e1 = R → 1·R; với e2 = R → sqrt(0,5)·R. Max = R.
+    // Vector (R, R, 0): cos with e1 = R → 1·R; with e2 = R → sqrt(0,5)·R. Max = R.
     expect(interestScore([R, R, 0], clusters)).toBeCloseTo(R, 12);
   });
 

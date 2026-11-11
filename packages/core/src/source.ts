@@ -1,28 +1,28 @@
 /**
- * Interface nguồn. Lõi chỉ biết kiểu này; mỗi nguồn (HN, arXiv, GitHub…) là một adapter.
+ * Source interface. The core only knows this type; each source (HN, arXiv, GitHub…) is an adapter.
  *
- * Trạng thái của nguồn (con trỏ, ETag…) là `unknown` với lõi: adapter tự đọc và tự trả về
- * trạng thái mới. Nhờ vậy thêm một kiểu nguồn không cần đổi schema.
+ * A source's state (cursor, ETag…) is `unknown` to the core: the adapter reads it itself and returns the
+ * new state. This way adding a source type needs no schema change.
  */
 import type { HttpClient } from "./http.ts";
 
-/** Một mục thô lấy được từ nguồn, chưa qua xử lý nào. */
+/** A raw item fetched from the source, before any processing. */
 export interface RawItem {
-  /** Id phía nguồn. Cùng với source_id là khoá idempotent của `documents`. */
+  /** Id on the source side. Together with source_id it is the idempotent key of `documents`. */
   externalId: string;
   url: string;
   title?: string;
   publishedAt?: Date;
-  /** Nội dung gốc đúng như nhận được (JSON, HTML, XML). Lưu nguyên vào ObjectStore. */
+  /** Original content exactly as received (JSON, HTML, XML). Stored unchanged in ObjectStore. */
   body: string;
   contentType: string;
-  /** Vài trường tiện tra cứu mà không phải mở bản thô (điểm, tác giả…). */
+  /** A few convenience fields for lookup without opening the raw item (score, author…). */
   meta?: Record<string, unknown>;
 }
 
 export interface FetchContext<C, S> {
   config: C;
-  /** `undefined` ở lần chạy đầu. */
+  /** `undefined` on the first run. */
   state: S | undefined;
   http: HttpClient;
   now: Date;
@@ -30,42 +30,42 @@ export interface FetchContext<C, S> {
 
 export interface FetchResult<S> {
   items: RawItem[];
-  /** Trạng thái để lần sau đọc tiếp. Chỉ được lưu khi lượt chạy thành công. */
+  /** State for the next run to resume from. Only saved when the run succeeds. */
   state: S;
-  /** Server trả 304: không có gì mới, không phải lỗi. */
+  /** Server returned 304: nothing new, not an error. */
   notModified?: boolean;
   httpStatus?: number;
   /**
-   * Lượt này dừng trước khi bắt kịp hiện tại (hết ngân sách, hoặc lỗi sau khi đã xong vài
-   * cửa sổ). `items` và `state` chỉ gồm phần đã lấy đủ; lượt sau đọc tiếp từ đó. Ghi lý do.
+   * This run stops before catching up to now (budget exhausted, or an error after a few
+   * windows). `items` and `state` only include what was fully fetched; the next run resumes there. Records the reason.
    */
   behind?: string;
   /**
-   * Số đo repo GitHub đọc được trong lượt này (trang Trending có tổng sao và "N stars today" của
-   * mọi repo trên trang, kể cả repo đã là tài liệu từ trước). Job fetch ghi thẳng vào `repo_stats`
-   * (chỉ ghi thêm), vì `documents` chỉ giữ một dòng mỗi repo. Nguồn khác không khai báo.
+   * GitHub repo measurements readable in this run (the Trending page has total stars and "N stars today" for
+   * every repo on the page, including repos already stored as documents). The fetch job writes directly to `repo_stats`
+   * (append only), since `documents` keeps only one row per repo. Other sources do not declare this.
    */
   repoStats?: RepoObservation[];
 }
 
-/** Một lần đo repo GitHub, xem `repo_stats` trong @radard/db. */
+/** One GitHub repo measurement; see `repo_stats` in @radard/db. */
 export interface RepoObservation {
-  /** `owner/repo`, job fetch tự viết thường. */
+  /** `owner/repo`; the fetch job lowercases it itself. */
   repo: string;
   stars: number;
   forks: number | null;
   source: "github_stars" | "trending_daily";
-  /** Số tăng nguồn tự báo ("N stars today"); radard tự chụp thì `null`. */
+  /** Increase reported by the source itself ("N stars today"); `null` when radard captured it itself. */
   reportedGain: number | null;
 }
 
 /**
- * Đi tiến theo các cửa sổ thời gian (lo, hi], mỗi cửa sổ không quá `cap` kết quả (giới hạn
- * phân trang của API), tới `end`. Con trỏ chỉ dời tới cuối cửa sổ ĐÃ LẤY ĐỦ, nên không bao
- * giờ có lỗ hổng: daemon tắt lâu thì các lượt sau lấp dần, không mất bài.
+ * Moves forward through time windows (lo, hi], each window returning at most `cap` results (the API's
+ * pagination limit), up to `end`. The cursor only advances to the end of a FULLY fetched window, so there is never a gap:
+ * if the daemon is off for a long time, later runs gradually fill it in, and no item is lost.
  *
- * `count(lo, hi)` trả tổng số kết quả của cửa sổ (kèm trang đầu để khỏi gọi lại), `fetchAll`
- * lấy hết cửa sổ. Thời gian là số nguyên theo đơn vị của nguồn (giây, phút…).
+ * `count(lo, hi)` returns the total number of results in the window (with the first page included to avoid a re-call), `fetchAll`
+ * fetches the whole window. Times are integers in the source's unit (seconds, minutes…).
  */
 export async function walkWindows<P, T>(opts: {
   start: number;
@@ -87,13 +87,13 @@ export async function walkWindows<P, T>(opts: {
     try {
       page = await opts.count(lo, hi);
       if (page.total > opts.cap && hi - lo > 1) {
-        // Cửa sổ quá đầy: thu hẹp một nửa rồi hỏi lại.
+        // Window too full: halve it and ask again.
         span = Math.max(1, Math.floor((hi - lo) / 2));
         continue;
       }
       items.push(...(await opts.fetchAll(lo, hi, page.first)));
     } catch (err) {
-      // Chưa xong cửa sổ nào thì báo lỗi như cũ; đã xong vài cửa sổ thì giữ phần đã có.
+      // If no window finished, report the error as before; if some windows finished, keep what was obtained.
       if (lo === opts.start) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       return { items, coveredUntil: lo, behind: `lỗi giữa chừng: ${msg}`.slice(0, 500) };
@@ -108,36 +108,36 @@ export interface SourceAdapter<C = unknown, S = unknown> {
   readonly kind: string;
   fetch(ctx: FetchContext<C, S>): Promise<FetchResult<S>>;
   /**
-   * Rút văn bản để embed từ bản thô của CHÍNH nguồn này (job process gọi). Không có thì job process
-   * dùng tiêu đề. Đặt cạnh `fetch` vì chỉ adapter biết bản thô của nó có cấu trúc gì.
+   * Extracts the text to embed from the raw item of THIS source (called by the process job). If absent, the process job
+   * uses the title. Placed next to `fetch` because only the adapter knows how its raw item is structured.
    */
   toText?(body: string, title: string | null): string;
   /**
-   * Lấy lại tín hiệu cộng đồng MỚI NHẤT (điểm, bình luận…) của các tài liệu, theo `externalId`.
-   * Gọi ngay trước khi xếp hạng: số lưu lúc lấy bài gần như luôn là lúc bài vừa đăng. Trả map
-   * externalId → { tên tín hiệu: giá trị }; tài liệu không còn trên nguồn thì vắng mặt.
+   * Re-fetches the LATEST community signals (score, comments…) of the documents, by `externalId`.
+   * Called right before ranking: the count stored when the item was fetched is almost always from the moment it was posted. Returns a map
+   * externalId → { signal name: value }; documents no longer on the source are absent.
    */
   refreshSignals?(externalIds: string[], http: HttpClient): Promise<Map<string, Signals>>;
   /**
-   * Mức cộng đồng quan tâm MỘT tài liệu, từ tín hiệu của nó, ở dạng CỘNG ĐƯỢC: các tài liệu cùng
-   * nguồn trong một sự kiện được cộng lại rồi mới lấy ln (xep-hang.html tab 04). Nguồn không có
-   * tín hiệu thì không khai báo hàm này: công thức dùng độ nổi trung tính.
+   * Community interest in ONE document, from its signals, in ADDITIVE form: documents from the same
+   * source in one event are summed, and only then is ln taken (xep-hang.html tab 04). A source without
+   * signals does not declare this function: the formula uses neutral engagement.
    */
   engagement?(signals: Signals): number | null;
   /**
-   * Trang thảo luận của tài liệu (bình luận HN…), khác với bài gốc ở `url`. Digest hiện nó thành
-   * link "Thảo luận". Không có trang thảo luận riêng (hoặc `url` đã chính là trang đó) thì `null`;
-   * nguồn không có thảo luận thì không khai báo hàm này.
+   * The document's discussion page (HN comments…), different from the original post at `url`. The digest shows it as a
+   * "Discussion" link. If there is no separate discussion page (or `url` already is that page), `null`;
+   * a source without discussions does not declare this function.
    */
   discussionUrl?(externalId: string, url: string): string | null;
   /**
-   * Trang chứa NỘI DUNG của tài liệu, khi bản thô của nguồn chỉ có tiêu đề và link (bài HN thường
-   * là một link sang blog, GitHub, báo). Job `pages` tải trang này, job process embed tiêu đề cùng
-   * phần chữ chính của trang. `null`: nội dung đã nằm trong bản thô (Ask HN). Nguồn có sẵn nội
-   * dung (arXiv có abstract, GitHub có ghi chú phát hành) thì không khai báo hàm này.
+   * The page holding the document's CONTENT, when the source's raw item only has a title and link (an HN post is usually
+   * a link to a blog, GitHub or a news site). The `pages` job fetches this page, and the process job embeds the title together with
+   * the page's main text. `null`: the content is already in the raw item (Ask HN). A source that already has its content
+   * (arXiv has an abstract, GitHub has release notes) does not declare this function.
    */
   articleUrl?(externalId: string, url: string): string | null;
 }
 
-/** Tín hiệu của một tài liệu: tên do adapter đặt (`hn_points`…) → giá trị. */
+/** Signals of a document: name set by the adapter (`hn_points`…) → value. */
 export type Signals = Record<string, number>;

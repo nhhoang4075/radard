@@ -1,8 +1,8 @@
 /**
- * Logger tối giản: một dòng mỗi sự kiện, dạng `scope message key=value`.
+ * Minimal logger: one line per event, in the form `scope message key=value`.
  *
- * Không kéo thư viện log vì daemon chỉ cần đọc được trên Railway và terminal; khi cần
- * truy vấn log có cấu trúc thì dữ liệu quan trọng đã nằm trong `fetch_runs` và `llm_calls`.
+ * No logging library: the daemon only needs to be readable on Railway and in the terminal; when
+ * structured log queries are needed, the important data already lives in `fetch_runs` and `llm_calls`.
  */
 type Fields = Record<string, unknown>;
 
@@ -17,7 +17,7 @@ function format(scope: string, msg: string, fields?: Fields): string {
 
 export function createLogger(scope: string) {
   return {
-    // biome-ignore lint/suspicious/noConsole: đây chính là logger
+    // biome-ignore lint/suspicious/noConsole: this is the logger itself
     info: (msg: string, fields?: Fields) => console.log(format(scope, msg, fields)),
     warn: (msg: string, fields?: Fields) => console.warn(format(scope, msg, fields)),
     error: (msg: string, fields?: Fields) => console.error(format(scope, msg, fields)),

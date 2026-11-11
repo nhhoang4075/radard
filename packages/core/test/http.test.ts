@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { createSecureContext, createServer as createTlsServer } from "node:tls";
 import { createHttpClient, HttpError } from "../src/http.ts";
 
-// Server cục bộ ghi lại phương thức và body của request. Khoảng giãn đo ở LÚC GỬI (bọc `fetch`), vì
-// client chỉ kiểm soát lúc gửi: đo lúc server nhận thì lượt đầu mở kết nối chậm vài ms (máy đang
-// chạy nhiều file test) làm khoảng cách trông ngắn hơn, test lỗi thất thường (139 ms, 13/10/2026).
+// Local server records the method and body of each request. The spacing is measured at SEND time (wrapping `fetch`), because
+// the client only controls send time: measuring at receipt makes the first connection setup a few ms slower (machine
+// running many test files), so the gap looks shorter and the test fails erratically (139 ms, 13/10/2026).
 const hits: {
   at: number;
   method: string;
@@ -93,7 +93,7 @@ test('redirect: "manual" trả thẳng 3xx kèm location; mặc định vẫn đ
   expect(followed.url).toBe(`${base}/dich`);
 });
 
-// Ghim địa chỉ: kết nối tới IP đã kiểm nhưng Host, SNI và kiểm chứng chứng chỉ vẫn theo tên gốc.
+// Pinning the address: connects to the checked IP, but Host, SNI and certificate verification still use the original name.
 test("connectTo: HTTP giữ header Host của tên gốc", async () => {
   const http = createHttpClient({ minIntervalMs: 0 });
   hits.length = 0;
@@ -156,7 +156,7 @@ describe.skipIf(!openssl)("connectTo: HTTPS", () => {
     tlsServer.close();
     rmSync(dir, { recursive: true, force: true });
   });
-  // Cho test tin chứng chỉ tự ký qua CA riêng (KHÔNG tắt kiểm chứng); client thật không có đường này.
+  // For the test that trusts a self-signed certificate via a private CA (verification NOT disabled); the real client has no such path.
   const withCa = (init: RequestInit | undefined) =>
     ({ ...init, tls: { ...((init as { tls?: object })?.tls ?? {}), ca: cert } }) as RequestInit;
   const fetchBefore = globalThis.fetch;

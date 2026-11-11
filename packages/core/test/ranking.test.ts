@@ -74,7 +74,7 @@ describe("normalize", () => {
 
 const cfg: RankConfig = {
   ...DEFAULT_RANK_CONFIG,
-  temperature: 0, // oracle xác định; chọn Gumbel có test riêng
+  temperature: 0, // deterministic oracle; Gumbel selection has its own tests
   priors: new Map([
     [1, 0.6],
     [2, 0.6],
@@ -141,15 +141,15 @@ describe("components", () => {
 
   test("P = lớn nhất theo nguồn: nguồn không đo được góp 0,3, nên được nhắc ít điểm không bị phạt", () => {
     const p = (docs: RankEvent["docs"]) => components(ev(1, docs), base, cfg, start, new Set()).P;
-    const lowHn = doc(1, 1, "a", 0.8, 2); // 2 điểm: dưới trung vị → 0
-    const paper = doc(2, 2, "b", 0.8); // nguồn không có tín hiệu
+    const lowHn = doc(1, 1, "a", 0.8, 2); // 2 points: below the median → 0
+    const paper = doc(2, 2, "b", 0.8); // source with no signal
     expect(p([lowHn])).toBe(0);
     expect(p([paper, lowHn])).toBe(0.3);
     expect(p([paper, doc(3, 1, "a", 0.8, 300)])).toBeCloseTo(
       (Math.log1p(300) - 1.099) / (7.04 - 1.099),
       12,
     );
-    // Tài liệu của nguồn có tín hiệu mà chưa lấy được tín hiệu: coi như chưa biết → trung tính.
+    // Document from a source with signals whose signal was not fetched yet: treated as unknown → neutral.
     expect(p([doc(4, 1, "a", 0.8, null)])).toBe(0.3);
   });
 
@@ -161,7 +161,7 @@ describe("components", () => {
       start,
       new Set(),
     );
-    expect(reposts.C).toBe(0); // 1 URL = trung vị (ln 2) → 0
+    expect(reposts.C).toBe(0); // 1 URL = median (ln 2) → 0
     const two = components(
       ev(1, [doc(1, 1, "a", 0.8), doc(2, 2, "b", 0.8)]),
       base,
@@ -255,7 +255,7 @@ describe("components", () => {
   });
 });
 
-/** Ứng viên với điểm cho sẵn, để test thuật toán chọn đúng như ví dụ trong xep-hang.html. */
+/** Candidates with preset scores, to test that the selection algorithm matches the example in xep-hang.html. */
 function cand(id: number, S: number, sourceId = 1, R = 0.9): Scored {
   return {
     event: ev(id, []),
@@ -286,14 +286,14 @@ describe("select", () => {
     };
     const all = [cand(1, 0.8), cand(2, 0.78), cand(3, 0.72), cand(4, 0.7)];
     const loose = { ...cfg, floorS: 0, maxPerSource: 7 };
-    // Còn 3 chỗ: B (thứ 2 theo S) bị đẩy ra vì trùng A, C và D vào thay.
+    // 3 slots left: B (2nd by S) is pushed out for duplicating A; C and D take its place.
     const three = select(all, { ...loose, maxItems: 3 }, sim);
     expect(three.picked.map((p) => p.event.eventId)).toEqual([1, 3, 4]);
-    // Còn chỗ thứ 4 thì B vẫn vào, ở cuối, sau khi bị phạt 0,153.
+    // With a 4th slot left, B still gets in, last, after its 0,153 penalty.
     const four = select(all, { ...loose, maxItems: 4 }, sim);
     expect(four.picked).toHaveLength(4);
     expect(four.picked.find((p) => p.event.eventId === 2)?.penalty).toBeCloseTo(0.153, 3);
-    // Thứ tự gửi theo điểm sau phạt: B không đứng ngay sau A.
+    // Send order by score after penalty: B is not right after A.
     expect(four.picked.map((p) => p.event.eventId)).toEqual([1, 3, 4, 2]);
   });
 

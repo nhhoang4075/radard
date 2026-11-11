@@ -1,13 +1,13 @@
 /**
- * Trang web được tài liệu link tới (bài HN → blog, GitHub, báo). Lõi chỉ biết các kiểu này; tải
- * trang (kèm robots.txt) và rút phần chữ chính là adapter (`@radard/adapters/pages`).
+ * Web pages linked from documents (HN post → blog, GitHub, news). The core only knows these types; fetching
+ * pages (including robots.txt) and extracting the main text are adapters (`@radard/adapters/pages`).
  */
 
 /**
- * ok: tải được HTML · blocked: robots.txt không cho bot tải · skipped: không phải trang HTML
- * (PDF, ảnh, video) · failed: lỗi HTTP (401/403 trang trả phí…) hoặc lỗi mạng · deferred: chưa
- * quyết được vì robots.txt không đọc được (5xx hoặc không kết nối được, RFC 9309); KHÔNG phải trạng
- * thái lưu trong DB, job không ghi dòng nào để lần chạy sau thử lại.
+ * ok: HTML fetched · blocked: robots.txt does not let the bot fetch it · skipped: not an HTML page
+ * (PDF, image, video) · failed: HTTP error (401/403 paywalled pages…) or network error · deferred: not decided yet
+ * because robots.txt could not be read (5xx or unreachable, RFC 9309); NOT a state
+ * stored in the DB: the job writes no row, so the next run retries it.
  */
 export type PageStatus = "ok" | "blocked" | "skipped" | "failed" | "deferred";
 
@@ -15,18 +15,18 @@ export interface PageFetchResult {
   status: PageStatus;
   httpStatus?: number;
   contentType?: string;
-  /** Địa chỉ sau redirect. */
+  /** Address after redirects. */
   finalUrl?: string;
-  /** Chỉ có khi `ok`. */
+  /** Only present when `ok`. */
   html?: string;
   error?: string;
 }
 
 export interface PageFetcher {
   fetch(url: string): Promise<PageFetchResult>;
-  /** Số host đang nằm trong cache robots.txt (để theo dõi bộ nhớ). */
+  /** Number of hosts currently in the robots.txt cache (for memory monitoring). */
   robotsCacheSize?(): number;
 }
 
-/** Phần chữ chính của trang (bỏ menu, quảng cáo, chân trang); `null` khi không rút được gì đáng kể. */
+/** Main text of the page (menus, ads, footers removed); `null` when nothing significant can be extracted. */
 export type PageExtractor = (html: string, url: string) => string | null;

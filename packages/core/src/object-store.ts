@@ -1,8 +1,8 @@
 /**
- * Kho bản thô. Khi dev ghi ra đĩa, khi deploy ghi lên R2; lõi không biết là cái nào.
+ * Raw content store. In dev it writes to disk, on deploy it writes to R2; the core does not know which.
  *
- * Key theo hash nội dung, nên ghi lại cùng một nội dung là vô hại, và hai nguồn trả về
- * cùng một thứ thì chỉ tốn một chỗ lưu.
+ * Keys are content hashes, so writing the same content again is harmless, and if two sources return
+ * the same thing it only costs one stored copy.
  */
 export interface ObjectStore {
   put(key: string, body: Uint8Array<ArrayBuffer>, contentType: string): Promise<void>;
@@ -10,7 +10,7 @@ export interface ObjectStore {
   exists(key: string): Promise<boolean>;
 }
 
-/** `raw/ab/abcdef….gz`: tách thư mục theo 2 ký tự đầu để một thư mục không có hàng triệu file. */
+/** `raw/ab/abcdef….gz`: split into folders by the first 2 characters so one folder never holds millions of files. */
 export function rawKey(sha256: string): string {
   return `raw/${sha256.slice(0, 2)}/${sha256}.gz`;
 }

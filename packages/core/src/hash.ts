@@ -1,6 +1,6 @@
 /**
- * Hash nội dung. Luôn chuẩn hoá Unicode NFC trước: tiếng Việt có hai cách mã hoá dấu
- * (dựng sẵn và tổ hợp), cùng một chữ nhìn giống hệt mà hash khác nhau thì dedup hỏng.
+ * Content hash. Always normalize Unicode to NFC first: Vietnamese has two ways to encode diacritics
+ * (precomposed and combining); the same-looking text could hash differently and break dedup.
  */
 export function nfc(text: string): string {
   return text.normalize("NFC");

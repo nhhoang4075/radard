@@ -1,4 +1,4 @@
-/** Ảnh chụp dữ liệu của bộ chấm: xuất ra JSON và nhập lại để chạy đúng số cũ không cần DB. */
+/** Scorer data snapshot: export to JSON and import again to reproduce the same numbers without a DB. */
 import type { EvalDay, EvalSample, Level } from "./types.ts";
 
 export interface EvalSnapshot {
@@ -36,7 +36,7 @@ function parseSample(x: unknown, date: string): EvalSample {
   return { date, position, urls: urls as string[], level: level as Level, score: out };
 }
 
-/** Đọc ảnh chụp từ JSON đã parse; sai hình dạng thì ném lỗi rõ ràng. */
+/** Reads a snapshot from parsed JSON; throws a clear error if the shape is wrong. */
 export function parseSnapshot(json: unknown): EvalDay[] {
   if (!isRecord(json) || json.version !== 1 || !Array.isArray(json.days))
     fail("thiếu version 1 hoặc days");

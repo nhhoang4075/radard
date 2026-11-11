@@ -1,14 +1,14 @@
 /**
- * Lớp thông báo của feed (quyết định 10/11/2026, mo-hinh-de-xuat.html): bản chụp feed là nguồn
- * chính; Telegram chỉ lấy tối đa `maxItems` tin ĐẦU của bản chụp (theo vị trí) có S ≥ sàn thông
- * báo, mỗi nguồn tối đa `maxPerSource` tin. Hàm thuần, chỉ đọc bản chụp: không đổi thứ tự hay tập
- * tin của feed, nên quy tắc báo đổi được mà không đụng xếp hạng.
+ * Feed notification layer (decision 10/11/2026, mo-hinh-de-xuat.html): the feed snapshot is the
+ * main source; Telegram takes at most `maxItems` items FROM THE START of the snapshot (by position) with S ≥ the notification floor,
+ * at most `maxPerSource` items per source. Pure function, reads the snapshot only: it does not change the order or set of
+ * feed items, so the notification rule can change without touching ranking.
  */
 
 export interface NotifyCandidate {
-  /** Vị trí trong bản chụp, 1..n. */
+  /** Position in the snapshot, 1..n. */
   position: number;
-  /** S (chưa trừ phạt), so với sàn thông báo. */
+  /** S (before penalty), compared with the notification floor. */
   S: number;
   sourceId: number;
 }
@@ -19,7 +19,7 @@ export interface NotifyRule {
   maxPerSource: number;
 }
 
-/** Các tin được báo, theo thứ tự vị trí trong bản chụp. */
+/** Notified items, in snapshot position order. */
 export function pickNotify<T extends NotifyCandidate>(items: readonly T[], rule: NotifyRule): T[] {
   const out: T[] = [];
   const perSource = new Map<number, number>();

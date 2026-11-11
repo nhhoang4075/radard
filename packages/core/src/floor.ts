@@ -1,20 +1,20 @@
 /**
- * Sàn điểm theo phân vị (duyệt 10/11/2026): sàn = phân vị q của điểm S các sự kiện qua cổng trong
- * 30 ngày trước, với q = 1 − 12/n (n = số sự kiện qua cổng trung bình mỗi ngày), để khoảng 12
- * tin/ngày vượt sàn; ngày không nổi bật thì ít tin hơn. Chưa đủ 14 ngày dữ liệu thì dùng sàn cố định.
- * Lưu ý (10/11/2026): S trong bể trước khi có điểm gu U theo công thức cũ (không có U, hệ số ×1,0),
- * sau đó theo công thức mới (0,9× + 0,10·U); cửa sổ 30 ngày pha trộn hai thang, không sửa dữ liệu cũ.
- * Hàm thuần: việc đọc bể và lọc dòng ở `apps/daemon/src/jobs/rank.ts`.
+ * Percentile-based score floor (approved 10/11/2026): floor = the q-th percentile of the S scores of the events passing the gate in the
+ * last 30 days, with q = 1 − 12/n (n = average number of events passing the gate per day), so about 12 items/day
+ * clear the floor; on quiet days fewer items. Before 14 days of data exist, use the fixed floor.
+ * Note (10/11/2026): S values in the pool from before the taste score U existed use the old formula (no U, factor ×1.0),
+ * then the new formula (0.9× + 0.10·U); the 30-day window mixes the two scales, old data is not modified.
+ * Pure function: reading the pool and filtering rows happen in `apps/daemon/src/jobs/rank.ts`.
  */
 import { percentileCont } from "./ranking.ts";
 
-/** Số tin mỗi ngày mà sàn nhắm tới. */
+/** Number of items per day that the floor targets. */
 export const FLOOR_TARGET_PER_DAY = 12;
-/** Cửa sổ lấy điểm: [end − 30 ngày, end). */
+/** Score window: [end − 30 days, end). */
 export const FLOOR_WINDOW_DAYS = 30;
-/** Số ngày có dữ liệu tối thiểu để dùng phân vị; dưới mức này dùng sàn cố định. */
+/** Minimum number of days with data to use percentiles; below this, use the fixed floor. */
 export const FLOOR_MIN_DAYS = 14;
-/** Kẹp q vào [0, 0,99]. n ≤ 12 cho q ≤ 0 (sàn = điểm thấp nhất, không lọc thêm); 0,99 chặn q → 1. */
+/** Clamps q to [0, 0.99]. n ≤ 12 gives q ≤ 0 (floor = lowest score, no further filtering); 0.99 caps q → 1. */
 export const FLOOR_MAX_Q = 0.99;
 
 export type FloorSource = "percentile" | "fixed";
@@ -22,18 +22,18 @@ export type FloorSource = "percentile" | "fixed";
 export interface FloorResult {
   value: number;
   source: FloorSource;
-  /** Chỉ có khi nguồn là phân vị. */
+  /** Only present when the source is a percentile. */
   q?: number;
-  /** Số sự kiện qua cổng trung bình mỗi ngày; chỉ có khi nguồn là phân vị. */
+  /** Average number of events passing the gate per day; only present when the source is a percentile. */
   n?: number;
-  /** Số ngày có dữ liệu trong cửa sổ. */
+  /** Number of days with data in the window. */
   days: number;
 }
 
 /**
- * @param scores điểm S (chưa trừ phạt) của các sự kiện qua cổng trong cửa sổ, đã bỏ tin đã gửi
- * @param days số ngày khác nhau có dữ liệu trong cửa sổ
- * @param fixed sàn cố định, dùng khi chưa đủ ngày hoặc không có điểm nào
+ * @param scores S scores (before penalty) of the events passing the gate in the window, with already-sent items removed
+ * @param days number of distinct days with data in the window
+ * @param fixed fixed floor, used when there are not enough days or no scores
  */
 export function percentileFloor(args: {
   scores: readonly number[];
@@ -43,8 +43,8 @@ export function percentileFloor(args: {
   targetPerDay?: number;
   maxQ?: number;
   /**
-   * Sàn feed (quyết định 10/11/2026): n ≤ mục tiêu cho q kẹp = 0, nghĩa là KHÔNG lọc theo sàn
-   * (giá trị 0; S luôn ≥ 0), thay vì lấy điểm thấp nhất của cửa sổ. Sàn thông báo giữ cách cũ.
+   * Feed floor (decision 10/11/2026): when n ≤ target, q clamps to 0, meaning NO filtering by floor
+   * (value 0; S is always ≥ 0), instead of taking the lowest score in the window. The notification floor keeps the old method.
    */
   noFilterAtZeroQ?: boolean;
 }): FloorResult {

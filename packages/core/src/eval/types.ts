@@ -1,18 +1,18 @@
 /**
- * Bộ chấm bất biến (a): kiểu dữ liệu. Phát lại các ngày đã gửi, chấm lại thứ tự tin bằng các
- * thành phần điểm đã lưu lúc chọn và nhãn 👍/👎; không gọi model, không đọc DB.
+ * Immutable scorer (a): data types. Replays the sent days, re-scores the item order using the
+ * score components stored at selection time and the 👍/👎 labels; calls no model, reads no DB.
  */
 
-/** Mức nhãn của một tin: 👍, chưa bấm (cũng là một mức), 👎. */
+/** Level label of an item: 👍, not clicked (also a level), 👎. */
 export type Level = "like" | "none" | "dislike";
 
 /**
- * Gain của từng mức (chốt: 👍 = 2, chưa bấm = 1, 👎 = 0). Đổi ở ĐÂY nếu sau này muốn khác; mọi
- * chỉ số đọc từ bảng này.
+ * Gain per level (fixed: 👍 = 2, not clicked = 1, 👎 = 0). Change it HERE if needed later; all
+ * metrics read gains from this table.
  */
 export const GAIN: Readonly<Record<Level, number>> = { like: 2, none: 1, dislike: 0 };
 
-/** Các thành phần điểm lưu trong `digests.meta.plan.items[].score` lúc chọn. */
+/** Score components stored in `digests.meta.plan.items[].score` at selection time. */
 export interface StoredScore {
   S: number;
   penalty: number;
@@ -24,19 +24,19 @@ export interface StoredScore {
   N: number;
 }
 
-/** Một tin đã gửi trong một ngày. */
+/** An item sent in one day. */
 export interface EvalSample {
-  /** Ngày (YYYY-MM-DD, giờ Việt Nam) của digest chứa tin. */
+  /** Day (YYYY-MM-DD, Vietnam time) of the digest that contains the item. */
   date: string;
-  /** Vị trí trong digest (1…7). Dùng để phá hoà một cách xác định. */
+  /** Position in the digest (1…7). Used to break ties deterministically. */
   position: number;
-  /** `url_canonical` của các tài liệu trong sự kiện: khoá bền của nhãn (event_id đổi khi dựng lại). */
+  /** `url_canonical` of the documents in the event: the stable label key (event_id changes when rebuilt). */
   urls: string[];
   level: Level;
   score: StoredScore;
 }
 
-/** Mọi tin đã gửi trong một ngày (tối đa 7). */
+/** All items sent in one day (at most 7). */
 export interface EvalDay {
   date: string;
   samples: EvalSample[];
@@ -44,7 +44,7 @@ export interface EvalDay {
 
 export const gainOf = (s: Pick<EvalSample, "level">): number => GAIN[s.level];
 
-/** Ngày không có gì để phân biệt (mọi tin cùng mức): không đo được thứ tự nên bị loại khỏi trung bình. */
+/** Day with nothing to tell apart (all items at the same level): order cannot be measured, so it is excluded from the mean. */
 export function isInformative(day: EvalDay): boolean {
   const first = day.samples[0];
   if (!first) return false;

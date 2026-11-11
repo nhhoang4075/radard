@@ -41,7 +41,7 @@ function cand(id: number, S: number, sourceId = 1, centroid: number[] = [1, 0]):
   };
 }
 
-/** Oracle: bản sao NGUYÊN VĂN logic chọn cũ (T = 0) viết lại độc lập trong test. */
+/** Oracle: a VERBATIM copy of the old selection logic (T = 0), rewritten independently in the test. */
 function oldSelect(
   scored: readonly Scored[],
   c: RankConfig,
@@ -89,7 +89,7 @@ describe("select với T = 0", () => {
       const n = 3 + Math.floor(r() * 20);
       const nSources = 1 + Math.floor(r() * 4);
       const items = Array.from({ length: n }, (_, i) => {
-        // Tâm gần nhau theo nhóm để có phạt trùng.
+        // Centers close together within each group, so there are duplicate penalties.
         const group = Math.floor(r() * 3);
         const centroid = [1 + 0.05 * r() * (group === 0 ? 1 : 0), group, 0.02 * r()];
         const gate = r() < 0.9 ? 0.9 : 0.3;
@@ -120,10 +120,10 @@ describe("select với T = 0", () => {
       if (want.some((w) => w.reserved)) withReserve++;
       if (want.some((w) => w.penalty > 0)) withPenalty++;
       if (items.length > c.maxItems && nSources === 1) withCap++;
-      // Cũng đúng khi không truyền rng và chữ ký cũ.
+      // Also correct when rng is not passed and with the old signature.
       expect(select(items, c).picked.map((p) => p.event.eventId)).toEqual(want.map((w) => w.id));
     }
-    // Bảo đảm bộ dữ liệu thật sự phủ các ca khó.
+    // Make sure the data set truly covers the hard cases.
     expect(withReserve).toBeGreaterThan(100);
     expect(withPenalty).toBeGreaterThan(20);
     expect(withCap).toBeGreaterThan(5);
@@ -158,7 +158,7 @@ describe("select với T > 0", () => {
   });
 
   test("thứ tự kết quả và phạt trùng vẫn theo S thật", () => {
-    // Nhiễu rất lớn: khoá gần như ngẫu nhiên, nhưng kết quả vẫn sắp theo S − phạt.
+    // Very large noise: the key is almost random, but the result is still sorted by S − penalty.
     const big = { ...cfg, temperature: 5, maxItems: 4 };
     for (let seed = 1; seed < 30; seed++) {
       const r = select(items, big, () => 0, mulberry32(seed)).picked;
@@ -170,7 +170,7 @@ describe("select với T > 0", () => {
 
 describe("simulateInclusion", () => {
   const SEED = 20261110;
-  const z = 4.5; // sai số cho phép, theo độ lệch chuẩn
+  const z = 4.5; // allowed error, in standard deviations
 
   test("(c) hai tin S bằng nhau, chọn 1: p ≈ 0,5 trong 4,5 độ lệch chuẩn", () => {
     const runs = 10_000;
@@ -181,14 +181,14 @@ describe("simulateInclusion", () => {
     );
     const sd = Math.sqrt((0.5 * 0.5) / runs);
     expect(Math.abs((res.selectionProb.get(1) ?? 0) - 0.5)).toBeLessThan(z * sd);
-    // Chọn đúng 1 tin mỗi lần: p1 + p2 = 1 chính xác.
+    // Always picks exactly 1 item: p1 + p2 = 1 exactly.
     expect((res.selectionProb.get(1) ?? 0) + (res.selectionProb.get(2) ?? 0)).toBeCloseTo(1, 12);
   });
 
   test("(d) Gumbel-max: p_i = softmax(S_i / T) với 3 tin, T = 0,1", () => {
     const S = [0.7, 0.65, 0.6];
     const T = 0.1;
-    // Tính tay: e^7 = 1096,633; e^6,5 = 665,142; e^6 = 403,429; tổng = 2165,204.
+    // By hand: e^7 = 1096,633; e^6,5 = 665,142; e^6 = 403,429; sum = 2165,204.
     const expected = [1096.633 / 2165.204, 665.142 / 2165.204, 403.429 / 2165.204];
     expect(expected[0]).toBeCloseTo(0.50648, 4);
     const runs = 10_000;
@@ -316,7 +316,7 @@ describe("deriveSimSeed và orderedListLogProb", () => {
   });
 
   test("ví dụ spec: S = 0,80/0,75/0,70/0,60, T = 0,05, chọn tin 0 rồi tin 1", () => {
-    // Tay: P(0) = e^16/(e^16+e^15+e^14+e^12), P(1 | còn 1,2,3) = e^15/(e^15+e^14+e^12).
+    // By hand: P(0) = e^16/(e^16+e^15+e^14+e^12), P(1 | remaining 1,2,3) = e^15/(e^15+e^14+e^12).
     const e = Math.exp;
     const want =
       Math.log(e(16) / (e(16) + e(15) + e(14) + e(12))) + Math.log(e(15) / (e(15) + e(14) + e(12)));

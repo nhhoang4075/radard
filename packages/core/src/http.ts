@@ -1,19 +1,19 @@
 import { hostnameOf } from "./url-guard.ts";
 
 /**
- * HTTP cho adapter nguồn: GET có điều kiện, POST (GraphQL của GitHub) và giới hạn tốc độ theo host.
+ * HTTP for source adapters: conditional GET, POST (GitHub's GraphQL), and per-host rate limiting.
  *
- * Crawl lịch sự không phải chỉ để khỏi bị chặn: 304 không tải lại body, và với GitHub
- * một request 304 có kèm token (`Authorization`) không bị trừ quota; không có token thì
- * vẫn bị trừ (đã thử 28/09/2026). Giới hạn theo host để hai nguồn cùng domain
- * (vài feed của một blog) không cộng dồn thành một cơn bão request.
+ * Polite crawling is not only about avoiding blocks: a 304 does not re-download the body, and for GitHub
+ * a 304 request that carries a token (`Authorization`) is not charged against the quota; without a token it
+ * is still charged (tested 28/09/2026). Limits are per host, so two sources on the same domain
+ * (several feeds of one blog) do not add up into a flood of requests.
  */
 export interface HttpResponse {
   status: number;
   body: string;
-  /** Địa chỉ cuối cùng sau khi đi theo redirect. */
+  /** Final address after following redirects. */
   url?: string;
-  /** `true`: body bị cắt ở `maxBytes`. */
+  /** `true`: body was cut at `maxBytes`. */
   truncated?: boolean;
   etag?: string;
   lastModified?: string;
@@ -25,17 +25,17 @@ export interface GetOptions {
   lastModified?: string;
   headers?: Record<string, string>;
   timeoutMs?: number;
-  /** Đọc body tối đa chừng này byte rồi dừng (trang web lạ có thể rất nặng). */
+  /** Read at most this many bytes, then stop (unknown web pages may be very heavy). */
   maxBytes?: number;
   /**
-   * `"manual"`: không tự đi theo redirect, trả thẳng phản hồi 3xx (kèm header `location`) để người
-   * gọi kiểm từng đích (đường tải trang lạ). Mặc định đi theo redirect như `fetch`.
+   * `"manual"`: do not follow redirects automatically; return the 3xx response directly (with the `location` header) so the
+   * caller checks each target (the path for loading unknown pages). Default: follow redirects like `fetch`.
    */
   redirect?: "manual";
   /**
-   * Kết nối thẳng tới địa chỉ IP này thay vì để `fetch` phân giải lại tên miền (chống DNS rebinding:
-   * địa chỉ đã được `resolvePublicUrl` kiểm là địa chỉ được nối). Giữ nguyên header `Host`, SNI và
-   * việc kiểm chứng chứng chỉ theo tên miền gốc. Không dùng khi host trong URL đã là IP.
+   * Connect directly to this IP address instead of letting `fetch` resolve the hostname again (prevents DNS rebinding:
+   * the address already checked by `resolvePublicUrl` is the one connected to). Keep the `Host` header, SNI and
+   * certificate verification by the original hostname. Not used when the host in the URL is already an IP.
    */
   connectTo?: string;
 }
@@ -46,13 +46,13 @@ export type PostOptions = Pick<
 >;
 
 /**
- * `post` bắt buộc chứ không tuỳ chọn: mọi client thật đều POST được, còn để tuỳ chọn thì chỗ gọi
- * phải xử lý trường hợp "không có post" vốn chỉ xảy ra trong test. Bản giả trong test chỉ cần khai
- * báo thêm một hàm ném lỗi.
+ * `post` is required, not optional: every real client can POST, and if it were optional the call sites would
+ * have to handle the "no post" case, which only happens in tests. The test fake only needs to declare
+ * one extra function that throws.
  */
 export interface HttpClient {
   get(url: string, opts?: GetOptions): Promise<HttpResponse>;
-  /** Gửi `body` nguyên văn, người gọi tự đặt `content-type`. Cùng giãn theo host, cùng `HttpError`. */
+  /** Send `body` verbatim; the caller sets `content-type` itself. Same per-host spacing, same `HttpError`. */
   post(url: string, body: string, opts?: PostOptions): Promise<HttpResponse>;
 }
 
@@ -61,14 +61,14 @@ export class HttpError extends Error {
     readonly status: number,
     readonly url: string,
     readonly bodySnippet: string,
-    /** Từ header `Retry-After` (429/503) nếu server gửi; đơn vị mili giây. */
+    /** From the `Retry-After` header (429/503) if the server sends it; in milliseconds. */
     readonly retryAfterMs?: number,
   ) {
     super(`HTTP ${status} ${url}`);
   }
 }
 
-/** `Retry-After` là số giây hoặc một ngày giờ HTTP; sai dạng thì coi như không có. */
+/** `Retry-After` is a number of seconds or an HTTP date; if malformed, treat it as absent. */
 export function parseRetryAfter(value: string | null, now = Date.now()): number | undefined {
   if (!value) return undefined;
   const secs = Number(value);
@@ -80,23 +80,23 @@ export function parseRetryAfter(value: string | null, now = Date.now()): number 
 const USER_AGENT = "radard/0.1 (personal research daemon; +https://nguyenhuyhoang.work)";
 
 export interface HttpClientOptions {
-  /** Khoảng cách tối thiểu giữa hai request tới cùng một host. */
+  /** Minimum gap between two requests to the same host. */
   minIntervalMs?: number;
-  /** Host nào có luật riêng thì ghi ở đây, ví dụ arXiv yêu cầu ≥ 3 giây. */
+  /** Hosts with their own rule are listed here, e.g. arXiv requires ≥ 3 seconds. */
   perHostIntervalMs?: Record<string, number>;
 }
 
 export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
   const minInterval = opts.minIntervalMs ?? 1000;
-  /** Request trước tới mỗi host: xong lượt chờ của nó thì mới tới lượt request sau. */
+  /** Previous request to each host: its wait must finish before the next request goes. */
   const queues = new Map<string, Promise<void>>();
-  /** Lúc request gần nhất tới mỗi host thật sự được gửi đi. */
+  /** Time the most recent request to each host was actually sent. */
   const lastSent = new Map<string, number>();
 
   /**
-   * Xếp hàng theo host, rồi chờ đủ khoảng cách tính từ lúc request TRƯỚC THẬT SỰ GỬI. Trước 13/10/2026
-   * lượt sau được hẹn theo giờ hẹn của lượt trước, nên lượt trước gửi trễ vài ms (máy bận) thì
-   * khoảng cách thật ngắn đi đúng chừng đó (đo được 142 ms cho luật 150 ms).
+   * Queue per host, then wait the full gap counted from when the PREVIOUS request was ACTUALLY SENT. Before 13/10/2026
+   * the next slot was scheduled from the previous slot's planned time, so if the previous request was sent a few ms late (busy machine),
+   * the real gap was shorter by that much (measured 142 ms for a 150 ms rule).
    */
   async function waitTurn(host: string): Promise<void> {
     const prev = queues.get(host) ?? Promise.resolve();
@@ -119,7 +119,7 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
     }
   }
 
-  /** Phần chung của GET và POST: chờ lượt theo host, quá giờ thì huỷ, mã ≥ 400 thành `HttpError`. */
+  /** Shared part of GET and POST: wait for the host's turn, abort on timeout, status ≥ 400 becomes an `HttpError`. */
   async function send(
     url: string,
     init: { method: "GET" | "POST"; headers: Record<string, string>; body?: string },
@@ -170,8 +170,8 @@ export function createHttpClient(opts: HttpClientOptions = {}): HttpClient {
 }
 
 /**
- * URL trỏ thẳng IP + header `Host` gốc; với https thêm `tls.serverName` để SNI và kiểm chứng chứng
- * chỉ vẫn theo tên miền gốc (đã thử trên Bun 1.4.3: sai tên hay không tin CA thì vẫn lỗi).
+ * URL pointing directly at the IP + the original `Host` header; for https also `tls.serverName` so SNI and certificate
+ * checks still use the original hostname (tested on Bun 1.4.3: a wrong name or an untrusted CA still errors).
  */
 function pinTo(url: string, address: string) {
   const u = new URL(url);

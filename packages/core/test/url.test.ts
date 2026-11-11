@@ -41,7 +41,7 @@ describe("canonicalizeUrl", () => {
   });
 
   test("không bỏ nhầm tham số chỉ trùng một phần tên", () => {
-    // `utm_\w+` hay `gclid` không được khớp lỏng vào tham số có nghĩa như `hsmi` (thiếu gạch dưới), `gclids`.
+    // `utm_\w+` or `gclid` must not loosely match parameters with meaning such as `hsmi` (missing underscore), `gclids`.
     expect(canonicalizeUrl("https://site.com/x?hsmi=1&gclids=2")).toBe(
       "https://site.com/x?gclids=2&hsmi=1",
     );

@@ -37,7 +37,7 @@ const dayOf = (date: string, levels: Level[], R?: (i: number) => number): EvalDa
 });
 
 describe("NDCG", () => {
-  // Gain 2,2,1,0 theo thứ tự P,Q,R,S
+  // Gains 2,2,1,0 in the order P,Q,R,S
   const gains = { P: 2, Q: 2, R: 1, S: 0 };
 
   test("thứ tự lý tưởng: DCG = 2/1 + 2/1,585 + 1/2 = 3,76 và NDCG = 1", () => {
@@ -58,7 +58,7 @@ describe("NDCG", () => {
     const d = dayOf("2026-10-20", ["like", "like", "none", "dislike"]);
     expect(ndcgOfDay(d.samples, [4, 3, 2, 1])).toBeCloseTo(1, 12);
     expect(ndcgOfDay(d.samples, [1, 2, 3, 4])).toBeCloseTo(0.66, 2);
-    // mọi điểm bằng nhau: giữ thứ tự gửi, ở đây trùng thứ tự lý tưởng
+    // all scores equal: keeps the send order, here matching the ideal order
     expect(ndcgOfDay(d.samples, [0, 0, 0, 0])).toBeCloseTo(1, 12);
   });
 });
@@ -120,13 +120,13 @@ describe("chia ngày: tập khoá kín", () => {
     const days: EvalDay[] = [];
     for (let i = 1; i <= 10; i++) {
       const date = `2026-10-${String(i).padStart(2, "0")}`;
-      // ngày 5 không thông tin
+      // day 5 has no information
       days.push(dayOf(date, i === 5 ? ["none", "none"] : ["like", "dislike"]));
     }
-    // đảo thứ tự vào để chắc chắn splitDays tự sắp theo ngày
+    // shuffle the order to make sure splitDays sorts by day itself
     const s = splitDays([...days].reverse());
     expect(s.uninformative.map((d) => d.date)).toEqual(["2026-10-05"]);
-    // có thông tin: 01,02,03,04,06,07,08,09,10 → k=3 là 04, k=7 là 09
+    // informative days: 01,02,03,04,06,07,08,09,10 → k=3 is 04, k=7 is 09
     expect(s.closed.map((d) => d.date)).toEqual(["2026-10-04", "2026-10-09"]);
     expect(s.regular.map((d) => d.date)).toEqual([
       "2026-10-01",
@@ -140,7 +140,7 @@ describe("chia ngày: tập khoá kín", () => {
   });
 });
 
-/** 12 ngày; R của tin càng cao thì càng được 👍 (baseline có tín hiệu). */
+/** 12 days; the higher an item's R, the more likely it gets 👍 (baseline with signal). */
 function twelveDays(): EvalDay[] {
   const out: EvalDay[] = [];
   for (let i = 1; i <= 12; i++) {
@@ -207,7 +207,7 @@ describe("bộ chấm", () => {
     const r = runEval(days, [spy], { includeClosed: true });
     const closed = new Set(["2026-10-04", "2026-10-08", "2026-10-12"]);
     expect(r.split.closed).toBe(3);
-    // 9 ngày thường bỏ-một-ngày + 1 lần fit cho tập khoá kín
+    // 9 regular leave-one-day-out days + 1 fit for the locked set
     expect(seen).toHaveLength(9 + 1);
     for (const train of seen) for (const d of train) expect(closed.has(d)).toBe(false);
     const regularDays =
@@ -219,9 +219,9 @@ describe("bộ chấm", () => {
   });
 
   test("biến thể tốt hơn hẳn thắng ở cả hai tập → nhận; tập khoá kín quá nhỏ → chưa đủ dữ liệu", () => {
-    // baseline xếp ngược nhãn (R tăng theo vị trí), oracle xếp đúng
+    // baseline ranks in reverse of the labels (R increases with position), the oracle ranks correctly
     const days: EvalDay[] = [];
-    // 24 ngày có thông tin → 6 ngày khoá kín, đủ ngưỡng MIN_DAYS_FOR_INTERVAL = 5.
+    // 24 informative days → 6 locked days, enough for MIN_DAYS_FOR_INTERVAL = 5.
     for (let i = 1; i <= 24; i++) {
       days.push(
         dayOf(

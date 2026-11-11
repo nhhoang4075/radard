@@ -1,11 +1,11 @@
-/** Lấy mẫu lại (bootstrap) theo NGÀY với bộ sinh ngẫu nhiên có hạt giống: cùng dữ liệu, cùng số. */
+/** Day-level bootstrap resampling with a seeded PRNG: same data, same numbers. */
 import { percentileCont } from "../ranking.ts";
 
-/** Số lần lấy mẫu lại và hạt giống CỐ ĐỊNH của bộ chấm: đổi hai số này là đổi phép đo. */
+/** Fixed resample count and seed of the scorer: changing these two numbers changes the measurement. */
 export const BOOTSTRAP_B = 2000;
 export const BOOTSTRAP_SEED = 20261110;
 
-/** mulberry32: bộ sinh giả ngẫu nhiên 32 bit, trả số trong [0, 1). */
+/** mulberry32: 32-bit PRNG returning a number in [0, 1). */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -19,17 +19,17 @@ export function mulberry32(seed: number): () => number {
 
 export interface MeanInterval {
   mean: number;
-  /** Cận dưới / trên của khoảng tin cậy 95% (phân vị 2,5% và 97,5% của trung bình lấy mẫu lại). */
+  /** Lower / upper bounds of the 95% confidence interval (2.5% and 97.5% percentiles of resampled means). */
   lo: number;
   hi: number;
-  /** Số ngày. */
+  /** Number of days. */
   n: number;
 }
 
 export const mean = (xs: readonly number[]): number =>
   xs.length === 0 ? Number.NaN : xs.reduce((a, b) => a + b, 0) / xs.length;
 
-/** Khoảng tin cậy 95% của trung bình `diffs` (một số mỗi ngày), lấy mẫu lại theo ngày có hoàn lại. */
+/** 95% confidence interval of the mean of `diffs` (one number per day), resampling days with replacement. */
 export function bootstrapMean(
   diffs: readonly number[],
   b = BOOTSTRAP_B,
@@ -55,7 +55,7 @@ export function bootstrapMean(
 
 export type Verdict = "win" | "tie" | "lose";
 
-/** "Thắng" chỉ khi CẬN DƯỚI > 0; "thua" khi cận trên < 0; còn lại là hoà trong nhiễu. */
+/** "Wins" only when the LOWER bound > 0; "loses" when the upper bound < 0; otherwise a tie within noise. */
 export function verdictOf(ci: Pick<MeanInterval, "lo" | "hi">): Verdict {
   if (ci.lo > 0) return "win";
   if (ci.hi < 0) return "lose";
