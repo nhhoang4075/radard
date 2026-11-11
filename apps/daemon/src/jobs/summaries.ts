@@ -1,12 +1,12 @@
 /**
- * Tóm tắt DÙNG CHUNG của sự kiện (quyết định 11/11/2026, mo-hinh-de-xuat.html: "tóm tắt dùng chung,
- * 'với bạn' tách thành nút bấm"): chỉ "chuyện gì xảy ra và bối cảnh", KHÔNG có câu "vì sao đáng chú ý
- * với bạn". Viết MỘT lần cho mỗi (sự kiện, ngôn ngữ, tập tài liệu) và cache ở `event_summaries`
- * (không có `profile_id`): hai hồ sơ cùng sự kiện dùng chung một dòng. Sự kiện có thêm bài thì tập
- * tài liệu đổi, `docs_hash` đổi, ra dòng mới.
+ * SHARED summary of an event (decision 11/11/2026, mo-hinh-de-xuat.html: "shared summary,
+ * 'for you' split into a button"): only "what happened and the context", with NO sentence "why it is
+ * notable for you". Written ONCE per (event, language, document set) and cached in `event_summaries`
+ * (no `profile_id`): two profiles with the same event share one row. If an event gets more articles, the document set
+ * changes, `docs_hash` changes, and a new row is created.
  *
- * Chỉ gọi model cho sự kiện CHƯA có cache, theo lô; mỗi lô thử lại đúng một lần. Lỗi một lô chỉ làm
- * các tin của lô đó không có tóm tắt (hiện tiêu đề gốc), không làm hỏng cả bản chụp.
+ * Calls the model only for events NOT yet cached, in batches; each batch is retried exactly once. An error in one batch only makes
+ * the items of that batch lack a summary (the original title shows), without breaking the whole snapshot.
  */
 import { createLogger, type LlmProvider, sha256 } from "@radard/core";
 import { type Database, eventSummaries } from "@radard/db";
@@ -15,13 +15,13 @@ import { type DocsOf, host, type ItemDoc, loadItemDocs } from "./item-docs.ts";
 
 const log = createLogger("summaries");
 
-/** Số tài liệu mỗi tin đưa cho LLM. */
+/** Number of documents per item given to the LLM. */
 export const LLM_DOCS_PER_ITEM = 4;
-/** Số tin trong một lời gọi tóm tắt. */
+/** Number of items in one summary call. */
 export const SUMMARY_BATCH_SIZE = 10;
 /**
- * Trần token ra. Token suy nghĩ ẩn của model tính vào trần này và dao động mạnh (13/10/2026: cùng một
- * prompt, ba lần gọi ra 2.127, 2.376 và chạm trần 4.000). Trần chỉ là giới hạn: tiền tính theo token dùng thật.
+ * Output token cap. The model's hidden thinking tokens count toward this cap and vary a lot (13/10/2026: for the same
+ * prompt, three calls produced 2,127, 2,376 and hit the 4,000 cap). The cap is only a limit: money is charged on actual tokens.
  */
 export const LLM_MAX_OUTPUT_TOKENS = 8000;
 
@@ -34,14 +34,14 @@ export interface SharedSummary {
 }
 
 /**
- * Tài liệu đưa vào prompt tóm tắt: LLM_DOCS_PER_ITEM tài liệu MỚI NHẤT (id lớn nhất) của tin. Không
- * phụ thuộc hồ sơ nào (không dùng điểm chủ đề), và sự kiện có thêm bài thì tập này đổi.
+ * Documents put into the summary prompt: the LLM_DOCS_PER_ITEM NEWEST documents (highest id) of the item. Not
+ * dependent on any profile (no topic score is used), and if the event gets more articles this set changes.
  */
 export function docsForSummary(docs: readonly ItemDoc[]): ItemDoc[] {
   return [...docs].sort((a, b) => b.id - a.id).slice(0, LLM_DOCS_PER_ITEM);
 }
 
-/** Băm danh sách id tài liệu (sắp xếp tăng dần) thành `docs_hash`. */
+/** Hashes the list of document ids (sorted ascending) into `docs_hash`. */
 export function docsHashOf(docIds: readonly number[]): string {
   return sha256([...docIds].sort((a, b) => a - b).join(","));
 }
@@ -52,7 +52,7 @@ export function summarySystem(lang: string): string {
     "You write short news summaries for a news feed that many different readers share.",
     `Write in ${language}. Keep product, company, model and library names as they are.`,
     "Use only the facts in the input. Never invent numbers, names, dates or claims.",
-    // 13/10/2026: thiếu dòng này, model viết "phần lớn tin chỉ có tiêu đề…" vào lời mở đầu.
+    // 13/10/2026: without this line, the model wrote "most items only have a title…" into the opening sentence.
     "Never comment on the input itself (how much text you were given, missing details); just leave out what you do not know.",
     "Return ONLY a JSON object, no markdown fences, with this shape:",
     '{"items": [{"n": number, "title": string, "summary": string}]}',
@@ -77,7 +77,7 @@ export function summaryPrompt(stories: readonly { n: number; docs: readonly Item
     .join("\n\n");
 }
 
-/** Đọc JSON model trả về; thiếu tin nào thì báo lỗi (để thử lại một lần, rồi bỏ lô). */
+/** Reads the JSON the model returns; if any item is missing, throws an error (so it is retried once, then the batch is dropped). */
 export function parseSummaryBatch(
   reply: string,
   count: number,
@@ -107,7 +107,7 @@ export function parseSummaryBatch(
   return items;
 }
 
-/** Một lô: gọi model, thử lại đúng một lần. Lỗi cả hai lần thì ném lỗi của lần cuối. */
+/** One batch: calls the model, retried exactly once. If both attempts fail, throws the error of the last attempt. */
 async function summarizeBatch(
   llm: LlmProvider,
   lang: string,
@@ -135,16 +135,16 @@ async function summarizeBatch(
 }
 
 export interface SharedSummaryResult {
-  /** Theo `eventId`: tóm tắt của tin (cache hoặc vừa viết). Tin không có thì vắng. */
+  /** By `eventId`: the summary of the item (from cache, or just written). Items without one are absent. */
   byEvent: Map<number, SharedSummary>;
-  /** Số tin phải nhờ model (chưa có cache) và số tin còn thiếu sau đó. */
+  /** Number of items that needed the model (not cached) and number still missing afterwards. */
   requested: number;
   failed: number;
 }
 
 /**
- * Bảo đảm có tóm tắt chung cho mọi tin trong `items` (ngôn ngữ `lang`). Cache hit không gọi model.
- * `llm` là null thì chỉ trả phần đã có cache.
+ * Ensures a shared summary exists for every item in `items` (language `lang`). A cache hit does not call the model.
+ * If `llm` is null, only the part already cached is returned.
  */
 export async function ensureSharedSummaries(
   deps: { db: Database; llm: LlmProvider | null },
@@ -214,7 +214,7 @@ export async function ensureSharedSummaries(
             .onConflictDoNothing();
           await load(batch);
         } catch (err) {
-          // Lỗi một lô: tin của lô đó rơi về tiêu đề gốc, các lô khác vẫn dùng được.
+          // A batch error: the items of that batch fall back to the original title, the other batches still work.
           log.error("lô tóm tắt lỗi, bỏ qua các tin của lô", {
             events: batch.length,
             error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
@@ -232,7 +232,7 @@ export async function ensureSharedSummaries(
   return out;
 }
 
-/** Tóm tắt theo id (tin của bản chụp trỏ tới qua `feed_items.summary_id`). */
+/** Summaries by id (the snapshot's items point to them via `feed_items.summary_id`). */
 export async function loadSummariesById(
   db: Database,
   ids: readonly number[],

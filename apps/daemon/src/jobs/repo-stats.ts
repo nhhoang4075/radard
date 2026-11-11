@@ -1,18 +1,18 @@
 /**
- * Job `repo_stats`: radard tự chụp số sao của các repo GitHub đang theo dõi, mỗi ngày một lần
- * (github-theo-doi.html tab 05–06), để có sao tăng trong 24 giờ và tăng tốc, thay vì chỉ có
- * "tổng sao / tuổi" (repo mới) hay số GitHub tự báo (Trending).
+ * Job `repo_stats`: radard snapshots the star counts of the tracked GitHub repos itself, once a day
+ * (github-theo-doi.html tab 05–06), to get the 24-hour star gain and its acceleration, instead of only having
+ * "total stars / age" (new repos) or the count GitHub self-reports (Trending).
  *
- *   tăng_24h(repo) = sao(lần đo mới nhất) − sao(lần đo gần nhất cách nó ≥ 20 giờ)
- *   tăng_tốc       = tăng_24h hôm nay − tăng_24h hôm qua (tính như trên, mốc là lần đo tham chiếu)
+ *   gain_24h(repo)   = stars(newest measurement) − stars(measurement at least 20 hours older than it)
+ *   acceleration     = gain_24h today − gain_24h yesterday (computed the same way; the anchor is the reference measurement)
  *
- * Mọi lần đo đều tính, dù là radard tự chụp (`github_stars`) hay đọc từ trang Trending
- * (`trending_daily`, job fetch ghi): cùng một con số sao. Luật ≥ 20 giờ làm hai lần đo sát nhau
- * (Trending 06:10, tự chụp 06:20, chạy tay thêm một lần) không bao giờ thành một "ngày".
+ * Every measurement counts, whether radard snapshots it (`github_stars`) or it is read from the Trending page
+ * (`trending_daily`, written by the fetch job): the same star number. The ≥ 20-hour rule keeps two close measurements
+ * (Trending 06:10, self-snapshot 06:20, one extra manual run) from ever becoming one "day".
  *
- * Tập theo dõi: repo có tài liệu trong 30 ngày qua từ nguồn `github_new_repos`, `github_trending`,
- * hoặc tài liệu của nguồn khác (bài HN…) có `url_canonical` là đúng trang repo. Repo có một tài liệu
- * bị đánh dấu `meta.suspicious` (sao bị bơm) thì không chụp.
+ * Tracked set: repos with a document in the last 30 days from the sources `github_new_repos`, `github_trending`,
+ * or from documents of another source (HN posts…) whose `url_canonical` is exactly the repo page. A repo with a document
+ * flagged `meta.suspicious` (inflated stars) is not snapshotted.
  */
 import { createLogger, type HttpClient, type Signals } from "@radard/core";
 import { type Database, documents, repoStats, sources } from "@radard/db";
@@ -24,19 +24,19 @@ const log = createLogger("repo_stats");
 
 const HOUR = 3_600_000;
 const TRACK_DAYS = 30;
-/** Lần đo tham chiếu phải cách lần mới nhất ít nhất chừng này giờ. */
+/** The reference measurement must be at least this many hours older than the newest one. */
 export const MIN_GAP_HOURS = 20;
-/** Đã tự chụp trong chừng này giờ thì lượt sau (chạy tay, pg-boss thử lại) bỏ qua repo đó. */
+/** If it was self-snapshotted within this many hours, the next run (manual run, pg-boss retry) skips that repo. */
 const RESNAP_HOURS = 12;
-/** Tín hiệu và số liệu chỉ dùng lần đo mới nhất còn trong chừng này giờ: cũ hơn là đã thôi theo dõi. */
+/** Signals and figures use only the newest measurement still within this many hours: older means the repo is no longer tracked. */
 const FRESH_HOURS = 36;
-/** Đọc lần đo trong chừng này ngày: đủ cho tăng_24h và tăng_tốc kể cả khi lỡ vài ngày. */
+/** Reads measurements within this many days: enough for gain_24h and acceleration even if a few days are missed. */
 const LOOKBACK_DAYS = 7;
 
 const REPO_KINDS = ["github_new_repos", "github_trending"];
 const REPO_NAME = /^[\w.-]+\/[\w.-]+$/;
 const REPO_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)$/;
-/** Trang của chính GitHub có dạng `github.com/x/y` nhưng không phải repo. */
+/** GitHub's own pages have the form `github.com/x/y` but are not repos. */
 const NOT_OWNERS = new Set([
   "orgs",
   "topics",
@@ -51,7 +51,7 @@ const NOT_OWNERS = new Set([
   "about",
 ]);
 
-/** `owner/repo` viết thường mà tài liệu này nói tới, hoặc `null` nếu không phải một repo. */
+/** Lowercase `owner/repo` this document refers to, or `null` if it is not a repo. */
 export function repoOfDoc(d: Pick<DocRef, "kind" | "externalId" | "urlCanonical">): string | null {
   if (REPO_KINDS.includes(d.kind)) {
     return REPO_NAME.test(d.externalId) ? d.externalId.toLowerCase() : null;
@@ -62,11 +62,11 @@ export function repoOfDoc(d: Pick<DocRef, "kind" | "externalId" | "urlCanonical"
 }
 
 export interface TrackedRepo {
-  /** Ngày tạo repo (Search API), để có "sao / tuổi" khi chưa đủ hai lần đo. */
+  /** Repo creation date (Search API), for "stars / age" when there are not yet two measurements. */
   createdAt: string | null;
 }
 
-/** Tập repo đang theo dõi, khoá là `owner/repo` viết thường. */
+/** Set of tracked repos, keyed by lowercase `owner/repo`. */
 export async function trackedRepos(db: Database, now: Date): Promise<Map<string, TrackedRepo>> {
   const rows = await db
     .select({
@@ -98,7 +98,7 @@ export async function trackedRepos(db: Database, now: Date): Promise<Map<string,
 }
 
 // ---------------------------------------------------------------------------------------------
-// Tính tăng
+// Compute the gains
 
 export interface Observation {
   at: Date;
@@ -109,19 +109,19 @@ export interface Observation {
 }
 
 export interface Growth {
-  /** `null`: chưa có lần đo nào cách lần mới nhất ≥ 20 giờ. */
+  /** `null`: no measurement yet at least 20 hours older than the newest. */
   gain24h: number | null;
-  /** `null`: chưa đủ ba lần đo cách nhau ≥ 20 giờ. */
+  /** `null`: not yet three measurements at least 20 hours apart. */
   accel: number | null;
 }
 
-/** Lần đo đầu tiên (danh sách mới trước) cách `from` ít nhất `MIN_GAP_HOURS`. */
+/** First measurement (newest first in the list) at least `MIN_GAP_HOURS` before `from`. */
 function referenceOf(obs: Observation[], from: Observation): Observation | undefined {
   const limit = from.at.getTime() - MIN_GAP_HOURS * HOUR;
   return obs.find((o) => o.at.getTime() <= limit);
 }
 
-/** Tăng 24 giờ và tăng tốc từ các lần đo của MỘT repo, theo thứ tự bất kỳ. */
+/** 24-hour gain and acceleration from the measurements of ONE repo, in any order. */
 export function growthOf(observations: Observation[]): Growth {
   const obs = [...observations].sort((a, b) => b.at.getTime() - a.at.getTime());
   const latest = obs[0];
@@ -132,7 +132,7 @@ export function growthOf(observations: Observation[]): Growth {
   return { gain24h, accel: prev ? gain24h - (ref.stars - prev.stars) : null };
 }
 
-/** Lần đo trong `LOOKBACK_DAYS` ngày của các repo này, mới trước. */
+/** Measurements within `LOOKBACK_DAYS` days of these repos, newest first. */
 async function loadObservations(
   db: Database,
   repos: string[],
@@ -174,16 +174,16 @@ export interface RepoStatsDeps {
   db: Database;
   http: HttpClient;
   now?: () => Date;
-  /** Số repo mỗi request GraphQL (test đặt nhỏ để thấy chia lô). */
+  /** Number of repos per GraphQL request (tests set this small to see batching). */
   batchSize?: number;
 }
 
 export interface RepoStatsOutcome {
   tracked: number;
-  /** Đã tự chụp trong `RESNAP_HOURS` giờ qua, lượt này bỏ qua. */
+  /** Self-snapshotted within the last `RESNAP_HOURS` hours: skipped this run. */
   fresh: number;
   observed: number;
-  /** GitHub không trả (repo bị xoá, đổi tên, chuyển riêng tư). */
+  /** GitHub did not return it (repo deleted, renamed, or made private). */
   missing: number;
   skipped?: string;
 }
@@ -194,12 +194,12 @@ export async function runRepoStats(deps: RepoStatsDeps): Promise<RepoStatsOutcom
   const tracked = [...(await trackedRepos(db, now)).keys()].sort();
   const out: RepoStatsOutcome = { tracked: tracked.length, fresh: 0, observed: 0, missing: 0 };
   if (!process.env.GITHUB_TOKEN) {
-    // GraphQL không cho gọi ẩn danh: thiếu token thì mọi request đều 401, thử lại cũng vô ích.
+    // GraphQL does not allow anonymous calls: without a token every request gets 401, so retrying is pointless.
     log.warn("bỏ qua: chưa đặt GITHUB_TOKEN", { tracked: tracked.length });
     return { ...out, skipped: "chưa đặt GITHUB_TOKEN" };
   }
-  // Idempotent theo thời gian: chạy lại ngay (CLI, pg-boss thử lại sau lỗi giữa chừng) chỉ chụp
-  // repo chưa được chụp gần đây, không ghi thêm lần đo trùng.
+  // Idempotent over time: running again right away (CLI, pg-boss retry after a mid-run failure) snapshots only
+  // repos not snapshotted recently, without writing duplicate measurements.
   const recent = new Set(
     tracked.length === 0
       ? []
@@ -237,12 +237,12 @@ export async function runRepoStats(deps: RepoStatsDeps): Promise<RepoStatsOutcom
 }
 
 // ---------------------------------------------------------------------------------------------
-// Dùng số đo
+// Use the measurements
 
 /**
- * Tín hiệu tính tại chỗ cho job signals (xem `LocalSignals` trong signals.ts): tài liệu nào nói tới
- * một repo đã có ≥ 2 lần đo cách nhau ≥ 20 giờ thì có `gh_gain_24h`, và `gh_accel_24h` khi đủ ba lần.
- * Không có thì vắng mặt: `engagement` của adapter tự dùng cách tạm (sao/tuổi, "N stars today").
+ * Locally computed signals for the signals job (see `LocalSignals` in signals.ts): a document that refers to
+ * a repo with ≥ 2 measurements at least 20 hours apart gets `gh_gain_24h`, and `gh_accel_24h` when three exist.
+ * Without them the field is absent: the adapter's `engagement` falls back to its own method (stars/age, "N stars today").
  */
 export async function repoStatsSignals(
   db: Database,
@@ -274,16 +274,16 @@ export interface RepoRow {
   stars: number | null;
   forks: number | null;
   observedAt: Date | null;
-  /** Số sao tăng mỗi ngày đã dùng, theo `basis`. */
+  /** Stars gained per day used, by `basis`. */
   gain24h: number | null;
   accel: number | null;
-  /** measured: tự đo · reported: GitHub báo ("N stars today") · age: tổng sao / tuổi */
+  /** measured: self-measured · reported: GitHub reports ("N stars today") · age: total stars / age */
   basis: "measured" | "reported" | "age" | null;
 }
 
 /**
- * Tăng 24 giờ của một repo, có cách tạm khi chưa đủ hai lần đo: repo trên Trending dùng số GitHub
- * báo ở lần đọc trang gần nhất, repo mới dùng tổng sao chia tuổi.
+ * 24-hour gain of a repo, with a fallback when there are not yet two measurements: a repo on Trending uses the number
+ * GitHub reported in the latest page read; a new repo uses total stars divided by age.
  */
 export function withFallback(
   obs: Observation[],
@@ -304,7 +304,7 @@ export function withFallback(
   return { gain24h: null, accel: null, basis: null };
 }
 
-/** Repo đang theo dõi kèm số đo mới nhất, tăng nhiều trước (cho CLI `repos`). */
+/** Tracked repos with their newest measurement, biggest gain first (for the `repos` CLI). */
 export async function listRepos(db: Database, now = new Date()): Promise<RepoRow[]> {
   const tracked = await trackedRepos(db, now);
   const obs = await loadObservations(db, [...tracked.keys()], now);

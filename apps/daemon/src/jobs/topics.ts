@@ -1,8 +1,8 @@
 /**
- * Chủ đề của người dùng: chọn từ thư viện, tự thêm, bật tắt, embed.
+ * The user's topics: choose from the library, add your own, enable/disable, embed.
  *
- * Mọi thao tác đều chạy được nhiều lần mà không sinh bản trùng (chọn lại = bật lại dòng cũ,
- * seed lại = cập nhật thư viện), vì chúng được gọi từ cả CLI lẫn bot Telegram.
+ * Every operation can be run many times without creating duplicates (choosing again = re-enabling the old row,
+ * re-seeding = updating the library), because they are called from both the CLI and the Telegram bot.
  */
 import { createLogger, type EmbeddingProvider, type LlmProvider, nfc } from "@radard/core";
 import { type Database, docTopicScores, profileTopics, topicExamples, topics } from "@radard/db";
@@ -13,10 +13,9 @@ import { TOPIC_LIBRARY, TOPIC_SUCCESSORS } from "../topics/library.ts";
 const log = createLogger("topics");
 
 /**
- * Đưa thư viện trong code vào bảng `topics`: thêm chủ đề mới, cập nhật chủ đề đã có theo `key`.
- * Chủ đề có câu mô tả mới thì xoá embedding để lượt process embed lại (điểm cũ xoá theo); đổi
- * `labelGuide` thì không (nó không được embed). Cuối cùng chuyển lựa chọn từ chủ đề đã rút sang chủ
- * đề thay nó (`carrySelections`).
+ * Puts the library in the code into the `topics` table: adds new topics, updates existing ones by `key`.
+ * A topic with a new description sentence has its embedding deleted so the process run embeds it again (old scores removed along with it); changing
+ * `labelGuide` does not (it is not embedded). Finally moves selections from withdrawn topics to the topic replacing them (`carrySelections`).
  */
 export async function seedLibrary(
   db: Database,
@@ -49,7 +48,7 @@ export async function seedLibrary(
         },
       });
   }
-  // Rút khỏi thư viện những chủ đề không còn trong code; người đã chọn vẫn giữ.
+  // Withdraws from the library the topics no longer in the code; those who selected them keep their selection.
   const keys = TOPIC_LIBRARY.map((t) => t.key);
   await db
     .update(topics)
@@ -60,14 +59,14 @@ export async function seedLibrary(
 }
 
 /**
- * Chuyển lựa chọn theo `TOPIC_SUCCESSORS`: với mỗi hồ sơ, chủ đề mới được chọn và bật nếu hồ sơ
- * đang bật ít nhất một chủ đề cũ trỏ tới nó (chủ đề mới đã bật sẵn thì giữ nguyên); chưa có dòng
- * `profile_topics` thì thêm. Sau đó tắt lựa chọn các chủ đề cũ đã rút. Lựa chọn đang tắt không
- * được chuyển. Chạy lại không đổi gì: chủ đề cũ đã tắt hết. Trả về số lựa chọn chủ đề cũ vừa tắt.
+ * Moves selections via `TOPIC_SUCCESSORS`: for each profile, the new topic is selected and enabled if the profile
+ * has at least one enabled old topic pointing to it (an already-enabled new topic is left as is); if there is no
+ * `profile_topics` row yet, one is added. Then turns off the selections of the withdrawn old topics. Disabled selections are not
+ * moved. Running again changes nothing: the old topics are all off. Returns the number of old-topic selections just turned off.
  */
 export async function carrySelections(db: Database): Promise<number> {
   const libraryKeys = new Set(TOPIC_LIBRARY.map((t) => t.key));
-  // Chỉ chuyển từ chủ đề đã rút: khoá còn trong thư viện thì người dùng vẫn chọn được chính nó.
+  // Only move from withdrawn topics: a key still in the library lets the user choose it directly.
   const pairs = Object.entries(TOPIC_SUCCESSORS).filter(
     ([from, to]) => !libraryKeys.has(from) && libraryKeys.has(to),
   );
@@ -77,8 +76,8 @@ export async function carrySelections(db: Database): Promise<number> {
     sql`, `,
   );
   return db.transaction(async (tx) => {
-    // Một hồ sơ có thể bật nhiều chủ đề cũ cùng trỏ tới một chủ đề mới: gom lại thành một dòng.
-    // Có chủ đề cũ "quan tâm" thì chủ đề mới là "quan tâm" ('include' > 'exclude').
+    // A profile may have several old topics enabled that point to the same new topic: merge them into one row.
+    // If an old topic was "interested", the new topic is "interested" too ('include' > 'exclude').
     await tx.execute(sql`
       insert into ${profileTopics} (profile_id, topic_id, kind, active)
       select pt.profile_id, dst.id, max(pt.kind), true
@@ -125,16 +124,16 @@ export interface LibraryEntry {
   key: string;
   groupName: string;
   name: string;
-  /** Người dùng đã chọn và đang bật. */
+  /** The user has selected and enabled it. */
   chosen: boolean;
 }
 
-/** Thư viện kèm trạng thái đã chọn, theo thứ tự hiển thị. */
+/** The library with the selected state, in display order. */
 export async function listLibrary(db: Database, profileId: number): Promise<LibraryEntry[]> {
   return db
     .select({
       id: topics.id,
-      // Chủ đề thư viện luôn có khoá và nhóm (topics_source_ck).
+      // Library topics always have a key and group (topics_source_ck).
       key: sql<string>`${topics.key}`,
       groupName: sql<string>`coalesce(${topics.groupName}, '')`,
       name: topics.name,
@@ -149,7 +148,7 @@ export async function listLibrary(db: Database, profileId: number): Promise<Libr
     .orderBy(asc(topics.position));
 }
 
-/** Chọn chủ đề từ thư viện theo `key`. Đã chọn rồi thì bật lại. Trả về số chủ đề được bật. */
+/** Selects topics from the library by `key`. If already selected, re-enables it. Returns the number of topics enabled. */
 export async function pickTopics(db: Database, profileId: number, keys: string[]): Promise<number> {
   if (keys.length === 0) return 0;
   const found = await db
@@ -170,7 +169,7 @@ export async function pickTopics(db: Database, profileId: number, keys: string[]
   return found.length;
 }
 
-/** Bật hoặc tắt chủ đề theo id của `profile_topics`. Không xoá: điểm cũ và embedding giữ lại. */
+/** Enables or disables a topic by the id of `profile_topics`. Does not delete: old scores and embeddings are kept. */
 export async function setTopicActive(
   db: Database,
   profileId: number,
@@ -185,7 +184,7 @@ export async function setTopicActive(
   return rows.length > 0;
 }
 
-/** Bật tắt chủ đề thư viện theo id của `topics` (nút trên Telegram mang id này). */
+/** Enables or disables a library topic by the id of `topics` (the Telegram buttons carry this id). */
 export async function toggleLibraryTopic(
   db: Database,
   profileId: number,
@@ -209,8 +208,8 @@ export async function toggleLibraryTopic(
 }
 
 /**
- * Bật (chọn, hoặc bật lại dòng cũ) hoặc tắt nhiều chủ đề thư viện theo id của `topics`, trong một
- * giao dịch. Id không thuộc thư viện đang dùng thì bỏ qua. Trả về số chủ đề được bật mới.
+ * Enables (selects, or re-enables the old row) or disables several library topics by id of `topics`, in one
+ * transaction. Ids not in the library in use are ignored. Returns the number of topics newly enabled.
  */
 export async function setLibraryTopics(
   db: Database,
@@ -265,7 +264,7 @@ Use what the reader said and close synonyms only; do not widen the topic.
 Avoid vague words that match almost every AI headline, such as "AI models", "LLMs" or "AI news", unless the reader's topic is exactly that.
 Reply with the description only, on one line.`;
 
-/** Một lời gọi LLM: lời của người dùng (tiếng Việt hay tiếng Anh) → câu mô tả tiếng Anh để embed. */
+/** One LLM call: the user's wording (Vietnamese or English) → English description sentence for embedding. */
 export async function describeTopic(
   llm: LlmProvider,
   label: string,
@@ -275,7 +274,7 @@ export async function describeTopic(
     task: "topic_describe",
     system: DESCRIBE_SYSTEM,
     prompt: `Topic name given by the reader: ${label}\nThe reader's own description: ${text}`,
-    // Model có token suy nghĩ ẩn tính vào trần này (đo 11/10/2026): để rộng.
+    // The model has hidden thinking tokens counted toward this cap (measured 11/10/2026): keep it generous.
     maxOutputTokens: 1500,
   });
   const line = nfc(reply)
@@ -296,8 +295,8 @@ export interface CustomTopicInput {
 }
 
 /**
- * Lưu chủ đề tự thêm: một dòng `topics` của hồ sơ, rồi chọn nó (bật ngay). Trùng tên (không phân biệt
- * hoa thường) với chủ đề thư viện hay chủ đề đã tự thêm thì báo lỗi. Trả về id của `profile_topics`.
+ * Saves a self-added topic: one `topics` row of the profile, then selects it (enabled right away). A name clash
+ * (case-insensitive) with a library topic or an already self-added topic is an error. Returns the id of the `profile_topics` row.
  */
 export async function addCustomTopic(
   db: Database,
@@ -337,9 +336,9 @@ export async function addCustomTopic(
 }
 
 /**
- * Embed mọi chủ đề chưa có vector của model hiện tại, trong một request: chủ đề trong thư viện và
- * chủ đề đã được chọn (kể cả chủ đề tự thêm, chủ đề đã rút khỏi thư viện), bật hay tắt. Gọi ở đầu
- * mỗi lượt process, và ngay sau khi người dùng chọn hoặc thêm chủ đề.
+ * Embeds every topic that has no vector for the current model yet, in one request: library topics and
+ * selected topics (including self-added topics and topics withdrawn from the library), enabled or disabled. Called at the start
+ * of each process run, and right after the user selects or adds a topic.
  */
 export async function embedPendingTopics(
   db: Database,
@@ -365,9 +364,9 @@ export async function embedPendingTopics(
     "embed_topic",
   );
   for (const [i, p] of pending.entries()) {
-    // Vector mới (mô tả đổi, hoặc đổi model) thì điểm cũ của chủ đề không còn đúng.
+    // A new vector (description changed, or the model changed): the topic's old scores are no longer valid.
     await db.delete(docTopicScores).where(eq(docTopicScores.topicId, p.id));
-    // Mô tả mới (chưa có vector) thì tin giả định viết từ mô tả cũ không còn đúng.
+    // A new description (no vector yet): fake items written from the old description are no longer valid.
     if (p.fresh) await db.delete(topicExamples).where(eq(topicExamples.topicId, p.id));
     await db
       .update(topics)
@@ -382,7 +381,7 @@ export async function embedPendingTopics(
   return pending.length;
 }
 
-/** Chủ đề của người dùng, để CLI và bot hiển thị. */
+/** The user's topics, for the CLI and bot to display. */
 export async function listProfileTopics(db: Database, profileId: number) {
   return db
     .select({

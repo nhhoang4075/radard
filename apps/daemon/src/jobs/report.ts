@@ -1,49 +1,49 @@
 /**
- * Báo cáo nghiệm thu 7 ngày (tuan-3-thuc-thi.html, bước 9): chấm từng tiêu chí, đọc thẳng từ các
- * bảng. Không gọi mạng, không gọi model.
+ * Seven-day acceptance report (tuan-3-thuc-thi.html, step 9): scores each criterion, reading straight from the
+ * tables. No network calls, no model calls.
  *
- *   1. ≥ 95% lượt fetch thành công (ok, not_modified, behind): chung và theo từng nguồn, vì một
- *      trang cào (GitHub Trending) hỏng không được che mất việc các nguồn còn lại có khoẻ không.
- *   2. Mọi digest đến đúng giờ: `sent`, tin MỞ ĐẦU tới người dùng lệch < 10 phút sau khung 07:00
- *      giờ VN (`deliveries.sent_at` của tin header, vị trí 0; chưa có thì dùng `digests.sent_at`).
- *   3. ≥ 70% tin sự kiện có ít nhất một 👍/👎 (D6, chốt 13/10/2026). Chỉ `deliveries.kind = 'event'`; mỗi tin lấy
- *      lượt bấm MỚI NHẤT (feedback chỉ ghi thêm, đổi ý là dòng mới).
- *   4. Chi phí model < $0,1 mỗi ngày lịch giờ VN.
- *   5. Số liệu đầu tiên: tài liệu đăng/ngày theo nguồn (kèm tổng lấy về), sự kiện/ngày, số sự kiện qua cổng mỗi digest,
- *      tỉ lệ 👍.
+ *   1. ≥ 95% of fetch runs succeed (ok, not_modified, behind): overall and per source, because one
+ *      broken scraper (GitHub Trending) must not hide whether the other sources are healthy.
+ *   2. Every digest is on time: `sent`, and the OPENING item reaches the user < 10 minutes after the 07:00
+ *      VN slot (`deliveries.sent_at` of the header item, position 0; if none, use `digests.sent_at`).
+ *   3. ≥ 70% of event items have at least one 👍/👎 (D6, settled 13/10/2026). Only `deliveries.kind = 'event'`; each item takes
+ *      its NEWEST press (feedback is append-only, a change of mind is a new row).
+ *   4. Model cost < $0,1 per day on the VN calendar.
+ *   5. First figures: documents published per day by source (with total fetched), events per day, events passing the gate per digest,
+ *      like share 👍.
  *
- * Cửa sổ: các khoảng 24 giờ của digest kết thúc ở khung 07:00 gần nhất đã quá hạn gửi. Fetch,
- * digest và phản hồi tính theo cửa sổ này; chi phí và số liệu theo ngày tính theo NGÀY LỊCH giờ VN
- * (00:00 → 24:00) nằm trọn trước khung cuối.
+ * Window: the 24-hour windows of the digest end at the latest 07:00 slot already past its send deadline. Fetch,
+ * digest and feedback are measured over this window; cost and per-day figures use the VN CALENDAR DAYS
+ * (00:00 → 24:00) that fall entirely before the last slot.
  */
 import { type Database, digests } from "@radard/db";
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 import { type DigestPlan, digestSlot } from "./digest.ts";
 
-/** VN không đổi giờ theo mùa nên lệch UTC cố định +7 (như digest.ts). */
+/** Vietnam does not change clocks seasonally, so the offset from UTC is a fixed +7 (as in digest.ts). */
 const VN_OFFSET_MS = 7 * 3_600_000;
 const DAY_MS = 86_400_000;
 const MINUTE_MS = 60_000;
 
 export const FETCH_MIN_SUCCESS = 0.95;
-/** Digest đến đúng giờ khi lệch so với khung dưới chừng này phút. */
+/** A digest is on time when it deviates from its slot by no more than this many minutes. */
 export const DIGEST_MAX_DELAY_MIN = 10;
 export const FEEDBACK_MIN_RATED = 0.7;
 export const COST_MAX_USD_PER_DAY = 0.1;
-/** Trạng thái fetch tính là thành công: `behind` là đã lấy được, chỉ chưa bắt kịp hiện tại. */
+/** Fetch statuses counted as success: `behind` means it was fetched, just not yet caught up to the present. */
 export const FETCH_OK_STATUSES = ["ok", "not_modified", "behind"] as const;
 const ERROR_SNIPPET_CHARS = 100;
 
 // ---------------------------------------------------------------------------------------------
-// Kiểu dữ liệu trả về
+// Return types
 
 export interface ReportWindow {
-  /** Khoảng [start, end) cho fetch; khoảng (start, end] cho mốc kết thúc của digest. */
+  /** The [start, end) range for fetch; (start, end] for the digest's end mark. */
   start: Date;
   end: Date;
-  /** Các khung 07:00 giờ VN trong cửa sổ, cũ trước. Mỗi khung phải có một digest. */
+  /** The 07:00 VN slots in the window, oldest first. Each slot must have one digest. */
   slots: Date[];
-  /** Ngày lịch giờ VN [dayStart, dayEnd), dạng `2026-10-12`, cũ trước. */
+  /** VN calendar days [dayStart, dayEnd), in the form `2026-10-12`, oldest first. */
   days: string[];
   dayStart: Date;
   dayEnd: Date;
@@ -60,7 +60,7 @@ export interface FetchSourceRow {
 export interface FetchErrorGroup {
   source: string;
   status: string;
-  /** 100 ký tự đầu của lỗi; trống khi lượt còn `running` (đang chạy hoặc bị bỏ dở). */
+  /** First 100 characters of the error; empty while the run is still `running` (in progress or abandoned). */
   error: string;
   n: number;
   lastAt: Date;
@@ -77,20 +77,20 @@ export interface FetchReport {
 
 export interface DigestDay {
   slot: Date;
-  /** Ngày của khung, giờ VN: `2026-10-13`. */
+  /** Day of the slot, VN time: `2026-10-13`. */
   date: string;
   digestId: number | null;
   status: "sent" | "sending" | "failed" | "missing";
-  /** Lúc tin mở đầu tới người dùng; chưa có tin mở đầu thì là `digests.sent_at`. */
+  /** When the opening item reached the user; if there is no opening item, `digests.sent_at`. */
   sentAt: Date | null;
-  /** Chưa có delivery tin mở đầu nên `sentAt` lấy từ `digests.sent_at` (sau tin cuối). */
+  /** No delivery for the opening item, so `sentAt` comes from `digests.sent_at` (after the last item). */
   headerFallback: boolean;
-  /** Phút từ khung 07:00 tới `sentAt`; trống khi digest chưa `sent`. */
+  /** Minutes from the 07:00 slot to `sentAt`; empty when the digest is not `sent`. */
   delayMin: number | null;
   onTime: boolean;
-  /** Số tin sự kiện đã gửi (deliveries `event`), không tính tin mở đầu. */
+  /** Number of event items sent (deliveries `event`), not counting the opening item. */
   items: number;
-  /** Từ `meta.plan.ranking`; trống khi chưa có plan. */
+  /** From `meta.plan.ranking`; empty when there is no plan. */
   candidates: number | null;
   passedGate: number | null;
 }
@@ -104,12 +104,12 @@ export interface DigestReport {
 
 export interface FeedbackReport {
   pass: boolean;
-  /** Tin sự kiện của các digest trong cửa sổ. */
+  /** Event items of the digests in the window. */
   deliveries: number;
-  /** Tin có ít nhất một 👍/👎. */
+  /** Items with at least one 👍/👎. */
   rated: number;
   rate: number | null;
-  /** Theo lượt bấm mới nhất của mỗi tin. */
+  /** By the newest press on each item. */
   likes: number;
   dislikes: number;
   likeShare: number | null;
@@ -132,8 +132,8 @@ export interface CostReport {
 export interface MetricsReport {
   sources: string[];
   /**
-   * Theo NGÀY ĐĂNG `coalesce(published_at, fetched_at)` (cùng mốc điểm tin của digest/rank); nguồn
-   * không có ngày đăng (GitHub repo) rơi về giờ lấy về. `fetched` là tổng tài liệu theo `fetched_at`.
+   * By PUBLICATION DATE `coalesce(published_at, fetched_at)` (the same time the digest score uses); sources
+   * with no publish date (GitHub repos) fall back to fetch time. `fetched` is the total documents by `fetched_at`.
    */
   docsPerDay: {
     day: string;
@@ -141,7 +141,7 @@ export interface MetricsReport {
     total: number;
     fetched: number;
   }[];
-  /** Theo `events.first_seen_at` (bảng events không có giờ tạo; `events rebuild` dựng lại). */
+  /** By `events.first_seen_at` (the events table has no creation time; `events rebuild` rebuilds it). */
   eventsPerDay: { day: string; n: number }[];
 }
 
@@ -156,22 +156,22 @@ export interface Report {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Cửa sổ
+// Window
 
-/** 00:00 giờ VN của ngày chứa `d`. */
+/** 00:00 VN time of the day containing `d`. */
 function vnMidnight(d: Date): Date {
   const t = d.getTime() + VN_OFFSET_MS;
   return new Date(t - (t % DAY_MS) - VN_OFFSET_MS);
 }
 
-/** `2026-10-12`: ngày giờ VN chứa `d`. */
+/** `2026-10-12`: the VN calendar day containing `d`. */
 export function vnDay(d: Date): string {
   return new Date(d.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /**
- * Cửa sổ `hours` giờ kết thúc ở khung 07:00 gần nhất ĐÃ QUÁ HẠN gửi (07:10): chạy lúc 07:05 thì
- * khung hôm nay chưa tính, để digest đang gửi không bị chấm là thiếu.
+ * A window of `hours` hours ends at the latest 07:00 slot ALREADY PAST its send deadline (07:10): running at 07:05 means
+ * today's slot is not counted yet, so a digest still being sent is not marked as missing.
  */
 export function reportWindow(now: Date, hours = 7 * 24): ReportWindow {
   const end = digestSlot(new Date(now.getTime() - DIGEST_MAX_DELAY_MIN * MINUTE_MS));
@@ -229,7 +229,7 @@ async function fetchReport(db: Database, w: ReportWindow): Promise<FetchReport> 
   const total = rows.reduce((a, r) => a + r.total, 0);
   const ok = rows.reduce((a, r) => a + r.ok, 0);
   const rate = ratio(ok, total);
-  // Cố ý: lượt kẹt ở `running` không nằm trong FETCH_OK_STATUSES nên tính là hỏng (lượt chưa xong là lượt hỏng).
+  // Deliberately: a run stuck in `running` is not in FETCH_OK_STATUSES, so it counts as failed (an unfinished run is a failed run).
   return {
     pass: rate !== null && rate >= FETCH_MIN_SUCCESS,
     total,
@@ -254,7 +254,7 @@ type DigestRow = {
   periodEnd: Date;
   status: string;
   sentAt: Date | null;
-  /** `deliveries.sent_at` của tin mở đầu (kind `header`, vị trí 0); trống khi chưa có. */
+  /** `deliveries.sent_at` of the opening item (kind `header`, position 0); empty when there is none. */
   headerSentAt: Date | null;
   meta: Record<string, unknown>;
   items: number;
@@ -307,11 +307,11 @@ async function digestReport(
       periodEnd: digests.periodEnd,
       status: digests.status,
       sentAt: digests.sentAt,
-      // `digests.sent_at` đặt SAU tin cuối nên không đo được giờ người dùng nhận tin đầu.
+      // `digests.sent_at` is set AFTER the last item, so it cannot measure when the user received the first item.
       headerSentAt: sql<Date | null>`(select h.sent_at from deliveries h
         where h.digest_id = digests.id and h.kind = 'header' and h.position = 0)`,
       meta: digests.meta,
-      // Ghi rõ `digests.id`: trong truy vấn con, "id" trần sẽ bị hiểu là id của deliveries.
+      // Name `digests.id` explicitly: in the subquery a bare "id" would be read as the id of deliveries.
       items: sql<number>`(select count(*)::int from deliveries x
         where x.digest_id = digests.id and x.kind = 'event')`,
     })
@@ -324,7 +324,7 @@ async function digestReport(
       ),
     )
     .orderBy(asc(digests.id));
-  // MVP-0 có một người nhận: mỗi khung một dòng. Nhiều dòng cùng khung thì lấy dòng tạo trước.
+  // MVP-0 has one recipient: one row per slot. If several rows share a slot, take the row created first.
   const bySlot = new Map<number, DigestRow>();
   for (const r of rows) {
     if (!bySlot.has(r.periodEnd.getTime())) {
@@ -340,7 +340,7 @@ async function digestReport(
 }
 
 // ---------------------------------------------------------------------------------------------
-// 3. Phản hồi
+// 3. Feedback
 
 async function feedbackReport(
   db: Database,
@@ -354,8 +354,8 @@ async function feedbackReport(
         select dl.id from deliveries dl join digests d on d.id = dl.digest_id
         where dl.profile_id = ${profileId} and dl.kind = 'event' and d.period_end > ${w.start} and d.period_end <= ${w.end}
       ), latest as (
-        -- feedback chỉ ghi thêm: dòng mới nhất (id lớn nhất) là ý kiến hiện tại
-        -- dòng clear (bỏ chọn) vẫn là dòng mới nhất của tin đó: tin đã bỏ chọn không tính là có phản hồi
+        -- feedback is append-only: the newest row (largest id) is the current opinion
+        -- a clear row (unselect) is still the newest row of that item: an unselected item does not count as having feedback
         select distinct on (f.delivery_id) f.delivery_id, f.kind
         from feedback f join ev on ev.id = f.delivery_id
         where f.kind in ('like', 'dislike', 'clear')
@@ -382,7 +382,7 @@ async function feedbackReport(
 }
 
 // ---------------------------------------------------------------------------------------------
-// 4. Chi phí
+// 4. Cost
 
 async function costReport(db: Database, w: ReportWindow): Promise<CostReport> {
   const rows = [
@@ -418,10 +418,10 @@ async function costReport(db: Database, w: ReportWindow): Promise<CostReport> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// 5. Số liệu đầu tiên
+// 5. First figures
 
 async function metricsReport(db: Database, w: ReportWindow): Promise<MetricsReport> {
-  // Ngày đăng: cùng mốc `coalesce(published_at, fetched_at)` mà rank.ts dùng để chọn tin 24 giờ qua.
+  // Publish date: the same `coalesce(published_at, fetched_at)` that rank.ts uses to pick the last 24 hours of items.
   const docs = [
     ...(await db.execute<{ day: string; source: string; n: number }>(sql`
       select to_char(coalesce(d.published_at, d.fetched_at) at time zone 'Asia/Ho_Chi_Minh',
@@ -432,7 +432,7 @@ async function metricsReport(db: Database, w: ReportWindow): Promise<MetricsRepo
         and coalesce(d.published_at, d.fetched_at) < ${w.dayEnd}
       group by 1, 2`)),
   ];
-  // Ngày lấy về: để các ngày lấy bù hoặc daemon tắt vẫn hiện ra.
+  // Fetch date: so that back-filled days or days with the daemon off still show up.
   const fetchedRows = [
     ...(await db.execute<{ day: string; n: number }>(sql`
       select to_char(fetched_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day,
@@ -489,16 +489,16 @@ export async function buildReport(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Trình bày: mỗi phần là các dòng chữ và bảng; cli.ts chỉ việc in (console.log / console.table).
+// Presentation: each section is lines of text and tables; cli.ts only prints (console.log / console.table).
 
 export type Block = string | Record<string, unknown>[];
 
 const mark = (pass: boolean) => (pass ? "✓" : "✗");
-/** Số thập phân kiểu Việt: dấu phẩy. */
+/** Vietnamese-style decimal number: comma as the decimal separator. */
 const dec = (x: number, digits: number) => x.toFixed(digits).replace(".", ",");
 const pct = (x: number | null) => (x === null ? "—" : `${dec(x * 100, 1)}%`);
 const usd = (x: number) => `$${dec(x, 4)}`;
-/** `13/10 07:04` giờ VN. */
+/** `13/10 07:04` in VN time. */
 function vnTime(d: Date): string {
   const s = new Date(d.getTime() + VN_OFFSET_MS).toISOString();
   return `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}`;
@@ -560,7 +560,7 @@ function digestBlocks(d: DigestReport): Block[] {
 
 function feedbackBlocks(f: FeedbackReport): Block[] {
   return [
-    // D6, chốt 13/10/2026: chỉ tiêu chí tỉ lệ này; KHÔNG có dòng đạt/không đạt theo số lượt tuyệt đối.
+    // D6, settled 13/10/2026: this rate criterion alone; there is NO pass/fail line based on absolute counts.
     `${mark(f.pass)} 3. ≥ ${Math.round(FEEDBACK_MIN_RATED * 100)}% tin sự kiện có ít nhất một 👍 hoặc 👎: ${pct(f.rate)} (${f.rated}/${f.deliveries} tin)`,
     `   Theo lượt bấm mới nhất: ${f.likes} thích, ${f.dislikes} không thích (không tính tin thử)`,
   ];
@@ -575,7 +575,7 @@ function costBlocks(c: CostReport): Block[] {
     out.push(
       c.days.map((d) => ({
         ngày: d.day,
-        // Việc không gọi trong ngày để trống, cho bảng dễ đọc.
+        // A call not made on that day is left blank, to keep the table easy to read.
         ...Object.fromEntries(tasks.map((t) => [t, d.byTask[t] ? usd(d.byTask[t]) : ""])),
         tổng: usd(d.usd),
         "dưới trần": mark(!d.over),
@@ -627,7 +627,7 @@ function metricsBlocks(r: Report): Block[] {
   return out;
 }
 
-/** Báo cáo ở dạng in ra terminal: chữ thường (✓ / ✗), bảng cho console.table. */
+/** The report as printed to the terminal: lowercase (✓ / ✗), tables for console.table. */
 export function formatReport(r: Report): Block[] {
   const w = r.window;
   const passed = [r.fetch.pass, r.digests.pass, r.feedback.pass, r.cost.pass].filter(

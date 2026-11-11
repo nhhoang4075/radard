@@ -1,14 +1,14 @@
 /**
- * Gợi ý chủ đề từ lời mô tả của người đọc (docs/mo-hinh-quyet-dinh.html tab "Gợi ý chủ đề"). Chỉ
- * đọc DB; các lời gọi model ghi `llm_calls`.
+ * Topic suggestions from the reader's description (docs/mo-hinh-quyet-dinh.html tab "Topic suggestions"). Reads
+ * the DB only; the model calls write `llm_calls`.
  *
- * Hai phần, chạy độc lập:
- * 1. Chấm thư viện: một lời gọi model ra quyết định, mỗi chủ đề thư viện đang dùng một câu có/không
- *    ("người đọc này có muốn nhận tin về chủ đề X không?"), chia ba mức theo xác suất.
- * 2. Chủ đề mới: một lời gọi LLM đề xuất 0–3 chủ đề thư viện chưa có (model ra quyết định không làm
- *    được việc này, vì nó chỉ chọn trong danh sách cho trước). Mỗi đề xuất qua bước soát chủ đề gần
- *    giống (`checkTopicOverlap`): trùng hẳn một chủ đề có sẵn thì bỏ, hẹp hơn/rộng hơn thì giữ kèm
- *    quan hệ để giao diện hiện cho người dùng.
+ * Two parts, run independently:
+ * 1. Library scoring: one decision-model call, with a yes/no question for each library topic in use
+ *    ("is this reader interested in news about topic X?"), split into three levels by probability.
+ * 2. New topics: one LLM call proposes 0–3 library topics not yet present (the decision model cannot do this,
+ *    since it only chooses from a given list). Each proposal goes through the near-duplicate check
+ *    (`checkTopicOverlap`): a proposal that fully duplicates an existing topic is dropped; narrower or broader ones are kept with
+ *    their relation so the UI can show it to the user.
  */
 import {
   createLogger,
@@ -23,18 +23,18 @@ import { checkTopicOverlap, type OverlapCandidate, topicNameEn } from "./topic-o
 
 const log = createLogger("topic-suggest");
 
-// Ngưỡng chia mức, chỉnh 16/10/2026 theo người dùng chấm 69 cặp (5 lời mô tả × 14 chủ đề): với
-// 0,85 / 0,58, 63/69 cặp đúng mức người dùng chọn và 0 lỗi nặng (tích sẵn cái người dùng không muốn,
-// hoặc không gợi ý cái người dùng muốn bật). Ngưỡng cũ 0,85 / 0,60: 62/69 và 1 lỗi nặng.
+// Level thresholds, tuned 16/10/2026 against 69 pairs the user scored (5 descriptions × 14 topics): with
+// 0,85 / 0,58, 63/69 pairs matched the level the user chose and 0 serious errors (ticked what the user did not want,
+// or did not suggest what the user wanted to turn on). Old thresholds 0,85 / 0,60: 62/69 and 1 serious error.
 
-/** Từ ngưỡng này trở lên: tích sẵn. */
+/** At or above this threshold: pre-ticked. */
 export const PRESELECT_MIN = 0.85;
-/** Từ ngưỡng này tới dưới `PRESELECT_MIN`: "có thể bạn quan tâm" (chưa tích). Dưới nữa: không gợi ý. */
+/** From this threshold up to below `PRESELECT_MIN`: "you may be interested" (not ticked). Below that: not suggested. */
 export const MAYBE_MIN = 0.58;
-/** Số chủ đề mới tối đa LLM được đề xuất. */
+/** Maximum number of new topics the LLM may propose. */
 export const MAX_NEW_TOPICS = 3;
 
-/** Câu hỏi có/không cho một chủ đề, sát câu chữ đã đo ngày 13/10/2026. */
+/** Yes/no question for one topic, close to the wording measured on 13/10/2026. */
 export function suggestInstructions(name: string, embedText: string): string {
   return `Would this reader want news about "${name}" in a daily AI news digest? Topic: ${embedText}`;
 }
@@ -43,26 +43,26 @@ export interface TopicSuggestion {
   topicId: number;
   key: string;
   label: string;
-  /** Xác suất model cho câu trả lời "có". */
+  /** The model's probability for the answer "yes". */
   probability: number;
 }
 
 export interface NewTopicSuggestion {
   name: string;
-  /** Câu mô tả tiếng Anh để embed, cùng dạng `describeTopic` viết. */
+  /** English description sentence to embed, in the same form as `describeTopic` writes. */
   embedText: string;
-  /** Vì sao đề xuất, một câu tiếng Việt. */
+  /** Why it is proposed, one Vietnamese sentence. */
   why: string;
-  /** `false`: chưa soát chủ đề gần giống (thiếu embedder hay model quyết định, hoặc lời gọi lỗi). */
+  /** `false`: near-duplicate check not done yet (missing embedder or decision model, or the call failed). */
   overlapChecked: boolean;
-  /** Luôn rỗng khi đã soát được: đề xuất có quan hệ với chủ đề có sẵn đều bị bỏ (xem `DroppedTopic`). */
+  /** Always empty once checked: proposals with a relation to an existing topic are all dropped (see `DroppedTopic`). */
   related: OverlapCandidate[];
 }
 
 export interface DroppedTopic {
   name: string;
   embedText: string;
-  /** Chủ đề có sẵn mà đề xuất trùng, hẹp hơn hoặc rộng hơn (quan hệ chắc nhất). */
+  /** Existing topic that the proposal duplicates, is narrower than, or is broader than (the most confident relation). */
   relatedTo: {
     topicId: number;
     label: string;
@@ -72,18 +72,18 @@ export interface DroppedTopic {
 }
 
 export interface SuggestResult {
-  /** Phần nào đã chạy: thiếu model quyết định (hoặc lời gọi lỗi) thì không chấm thư viện; thiếu LLM thì không đề xuất chủ đề mới. */
+  /** Which parts ran: without the decision model (or on a failed call) library topics are not scored; without an LLM no new topics are proposed. */
   ran: { library: boolean; newTopics: boolean };
-  /** Xác suất ≥ `PRESELECT_MIN`, cao trước. */
+  /** Probability ≥ `PRESELECT_MIN`, highest first. */
   preselect: TopicSuggestion[];
-  /** `MAYBE_MIN` ≤ xác suất < `PRESELECT_MIN`, cao trước. */
+  /** `MAYBE_MIN` ≤ probability < `PRESELECT_MIN`, highest first. */
   maybe: TopicSuggestion[];
-  /** Xác suất < `MAYBE_MIN`, cao trước. */
+  /** Probability < `MAYBE_MIN`, highest first. */
   notSuggested: TopicSuggestion[];
   newTopics: NewTopicSuggestion[];
-  /** Đề xuất bị bỏ vì trùng một chủ đề có sẵn (để đánh giá, không hiện cho người dùng). */
+  /** Proposal dropped for duplicating an existing topic (for evaluation, not shown to the user). */
   dropped: DroppedTopic[];
-  /** Lỗi của từng phần, nếu có. */
+  /** Error of each part, if any. */
   errors: { library?: string; newTopics?: string };
 }
 
@@ -92,7 +92,7 @@ export interface SuggestDeps {
   profileId: number;
   decider: DecisionProvider | null;
   llm: LlmProvider | null;
-  /** Cần cho bước soát chủ đề gần giống; thiếu thì đề xuất mới giữ nguyên, `overlapChecked = false`. */
+  /** Needed for the near-duplicate check; without it the new proposals are kept as is, `overlapChecked = false`. */
   embedder: EmbeddingProvider | null;
 }
 
@@ -103,7 +103,7 @@ interface LibraryTopic {
   embedText: string;
 }
 
-/** Chủ đề thư viện đang dùng (không gồm chủ đề đã rút), theo thứ tự hiển thị. */
+/** Library topics in use (excluding withdrawn topics), in display order. */
 async function activeLibrary(db: Database): Promise<LibraryTopic[]> {
   const rows = await db
     .select({
@@ -118,7 +118,7 @@ async function activeLibrary(db: Database): Promise<LibraryTopic[]> {
   return rows.map((r) => ({ ...r, key: r.key ?? "" }));
 }
 
-/** Gợi ý chủ đề cho lời mô tả `description` (lời người đọc tự viết về mình). */
+/** Topic suggestions for the description `description` (the reader's own wording about themselves). */
 export async function suggestTopics(
   deps: SuggestDeps,
   description: string,
@@ -143,7 +143,7 @@ export async function suggestTopics(
   };
 }
 
-/** Chia ba mức theo xác suất, cao trước trong mỗi mức. */
+/** Splits into three levels by probability, highest first within each level. */
 export function tier(
   suggestions: TopicSuggestion[],
 ): Pick<SuggestResult, "preselect" | "maybe" | "notSuggested"> {
@@ -158,9 +158,9 @@ export function tier(
 const keyOf = (t: LibraryTopic) => `topic_${t.id}`;
 
 /**
- * Một lời gọi cho mọi chủ đề thư viện (thư viện ~14–17 chủ đề, dưới xa giới hạn 32k token của Jev).
- * Hồ sơ lưu bằng tiếng Anh nên trạng thái đưa nguyên văn; tên chủ đề cũng tiếng Anh, cùng bộ tên đã đo mà
- * cổng chủ đề và kiểm trùng dùng (`topicNameEn`).
+ * One call for all library topics (the library has ~14–17 topics, far below Jev's 32k token limit).
+ * The profile is stored in English so the state carries it as is; topic names are in English too, the same set of names measured that
+ * the topic gate and the duplicate check use (`topicNameEn`).
  */
 async function rateLibrary(
   decider: DecisionProvider | null,
@@ -208,7 +208,7 @@ Reply with a JSON array only, no other text. Each element:
  "descriptionEn": "<short English topic name>: <comma-separated concrete subtopics, techniques, products or organisations>", 15 to 45 words in English, naming concrete things; avoid vague words that match almost every AI headline such as "AI models", "LLMs" or "AI news",
  "why": one short Vietnamese sentence saying which part of the reader's description this topic serves}`;
 
-/** Lời nhắc: lời mô tả rồi thư viện, mỗi chủ đề một dòng "tên tiếng Việt | câu mô tả tiếng Anh". */
+/** Prompt: the description, then the library, one topic per line as "Vietnamese name | English description sentence". */
 export function proposePrompt(
   description: string,
   library: { label: string; embedText: string }[],
@@ -226,9 +226,9 @@ export interface ProposedTopic {
 const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
 /**
- * Đọc mảng JSON trong câu trả lời (chịu được khối ```json bao quanh và chữ thừa hai đầu). Không
- * thấy mảng hay JSON hỏng thì lỗi (để thử lại); mục thiếu trường hay sai độ dài thì bỏ riêng mục đó.
- * Câu mô tả cho rộng hơn khung 15–45 từ một chút (10–60) để không bỏ đề xuất tốt chỉ vì lệch vài từ.
+ * Reads the JSON array in the answer (tolerates a surrounding ```json block and extra text at both ends). Without
+ * an array, or with broken JSON, it throws an error (to retry); items missing a field or with the wrong length are dropped individually.
+ * Description sentences may be a little wider than the 15–45 word range (10–60), so good proposals are not dropped over a few words.
  */
 export function parseProposals(reply: string): ProposedTopic[] {
   const start = reply.indexOf("[");
@@ -239,7 +239,7 @@ export function parseProposals(reply: string): ProposedTopic[] {
   const out: ProposedTopic[] = [];
   for (const it of data as Record<string, unknown>[]) {
     if (!it || typeof it !== "object") continue;
-    // Khoá trên dây giữ nguyên tên cũ (`labelVi`, `descriptionEn`): đó là hợp đồng với prompt của LLM.
+    // The keys on the wire keep their old names (`labelVi`, `descriptionEn`): they are the contract with the LLM prompt.
     const { labelVi, descriptionEn, why } = it;
     if (typeof labelVi !== "string" || typeof descriptionEn !== "string" || typeof why !== "string")
       continue;
@@ -257,7 +257,7 @@ export function parseProposals(reply: string): ProposedTopic[] {
   return out.slice(0, MAX_NEW_TOPICS);
 }
 
-/** Một lời gọi LLM, thử lại đúng một lần khi câu trả lời không đọc được (như tóm tắt digest). */
+/** One LLM call, retried exactly once when the answer cannot be read (as with the digest summary). */
 async function proposeNewTopics(
   llm: LlmProvider | null,
   description: string,
@@ -272,10 +272,10 @@ async function proposeNewTopics(
         task: "suggest_new_topics",
         system: PROPOSE_SYSTEM,
         prompt,
-        // Model có token suy nghĩ ẩn tính vào trần này (đo 11/10/2026): để rộng.
+        // The model has hidden thinking tokens counted toward this cap (measured 11/10/2026): keep it generous.
         maxOutputTokens: 3000,
       });
-      // Tên trùng chủ đề thư viện thì không lưu được (`addCustomTopic`): bỏ luôn.
+      // A name that clashes with a library topic cannot be saved (`addCustomTopic`): drop it.
       const labels = new Set(library.map((t) => t.label.toLowerCase()));
       const topics = parseProposals(reply).filter((p) => !labels.has(p.name.toLowerCase()));
       return { ran: true, topics };
@@ -287,7 +287,7 @@ async function proposeNewTopics(
   return { ran: false, topics: [], error: error.slice(0, 500) };
 }
 
-/** Soát từng đề xuất (song song): trùng một chủ đề có sẵn thì bỏ, còn lại giữ kèm quan hệ. */
+/** Checks each proposal (in parallel): a duplicate of an existing topic is dropped, the rest are kept with their relation. */
 async function checkProposals(
   deps: SuggestDeps,
   proposed: ProposedTopic[],
@@ -311,9 +311,9 @@ async function checkProposals(
   const kept: NewTopicSuggestion[] = [];
   const dropped: DroppedTopic[] = [];
   for (const { p, ran, candidates } of results) {
-    // Chỉ giữ đề xuất khác mọi chủ đề có sẵn: người dùng chấm 16/10/2026 thấy hữu ích đúng 2 đề xuất
-    // "khác hết" và không muốn 2 đề xuất "hẹp hơn" (0,55 và 0,95). Chủ đề mới là để lấp chỗ thư viện thiếu.
-    // Ứng viên đã xếp trùng > hẹp hơn > rộng hơn, chắc hơn trước.
+    // Keep only proposals different from every existing topic: on 16/10/2026 the user found exactly 2 "all different" proposals
+    // useful and did not want 2 "narrower" ones (0,55 and 0,95). New topics are there to fill gaps in the library.
+    // Candidates ranked duplicate > narrower > broader, more confident first.
     const top = candidates[0];
     if (top) {
       dropped.push({

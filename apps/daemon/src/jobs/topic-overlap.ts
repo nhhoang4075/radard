@@ -1,15 +1,15 @@
 /**
- * Soát chủ đề gần giống, chạy TRƯỚC khi lưu một chủ đề tự thêm (docs/mo-hinh-quyet-dinh.html tab
- * 02 và 06). Chỉ đọc DB; lời gọi model duy nhất ghi `llm_calls` (hỏi quan hệ, embed câu mô tả).
+ * Overlap check for similar topics, run BEFORE saving a self-added topic (docs/mo-hinh-quyet-dinh.html tab
+ * 02 and 06). Reads the DB only; the only model call writes `llm_calls` (asks the relation, embeds the description).
  *
- * Model ra quyết định được hỏi quan hệ của chủ đề mới với MỌI chủ đề có sẵn trong một lời gọi:
- * trùng, hẹp hơn, rộng hơn hay khác. Không lọc trước bằng "tỉ lệ trùng tin": đo trên dữ liệu thật
- * (15/10/2026), các tin chung chung lọt vào top 300 của nhiều chủ đề cùng lúc làm tỉ lệ của mọi cặp
- * lên ~0,3, trong khi chủ đề cha đúng ("Hạ tầng AI" với "Chạy LLM trên máy") chỉ 0,28 nên bị bỏ
- * sót. Hỏi hết thì Jev chọn đúng cả 4 bản nháp thử, 0,6–0,9 giây, ~3.100 token cho 14 chủ đề.
+ * The decision model is asked the relation of the new topic to EVERY existing topic in one call:
+ * overlapping, narrower, broader, or different. It is not pre-filtered by "item overlap ratio": measured on real data
+ * (15/10/2026), generic items fall into the top 300 of many topics at once, pushing every pair's ratio
+ * up to ~0,3, while the correct parent topic ("Hạ tầng AI" vs "Chạy LLM trên máy") is only 0,28 and gets missed. Asking all of them,
+ * Jev picked the right answer for all 4 trial drafts, 0,6–0,9 seconds, ~3.100 tokens for 14 topics.
  *
- * "Tỉ lệ trùng tin" (số tin chung trong 300 tin khớp nhất của mỗi bên, 30 ngày qua, chia 300) và
- * tin ví dụ vẫn được tính cho các chủ đề model báo là gần, làm bằng chứng cho người dùng.
+ * "Item overlap ratio" (shared items among the top 300 matches of each side, last 30 days, divided by 300) and
+ * example items are still computed for the topics the model says are close, as evidence for the user.
  */
 import type { DecisionProvider, EmbeddingProvider } from "@radard/core";
 import type { Database } from "@radard/db";
@@ -17,26 +17,26 @@ import { sql } from "drizzle-orm";
 import { topicQueryText } from "../topics/instruct.ts";
 import { TOPIC_NAMES_EN } from "../topics/library.ts";
 
-/** Số tin khớp nhất của mỗi chủ đề đem ra so (tab 02: 300 tin của 30 ngày). */
+/** Number of best-matching items per topic compared (tab 02: 300 items over 30 days). */
 export const OVERLAP_TOP_N = 300;
 export const OVERLAP_WINDOW_DAYS = 30;
 
 /**
- * Tin nằm trong top 300 của từ chừng này chủ đề thư viện trở lên là tin "chung chung" (tiêu đề
- * ngắn, mơ hồ như "OpenAI (2015)"): đo 15/10/2026 trên dữ liệu server, 125 tin nằm trong top 300
- * của ≥ 6 trên 14 chủ đề. Không đưa chúng vào tin ví dụ vì chúng không cho thấy hai chủ đề khác
- * nhau ở đâu; tỉ lệ trùng tin thì vẫn tính cả chúng.
+ * Items within the top 300 of this many or more library topics are "generic" (short, vague headlines
+ * like "OpenAI (2015)"): measured 15/10/2026 on server data, 125 items were in the top 300
+ * of ≥ 6 of the 14 topics. They are not used as example items, because they do not show where two topics differ;
+ * their overlap ratio is still counted.
  */
 export const HUB_MIN_TOPICS = 6;
 
 /**
- * Tối đa số câu hỏi mỗi lời gọi: Jev nhận tối đa 32k token cho trạng thái + câu hỏi; 14 chủ đề
- * tốn ~3.100 token, nên 30 chủ đề vẫn dư nhiều. Nhiều hơn thì chia thành nhiều lời gọi.
+ * Maximum questions per call: Jev takes at most 32k tokens for state + questions; 14 topics
+ * cost ~3.100 tokens, so 30 topics still leave plenty of room. More than that is split into several calls.
  */
 export const MAX_QUESTIONS_PER_CALL = 30;
 const EXAMPLES = 3;
 
-/** Bốn quan hệ, đúng câu chữ đã thử trên 6 model ngày 13/10/2026 (tab 05). */
+/** The four relations, worded exactly as tried on 6 models on 13/10/2026 (tab 05). */
 export const RELATION_CRITERIA = {
   same: "The new topic covers essentially the same news as the existing topic",
   narrower: "The new topic is a narrower part of the existing topic",
@@ -44,18 +44,18 @@ export const RELATION_CRITERIA = {
   different: "The topics are about different news, with only small overlap",
 } as const;
 export type TopicRelation = keyof typeof RELATION_CRITERIA;
-/** Quan hệ đáng báo cho người dùng, theo thứ tự hiển thị. */
+/** Relations worth reporting to the user, in display order. */
 export type CloseRelation = Exclude<TopicRelation, "different">;
 const RELATION_ORDER: Record<CloseRelation, number> = { same: 0, narrower: 1, broader: 2 };
 
-/** Câu hỏi cho chủ đề có khoá `key` trong `existing_topics` của trạng thái. */
+/** The question for the topic with key `key` in the state's `existing_topics`. */
 export function relationInstructions(key: string): string {
   return `How does the new topic relate to the existing topic ${key}, in terms of which news articles each would match?`;
 }
 
 export interface TopicDraft {
   label: string;
-  /** Câu mô tả tiếng Anh dùng để embed (cùng dạng `describeTopic` viết). */
+  /** English description sentence used for embedding (same form as `describeTopic` writes). */
   embedText: string;
 }
 
@@ -63,29 +63,29 @@ export interface OverlapCandidate {
   topicId: number;
   label: string;
   origin: "library" | "custom";
-  /** Người dùng đã chọn và đang bật chủ đề này. */
+  /** The user has selected and enabled this topic. */
   enabled: boolean;
   relation: CloseRelation;
-  /** Xác suất model cho quan hệ đã chọn. */
+  /** The model's probability for the chosen relation. */
   probability: number;
-  /** Tỉ lệ trùng tin, 0..1 (gồm cả tin chung chung). */
+  /** Item overlap ratio, 0..1 (including generic items). */
   ratio: number;
-  /** Tiêu đề tin cả hai cùng bắt, khớp chủ đề mới nhất trước, bỏ tin chung chung. */
+  /** Item titles both catch, matched to the newest topic first, generic items dropped. */
   shared: string[];
-  /** Tiêu đề tin chỉ chủ đề mới bắt, khớp chủ đề mới nhất trước, bỏ tin chung chung. */
+  /** Item titles only the new topic catches, matched to the newest topic first, generic items dropped. */
   onlyNew: string[];
 }
 
 export interface OverlapCheck {
-  /** `false`: không có model quyết định hoặc lời gọi lỗi, nên chưa soát được (không có ứng viên). */
+  /** `false`: no decision model or the call failed, so the check could not run (no candidates). */
   ran: boolean;
-  /** Chủ đề model báo là gần: trùng, rồi hẹp hơn, rồi rộng hơn; cùng quan hệ thì chắc hơn trước. */
+  /** Close topics the model reports: overlapping, then narrower, then broader; within one relation, the more confident first. */
   candidates: OverlapCandidate[];
-  /** Số chủ đề có sẵn đã hỏi. */
+  /** Number of existing topics asked. */
   asked: number;
-  /** Model đã trả lời; `null` khi không chạy. */
+  /** The model answered; `null` when it did not run. */
   model: string | null;
-  /** Số tin trong tập so của chủ đề mới (bằng `OVERLAP_TOP_N` khi đủ dữ liệu); 0 khi không cần đo. */
+  /** Number of items in the new topic's comparison set (equals `OVERLAP_TOP_N` when there is enough data); 0 when no measurement is needed. */
   docs: number;
 }
 
@@ -96,13 +96,13 @@ interface NewDoc {
 
 type TopicRow = {
   id: number;
-  /** Khoá thư viện; `null` với chủ đề tự thêm. */
+  /** Library key; `null` for self-added topics. */
   key: string | null;
   label: string;
   origin: "library" | "custom";
   embedText: string;
   enabled: boolean;
-  /** Đã có điểm trong `doc_topic_scores`. */
+  /** Already has a score in `doc_topic_scores`. */
   scored: boolean;
 };
 
@@ -120,9 +120,9 @@ export interface OverlapDeps {
 }
 
 /**
- * Hỏi quan hệ của bản nháp với mọi chủ đề có embedding (thư viện đang dùng và chủ đề tự thêm của
- * hồ sơ, bật hay tắt), rồi đo tỉ lệ trùng tin và lấy tin ví dụ cho các chủ đề không "khác".
- * Không ghi gì ngoài `llm_calls`.
+ * Asks the relation of the draft to every topic with an embedding (library topics and the profile's
+ * self-added topics, enabled or disabled), then measures the item overlap ratio and takes example items for topics that are not "different".
+ * Writes nothing except `llm_calls`.
  */
 export async function checkTopicOverlap(
   deps: OverlapDeps,
@@ -145,7 +145,7 @@ export async function checkTopicOverlap(
   return { ...base, ...evidence };
 }
 
-/** Tỉ lệ trùng tin và tin ví dụ cho các chủ đề gần, xếp như `close`. */
+/** Item overlap ratio and example items for the close topics, ordered as `close`. */
 async function measureOverlap(
   deps: OverlapDeps,
   draft: TopicDraft,
@@ -162,8 +162,8 @@ async function measureOverlap(
   );
   if (!vector) throw new Error("embedder không trả vector");
   const newTop = await topDocsForVector(deps.db, vector, model, since, topN);
-  // Tập top N của chủ đề gần (để tính tỉ lệ) và của mọi chủ đề thư viện (để nhận ra tin chung
-  // chung), chỉ cần phần nằm trong tập của chủ đề mới.
+  // Top N set of each close topic (for the ratio) and of every library topic (to recognize generic
+  // items): only the part inside the new topic's set is needed.
   const closeIds = new Set(close.map((c) => c.topic.id));
   const wanted = topics.filter((t) => closeIds.has(t.id) || t.origin === "library");
   const sets = await sharedDocs(
@@ -196,7 +196,7 @@ async function measureOverlap(
   return { candidates, docs: newTop.length };
 }
 
-/** Tin nằm trong top N của ít nhất `min` chủ đề thư viện. */
+/** Items within the top N of at least `min` library topics. */
 function hubDocs(topics: TopicRow[], sets: Map<number, Set<number>>, min: number): Set<number> {
   const count = new Map<number, number>();
   for (const t of topics) {
@@ -206,7 +206,7 @@ function hubDocs(topics: TopicRow[], sets: Map<number, Set<number>>, min: number
   return new Set([...count].filter(([, n]) => n >= min).map(([id]) => id));
 }
 
-/** Top N tài liệu của cửa sổ theo cosine với `vector`, cao trước; chấm như `scoreTopics`. */
+/** Top N documents of the window by cosine with `vector`, highest first; scored like `scoreTopics`. */
 async function topDocsForVector(
   db: Database,
   vector: number[],
@@ -226,7 +226,7 @@ async function topDocsForVector(
   return [...rows].map((r) => ({ id: Number(r.id), title: String(r.title) }));
 }
 
-/** Chủ đề đem ra so: thư viện đang dùng và chủ đề tự thêm của hồ sơ, có embedding cùng model. */
+/** Topics to compare: library topics in use and the profile's self-added topics, with an embedding from the same model. */
 async function existingTopics(db: Database, profileId: number, model: string): Promise<TopicRow[]> {
   const rows = await db.execute(sql`
     select t.id::int as id, t.key, t.name as label, t.origin, t.embed_text as "embedText",
@@ -250,9 +250,9 @@ async function existingTopics(db: Database, profileId: number, model: string): P
 }
 
 /**
- * Với mỗi chủ đề: những tài liệu nằm trong cả top N của nó lẫn `ids` (top N của chủ đề mới).
- * Chủ đề đã được chấm (`doc_topic_scores`, job process) thì đọc điểm có sẵn, nhanh hơn ~20 lần
- * (đo 15/10/2026: 14 chủ đề ~50 ms so với ~1,2 giây); chủ đề vừa embed, chưa chấm thì tính cosine.
+ * For each topic: the documents that are in both its top N and `ids` (the top N of the new topic).
+ * A topic already scored (`doc_topic_scores`, process job) reads the existing scores, ~20 times faster
+ * (measured 15/10/2026: 14 topics ~50 ms vs ~1.2 seconds); a topic just embedded and not yet scored uses cosine.
  */
 async function sharedDocs(
   db: Database,
@@ -307,8 +307,8 @@ async function sharedDocs(
 }
 
 /**
- * Tên tiếng Anh ngắn của chủ đề: phần trước dấu hai chấm của câu mô tả ("AI agents: …"). Model
- * quyết định chỉ được hãng bảo đảm với tiếng Anh, nên không đưa tên tiếng Việt khi tránh được.
+ * The short English name of a topic: the part before the colon of its description sentence ("AI agents: …"). The model
+ * decision is only guaranteed in English, so the Vietnamese name is not passed when it can be avoided.
  */
 export function englishName(embedText: string, fallback: string): string {
   const head = embedText.split(":")[0]?.trim() ?? "";
@@ -316,8 +316,8 @@ export function englishName(embedText: string, fallback: string): string {
 }
 
 /**
- * Tên tiếng Anh đưa cho model quyết định: chủ đề thư viện dùng tên soạn sẵn (`TOPIC_NAMES_EN`,
- * đúng tên đã đo); chủ đề tự thêm dùng phần "Tên:" của câu mô tả, không có thì nhãn.
+ * English name passed to the decision model: library topics use the built-in name (`TOPIC_NAMES_EN`,
+ * exactly the name measured); self-added topics use the "Name:" part of the description sentence, or the label if there is none.
  */
 export function topicNameEn(t: { key: string | null; label: string; embedText: string }) {
   return (t.key ? TOPIC_NAMES_EN[t.key] : undefined) ?? englishName(t.embedText, t.label);
@@ -326,10 +326,9 @@ export function topicNameEn(t: { key: string | null; label: string; embedText: s
 const keyOf = (t: TopicRow) => `topic_${t.id}`;
 
 /**
- * Mỗi chủ đề có sẵn một câu `choice`, chung một trạng thái: chủ đề mới và các chủ đề có sẵn theo
- * khoá câu hỏi (`existing_topics.topic_<id>`). Quá `MAX_QUESTIONS_PER_CALL` chủ đề thì chia lô,
- * các lô gọi song song. Lô nào lỗi thì `null` (lỗi đã ghi vào `llm_calls`): soát nửa vời dễ bỏ
- * sót, nên coi như chưa soát.
+ * Each existing topic has one `choice` question, in one shared state: the new topic and the existing topics by
+ * question key (`existing_topics.topic_<id>`). Above `MAX_QUESTIONS_PER_CALL` topics, it splits into batches, and
+ * the batches are called in parallel. If a batch fails it gives `null` (the error is logged in `llm_calls`): a half-done check easily misses things, so it counts as not checked.
  */
 async function askRelations(
   decider: DecisionProvider,

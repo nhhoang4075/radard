@@ -1,9 +1,9 @@
 /**
- * Job `fetch`: chạy một adapter nguồn, lưu bản thô, ghi `documents`.
+ * `fetch` job: runs one source adapter, stores the raw copy, writes `documents`.
  *
- * Idempotent theo (source_id, external_id): chạy lại, chạy trùng hay bị kill giữa chừng
- * đều không sinh bản ghi thừa. Trạng thái nguồn chỉ được cập nhật khi cả lượt thành công,
- * nên lượt lỗi sẽ được lượt sau đọc lại từ đúng chỗ cũ.
+ * Idempotent by (source_id, external_id): running again, running twice, or being killed midway
+ * never produces extra records. Source state is updated only when the whole run succeeds,
+ * so a failed run is read again from the same place by the next run.
  */
 import {
   canonicalizeUrl,
@@ -23,7 +23,7 @@ export interface FetchDeps {
   store: ObjectStore;
   http: HttpClient;
   now?: () => Date;
-  /** Cho test thay adapter thật bằng adapter giả. */
+  /** For tests: replace the real adapter with a fake one. */
   resolveAdapter?: typeof adapterFor;
 }
 
@@ -33,7 +33,7 @@ export interface FetchOutcome {
   nFetched: number;
   nNew: number;
   error?: string;
-  /** Lượt dừng trước khi bắt kịp hiện tại; lượt sau đọc tiếp. */
+  /** A run stops before catching up to the present; the next run continues reading. */
   behind?: string;
 }
 
@@ -101,14 +101,14 @@ export async function runFetch(sourceId: number, deps: FetchDeps): Promise<Fetch
         target: sourceState.sourceId,
         set: { lastErrorAt: now, failCount: sql`${sourceState.failCount} + 1` },
       });
-    // Ném lại để pg-boss tính là lỗi và retry theo cấu hình của queue.
+    // Rethrow so pg-boss counts it as a failure and retries per the queue config.
     throw err;
   }
 }
 
 /**
- * Chỉ ghi bản thô cho mục chưa có: một lượt HN trả về cả mục đã thấy (vì có khoảng lùi),
- * không cần nén và ghi lại chúng.
+ * Only writes the raw copy for items not yet stored: an HN run returns items already seen (because of the look-back window),
+ * so there is no need to compress and rewrite them.
  */
 async function storeItems(
   sourceId: number,
@@ -153,11 +153,11 @@ async function storeItems(
 }
 
 /**
- * Hẹn lại một lượt fetch bị giới hạn tốc độ (HTTP 429). Cấu hình retry của queue (30 giây, 1
- * phút, 2 phút) thử lại quá sớm: lần 30/10/2026 arXiv trả 429 cả bốn lượt trong 5 phút. Nên 429
- * không ném lỗi cho pg-boss mà hẹn một job mới sau 15, 30, 60, 120 phút (hoặc `Retry-After` nếu
- * server đòi lâu hơn); hết bậc thì ném lỗi như mọi lỗi khác. Trả về số giây chờ, hoặc `null`
- * nếu không phải 429 hay đã hết bậc (người gọi ném lại lỗi).
+ * Reschedules a fetch run that was rate-limited (HTTP 429). The queue's retry config (30 seconds, 1
+ * minute, 2 minutes) retries too early: on 30/10/2026 arXiv returned 429 on all four runs within 5 minutes. So a 429
+ * does not throw an error to pg-boss; instead it schedules a new job after 15, 30, 60, 120 minutes (or `Retry-After` if the
+ * server asks for longer); when the steps run out it throws an error like any other. Returns the seconds to wait, or `null`
+ * if it is not a 429 or the steps are exhausted (the caller rethrows the error).
  */
 export const RATE_LIMIT_STEPS_MIN = [15, 30, 60, 120] as const;
 export function rateLimitDelaySeconds(err: unknown, attempt: number): number | null {

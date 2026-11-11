@@ -1,36 +1,36 @@
 /**
- * Đọc dữ liệu cho bộ chấm bất biến (a) từ DB. Hai lớp tách riêng:
- *   1. các câu truy vấn (`queryDeliveries`, `queryLatestFeedback`, `queryUrls`) trả dòng thô;
- *   2. `buildDays` dựng mẫu từ dòng thô, thuần, không chạm DB.
- * Lọc theo hồ sơ/người nhận nằm ở lớp 1 (`EvalFilter`).
+ * Reads data for the invariant checker (a) from the DB. Two layers, kept separate:
+ *   1. the queries (`queryDeliveries`, `queryLatestFeedback`, `queryUrls`) return raw rows;
+ *   2. `buildDays` builds samples from raw rows, purely, without touching the DB.
+ * Filtering by profile/recipient happens in layer 1 (`EvalFilter`).
  */
 
 import type { EvalDay, EvalSample, Level, StoredScore } from "@radard/core";
 import { type Database, deliveries, digests, documents, feedback } from "@radard/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-/** Bộ lọc tuỳ chọn; để trống = mọi người nhận. */
+/** Optional filter; empty = every recipient. */
 export interface EvalFilter {
-  /** Chỉ lấy tin của hồ sơ này (`digests.profile_id`). */
+  /** Only take items of this profile (`digests.profile_id`). */
   profileId?: number;
   channel?: string;
   recipient?: string;
 }
 
-/** Một tin sự kiện đã gửi, kèm plan của digest chứa nó. */
+/** One sent event item, with the plan of the digest that contains it. */
 export interface RawDelivery {
   deliveryId: number;
   digestId: number;
   periodEnd: Date;
   position: number;
   documentIds: number[];
-  /** `digests.meta` nguyên khối; chỉ `plan.items` được đọc. */
+  /** `digests.meta` as a whole; only `plan.items` is read. */
   digestMeta: Record<string, unknown>;
 }
 
 export type FeedbackKind = "like" | "dislike" | "clear";
 
-/** Dòng phản hồi MỚI NHẤT của mỗi delivery (chỉ like/dislike/clear). */
+/** The LATEST feedback row of each delivery (only like/dislike/clear). */
 export type LatestFeedback = ReadonlyMap<number, FeedbackKind>;
 
 export async function queryDeliveries(
@@ -69,7 +69,7 @@ export async function queryDeliveries(
   return out;
 }
 
-/** Dòng mới nhất của mỗi delivery theo (created_at, id lớn hơn thắng); `comment` bị bỏ qua. */
+/** The newest row of each delivery by (created_at, larger id wins); `comment` is ignored. */
 export async function queryLatestFeedback(
   db: Database,
   deliveryIds: readonly number[],
@@ -117,7 +117,7 @@ const VN_DAY = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-/** Ngày YYYY-MM-DD của một thời điểm theo giờ Việt Nam. */
+/** The YYYY-MM-DD date of a moment in Vietnam time. */
 export const vnDay = (d: Date): string => VN_DAY.format(d);
 
 export function levelOf(kind: FeedbackKind | undefined): Level {
@@ -138,7 +138,7 @@ function storedScore(x: unknown): StoredScore | null {
   return out;
 }
 
-/** `position` → điểm đã lưu của các item trong plan. */
+/** `position` → saved score of the items in the plan. */
 function planScores(meta: Record<string, unknown>): Map<number, StoredScore> {
   const out = new Map<number, StoredScore>();
   const plan = meta.plan;
@@ -156,11 +156,11 @@ function planScores(meta: Record<string, unknown>): Map<number, StoredScore> {
 
 export interface BuiltDays {
   days: EvalDay[];
-  /** Tin bị bỏ vì plan không có item/điểm tương ứng (plan cũ hoặc hỏng). */
+  /** Items dropped because the plan has no matching item/score (old or broken plan). */
   skipped: number;
 }
 
-/** Dựng các ngày từ dòng thô. Thuần: không chạm DB. */
+/** Builds the days from raw rows. Pure: does not touch the DB. */
 export function buildDays(
   rows: readonly RawDelivery[],
   latest: LatestFeedback,
@@ -201,7 +201,7 @@ export function buildDays(
   return { days, skipped };
 }
 
-/** Đọc DB rồi dựng các ngày. */
+/** Reads the DB, then builds the days. */
 export async function loadDays(db: Database, filter: EvalFilter = {}): Promise<BuiltDays> {
   const rows = await queryDeliveries(db, filter);
   const latest = await queryLatestFeedback(

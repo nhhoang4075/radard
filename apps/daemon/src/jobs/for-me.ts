@@ -1,12 +1,12 @@
 /**
- * "Với tôi?" (quyết định 11/11/2026, mo-hinh-de-xuat.html): bấm vào một tin thì model nói tin này có
- * ý nghĩa gì với CHÍNH người đọc, dựa trên hồ sơ thật (mô tả, bối cảnh, chủ đề đang bật, vài tin đã 👍).
- * Tách khỏi tóm tắt chung để tóm tắt không phải đoán "vì sao đáng chú ý với bạn" cho mọi tin.
+ * "For me?" (decision 11/11/2026, mo-hinh-de-xuat.html): tap an item and the model says what this item means
+ * for the READER themself, based on the real profile (description, context, enabled topics, a few 👍 items).
+ * Separated from the shared summary so the summary does not have to guess "why it is notable for you" for every item.
  *
- * Phân quyền (fail-closed): sự kiện phải nằm trong `feed_items` của CHÍNH hồ sơ (lọc theo `profile_id`),
- * không thì trả `not_found` và không gọi model. Hạn mức mỗi hồ sơ mỗi ngày (VN); cache hit không tính.
- * Chống đua: hai lượt cùng (hồ sơ, sự kiện) cùng lúc dùng chung MỘT lời gọi model (trong tiến trình);
- * `event_for_profile` có khoá duy nhất nên hai tiến trình đua nhau vẫn chỉ giữ một dòng.
+ * Authorization (fail-closed): the event must be in `feed_items` of the SAME profile (filtered by `profile_id`),
+ * otherwise return `not_found` and do not call the model. Daily quota per profile (VN); cache hits are not counted.
+ * Race protection: two calls for the same (profile, event) at once share ONE model call (in process);
+ * `event_for_profile` has a unique key, so two processes racing still keep only one row.
  */
 import { createLogger, type LlmProvider, sha256 } from "@radard/core";
 import { type Database, eventForProfile, feedItems, profile } from "@radard/db";
@@ -17,9 +17,9 @@ import { docsForSummary, LANG_NAMES, loadSummariesById } from "./summaries.ts";
 
 const log = createLogger("for-me");
 
-/** Hạn mức mặc định: số câu "Với tôi?" mỗi hồ sơ được nhờ model viết mỗi ngày. Đổi qua `FOR_ME_DAILY_LIMIT`. */
+/** Default quota: number of "For me?" answers per profile the model may write per day. Changed via `FOR_ME_DAILY_LIMIT`. */
 export const DEFAULT_FOR_ME_DAILY_LIMIT = 100;
-/** Số tin đã 👍 gần nhất đưa cho model. */
+/** Number of most recent 👍 items given to the model. */
 const LIKED_TITLES = 10;
 const FOR_ME_MAX_OUTPUT_TOKENS = 2000;
 const VN_OFFSET_MS = 7 * 3_600_000;
@@ -27,28 +27,28 @@ const VN_OFFSET_MS = 7 * 3_600_000;
 export interface ForMeDeps {
   db: Database;
   llm: LlmProvider | null;
-  /** Mặc định `DEFAULT_FOR_ME_DAILY_LIMIT`. */
+  /** Default `DEFAULT_FOR_ME_DAILY_LIMIT`. */
   dailyLimit?: number;
-  /** Đồng hồ, tiêm vào để test. */
+  /** Clock, injected for tests. */
   now?: () => Date;
 }
 
 export type ForMeOutcome =
   | { status: "ok"; text: string; cached: boolean }
-  /** Sự kiện không có trong feed của hồ sơ này (hoặc hồ sơ không tồn tại). */
+  /** The event is not in this profile's feed (or the profile does not exist). */
   | { status: "not_found" }
-  /** Hết hạn mức ngày. */
+  /** Daily quota exhausted. */
   | { status: "limit" }
-  /** Chưa cấu hình model, hoặc model lỗi / trả rỗng. */
+  /** Model not configured, or the model failed / returned empty. */
   | { status: "unavailable" };
 
-/** 00:00 giờ VN của ngày chứa `now`, dạng thời điểm UTC. */
+/** 00:00 Vietnam time of the day containing `now`, as a UTC timestamp. */
 export function vnDayStart(now: Date): Date {
   const vn = new Date(now.getTime() + VN_OFFSET_MS);
   return new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - VN_OFFSET_MS);
 }
 
-/** Băm bối cảnh hồ sơ cho cache; KHÔNG gồm tin đã thích (để cache ổn định). */
+/** Hashes the profile context for the cache; does NOT include liked items (so the cache is stable). */
 export function contextHashOf(p: {
   description: string | null;
   promptContext: string;
@@ -101,7 +101,7 @@ export function forMePrompt(i: {
   ].join("\n");
 }
 
-/** Tiêu đề các tin hồ sơ đã 👍 gần nhất (nhãn mới nhất của mỗi tin là like; bỏ 👎 và bỏ chọn). */
+/** Titles of the profile's most recent 👍 items (the newest label of each item is like; 👎 and unselect are dropped). */
 async function recentLikedTitles(db: Database, profileId: number): Promise<string[]> {
   const rows = await db.execute<{ title: string }>(sql`
     select title from (
@@ -120,11 +120,11 @@ async function recentLikedTitles(db: Database, profileId: number): Promise<strin
     where kind = 'like' and title is not null
     order by created_at desc, id desc
     limit ${LIKED_TITLES}`);
-  // Tiêu đề tin đã gửi có số thứ tự đầu dòng ("3. …"): bỏ.
+  // Titles of sent items with a leading numbering ("3. …") are dropped.
   return rows.map((r) => r.title.replace(/^\d+\.\s+/, ""));
 }
 
-/** Còn hạn mức hôm nay không (số câu đã lưu từ 00:00 VN + số lời gọi đang chạy của hồ sơ < hạn mức). */
+/** Whether there is quota left today (answers saved since 00:00 VN + the profile's running calls < quota). */
 async function withinLimit(deps: ForMeDeps, profileId: number): Promise<boolean> {
   const limit = deps.dailyLimit ?? DEFAULT_FOR_ME_DAILY_LIMIT;
   const since = vnDayStart((deps.now ?? (() => new Date()))());
@@ -132,14 +132,14 @@ async function withinLimit(deps: ForMeDeps, profileId: number): Promise<boolean>
     .select({ n: sql<number>`count(*)::int` })
     .from(eventForProfile)
     .where(and(eq(eventForProfile.profileId, profileId), gte(eventForProfile.createdAt, since)));
-  // `inflightByProfile` đã gồm cả lượt này (cộng ngay sau khi tạo lời hứa), nên trừ 1.
+  // `inflightByProfile` already includes this call (added right after creating the promise), so subtract 1.
   const active = (inflightByProfile.get(profileId) ?? 1) - 1;
   return (used?.n ?? 0) + active < limit;
 }
 
-/** Đang chờ model theo (hồ sơ, sự kiện, ngôn ngữ, bối cảnh): lượt thứ hai dùng chung kết quả. */
+/** Pending model call for (profile, event, language, context): a second call shares the result. */
 const inflight = new Map<string, Promise<ForMeOutcome>>();
-/** Số lời gọi đang chạy của mỗi hồ sơ, cộng vào số đã dùng để hạn mức không bị vượt khi bấm dồn. */
+/** Number of running calls per profile, added to the used count so the quota is not exceeded on rapid taps. */
 const inflightByProfile = new Map<number, number>();
 
 export async function explainForProfile(
@@ -147,7 +147,7 @@ export async function explainForProfile(
   q: { profileId: number; eventId: number },
 ): Promise<ForMeOutcome> {
   const { db } = deps;
-  // 1. Phân quyền: tin phải thuộc feed của CHÍNH hồ sơ. Chưa qua bước này thì không đọc gì thêm.
+  // 1. Authorization: the item must belong to the feed of the SAME profile. Nothing else is read before this step.
   const [item] = await db
     .select()
     .from(feedItems)
@@ -173,11 +173,11 @@ export async function explainForProfile(
   );
   const lookup = async () => (await db.select().from(eventForProfile).where(where))[0];
 
-  // 2. Cache hit: không gọi model, không tính hạn mức.
+  // 2. Cache hit: no model call, quota not counted.
   const hit = await lookup();
   if (hit) return { status: "ok", text: hit.text, cached: true };
 
-  // 3. Chống đua: lượt cùng khoá đang chờ model thì dùng chung kết quả.
+  // 3. Race protection: a call with the same key that is pending in the model shares its result.
   const key = `${q.profileId}|${q.eventId}|${lang}|${contextHash}`;
   const running = inflight.get(key);
   if (running) {
@@ -233,7 +233,7 @@ export async function explainForProfile(
         model: llm.model,
       })
       .onConflictDoNothing();
-    // Hai tiến trình đua nhau: giữ dòng đã có, bỏ câu của mình.
+    // Two processes racing: keep the row already there, drop our own answer.
     return { status: "ok", text: (await lookup())?.text ?? text, cached: false };
   })();
   inflight.set(key, work);
