@@ -113,6 +113,7 @@ async function seedItems(
       )[0]?.id ?? 0;
     const docIds = [await mk(1, srcHn, "hn.test")];
     if (i === 2) docIds.push(await mk(2, srcArxiv, "arxiv.test"));
+    if (i === 4) docIds.push(await mk(2, srcHn, "hn.test")); // một nguồn, hai bài
     let summaryId: number | null = null;
     if (i === 1) {
       summaryId =
@@ -265,6 +266,7 @@ describe("GET /api/feed", () => {
       summary: "Tóm tắt chung a1",
       topic: "Agent AI",
       sourceCount: 1,
+      articleCount: 1,
       sources: ["HN"],
       updated: false,
       inDigest: false,
@@ -277,6 +279,7 @@ describe("GET /api/feed", () => {
       summary: null,
       topic: "Agent AI",
       sourceCount: 2,
+      articleCount: 2,
       sources: ["HN", "arXiv"],
       updated: true,
       inDigest: false,
@@ -288,6 +291,11 @@ describe("GET /api/feed", () => {
       notifyPosition: 1,
       updated: false,
     });
+  });
+
+  test("một nguồn nhiều bài: sourceCount = 1, articleCount = 2", async () => {
+    const j = await (await get("/api/feed", hA)).json();
+    expect(j.items[3]).toMatchObject({ sources: ["HN"], sourceCount: 1, articleCount: 2 });
   });
 
   test("phân trang theo cursor đủ K tin; hết thì nextCursor = null", async () => {

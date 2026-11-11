@@ -337,7 +337,10 @@ export interface FeedItemView {
   title: string;
   summary: string | null;
   topic: string | null;
+  /** Số tên nguồn khác nhau (= sources.length). */
   sourceCount: number;
+  /** Số bài khác nhau (distinct url_canonical). */
+  articleCount: number;
   sources: string[];
   updated: boolean;
   inDigest: boolean;
@@ -398,7 +401,8 @@ async function decorate(
       title: r.title,
       summary: r.summaryId === null ? null : (summaryText.get(r.summaryId) ?? null),
       topic: r.topicId === null ? null : (topicName.get(r.topicId) ?? null),
-      sourceCount: new Set(docs.map((d) => d.urlCanonical)).size,
+      sourceCount: new Set(docs.map((d) => d.sourceName)).size,
+      articleCount: new Set(docs.map((d) => d.urlCanonical)).size,
       sources: [...new Set(docs.map((d) => d.sourceName))],
       updated: r.n < 1,
       inDigest: r.notifyPosition !== null,
