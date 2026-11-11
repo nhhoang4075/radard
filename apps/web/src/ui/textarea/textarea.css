@@ -1,0 +1,21 @@
+.rd-textarea {
+  width: 100%;
+  min-height: 104px;
+  border: 1px solid var(--rd-color-border-strong);
+  border-radius: var(--rd-control-radius);
+  padding: 10px 12px;
+  font-family: var(--rd-font-serif);
+  font-size: 15.5px;
+  line-height: 1.5;
+  resize: vertical;
+  background: var(--rd-color-surface-panel);
+  color: var(--rd-color-text);
+  outline: 0;
+  transition: border-color var(--rd-duration-fast);
+}
+.rd-textarea:hover {
+  border-color: var(--rd-color-text-subtle);
+}
+.rd-textarea:focus {
+  border-color: var(--rd-color-action);
+}

@@ -1,12 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { requireSession, SessionError } from "../features/auth/require-session.tsx";
 import { useSession } from "../features/auth/use-session.ts";
 import { authClient } from "../lib/api.ts";
 import { strings } from "../lib/strings.vi.ts";
+import { AppShell } from "../shell/app-shell.tsx";
+import { Button } from "../ui/index.ts";
 
-// Trang trống sau đăng nhập (placeholder): tên người dùng và nút đăng xuất. Feed làm ở đợt sau.
-function HomePage() {
+// Khung đã đăng nhập: app shell + chân sidebar (tên, đăng xuất). Trang con render trong <Outlet/>.
+function Layout() {
   const { data } = useSession();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -16,18 +18,24 @@ function HomePage() {
     await navigate({ to: "/login" });
   };
   return (
-    <main className="page">
-      <h1>{strings.appName}</h1>
-      <p>{strings.home.hello(data?.name ?? "")}</p>
-      <button type="button" onClick={() => void onSignOut()}>
-        {strings.home.signOut}
-      </button>
-    </main>
+    <AppShell
+      crumb={strings.nav.items.feed}
+      sidebarFooter={
+        <>
+          <div>{data?.name ?? ""}</div>
+          <Button variant="ghost" size="sm" onClick={() => void onSignOut()}>
+            {strings.home.signOut}
+          </Button>
+        </>
+      }
+    >
+      <Outlet />
+    </AppShell>
   );
 }
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_app")({
   beforeLoad: ({ context }) => requireSession(context.queryClient),
   errorComponent: SessionError,
-  component: HomePage,
+  component: Layout,
 });

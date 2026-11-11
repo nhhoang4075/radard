@@ -1,0 +1,8 @@
+.rd-tooltip {
+  z-index: var(--rd-z-overlay);
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--rd-color-action);
+  color: var(--rd-color-action-text);
+  font-size: 12.5px;
+}

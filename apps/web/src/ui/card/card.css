@@ -1,0 +1,5 @@
+.rd-card {
+  background: var(--rd-color-surface-panel);
+  border: 1px solid var(--rd-color-border);
+  border-radius: var(--rd-radius-lg);
+}

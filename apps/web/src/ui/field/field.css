@@ -1,0 +1,39 @@
+.rd-field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  height: var(--rd-control-height);
+  border: 1px solid var(--rd-color-border-strong);
+  border-radius: var(--rd-control-radius);
+  padding: 0 12px;
+  background: var(--rd-color-surface-panel);
+  transition: border-color var(--rd-duration-fast);
+}
+.rd-field:hover {
+  border-color: var(--rd-color-text-subtle);
+}
+.rd-field:focus-within {
+  border-color: var(--rd-color-action);
+}
+.rd-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  font-size: 14.5px;
+  background: none;
+}
+.rd-field svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--rd-color-text-subtle);
+}
+.rd-field-help {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--rd-color-text-muted);
+}
