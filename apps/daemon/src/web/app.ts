@@ -1,8 +1,11 @@
 /**
  * Máy chủ HTTP (Hono) của vai trò `web`.
  *
- *   GET /healthz  → 200
- *   GET /o/:token → ghi lượt mở rồi 302 tới URL lấy từ DB
+ *   GET /healthz   → 200
+ *   GET /o/:token  → ghi lượt mở rồi 302 tới URL lấy từ DB
+ *   /api/auth/*    → Better Auth (đăng nhập GitHub/Google, phiên)
+ *   /api/*         → API Hono; mọi route trừ `providers` đi qua `sessionMiddleware` (401/403)
+ *   còn lại        → file build của `apps/web` (SPA fallback), cùng origin nên cookie phiên đơn giản
  *
  * Fail-closed: không có `LINK_SECRET` thì `/o/*` luôn 404. URL đích chỉ lấy từ `deliveries.meta`,
  * không bao giờ từ request. Mọi lỗi (token sai, không tìm thấy, URL lạ) đều là 404 trơn, không nêu lý do.
@@ -11,6 +14,11 @@ import { createLogger } from "@radard/core";
 import { type Database, deliveries } from "@radard/db";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import type { Auth } from "./auth.ts";
+import type { SocialProviderId } from "./auth-config.ts";
+import { type SessionEnv, sessionMiddleware } from "./middleware/session.ts";
+import { meRoute } from "./routes/me.ts";
+import { createStaticHandler, DEFAULT_WEB_DIST } from "./static.ts";
 import { verifyToken } from "./token.ts";
 
 const log = createLogger("web");
@@ -21,6 +29,10 @@ export interface WebOptions {
   db: Database;
   /** `LINK_SECRET`; thiếu thì `/o/*` trả 404. */
   secret: string | undefined;
+  /** Đăng nhập; thiếu (cấu hình chưa đủ) thì mọi `/api/*` trả 503, các route khác vẫn chạy. */
+  auth?: { auth: Auth; providers: SocialProviderId[] } | null;
+  /** Thư mục build của `apps/web`; mặc định `apps/web/dist`. */
+  webDist?: string;
   /** Đồng hồ, tiêm vào để test giả lập thời gian. */
   now?: () => Date;
 }
@@ -83,6 +95,19 @@ export async function recordLinkOpen(
   });
 }
 
+/**
+ * API dưới `/api`. `providers` là route công khai duy nhất; `sessionMiddleware` đứng ngay sau nó nên
+ * mọi route thêm sau (qua `.route(...)` bên dưới) đều bị 401/403 khi chưa có phiên và hồ sơ.
+ * Giữ ở dạng một chuỗi gọi liền để `AppType` suy ra được cho client `hc` của `apps/web`.
+ */
+export function buildApi(deps: { db: Database; auth: Auth; providers: SocialProviderId[] }) {
+  return new Hono<SessionEnv>()
+    .get("/providers", (c) => c.json({ providers: deps.providers }))
+    .use("*", sessionMiddleware(deps))
+    .route("/me", meRoute);
+}
+export type AppType = ReturnType<typeof buildApi>;
+
 export function createWebApp(opts: WebOptions) {
   const { db, secret } = opts;
   const now = opts.now ?? (() => new Date());
@@ -136,6 +161,19 @@ export function createWebApp(opts: WebOptions) {
       headers: { Location: target, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" },
     });
   });
+
+  // --- API và đăng nhập. Thứ tự đăng ký quan trọng: route công khai trước, `requireProfile` sau. ---
+  const { auth } = opts;
+  if (auth) {
+    const authHandler = auth.auth.handler;
+    app.on(["GET", "POST"], "/api/auth/*", (c) => authHandler(c.req.raw));
+    app.route("/api", buildApi({ db, auth: auth.auth, providers: auth.providers }));
+  } else {
+    app.all("/api/*", (c) => c.json({ error: "auth_not_configured" }, 503));
+  }
+  app.all("/api/*", (c) => c.json({ error: "not_found" }, 404));
+
+  app.all("*", createStaticHandler(opts.webDist ?? DEFAULT_WEB_DIST));
 
   return {
     app,

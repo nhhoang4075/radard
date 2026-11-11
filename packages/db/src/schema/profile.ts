@@ -20,6 +20,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { user } from "./auth.ts";
 import { EMBED_DIMENSIONS } from "./derived.ts";
 
 /**
@@ -36,6 +37,13 @@ export const profile = pgTable("profile", {
   /** Lời người dùng tự viết về mình; không dùng trong prompt. */
   description: text("description"),
   displayLang: text("display_lang").notNull().default("vi"),
+  /**
+   * Tài khoản đăng nhập web của hồ sơ (`user.id`). Duy nhất: một user một hồ sơ. Trống cho tới khi
+   * người đó đăng nhập lần đầu (hồ sơ 1 của chủ dự án được nối qua `OWNER_EMAIL`).
+   */
+  userId: text("user_id")
+    .unique()
+    .references(() => user.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
 });
 

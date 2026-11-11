@@ -35,6 +35,23 @@ export const env = {
   linkSecret: process.env.LINK_SECRET || undefined,
   /** Địa chỉ công khai của vai trò `web` (ví dụ https://radard.example.com); cùng `linkSecret` bật link theo dõi. */
   publicBaseUrl: process.env.PUBLIC_BASE_URL || undefined,
+  /**
+   * Đăng nhập web (Better Auth). Thiếu `BETTER_AUTH_SECRET` hoặc `BETTER_AUTH_URL` thì đăng nhập tắt
+   * (`/api/*` trả 503), daemon vẫn chạy. Kiểm bằng zod ở `web/auth-config.ts`.
+   */
+  auth: {
+    secret: process.env.BETTER_AUTH_SECRET || undefined,
+    baseURL:
+      process.env.BETTER_AUTH_URL ||
+      (process.env.NODE_ENV === "production"
+        ? undefined
+        : `http://localhost:${num(process.env.PORT, 8080)}`),
+    ownerEmail: process.env.OWNER_EMAIL || undefined,
+    githubClientId: process.env.GITHUB_CLIENT_ID || undefined,
+    githubClientSecret: process.env.GITHUB_CLIENT_SECRET || undefined,
+    googleClientId: process.env.GOOGLE_CLIENT_ID || undefined,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || undefined,
+  },
   fetchConcurrency: num(process.env.FETCH_CONCURRENCY, 4),
 
   /**

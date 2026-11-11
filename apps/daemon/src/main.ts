@@ -4,7 +4,7 @@
  *   scheduler  đồng bộ lịch cron (chỉ chạy MỘT bản)
  *   worker     chạy job, nhân bản được
  *   bot        nhận lượt bấm 👍/👎 (chỉ MỘT bản cho mỗi bot token)
- *   web        máy chủ HTTP: /healthz và /o/:token (theo dõi lượt mở link)
+ *   web        máy chủ HTTP: /healthz, /o/:token (theo dõi lượt mở link), /api (đăng nhập) và giao diện web
  *   all        cả bốn, dùng khi dev và trên Railway ở MVP-0
  */
 import { createLogger } from "@radard/core";
@@ -70,7 +70,12 @@ async function main(): Promise<void> {
     } else log.warn("vai trò bot tắt: chưa đặt TELEGRAM_BOT_TOKEN");
   }
   if (runsWeb) {
-    const stopWeb = startWeb({ db: deps.db, port: env.port, secret: env.linkSecret });
+    const stopWeb = startWeb({
+      db: deps.db,
+      port: env.port,
+      secret: env.linkSecret,
+      auth: env.auth,
+    });
     stops.push(stopWeb);
   }
   log.info("đang chạy", { role: env.role });

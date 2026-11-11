@@ -75,6 +75,8 @@ import {
   createProcessDeps,
 } from "./runtime.ts";
 import { DEFAULT_PROFILE, DEFAULT_SOURCES } from "./sources/index.ts";
+import { normalizeEmail } from "./web/email.ts";
+import { addInvite, listInvites, revokeInvite } from "./web/invites.ts";
 
 const USAGE = `
 radard — CLI
@@ -109,6 +111,11 @@ radard — CLI
                              Nối người nhận với một hồ sơ (vd: channels add 1 telegram <chat_id>);
                              chạy lại không đổi gì. Chưa có dòng nào thì digest không gửi ai và bot
                              từ chối mọi chat
+
+  invites                    Danh sách email được mời đăng nhập web
+  invites add <email>        Mời một email (chữ thường); chạy lại không đổi gì
+  invites revoke <email>     Thu hồi: xoá lời mời chưa dùng và xoá tài khoản web cùng email (phiên hết
+                             hiệu lực, hồ sơ và dữ liệu giữ nguyên); không áp dụng cho OWNER_EMAIL
 
   topics                     Thư viện chủ đề (✓ = đã chọn) và chủ đề của bạn
   topics seed                Nạp/cập nhật thư viện chủ đề từ code
@@ -497,6 +504,25 @@ const COMMANDS: Record<string, Command> = {
     const added = await seedProfileChannel(db, { profileId, channel, recipient });
     if (!added && owner === null) throw new Error(`không có hồ sơ ${profileId}`);
     console.log(added ? "đã thêm" : "đã có sẵn, không đổi");
+  },
+
+  invites: async ({ db }) => {
+    const rows = await listInvites(db);
+    console.table(rows.map((r) => ({ email: r.email, mời_lúc: r.createdAt, dùng_lúc: r.usedAt })));
+  },
+
+  "invites add": async ({ db }) => {
+    const res = await addInvite(db, process.argv[4] ?? "");
+    console.log(res.added ? `đã mời ${res.email}` : `${res.email} đã được mời, không đổi`);
+  },
+
+  "invites revoke": async ({ db }) => {
+    const r = await revokeInvite(db, normalizeEmail(env.auth.ownerEmail), process.argv[4] ?? "");
+    const invite = r.inviteRemoved ? "đã xoá lời mời chưa dùng" : "không có lời mời chưa dùng";
+    const usr = r.userRemoved
+      ? "đã xoá tài khoản web (phiên hết hiệu lực, hồ sơ giữ nguyên)"
+      : "không có tài khoản web";
+    console.log(`${r.email}: ${invite}; ${usr}`);
   },
 
   "notify test": async ({ db }) => {

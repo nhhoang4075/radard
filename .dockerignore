@@ -8,3 +8,4 @@ data
 docs
 *.log
 .DS_Store
+**/dist

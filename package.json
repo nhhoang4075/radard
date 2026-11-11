@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "bun apps/daemon/src/main.ts",
     "cli": "bun apps/daemon/src/cli.ts",
+    "web:dev": "bun run --cwd apps/web dev",
+    "web:build": "bun run --cwd apps/web build",
     "check": "bun run typecheck && bun run lint && bun test",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "biome check .",

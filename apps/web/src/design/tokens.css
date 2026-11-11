@@ -1,0 +1,11 @@
+/* PLACEHOLDER tối thiểu cho khung đăng nhập. Phiên giao diện (radard-ui) thay thế bằng token thật.
+   Nơi duy nhất được có mã màu thô; chỉ giao diện sáng. */
+:root {
+  color-scheme: light;
+  --rd-bg: #ffffff;
+  --rd-text: #1a1a1a;
+  --rd-muted: #5c5c5c;
+  --rd-error: #a31515;
+  --rd-border: #1a1a1a;
+  --rd-hover: #f0f0f0;
+}

@@ -1,0 +1,41 @@
+/* PLACEHOLDER tối thiểu (xem tokens.css). */
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--rd-bg);
+  color: var(--rd-text);
+}
+
+.page {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.muted {
+  color: var(--rd-muted);
+}
+
+.error {
+  color: var(--rd-error);
+}
+
+button {
+  font: inherit;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--rd-border);
+  border-radius: 6px;
+  background: var(--rd-bg);
+  color: var(--rd-text);
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--rd-hover);
+}
