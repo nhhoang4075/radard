@@ -32,21 +32,21 @@ export function keysToDelete(keys: string[], keep: number): string[] {
 
 function need(name: string): string {
   const v = process.env[name];
-  if (!v) throw new Error(`thiếu biến môi trường ${name}`);
+  if (!v) throw new Error(`missing environment variable ${name}`);
   return v;
 }
 
 async function run(cmd: string[]): Promise<string> {
   const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "inherit" });
   const out = await new Response(p.stdout).text();
-  if ((await p.exited) !== 0) throw new Error(`${cmd[0]} thoát với mã ${p.exitCode}`);
+  if ((await p.exited) !== 0) throw new Error(`${cmd[0]} exited with code ${p.exitCode}`);
   return out;
 }
 
 async function main() {
   const prefix = process.env.BACKUP_PREFIX ?? "backup/";
   const keep = Number(process.env.BACKUP_KEEP ?? DEFAULT_KEEP);
-  if (!Number.isInteger(keep) || keep < 1) throw new Error("BACKUP_KEEP phải là số nguyên ≥ 1");
+  if (!Number.isInteger(keep) || keep < 1) throw new Error("BACKUP_KEEP must be an integer >= 1");
   const s3 = new S3Client({
     endpoint: need("R2_ENDPOINT"),
     bucket: need("R2_BUCKET"),
@@ -58,18 +58,18 @@ async function main() {
   const key = `${prefix}${name}`;
   const file = `/tmp/${name}`;
 
-  process.stdout.write(`sao lưu bắt đầu key=${key}\n`);
+  process.stdout.write(`backup started key=${key}\n`);
   await run(["pg_dump", "-Fc", "--no-owner", `--dbname=${need("DATABASE_URL")}`, "-f", file]);
   const size = Bun.file(file).size;
   const toc = await run(["pg_restore", "-l", file]);
   const tables = toc.split("\n").filter((l) => l.includes("TABLE DATA")).length;
   if (size === 0 || tables === 0)
-    throw new Error(`file dump không hợp lệ size=${size} tables=${tables}`);
+    throw new Error(`invalid dump file size=${size} tables=${tables}`);
 
   await s3.write(key, Bun.file(file));
   const remote = (await s3.stat(key)).size;
-  if (remote !== size) throw new Error(`kích thước trên R2 (${remote}) khác file local (${size})`);
-  process.stdout.write(`sao lưu đã lên R2 key=${key} bytes=${size} tables=${tables}\n`);
+  if (remote !== size) throw new Error(`size on R2 (${remote}) differs from local file (${size})`);
+  process.stdout.write(`backup uploaded to R2 key=${key} bytes=${size} tables=${tables}\n`);
 
   const keys: string[] = [];
   let token: string | undefined;
@@ -80,13 +80,13 @@ async function main() {
   } while (token);
   const old = keysToDelete(keys, keep);
   for (const k of old) await s3.delete(k);
-  process.stdout.write(`sao lưu xong giữ=${keys.length - old.length} xoá=${old.length}\n`);
+  process.stdout.write(`backup done kept=${keys.length - old.length} deleted=${old.length}\n`);
   await Bun.file(file).delete();
 }
 
 if (import.meta.main) {
   main().catch((err) => {
-    process.stderr.write(`sao lưu LỖI: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`backup ERROR: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   });
 }
