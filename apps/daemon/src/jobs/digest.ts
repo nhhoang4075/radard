@@ -17,7 +17,7 @@
 import {
   createLogger,
   type DecisionProvider,
-  FOR_ME_COPY,
+  FOR_ME_LABELS,
   type HttpClient,
   type Link,
   type LlmProvider,
@@ -71,8 +71,8 @@ const MAX_RELATED = 3;
 const ACTIONS: Message["actions"] = [
   { id: "like", label: "👍" },
   { id: "dislike", label: "👎" },
-  // Nhãn tạm, chủ dự án duyệt câu chữ: mọi chuỗi mới nằm ở FOR_ME_COPY (packages/core/src/copy.ts).
-  { id: "for_me", label: FOR_ME_COPY.button },
+  // Nhãn tạm, chủ dự án duyệt câu chữ: mọi chuỗi mới nằm ở FOR_ME_LABELS (packages/core/src/copy.ts).
+  { id: "for_me", label: FOR_ME_LABELS.button },
 ];
 
 /** Khung giờ gửi gần nhất không muộn hơn `now`: mốc kết thúc của khoảng 24 giờ. */

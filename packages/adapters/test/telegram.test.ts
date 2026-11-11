@@ -7,7 +7,7 @@ import {
   type ChatHandlers,
   type CustomTopicDraft,
   type FeedbackEvent,
-  FOR_ME_COPY,
+  FOR_ME_LABELS,
   type ForMeEvent,
   type ProfileSuggestions,
   type ProfileView,
@@ -149,7 +149,7 @@ describe("nút Với tôi?", () => {
   const actions = [
     { id: "like" as const, label: "👍" },
     { id: "dislike" as const, label: "👎" },
-    { id: "for_me" as const, label: FOR_ME_COPY.button },
+    { id: "for_me" as const, label: FOR_ME_LABELS.button },
   ];
 
   test("nằm cạnh 👍/👎, mang fm:ask (ASCII, ≤ 64 byte); chọn 👍 không đổi nút này", () => {
@@ -157,11 +157,11 @@ describe("nút Với tôi?", () => {
       [
         { text: "👍", callback_data: "fb:like" },
         { text: "👎", callback_data: "fb:dislike" },
-        { text: FOR_ME_COPY.button, callback_data: "fm:ask" },
+        { text: FOR_ME_LABELS.button, callback_data: "fm:ask" },
       ],
     ]);
     expect(feedbackKeyboard(actions, "like").inline_keyboard[0]?.[2]).toEqual({
-      text: FOR_ME_COPY.button,
+      text: FOR_ME_LABELS.button,
       callback_data: "fm:ask",
     });
   });
@@ -191,7 +191,7 @@ describe("nút Với tôi?", () => {
     await bot.handleUpdate(press("fm:ask"));
     expect(asked).toEqual([{ channel: "telegram", recipient: ME, messageId: "58" }]);
     expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery", "sendMessage"]);
-    expect(calls[0]?.payload.text).toBe(FOR_ME_COPY.working);
+    expect(calls[0]?.payload.text).toBe(FOR_ME_LABELS.working);
     expect(calls[1]?.payload).toMatchObject({
       chat_id: Number(ME),
       text: "Câu trả lời.",
@@ -199,11 +199,11 @@ describe("nút Với tôi?", () => {
     });
   });
 
-  test("not_found / limit / unavailable và lỗi ném ra: báo bằng chuỗi trong FOR_ME_COPY", async () => {
+  test("not_found / limit / unavailable và lỗi ném ra: báo bằng chuỗi trong FOR_ME_LABELS", async () => {
     for (const [res, text] of [
-      [{ status: "not_found" }, FOR_ME_COPY.notFound],
-      [{ status: "limit" }, FOR_ME_COPY.limit],
-      [{ status: "unavailable" }, FOR_ME_COPY.unavailable],
+      [{ status: "not_found" }, FOR_ME_LABELS.notFound],
+      [{ status: "limit" }, FOR_ME_LABELS.limit],
+      [{ status: "unavailable" }, FOR_ME_LABELS.unavailable],
     ] as const) {
       const { bot, calls } = setup(async () => res);
       await bot.handleUpdate(press("fm:ask"));
@@ -213,7 +213,7 @@ describe("nút Với tôi?", () => {
       throw new Error("DB rớt");
     });
     await bot.handleUpdate(press("fm:ask"));
-    expect(calls.at(-1)?.payload.text).toBe(FOR_ME_COPY.unavailable);
+    expect(calls.at(-1)?.payload.text).toBe(FOR_ME_LABELS.unavailable);
   });
 
   test("lõi không hỗ trợ onForMe: chỉ trả lời callback; người lạ bấm: không gọi gì", async () => {

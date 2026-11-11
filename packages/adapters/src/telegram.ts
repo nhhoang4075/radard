@@ -17,7 +17,7 @@ import {
   type CustomTopicDraft,
   createLogger,
   type FeedbackKind,
-  FOR_ME_COPY,
+  FOR_ME_LABELS,
   type ForMeResult,
   type Link,
   type Message,
@@ -617,7 +617,7 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
       [
         { id: "like", label: LABELS.like },
         { id: "dislike", label: LABELS.dislike },
-        ...(hasForMe ? [{ id: "for_me" as const, label: FOR_ME_COPY.button }] : []),
+        ...(hasForMe ? [{ id: "for_me" as const, label: FOR_ME_LABELS.button }] : []),
       ],
       state === "none" ? undefined : state,
     );
@@ -632,7 +632,7 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
       return;
     }
     // Trả lời ngay để nút không quay vòng trong lúc model viết.
-    await ctx.answerCallbackQuery({ text: FOR_ME_COPY.working });
+    await ctx.answerCallbackQuery({ text: FOR_ME_LABELS.working });
     let res: ForMeResult;
     try {
       res = await handlers.onForMe({
@@ -650,10 +650,10 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
           ? `${res.text.slice(0, MAX_REPLY_CHARS)}…`
           : res.text
         : res.status === "not_found"
-          ? FOR_ME_COPY.notFound
+          ? FOR_ME_LABELS.notFound
           : res.status === "limit"
-            ? FOR_ME_COPY.limit
-            : FOR_ME_COPY.unavailable;
+            ? FOR_ME_LABELS.limit
+            : FOR_ME_LABELS.unavailable;
     await ctx.reply(text, {
       reply_parameters: { message_id: message.message_id },
       link_preview_options: { is_disabled: true },

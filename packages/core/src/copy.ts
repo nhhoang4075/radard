@@ -3,7 +3,7 @@
  * câu chữ (quyết định 11/11/2026: "câu chữ của hai nút và định dạng tin Telegram chủ dự án duyệt").
  * TẠM, CHƯA DUYỆT: đổi ở đây là đổi mọi nơi.
  */
-export const FOR_ME_COPY = {
+export const FOR_ME_LABELS = {
   /** Nhãn nút trong tin Telegram. */
   button: "Với tôi?",
   /** Hiện ngay khi bấm (trong lúc model viết). */

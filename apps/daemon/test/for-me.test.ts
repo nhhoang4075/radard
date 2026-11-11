@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeLlm } from "@radard/adapters/ai-fake";
 import { createTelegramRouter } from "@radard/adapters/telegram";
-import { FOR_ME_COPY } from "@radard/core";
+import { FOR_ME_LABELS } from "@radard/core";
 import {
   createDatabase,
   deliveries,
@@ -538,7 +538,7 @@ describe("Telegram thật: router + chatResolver + nút fm:ask", () => {
     const { bot, sent } = await setup(null);
     await bot.handleUpdate(press("100", "cb-1"));
     const reply = sent.find((c) => c.method === "sendMessage");
-    expect(reply?.payload.text).toBe(FOR_ME_COPY.unavailable);
+    expect(reply?.payload.text).toBe(FOR_ME_LABELS.unavailable);
     expect(await db.select().from(eventForProfile)).toHaveLength(0);
   });
 });
