@@ -53,6 +53,11 @@ export const env = {
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || undefined,
   },
   fetchConcurrency: num(process.env.FETCH_CONCURRENCY, 4),
+  /**
+   * Hạn mức "Với tôi?" (web và Telegram): số câu model viết cho mỗi hồ sơ mỗi ngày (giờ VN). Cache
+   * hit không tính (quyết định 11/11/2026).
+   */
+  forMeDailyLimit: num(process.env.FOR_ME_DAILY_LIMIT, 100),
 
   /**
    * `gateway` cần `AI_GATEWAY_API_KEY`; `fake` là embedding băm từ, chỉ để thử cơ chế

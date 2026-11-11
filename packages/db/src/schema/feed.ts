@@ -31,6 +31,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { jsonb } from "./json.ts";
 import { profile } from "./profile.ts";
+import { eventSummaries } from "./summaries.ts";
 
 export const feedSnapshots = pgTable(
   "feed_snapshots",
@@ -103,6 +104,13 @@ export const feedItems = pgTable(
      * báo chỉ đọc bản chụp, không ảnh hưởng việc chọn feed.
      */
     notifyPosition: integer("notify_position"),
+    /**
+     * Tóm tắt chung (`event_summaries`) đúng như lúc dựng bản chụp, ổn định dù sự kiện về sau có thêm
+     * bài. NULL khi chưa có (model lỗi hoặc chưa cấu hình): tin hiện bằng tiêu đề gốc.
+     */
+    summaryId: bigint("summary_id", { mode: "number" }).references(() => eventSummaries.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

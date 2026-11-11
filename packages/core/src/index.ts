@@ -1,4 +1,5 @@
 export * from "./ai.ts";
+export * from "./copy.ts";
 export * from "./eval/index.ts";
 export * from "./feed.ts";
 export * from "./floor.ts";

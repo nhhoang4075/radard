@@ -8,15 +8,19 @@ import {
   createLogger,
   type DecisionProvider,
   type EmbeddingProvider,
+  type ForMeEvent,
+  type ForMeResult,
   type LlmProvider,
   type ProfileHandlers,
   type SuggestedTopic,
   type TopicHandlers,
   type TopicItem,
 } from "@radard/core";
-import { type Database, profileOf } from "@radard/db";
+import { type Database, deliveries, profileOf } from "@radard/db";
+import { and, eq } from "drizzle-orm";
 import { runBaselines } from "../jobs/baselines.ts";
 import { recordFeedback } from "../jobs/feedback.ts";
+import { explainForProfile } from "../jobs/for-me.ts";
 import { scoreTopics } from "../jobs/process.ts";
 import { describeReader, readProfile, saveProfile } from "../jobs/profile.ts";
 import { suggestTopics } from "../jobs/topic-suggest.ts";
@@ -41,6 +45,8 @@ export interface BotDeps {
   llm: LlmProvider | null;
   /** Model ra quyết định: chấm thư viện khi gợi ý chủ đề (/profile). Thiếu thì không gợi ý được. */
   decider: DecisionProvider | null;
+  /** Hạn mức "Với tôi?" mỗi hồ sơ mỗi ngày (mặc định ở `for-me.ts`). */
+  forMeDailyLimit?: number;
 }
 
 /**
@@ -194,10 +200,40 @@ export function profileHandlers(
   };
 }
 
+/**
+ * Nút "Với tôi?" trên một tin Telegram. Tin phải là tin radard đã gửi cho CHÍNH hồ sơ này (tra
+ * `deliveries` theo kênh, người nhận, id tin VÀ `profile_id`); sự kiện của tin còn phải nằm trong feed
+ * của hồ sơ (kiểm lại ở `explainForProfile`). Không tìm thấy thì `not_found`, không gọi model.
+ */
+export async function forMeFor(deps: BotDeps, ev: ForMeEvent): Promise<ForMeResult> {
+  const [d] = await deps.db
+    .select({ eventId: deliveries.eventId })
+    .from(deliveries)
+    .where(
+      and(
+        eq(deliveries.channel, ev.channel),
+        eq(deliveries.recipient, ev.recipient),
+        eq(deliveries.messageId, ev.messageId),
+        eq(deliveries.profileId, deps.profileId),
+      ),
+    );
+  if (!d || d.eventId === null) return { status: "not_found" };
+  const r = await explainForProfile(
+    {
+      db: deps.db,
+      llm: deps.llm,
+      ...(deps.forMeDailyLimit === undefined ? {} : { dailyLimit: deps.forMeDailyLimit }),
+    },
+    { profileId: deps.profileId, eventId: d.eventId },
+  );
+  return r.status === "ok" ? { status: "ok", text: r.text } : { status: r.status };
+}
+
 /** Bộ xử lý của MỘT hồ sơ: mọi truy vấn trong đó dùng đúng `profileId` này. */
 export function handlersFor(deps: BotDeps, refresh: () => void): ChatHandlers {
   return {
     onFeedback: (ev) => recordFeedback(deps.db, ev, deps.profileId),
+    onForMe: (ev) => forMeFor(deps, ev),
     topics: topicHandlers(deps, refresh),
     profile: profileHandlers(deps, refresh),
   };

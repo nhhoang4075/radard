@@ -17,6 +17,8 @@ import {
   type CustomTopicDraft,
   createLogger,
   type FeedbackKind,
+  FOR_ME_COPY,
+  type ForMeResult,
   type Link,
   type Message,
   type Notifier,
@@ -81,6 +83,11 @@ export function render(msg: Message): string {
 
 const LABELS: Record<FeedbackKind, string> = { like: "👍", dislike: "👎" };
 
+/** Dữ liệu của nút "Với tôi?": không mang id tin, lượt bấm kèm `message_id` và `chat.id` là đủ. */
+const FOR_ME_DATA = "fm:ask";
+/** Giới hạn độ dài một tin Telegram (ký tự), chừa chỗ cho dấu cắt. */
+const MAX_REPLY_CHARS = 4000;
+
 /**
  * Dấu "đang chọn": ✓ đơn sắc (U+2713, hiện như chữ), không dùng emoji màu như ✅ (yêu cầu
  * 13/10/2026). Đi kèm màu nút (`style` của Bot API: success xanh lá, primary xanh dương, danger
@@ -98,6 +105,10 @@ export function feedbackKeyboard(
 ): InlineKeyboard {
   const kb = new InlineKeyboard();
   for (const a of actions) {
+    if (a.id === "for_me") {
+      kb.text(a.label, FOR_ME_DATA);
+      continue;
+    }
     if (a.id !== chosen) {
       kb.text(a.label, `fb:${a.id}`);
       continue;
@@ -594,14 +605,59 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
     await ctx.answerCallbackQuery({
       text: state === "none" ? "Đã bỏ chọn" : `Đã ghi nhận ${LABELS[state]}`,
     });
+    // Giữ nút "Với tôi?" nếu tin đang có nó (tin cũ trước khi có nút thì không thêm).
+    const hasForMe =
+      "reply_markup" in message &&
+      Boolean(
+        message.reply_markup?.inline_keyboard.some((row) =>
+          row.some((b) => "callback_data" in b && b.callback_data === FOR_ME_DATA),
+        ),
+      );
     const kb = feedbackKeyboard(
       [
         { id: "like", label: LABELS.like },
         { id: "dislike", label: LABELS.dislike },
+        ...(hasForMe ? [{ id: "for_me" as const, label: FOR_ME_COPY.button }] : []),
       ],
       state === "none" ? undefined : state,
     );
     await ctx.editMessageReplyMarkup({ reply_markup: kb }).catch(ignoreNotModified);
+  });
+
+  // "Với tôi?": lõi tra tin về hồ sơ của chat này (chat lạ đã bị chặn từ đầu chuỗi middleware).
+  bot.callbackQuery(FOR_ME_DATA, async (ctx) => {
+    const message = ctx.callbackQuery.message;
+    if (!message || !handlers.onForMe) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    // Trả lời ngay để nút không quay vòng trong lúc model viết.
+    await ctx.answerCallbackQuery({ text: FOR_ME_COPY.working });
+    let res: ForMeResult;
+    try {
+      res = await handlers.onForMe({
+        channel: CHANNEL,
+        recipient: String(message.chat.id),
+        messageId: String(message.message_id),
+      });
+    } catch (err) {
+      log.error("Với tôi? lỗi", describeError(err));
+      res = { status: "unavailable" };
+    }
+    const text =
+      res.status === "ok"
+        ? res.text.length > MAX_REPLY_CHARS
+          ? `${res.text.slice(0, MAX_REPLY_CHARS)}…`
+          : res.text
+        : res.status === "not_found"
+          ? FOR_ME_COPY.notFound
+          : res.status === "limit"
+            ? FOR_ME_COPY.limit
+            : FOR_ME_COPY.unavailable;
+    await ctx.reply(text, {
+      reply_parameters: { message_id: message.message_id },
+      link_preview_options: { is_disabled: true },
+    });
   });
 
   const awaiting: Awaiting = new Map();

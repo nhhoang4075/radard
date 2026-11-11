@@ -10,13 +10,14 @@
  * Fail-closed: không có `LINK_SECRET` thì `/o/*` luôn 404. URL đích chỉ lấy từ `deliveries.meta`,
  * không bao giờ từ request. Mọi lỗi (token sai, không tìm thấy, URL lạ) đều là 404 trơn, không nêu lý do.
  */
-import { createLogger } from "@radard/core";
+import { createLogger, type LlmProvider } from "@radard/core";
 import { type Database, deliveries } from "@radard/db";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Auth } from "./auth.ts";
 import type { SocialProviderId } from "./auth-config.ts";
 import { type SessionEnv, sessionMiddleware } from "./middleware/session.ts";
+import { eventsRoute } from "./routes/events.ts";
 import { meRoute } from "./routes/me.ts";
 import { createStaticHandler, DEFAULT_WEB_DIST } from "./static.ts";
 import { verifyToken } from "./token.ts";
@@ -33,6 +34,10 @@ export interface WebOptions {
   auth?: { auth: Auth; providers: SocialProviderId[] } | null;
   /** Thư mục build của `apps/web`; mặc định `apps/web/dist`. */
   webDist?: string;
+  /** Model viết "Với ttôi?"... */
+  llm?: LlmProvider | null;
+  /** Hạn mức "Với tôi?" mỗi hồ sơ mỗi ngày. */
+  forMeDailyLimit?: number;
   /** Đồng hồ, tiêm vào để test giả lập thời gian. */
   now?: () => Date;
 }
@@ -100,11 +105,27 @@ export async function recordLinkOpen(
  * mọi route thêm sau (qua `.route(...)` bên dưới) đều bị 401/403 khi chưa có phiên và hồ sơ.
  * Giữ ở dạng một chuỗi gọi liền để `AppType` suy ra được cho client `hc` của `apps/web`.
  */
-export function buildApi(deps: { db: Database; auth: Auth; providers: SocialProviderId[] }) {
+export function buildApi(deps: {
+  db: Database;
+  auth: Auth;
+  providers: SocialProviderId[];
+  llm?: LlmProvider | null;
+  forMeDailyLimit?: number;
+  now?: () => Date;
+}) {
   return new Hono<SessionEnv>()
     .get("/providers", (c) => c.json({ providers: deps.providers }))
     .use("*", sessionMiddleware(deps))
-    .route("/me", meRoute);
+    .route("/me", meRoute)
+    .route(
+      "/events",
+      eventsRoute({
+        db: deps.db,
+        llm: deps.llm ?? null,
+        ...(deps.forMeDailyLimit === undefined ? {} : { dailyLimit: deps.forMeDailyLimit }),
+        ...(deps.now ? { now: deps.now } : {}),
+      }),
+    );
 }
 export type AppType = ReturnType<typeof buildApi>;
 
@@ -167,7 +188,17 @@ export function createWebApp(opts: WebOptions) {
   if (auth) {
     const authHandler = auth.auth.handler;
     app.on(["GET", "POST"], "/api/auth/*", (c) => authHandler(c.req.raw));
-    app.route("/api", buildApi({ db, auth: auth.auth, providers: auth.providers }));
+    app.route(
+      "/api",
+      buildApi({
+        db,
+        auth: auth.auth,
+        providers: auth.providers,
+        llm: opts.llm ?? null,
+        ...(opts.forMeDailyLimit === undefined ? {} : { forMeDailyLimit: opts.forMeDailyLimit }),
+        now,
+      }),
+    );
   } else {
     app.all("/api/*", (c) => c.json({ error: "auth_not_configured" }, 503));
   }

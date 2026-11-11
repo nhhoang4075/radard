@@ -65,6 +65,7 @@ async function main(): Promise<void> {
         embedder: createEmbedder(deps.db),
         llm: createLlm(deps.db),
         decider: createDecider(deps.db),
+        forMeDailyLimit: env.forMeDailyLimit,
       };
       stops.push(await startBot(bot, chat));
     } else log.warn("vai trò bot tắt: chưa đặt TELEGRAM_BOT_TOKEN");
@@ -75,6 +76,8 @@ async function main(): Promise<void> {
       port: env.port,
       secret: env.linkSecret,
       auth: env.auth,
+      llm: createLlm(deps.db),
+      forMeDailyLimit: env.forMeDailyLimit,
     });
     stops.push(stopWeb);
   }

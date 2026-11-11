@@ -1,5 +1,5 @@
 /** Vai trò `web`: mở cổng HTTP phục vụ `/healthz`, `/o/:token`, `/api/*` (đăng nhập) và file build của `apps/web`. */
-import { createLogger } from "@radard/core";
+import { createLogger, type LlmProvider } from "@radard/core";
 import type { Database } from "@radard/db";
 import { createWebApp } from "../web/app.ts";
 import { createAuth } from "../web/auth.ts";
@@ -12,6 +12,9 @@ export function startWeb(opts: {
   port: number;
   secret: string | undefined;
   auth: RawAuthEnv;
+  /** Model viết "Với tôi?"; thiếu thì `POST /api/events/:id/for-me` trả 503. */
+  llm?: LlmProvider | null;
+  forMeDailyLimit?: number;
 }): () => Promise<void> {
   if (!opts.secret) log.warn("chưa đặt LINK_SECRET: route /o/* trả 404 cho mọi token");
   const { config, problems } = loadAuthConfig(opts.auth);
@@ -23,7 +26,13 @@ export function startWeb(opts: {
         providers: Object.keys(config.providers) as SocialProviderId[],
       }
     : null;
-  const { app, idle } = createWebApp({ db: opts.db, secret: opts.secret, auth });
+  const { app, idle } = createWebApp({
+    db: opts.db,
+    secret: opts.secret,
+    auth,
+    llm: opts.llm ?? null,
+    ...(opts.forMeDailyLimit === undefined ? {} : { forMeDailyLimit: opts.forMeDailyLimit }),
+  });
   const server = Bun.serve({ port: opts.port, fetch: app.fetch });
   log.info("web đang nghe", { port: server.port });
   return async () => {

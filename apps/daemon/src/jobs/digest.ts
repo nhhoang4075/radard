@@ -1,8 +1,10 @@
 /**
  * Job điểm tin (digest) mỗi sáng: lớp THÔNG BÁO của feed (quyết định 10/11/2026). Tin lấy từ bản chụp
  * feed của ngày (feed.ts: một bản chụp mỗi hồ sơ mỗi khung, select chạy một lần với trần K); digest
- * chỉ lấy ≤ 7 tin đầu của bản chụp qua sàn thông báo, nhờ LLM viết lời mở đầu và tóm tắt, gửi qua
- * Notifier. Telegram không ảnh hưởng việc chọn feed.
+ * chỉ lấy ≤ 7 tin đầu của bản chụp qua sàn thông báo, dùng tóm tắt CHUNG đã chụp trong bản chụp
+ * (`feed_items.summary_id`, summaries.ts; không có model tóm tắt riêng), nhờ LLM gán nhãn chủ đề và viết
+ * lời mở đầu theo hồ sơ (một lời gọi nhỏ chỉ nhận tiêu đề), gửi qua Notifier. Telegram không ảnh
+ * hưởng việc chọn feed.
  *
  * Chạy lại an toàn (tuan-3-thuc-thi.html, bước 6):
  *   1. Mỗi khung giờ (07:00 giờ VN) một dòng `digests`. Đã `sent` thì dừng.
@@ -15,6 +17,7 @@
 import {
   createLogger,
   type DecisionProvider,
+  FOR_ME_COPY,
   type HttpClient,
   type Link,
   type LlmProvider,
@@ -25,16 +28,11 @@ import {
   type Database,
   deliveries,
   digests,
-  docSignals,
-  docText,
-  docTopicScores,
-  documents,
   enabledRecipients,
   type FeedItem,
   profile,
-  sources,
 } from "@radard/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
 import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
 import { buildTrackingUrl } from "../web/token.ts";
@@ -48,8 +46,18 @@ import {
   snapshotLearning,
   snapshotRanking,
 } from "./feed.ts";
+import { host, type ItemDoc, loadItemDocs } from "./item-docs.ts";
 import { loadProfileTopics, type RankResult, rankPeriod } from "./rank.ts";
 import type { SelectionLearning } from "./selection-learning.ts";
+import {
+  ensureSharedSummaries,
+  LANG_NAMES,
+  LLM_MAX_OUTPUT_TOKENS,
+  loadSummariesById,
+  type SharedSummary,
+} from "./summaries.ts";
+
+export type { ItemDoc } from "./item-docs.ts";
 
 const log = createLogger("digest");
 
@@ -60,19 +68,11 @@ const DAY_MS = 86_400_000;
 
 /** Số bài "Bài khác" hiện thành link; phần còn lại thành "+N bài". */
 const MAX_RELATED = 3;
-/** Số tài liệu mỗi tin đưa cho LLM, và độ dài trích đoạn mỗi tài liệu. */
-const LLM_DOCS_PER_ITEM = 4;
-const LLM_EXCERPT_CHARS = 500;
-/**
- * Trần token ra. Token suy nghĩ ẩn của model tính vào trần này và dao động mạnh: 13/10/2026, cùng
- * một prompt 6 tin (1.613 token vào), ba lần gọi ra 2.127, 2.376 và chạm trần 4.000 (2.788 token
- * suy nghĩ, JSON bị cắt). Trần chỉ là giới hạn: tiền tính theo token dùng thật.
- */
-const LLM_MAX_OUTPUT_TOKENS = 8000;
-
 const ACTIONS: Message["actions"] = [
   { id: "like", label: "👍" },
   { id: "dislike", label: "👎" },
+  // Nhãn tạm, chủ dự án duyệt câu chữ: mọi chuỗi mới nằm ở FOR_ME_COPY (packages/core/src/copy.ts).
+  { id: "for_me", label: FOR_ME_COPY.button },
 ];
 
 /** Khung giờ gửi gần nhất không muộn hơn `now`: mốc kết thúc của khoảng 24 giờ. */
@@ -137,33 +137,6 @@ export interface DigestPlan {
   ranking: RankingInfo;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Tài liệu của các tin đã chọn, đủ để dựng link và đưa cho LLM
-
-export interface ItemDoc {
-  id: number;
-  sourceId: number;
-  sourceName: string;
-  kind: string;
-  externalId: string;
-  title: string | null;
-  url: string;
-  urlCanonical: string;
-  excerpt: string;
-  signals: Record<string, number>;
-  /** Điểm chủ đề của tài liệu với chủ đề cho R cao nhất của tin. */
-  topicScore: number;
-  engagement: number | null;
-}
-
-function host(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
 /**
  * Link của một tin. Bài viết khác nhau = URL khác nhau (5 lượt đăng lại một URL là một bài).
  *   main: bài khớp chủ đề nhất · related: các bài khác, tối đa MAX_RELATED, còn lại "+N bài" ·
@@ -209,14 +182,15 @@ function sourcesLine(docs: readonly ItemDoc[]): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// LLM: một lời gọi cho cả bản điểm tin
+// LLM theo hồ sơ: gán nhãn chủ đề và lời mở đầu (một lời gọi nhỏ, chỉ nhận tiêu đề)
+//
+// Tóm tắt của từng tin là tóm tắt CHUNG (summaries.ts, quyết định 11/11/2026); chỉ hai việc này giữ
+// theo hồ sơ vì cần chủ đề và bối cảnh của hồ sơ.
 
-const LANG_NAMES: Record<string, string> = { vi: "Vietnamese", en: "English" };
-
-export interface Summaries {
+export interface Labels {
   intro: string;
-  /** `topic`: một nhãn trong danh sách chủ đề của bạn, đúng nguyên văn; vắng nếu model chọn sai. */
-  items: Map<number, { title: string; summary: string; topic?: string }>;
+  /** Nhãn chủ đề đúng nguyên văn trong danh sách của hồ sơ, theo số thứ tự tin; vắng nếu model chọn sai. */
+  topics: Map<number, string>;
 }
 
 /** Một chủ đề đang bật, như LLM thấy khi gắn nhãn: tên và phạm vi (chủ đề tự thêm chỉ có tên). */
@@ -227,30 +201,23 @@ export interface TopicChoice {
 
 /**
  * `topics`: các chủ đề bạn đang theo dõi, kèm phạm vi. Model chọn nhãn cho từng tin vì nó đọc được
- * cả trích đoạn và hiểu tiêu đề ngắn, còn embedding của tiêu đề 10 chữ hay đoán sai (Janas,
- * "streaming experts from SSD", bị gán RAG; 13/10/2026). Không đưa nhãn embedding vào prompt
+ * tiêu đề tiếng Việt/Anh và hiểu phạm vi chủ đề, còn embedding của tiêu đề 10 chữ hay đoán sai
+ * (Janas, "streaming experts from SSD", bị gán RAG; 13/10/2026). Không đưa nhãn embedding vào prompt
  * để model không bám theo nhãn đó. Phạm vi (dòng "Not: …") và hai quy tắc phân xử lấy từ
  * docs/bo-chu-de-moi.html: khoảng 30% tin nằm giữa hai chủ đề, cần luật rõ để nhãn nhất quán.
  */
-export function digestSystem(
-  context: string,
-  lang: string,
-  topics: readonly TopicChoice[],
-): string {
+export function labelSystem(context: string, lang: string, topics: readonly TopicChoice[]): string {
   const language = LANG_NAMES[lang] ?? lang;
   return [
-    "You write a short morning news brief for one reader.",
-    `About the reader (use it to explain why each story matters to them): ${context}`,
+    "You label the stories of one reader's morning news brief and write its opening line.",
+    `About the reader: ${context}`,
     `Write in ${language}. Keep product, company, model and library names as they are.`,
     "Use only the facts in the input. Never invent numbers, names, dates or claims.",
-    // 13/10/2026: thiếu dòng này, model viết "phần lớn tin chỉ có tiêu đề…" vào lời mở đầu.
     "Never comment on the input itself (how much text you were given, missing details); just leave out what you do not know.",
     "Return ONLY a JSON object, no markdown fences, with this shape:",
-    '{"intro": string, "items": [{"n": number, "title": string, "summary": string, "topic": string}]}',
+    '{"intro": string, "items": [{"n": number, "topic": string}]}',
     "- intro: 1-2 sentences on what stands out today as a whole.",
     "- items: exactly one entry per input story, with the same n.",
-    "- title: at most 12 words.",
-    "- summary: 2-3 sentences: what happened, then why it matters to this reader.",
     "- topic: the reader's topic this story is mostly about. Copy only the quoted label, exactly as written, from this list (the text after a label says what the topic covers):",
     ...topics.map((t) => `  - ${JSON.stringify(t.label)}${t.note ? `: ${t.note}` : ""}`),
     "  When a story fits two topics:",
@@ -259,91 +226,51 @@ export function digestSystem(
   ].join("\n");
 }
 
-export function digestPrompt(stories: readonly { n: number; docs: readonly ItemDoc[] }[]): string {
-  return stories
-    .map((s) => {
-      const docs = [...s.docs]
-        .sort((a, b) => b.topicScore - a.topicScore)
-        .slice(0, LLM_DOCS_PER_ITEM)
-        .map((d) => {
-          const signals = Object.entries(d.signals)
-            .map(([k, v]) => `${k} ${v}`)
-            .join(", ");
-          const head = `- [${d.sourceName}${signals ? `, ${signals}` : ""}] ${d.title ?? "(no title)"} (${host(d.url)})`;
-          return d.excerpt ? `${head}\n  Excerpt: ${d.excerpt}` : head;
-        });
-      return [`Story ${s.n}`, "Documents:", ...docs].join("\n");
-    })
-    .join("\n\n");
+export function labelPrompt(stories: readonly { n: number; title: string }[]): string {
+  return stories.map((s) => `Story ${s.n}: ${s.title}`).join("\n");
 }
 
-/** Đọc JSON model trả về; sai cấu trúc thì báo lỗi (để thử lại hoặc chuyển bản không tóm tắt). */
-export function parseSummaries(
-  reply: string,
-  count: number,
-  topics: readonly string[] = [],
-): Summaries {
+/** Đọc JSON model trả về; thiếu lời mở đầu thì báo lỗi (để thử lại hoặc bỏ). Nhãn sai/thiếu thì bỏ nhãn đó. */
+export function parseLabels(reply: string, topics: readonly string[] = []): Labels {
   const start = reply.indexOf("{");
   const end = reply.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("không thấy JSON trong câu trả lời");
-  const data = JSON.parse(reply.slice(start, end + 1)) as {
-    intro?: unknown;
-    items?: unknown;
-  };
+  const data = JSON.parse(reply.slice(start, end + 1)) as { intro?: unknown; items?: unknown };
   if (typeof data.intro !== "string" || data.intro.trim().length === 0) {
     throw new Error("thiếu intro");
   }
   if (!Array.isArray(data.items)) throw new Error("thiếu items");
-  const items = new Map<number, { title: string; summary: string; topic?: string }>();
   const known = new Set(topics);
-  for (const it of data.items as {
-    n?: unknown;
-    title?: unknown;
-    summary?: unknown;
-    topic?: unknown;
-  }[]) {
-    if (
-      typeof it.n !== "number" ||
-      typeof it.title !== "string" ||
-      typeof it.summary !== "string"
-    ) {
-      continue;
-    }
-    const title = it.title.trim();
-    const summary = it.summary.trim();
-    if (title.length === 0 || title.length > 200 || summary.length < 20) continue;
+  const labelled = new Map<number, string>();
+  for (const it of data.items as { n?: unknown; topic?: unknown }[]) {
     // Nhãn sai hoặc thiếu không làm hỏng cả bản: dùng nhãn embedding cho tin đó.
-    const topic =
-      typeof it.topic === "string" && known.has(it.topic.trim()) ? it.topic.trim() : undefined;
-    items.set(it.n, topic ? { title, summary, topic } : { title, summary });
+    if (typeof it.n === "number" && typeof it.topic === "string" && known.has(it.topic.trim())) {
+      labelled.set(it.n, it.topic.trim());
+    }
   }
-  for (let n = 1; n <= count; n++) {
-    if (!items.has(n)) throw new Error(`thiếu tóm tắt cho tin ${n}`);
-  }
-  return { intro: data.intro.trim(), items };
+  return { intro: data.intro.trim(), topics: labelled };
 }
 
-async function summarize(
+async function labelStories(
   llm: LlmProvider,
   system: string,
   prompt: string,
-  count: number,
   topics: readonly string[],
-): Promise<{ ok: Summaries } | { error: string }> {
+): Promise<{ ok: Labels } | { error: string }> {
   let error = "";
-  // Thử lại đúng một lần: model đôi khi trả JSON thiếu mục hoặc bị cắt.
+  // Thử lại đúng một lần: model đôi khi trả JSON thiếu hoặc bị cắt.
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const reply = await llm.generateText({
-        task: "digest",
+        task: "digest_labels",
         system,
         prompt,
         maxOutputTokens: LLM_MAX_OUTPUT_TOKENS,
       });
-      return { ok: parseSummaries(reply, count, topics) };
+      return { ok: parseLabels(reply, topics) };
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
-      log.warn("tóm tắt hỏng", { attempt, error: error.slice(0, 300) });
+      log.warn("gán nhãn hỏng", { attempt, error: error.slice(0, 300) });
     }
   }
   return { error: error.slice(0, 500) };
@@ -364,118 +291,6 @@ export interface DigestDeps {
 
 /** Một tin của bản thông báo: tin feed đã lưu (có `id`) hoặc tin của bản xem thử (chưa lưu). */
 type NotifySource = (FeedItem | FeedItemDraft) & { id?: number };
-
-async function loadSignals(
-  db: Database,
-  ids: readonly number[],
-): Promise<Map<number, Record<string, number>>> {
-  const out = new Map<number, Record<string, number>>();
-  for (const s of await db
-    .select()
-    .from(docSignals)
-    .where(inArray(docSignals.documentId, [...ids]))) {
-    out.set(s.documentId, { ...out.get(s.documentId), [s.metric]: s.value });
-  }
-  return out;
-}
-
-/** Điểm chủ đề theo khoá `documentId|topicId`, chỉ cho chủ đề cho R của các tin. */
-async function loadTopicScores(
-  db: Database,
-  ids: readonly number[],
-  items: readonly NotifySource[],
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  const topicIds = [...new Set(items.flatMap((it) => (it.topicId === null ? [] : [it.topicId])))];
-  if (topicIds.length === 0) return out;
-  for (const t of await db
-    .select()
-    .from(docTopicScores)
-    .where(
-      and(inArray(docTopicScores.documentId, [...ids]), inArray(docTopicScores.topicId, topicIds)),
-    )) {
-    out.set(`${t.documentId}|${t.topicId}`, t.score);
-  }
-  return out;
-}
-
-/** Độ nổi thô do adapter của nguồn tính từ tín hiệu, như bước xếp hạng; không có thì null. */
-function engagementOf(kind: string, sig: Record<string, number> | undefined): number | null {
-  if (!sig || !kind) return null;
-  try {
-    return adapterFor(kind).engagement?.(sig) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Tài liệu của các tin sẽ báo, theo `document_ids` đã chụp trong bản chụp (đúng các tài liệu bước
- * xếp hạng đã xét), đủ để dựng link và đưa cho LLM. Điểm chủ đề lấy theo chủ đề cho R của tin; độ
- * nổi tính lại từ tín hiệu đã lưu bằng adapter của nguồn, như bước xếp hạng.
- */
-async function loadItemDocs(
-  db: Database,
-  items: readonly NotifySource[],
-): Promise<Map<number, ItemDoc[]>> {
-  const out = new Map<number, ItemDoc[]>();
-  const ids = [...new Set(items.flatMap((it) => it.documentIds))];
-  if (ids.length === 0) return out;
-  const rows = await db
-    .select({
-      id: documents.id,
-      sourceId: documents.sourceId,
-      externalId: documents.externalId,
-      title: documents.title,
-      url: documents.url,
-      urlCanonical: documents.urlCanonical,
-      text: docText.text,
-    })
-    .from(documents)
-    .leftJoin(docText, eq(docText.documentId, documents.id))
-    .where(inArray(documents.id, ids));
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const signals = await loadSignals(db, ids);
-  const topicScore = await loadTopicScores(db, ids, items);
-  const srcRows = await db
-    .select({ id: sources.id, name: sources.name, kind: sources.kind })
-    .from(sources);
-  const src = new Map(srcRows.map((x) => [x.id, x]));
-  for (const it of items) {
-    const list: ItemDoc[] = [];
-    for (const id of it.documentIds) {
-      const r = byId.get(id);
-      if (!r) continue;
-      const kind = src.get(r.sourceId)?.kind ?? "";
-      const sig = signals.get(r.id);
-      list.push({
-        id: r.id,
-        sourceId: r.sourceId,
-        sourceName: src.get(r.sourceId)?.name ?? String(r.sourceId),
-        kind,
-        externalId: r.externalId,
-        title: r.title,
-        url: r.url,
-        urlCanonical: r.urlCanonical,
-        excerpt: excerptOf(r.text, r.title),
-        signals: sig ?? {},
-        topicScore: it.topicId === null ? 0 : (topicScore.get(`${r.id}|${it.topicId}`) ?? 0),
-        engagement: engagementOf(kind, sig),
-      });
-    }
-    out.set(it.eventId, list);
-  }
-  return out;
-}
-
-/** Văn bản đã embed bắt đầu bằng tiêu đề: bỏ phần đó, lấy đoạn đầu phần còn lại. */
-function excerptOf(text: string | null, title: string | null): string {
-  if (!text) return "";
-  let body = text;
-  if (title && body.startsWith(title)) body = body.slice(title.length);
-  body = body.replace(/\s+/g, " ").trim();
-  return body.length > LLM_EXCERPT_CHARS ? `${body.slice(0, LLM_EXCERPT_CHARS)}…` : body;
-}
 
 function scoreOfItem(it: NotifySource): PlanItem["score"] {
   const r = (x: number) => Math.round(x * 1000) / 1000;
@@ -565,32 +380,51 @@ export async function planFromItems(
     docs: docsByEvent.get(p.eventId) ?? [],
   }));
 
-  let summaries: Summaries | null = null;
+  // Tóm tắt CHUNG của từng tin: bản chụp đã chụp sẵn (`summary_id`). Chỉ tin của bản xem thử (chưa
+  // lưu, không có `id`) mới được viết ở đây; tin của bản chụp thiếu tóm tắt (model lỗi lúc dựng)
+  // giữ nguyên tiêu đề gốc, không gọi model lại: Telegram không có model tóm tắt riêng.
+  const lang = prof?.displayLang ?? "vi";
+  const snapshotSummaries = await loadSummariesById(
+    deps.db,
+    picked.flatMap((p) => (p.summaryId ? [p.summaryId] : [])),
+  );
+  const preview = picked.filter((p) => p.id === undefined && !p.summaryId);
+  const previewSummaries =
+    preview.length > 0
+      ? (await ensureSharedSummaries({ db: deps.db, llm: deps.llm }, preview, lang)).byEvent
+      : new Map<number, SharedSummary>();
+  const summaryOf = (p: NotifySource): SharedSummary | undefined =>
+    p.summaryId ? snapshotSummaries.get(p.summaryId) : previewSummaries.get(p.eventId);
+
+  // Theo hồ sơ: nhãn chủ đề và lời mở đầu, một lời gọi nhỏ chỉ nhận tiêu đề.
+  const titleOf = (p: NotifySource, docs: readonly ItemDoc[]): string =>
+    summaryOf(p)?.title ??
+    [...docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ??
+    p.title;
+  let labels: Labels | null = null;
   let llmInfo: DigestPlan["llm"] = null;
   if (deps.llm) {
     const topics = topicRows.map(
       (t): TopicChoice => (t.note ? { label: t.label, note: t.note } : { label: t.label }),
     );
-    const result = await summarize(
+    const result = await labelStories(
       deps.llm,
-      digestSystem(prof?.promptContext ?? "", prof?.displayLang ?? "vi", topics),
-      digestPrompt(stories),
-      stories.length,
+      labelSystem(prof?.promptContext ?? "", lang, topics),
+      labelPrompt(picked.map((p, i) => ({ n: i + 1, title: titleOf(p, stories[i]?.docs ?? []) }))),
       topics.map((t) => t.label),
     );
     if ("ok" in result) {
-      summaries = result.ok;
+      labels = result.ok;
       llmInfo = { model: deps.llm.model };
     } else llmInfo = { model: deps.llm.model, error: result.error };
   }
 
   const items: PlanItem[] = picked.map((p, i) => {
     const story = stories[i] ?? { n: i + 1, topic: null, docs: [] };
-    const written = summaries?.items.get(story.n);
+    const written = summaryOf(p);
+    const labelled = labels?.topics.get(story.n);
     const { links, moreRelated } = buildLinks(story.docs);
-    const fallbackTitle =
-      [...story.docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ?? p.title;
-    const topic = written?.topic ?? story.topic;
+    const topic = labelled ?? story.topic;
     // N < 1: sự kiện đã gửi trước đó và nay có URL mới, nên là tin tiếp diễn (xep-hang.html, tab N).
     const why = [
       p.n < 1 ? "Cập nhật" : null,
@@ -607,7 +441,7 @@ export async function planFromItems(
       documentIds: story.docs.map((d) => d.id),
       message: {
         kind: "digest",
-        title: `${story.n}. ${written?.title ?? fallbackTitle}`,
+        title: `${story.n}. ${titleOf(p, story.docs)}`,
         lines: [written?.summary, why].filter((l): l is string => Boolean(l)),
         links,
         moreRelated,
@@ -616,22 +450,24 @@ export async function planFromItems(
       score: scoreOfItem(p),
       topic,
       topicByEmbedding: story.topic,
-      topicSource: written?.topic ? "llm" : "embedding",
+      topicSource: labelled ? "llm" : "embedding",
     };
   });
 
   const count = `Chọn ${items.length} trong ${ranking.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`;
+  const summarized = picked.some((p) => summaryOf(p) !== undefined);
   const header: Message = {
     kind: "digest",
     title: `Điểm tin ${date}`,
-    lines: summaries
-      ? [summaries.intro, count]
-      : [
-          count,
-          "Bản không tóm tắt: phần tóm tắt bị lỗi, các tin dưới đây chỉ có tiêu đề gốc và link.",
-        ],
+    lines: [
+      ...(labels ? [labels.intro] : []),
+      count,
+      ...(summarized
+        ? []
+        : ["Bản không tóm tắt: phần tóm tắt bị lỗi, các tin dưới đây chỉ có tiêu đề gốc và link."]),
+    ],
   };
-  return { ...base, header, items, summarized: summaries !== null, llm: llmInfo };
+  return { ...base, header, items, summarized, llm: llmInfo };
 }
 
 // ---------------------------------------------------------------------------------------------

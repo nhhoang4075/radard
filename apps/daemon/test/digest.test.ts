@@ -15,6 +15,7 @@ import {
   docTopicScores,
   documents,
   eventDocuments,
+  eventSummaries,
   events,
   profile,
   profileTopics,
@@ -29,11 +30,13 @@ import {
   type DigestPlan,
   digestSlot,
   type ItemDoc,
-  parseSummaries,
+  parseLabels,
   runDigest,
   vnDate,
 } from "../src/jobs/digest.ts";
+import { ensureFeedSnapshot } from "../src/jobs/feed.ts";
 import type { SelectionLearning } from "../src/jobs/selection-learning.ts";
+import { parseSummaryBatch } from "../src/jobs/summaries.ts";
 
 import { addTopic } from "./topic-fixture.ts";
 
@@ -82,23 +85,35 @@ async function addEvent(score = 0.79, sourceId = hn): Promise<{ eventId: number;
   return { eventId: e?.id ?? 0, docId: d?.id ?? 0 };
 }
 
-/** LLM giả trả đúng số mục có trong prompt. */
+/**
+ * LLM giả. Hai loại lời gọi: tóm tắt CHUNG (system "news summaries": mỗi `Story n` một tóm tắt) và gán
+ * nhãn + lời mở đầu theo hồ sơ (system "label the stories": mỗi `Story n: tiêu đề` một nhãn).
+ */
 function goodLlm(topicOf: (n: number) => string | undefined = () => undefined) {
   const calls: { prompt: string; system?: string }[] = [];
+  const summaryCalls: { prompt: string; system?: string }[] = [];
+  const labelCalls: { prompt: string; system?: string }[] = [];
   const llm = fakeLlm({
     reply(prompt, system) {
       calls.push({ prompt, system });
+      const wrap = (o: unknown) => `\`\`\`json\n${JSON.stringify(o)}\n\`\`\``;
+      if (system?.includes("label the stories")) {
+        labelCalls.push({ prompt, system });
+        const n = (prompt.match(/^Story \d+:/gm) ?? []).length;
+        const items = Array.from({ length: n }, (_, i) => ({ n: i + 1, topic: topicOf(i + 1) }));
+        return wrap({ intro: "Sáng nay nổi bật là agent.", items });
+      }
+      summaryCalls.push({ prompt, system });
       const n = (prompt.match(/^Story \d+$/gm) ?? []).length;
       const items = Array.from({ length: n }, (_, i) => ({
         n: i + 1,
         title: `Tiêu đề ${i + 1}`,
         summary: `Tóm tắt tin số ${i + 1}, đủ dài để qua kiểm tra.`,
-        topic: topicOf(i + 1),
       }));
-      return `\`\`\`json\n${JSON.stringify({ intro: "Sáng nay nổi bật là agent.", items })}\n\`\`\``;
+      return wrap({ items });
     },
   });
-  return { llm, calls };
+  return { llm, calls, summaryCalls, labelCalls };
 }
 
 beforeAll(async () => {
@@ -108,7 +123,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   seq = 0;
   await db.execute(
-    sql`truncate sources, events, profile, topics, documents, digests restart identity cascade`,
+    sql`truncate sources, events, profile, topics, documents, digests, event_summaries restart identity cascade`,
   );
   const [s] = await db
     .insert(sources)
@@ -157,11 +172,16 @@ describe("hồ sơ thứ hai", () => {
     const two = goodLlm();
     const plan = await buildPlan({ db, profileId: 2, llm: two.llm }, SLOT);
     expect(plan.items.length).toBeGreaterThan(0);
-    expect(one.calls[0]?.system).toContain("I build AI agents.");
-    expect(one.calls[0]?.system).toContain("Write in Vietnamese");
-    expect(two.calls[0]?.system).toContain("I study robotics.");
-    expect(two.calls[0]?.system).not.toContain("I build AI agents.");
-    expect(two.calls[0]?.system).toContain("Write in English");
+    // Gán nhãn và lời mở đầu theo hồ sơ: bối cảnh và ngôn ngữ của đúng hồ sơ đó.
+    expect(one.labelCalls[0]?.system).toContain("I build AI agents.");
+    expect(one.labelCalls[0]?.system).toContain("Write in Vietnamese");
+    expect(two.labelCalls[0]?.system).toContain("I study robotics.");
+    expect(two.labelCalls[0]?.system).not.toContain("I build AI agents.");
+    expect(two.labelCalls[0]?.system).toContain("Write in English");
+    // Tóm tắt chung viết theo ngôn ngữ, không mang bối cảnh người đọc nào.
+    expect(one.summaryCalls[0]?.system).toContain("Write in Vietnamese");
+    expect(two.summaryCalls[0]?.system).toContain("Write in English");
+    expect(two.summaryCalls[0]?.system).not.toContain("I study robotics.");
     const notifier = fakeNotifier();
     await runDigest({ db, profileId: 2, llm: goodLlm().llm, notifier, recipient: RECIPIENT }, SLOT);
     const [row] = await db.select().from(digests).where(eq(digests.profileId, 2));
@@ -184,7 +204,7 @@ describe("runDigest", () => {
   test("gửi tin mở đầu rồi từng tin; chạy lại cùng khung thì không gửi gì thêm", async () => {
     for (let i = 0; i < 4; i++) await addEvent();
     const notifier = fakeNotifier();
-    const { llm, calls } = goodLlm();
+    const { llm, calls, labelCalls } = goodLlm();
     const deps = { db, profileId: 1, llm, notifier, recipient: RECIPIENT };
 
     const first = await runDigest(deps, SLOT);
@@ -209,10 +229,10 @@ describe("runDigest", () => {
     expect(item?.links?.[1]?.url).toBe(
       `https://news.ycombinator.com/item?id=${1000 + Number(label.slice(4, 5))}`,
     );
-    expect(item?.actions?.map((a) => a.id)).toEqual(["like", "dislike"]);
-    // Prompt đọc bối cảnh từ hồ sơ, không viết cứng.
-    expect(calls[0]?.system).toContain("I build AI agents.");
-    expect(calls[0]?.system).toContain("Vietnamese");
+    expect(item?.actions?.map((a) => a.id)).toEqual(["like", "dislike", "for_me"]);
+    // Lời gọi gán nhãn đọc bối cảnh từ hồ sơ, không viết cứng.
+    expect(labelCalls[0]?.system).toContain("I build AI agents.");
+    expect(labelCalls[0]?.system).toContain("Vietnamese");
 
     expect(await positions()).toEqual([0, 1, 2, 3, 4]);
     const [dg] = await db.select().from(digests);
@@ -224,7 +244,8 @@ describe("runDigest", () => {
     const again = await runDigest(deps, SLOT);
     expect(again).toMatchObject({ status: "already_sent", sentNow: 0 });
     expect(notifier.sent).toHaveLength(5);
-    expect(calls).toHaveLength(1);
+    // Một lô tóm tắt chung + một lời gọi gán nhãn; chạy lại không gọi gì thêm.
+    expect(calls).toHaveLength(2);
   });
 
   test("chết sau tin thứ 3 thì lượt sau gửi tiếp từ tin còn thiếu, theo plan đã lưu", async () => {
@@ -251,7 +272,7 @@ describe("runDigest", () => {
       "4. Tiêu đề 4",
     ]);
     expect(await positions()).toEqual([0, 1, 2, 3, 4]);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
   });
 
   test("LLM trả JSON hỏng hai lần thì gửi bản không tóm tắt: tiêu đề gốc và link", async () => {
@@ -266,13 +287,29 @@ describe("runDigest", () => {
     const notifier = fakeNotifier();
     const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     expect(out).toMatchObject({ status: "sent", summarized: false, items: 1 });
-    expect(calls).toBe(2);
+    // Mỗi việc (tóm tắt chung, gán nhãn) thử đúng hai lần.
+    expect(calls).toBe(4);
     const [header, item] = notifier.sent.map((s) => s.msg);
     expect(header?.lines.join(" ")).toContain("Bản không tóm tắt");
     expect(item?.title).toBe("1. Original title 1");
     expect(item?.lines).toEqual(["Chủ đề: Agent AI · HN"]);
     const plan = planOf((await db.select().from(digests))[0]?.meta);
     expect(plan.llm?.error).toBeTruthy();
+  });
+
+  test("Telegram dùng đúng tóm tắt đã chụp trong bản chụp, không gọi model tóm tắt riêng", async () => {
+    await addEvent();
+    await addEvent();
+    // Bản chụp dựng không có model: tin không có summary_id.
+    await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
+    const { llm, summaryCalls, labelCalls } = goodLlm();
+    const notifier = fakeNotifier();
+    const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
+    expect(out).toMatchObject({ status: "sent", summarized: false, items: 2 });
+    expect(summaryCalls).toHaveLength(0);
+    expect(labelCalls).toHaveLength(1);
+    expect(notifier.sent[1]?.msg.title).toMatch(/^1\. Original title \d$/);
+    expect((await db.select().from(eventSummaries)).length).toBe(0);
   });
 
   test("ngày không có tin nào vượt sàn: một tin ngắn, không gọi LLM (D5)", async () => {
@@ -314,9 +351,11 @@ describe("runDigest", () => {
     await addEvent();
     await addEvent();
     const notifier = fakeNotifier();
-    const { llm, calls } = goodLlm((n) => (n === 1 ? "GPU & inference" : "Không có chủ đề này"));
+    const { llm, labelCalls } = goodLlm((n) =>
+      n === 1 ? "GPU & inference" : "Không có chủ đề này",
+    );
     await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
-    const system = calls[0]?.system ?? "";
+    const system = labelCalls[0]?.system ?? "";
     expect(system).toContain(
       '  - "Agent AI"\n  - "GPU & inference": GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI).\n',
     );
@@ -324,7 +363,7 @@ describe("runDigest", () => {
     expect(system).toContain("A more specific topic beats a general one");
     expect(system).toContain("The application domain beats the data modality");
     // Nhãn embedding không được đưa vào prompt.
-    expect(calls[0]?.prompt).not.toContain("Agent AI");
+    expect(labelCalls[0]?.prompt).not.toContain("Agent AI");
     expect(notifier.sent[1]?.msg.lines.at(-1)).toBe("Chủ đề: GPU & inference · HN");
     expect(notifier.sent[2]?.msg.lines.at(-1)).toBe("Chủ đề: Agent AI · HN");
     const plan = planOf((await db.select().from(digests))[0]?.meta);
@@ -438,19 +477,25 @@ describe("hàm thuần", () => {
     expect(moreRelated).toBe(1);
   });
 
-  test("đọc JSON của model: bỏ rào markdown; thiếu mục thì báo lỗi", () => {
-    const ok = parseSummaries(
-      'Đây:\n```json\n{"intro":"Mở đầu","items":[{"n":1,"title":"A","summary":"Một câu tóm tắt đủ dài."}]}\n```',
+  test("đọc JSON tóm tắt chung: bỏ rào markdown; thiếu mục thì báo lỗi", () => {
+    const ok = parseSummaryBatch(
+      'Đây:\n```json\n{"items":[{"n":1,"title":"A","summary":"Một câu tóm tắt đủ dài."}]}\n```',
       1,
     );
-    expect(ok.intro).toBe("Mở đầu");
-    expect(ok.items.get(1)?.title).toBe("A");
+    expect(ok.get(1)?.title).toBe("A");
     expect(() =>
-      parseSummaries(
-        '{"intro":"x","items":[{"n":1,"title":"A","summary":"Một câu tóm tắt đủ dài."}]}',
-        2,
-      ),
+      parseSummaryBatch('{"items":[{"n":1,"title":"A","summary":"Một câu tóm tắt đủ dài."}]}', 2),
     ).toThrow("thiếu tóm tắt cho tin 2");
+  });
+
+  test("đọc JSON nhãn: lời mở đầu bắt buộc; nhãn không có trong danh sách thì bỏ", () => {
+    const ok = parseLabels(
+      '{"intro":"Mở đầu","items":[{"n":1,"topic":"Agent AI"},{"n":2,"topic":"Lạ"},{"n":3}]}',
+      ["Agent AI"],
+    );
+    expect(ok.intro).toBe("Mở đầu");
+    expect([...ok.topics]).toEqual([[1, "Agent AI"]]);
+    expect(() => parseLabels('{"items":[]}', [])).toThrow("thiếu intro");
   });
 });
 

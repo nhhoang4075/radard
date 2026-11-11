@@ -31,7 +31,8 @@ export interface Message {
   links?: Link[];
   /** Số bài liên quan KHÔNG có trong `links` (hiện "+N bài"). */
   moreRelated?: number;
-  actions?: { id: FeedbackKind; label: string }[];
+  /** `for_me`: nút "Với tôi?" (không phải phản hồi, không ghi `feedback`). */
+  actions?: { id: FeedbackKind | "for_me"; label: string }[];
 }
 
 export interface Notifier {
@@ -53,6 +54,19 @@ export interface FeedbackEvent {
    */
   sourceId: string;
 }
+
+/** Một lượt bấm "Với tôi?" trên một tin. */
+export interface ForMeEvent {
+  channel: string;
+  recipient: string;
+  /** Tin được bấm: nối về `deliveries` qua (channel, recipient, message_id). */
+  messageId: string;
+}
+
+/** Kết quả "Với tôi?"; `status` khác `ok` thì kênh báo lỗi tương ứng, không có `text`. */
+export type ForMeResult =
+  | { status: "ok"; text: string }
+  | { status: "not_found" | "limit" | "unavailable" };
 
 /** Một chủ đề hiện trong danh sách chọn: từ thư viện hoặc do người dùng tự thêm. */
 export interface TopicItem {
@@ -142,6 +156,11 @@ export interface ChatHandlers {
    * coi là nút vừa bấm.
    */
   onFeedback(ev: FeedbackEvent): Promise<{ recorded: boolean; state?: FeedbackState }>;
+  /**
+   * Nút "Với tôi?": tin được bấm tra về hồ sơ của người bấm ở phía lõi (fail-closed). Không có thì
+   * kênh coi nút là nút lạ.
+   */
+  onForMe?(ev: ForMeEvent): Promise<ForMeResult>;
   /** Không có thì kênh không nhận lệnh chọn chủ đề. */
   topics?: TopicHandlers;
   /** Không có thì kênh không nhận lệnh /profile. */

@@ -9,13 +9,20 @@
  *   3. Lớp thông báo (≤ 7 tin đầu qua sàn thông báo, `pickNotify`) chỉ ĐÁNH DẤU tin trong bản chụp
  *      (`notify_position`), không đổi bản chụp.
  */
-import { createLogger, type DecisionProvider, type HttpClient, pickNotify } from "@radard/core";
+import {
+  createLogger,
+  type DecisionProvider,
+  type HttpClient,
+  type LlmProvider,
+  pickNotify,
+} from "@radard/core";
 import {
   type Database,
   type FeedItem,
   type FeedSnapshot,
   feedItems,
   feedSnapshots,
+  profile,
 } from "@radard/db";
 import { and, asc, eq } from "drizzle-orm";
 import { recordCandidatePoolSafely } from "./candidate-pool.ts";
@@ -27,6 +34,7 @@ import {
   notifyRuleOf,
   type SelectionLearning,
 } from "./selection-learning.ts";
+import { ensureSharedSummaries } from "./summaries.ts";
 
 const log = createLogger("feed");
 const DAY_MS = 86_400_000;
@@ -152,6 +160,11 @@ export interface FeedDeps {
   profileId: number;
   http?: HttpClient;
   decider?: DecisionProvider | null;
+  /**
+   * Model viết tóm tắt chung (`event_summaries`) cho MỌI tin của bản chụp. Không có (hoặc lỗi) thì
+   * tin không có `summary_id` và hiện tiêu đề gốc; không chặn bản chụp.
+   */
+  llm?: LlmProvider | null;
   /** Tính dữ liệu học sau khi chọn (mặc định `computeSelectionLearning`); chỉ test thay. */
   computeLearning?: (rank: RankResult) => SelectionLearning | null;
 }
@@ -179,6 +192,37 @@ async function loadItems(db: Database, s: FeedSnapshot): Promise<FeedItem[]> {
     .from(feedItems)
     .where(and(eq(feedItems.snapshotId, s.id), eq(feedItems.profileId, s.profileId)))
     .orderBy(asc(feedItems.position));
+}
+
+/**
+ * Bảo đảm có tóm tắt chung cho TẤT CẢ tin của bản chụp (quyết định 11/11/2026) và ghi `summary_id`
+ * vào từng tin: tóm tắt đúng như lúc dựng bản chụp, ổn định dù sự kiện về sau có thêm bài. Mọi lỗi
+ * chỉ làm tin thiếu tóm tắt, không chặn bản chụp.
+ */
+async function attachSharedSummaries(deps: FeedDeps, drafts: FeedItemDraft[]): Promise<void> {
+  try {
+    const [prof] = await deps.db
+      .select({ lang: profile.displayLang })
+      .from(profile)
+      .where(eq(profile.id, deps.profileId));
+    const res = await ensureSharedSummaries(
+      { db: deps.db, llm: deps.llm ?? null },
+      drafts,
+      prof?.lang ?? "vi",
+    );
+    for (const d of drafts) d.summaryId = res.byEvent.get(d.eventId)?.id ?? null;
+    log.info("tóm tắt chung của bản chụp", {
+      profileId: deps.profileId,
+      items: drafts.length,
+      requested: res.requested,
+      failed: res.failed,
+    });
+  } catch (err) {
+    log.error("tóm tắt chung lỗi, bản chụp không có tóm tắt", {
+      profileId: deps.profileId,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+    });
+  }
 }
 
 /**
@@ -224,6 +268,7 @@ export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<Fe
     });
   }
   const drafts = feedItemsOf(rank, profileId);
+  await attachSharedSummaries(deps, drafts);
 
   const built = await db.transaction(async (tx) => {
     const [locked] = await tx.select().from(feedSnapshots).where(key).for("update");

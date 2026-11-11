@@ -3,13 +3,16 @@
  * quả giả), update giả đưa vào bằng `bot.handleUpdate`.
  */
 import { describe, expect, test } from "bun:test";
-import type {
-  CustomTopicDraft,
-  FeedbackEvent,
-  ProfileSuggestions,
-  ProfileView,
-  ProposedTopicItem,
-  TopicItem,
+import {
+  type ChatHandlers,
+  type CustomTopicDraft,
+  type FeedbackEvent,
+  FOR_ME_COPY,
+  type ForMeEvent,
+  type ProfileSuggestions,
+  type ProfileView,
+  type ProposedTopicItem,
+  type TopicItem,
 } from "@radard/core";
 import type { Transformer } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
@@ -139,6 +142,104 @@ describe("render", () => {
         { text: "👎 ✓", callback_data: "fb:dislike", style: "danger" },
       ],
     ]);
+  });
+});
+
+describe("nút Với tôi?", () => {
+  const actions = [
+    { id: "like" as const, label: "👍" },
+    { id: "dislike" as const, label: "👎" },
+    { id: "for_me" as const, label: FOR_ME_COPY.button },
+  ];
+
+  test("nằm cạnh 👍/👎, mang fm:ask (ASCII, ≤ 64 byte); chọn 👍 không đổi nút này", () => {
+    expect(feedbackKeyboard(actions).inline_keyboard).toEqual([
+      [
+        { text: "👍", callback_data: "fb:like" },
+        { text: "👎", callback_data: "fb:dislike" },
+        { text: FOR_ME_COPY.button, callback_data: "fm:ask" },
+      ],
+    ]);
+    expect(feedbackKeyboard(actions, "like").inline_keyboard[0]?.[2]).toEqual({
+      text: FOR_ME_COPY.button,
+      callback_data: "fm:ask",
+    });
+  });
+
+  function setup(onForMe?: ChatHandlers["onForMe"]) {
+    const api = fakeApi();
+    const asked: ForMeEvent[] = [];
+    const bot = createTelegramBot(
+      { token: "123:TEST", allowedChatId: ME, botInfo, transformer: api.t },
+      {
+        onFeedback: async () => ({ recorded: true }),
+        ...(onForMe
+          ? {
+              onForMe: async (ev: ForMeEvent) => {
+                asked.push(ev);
+                return onForMe(ev);
+              },
+            }
+          : {}),
+      },
+    );
+    return { bot, asked, calls: api.calls };
+  }
+
+  test("bấm: trả lời ngay để nút hết quay, rồi trả lời trong chat (reply vào tin gốc)", async () => {
+    const { bot, asked, calls } = setup(async () => ({ status: "ok", text: "Câu trả lời." }));
+    await bot.handleUpdate(press("fm:ask"));
+    expect(asked).toEqual([{ channel: "telegram", recipient: ME, messageId: "58" }]);
+    expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery", "sendMessage"]);
+    expect(calls[0]?.payload.text).toBe(FOR_ME_COPY.working);
+    expect(calls[1]?.payload).toMatchObject({
+      chat_id: Number(ME),
+      text: "Câu trả lời.",
+      reply_parameters: { message_id: 58 },
+    });
+  });
+
+  test("not_found / limit / unavailable và lỗi ném ra: báo bằng chuỗi trong FOR_ME_COPY", async () => {
+    for (const [res, text] of [
+      [{ status: "not_found" }, FOR_ME_COPY.notFound],
+      [{ status: "limit" }, FOR_ME_COPY.limit],
+      [{ status: "unavailable" }, FOR_ME_COPY.unavailable],
+    ] as const) {
+      const { bot, calls } = setup(async () => res);
+      await bot.handleUpdate(press("fm:ask"));
+      expect(calls.at(-1)?.payload.text).toBe(text);
+    }
+    const { bot, calls } = setup(async () => {
+      throw new Error("DB rớt");
+    });
+    await bot.handleUpdate(press("fm:ask"));
+    expect(calls.at(-1)?.payload.text).toBe(FOR_ME_COPY.unavailable);
+  });
+
+  test("lõi không hỗ trợ onForMe: chỉ trả lời callback; người lạ bấm: không gọi gì", async () => {
+    const none = setup();
+    await none.bot.handleUpdate(press("fm:ask"));
+    expect(none.calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+    const { bot, asked, calls } = setup(async () => ({ status: "ok", text: "x" }));
+    await bot.handleUpdate(press("fm:ask", "999"));
+    expect(asked).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("bấm 👍 trên tin có nút Với tôi?: bàn phím mới giữ nút đó; tin cũ không có thì không thêm", async () => {
+    const { bot, calls } = setup();
+    const withBtn = press("fb:like");
+    const msg = withBtn.callback_query?.message as { reply_markup?: unknown };
+    msg.reply_markup = feedbackKeyboard(actions);
+    await bot.handleUpdate(withBtn);
+    expect(
+      JSON.stringify(calls.find((c) => c.method === "editMessageReplyMarkup")?.payload),
+    ).toContain("fm:ask");
+    const old = setup();
+    await old.bot.handleUpdate(press("fb:like"));
+    expect(
+      JSON.stringify(old.calls.find((c) => c.method === "editMessageReplyMarkup")?.payload),
+    ).not.toContain("fm:ask");
   });
 });
 
