@@ -78,11 +78,11 @@ export function createImpressionQueue(
   };
 
   return {
-    add(snapshotId: number, position: number, seenAt: string) {
+    add(snapshotId: number, position: number) {
       const key = `${snapshotId}:${position}`;
       if (seen.has(key)) return false;
       seen.add(key);
-      pending.push({ snapshotId, position, seenAt });
+      pending.push({ snapshotId, position });
       if (pending.length >= batchSize) flush();
       else if (timer === undefined) timer = s.set(flush, flushMs);
       return true;

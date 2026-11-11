@@ -70,18 +70,18 @@ describe("createImpressionQueue", () => {
     const sent: unknown[][] = [];
     const c = fakeClock();
     const q = createImpressionQueue((b) => sent.push(b), { scheduler: c.s });
-    expect(q.add(7, 1, "t")).toBe(true);
-    expect(q.add(7, 1, "t2")).toBe(false);
-    expect(q.add(8, 1, "t")).toBe(true); // snapshot khác thì không trùng
+    expect(q.add(7, 1)).toBe(true);
+    expect(q.add(7, 1)).toBe(false);
+    expect(q.add(8, 1)).toBe(true); // snapshot khác thì không trùng
     q.flush();
     expect(sent).toEqual([
       [
-        { snapshotId: 7, position: 1, seenAt: "t" },
-        { snapshotId: 8, position: 1, seenAt: "t" },
+        { snapshotId: 7, position: 1 },
+        { snapshotId: 8, position: 1 },
       ],
     ]);
     // đã gửi rồi vẫn nhớ: không gửi lại ở lô sau
-    expect(q.add(7, 1, "t3")).toBe(false);
+    expect(q.add(7, 1)).toBe(false);
   });
 
   test("gom lô: đủ batchSize thì gửi, không đủ thì gửi sau flushMs", () => {
@@ -92,12 +92,12 @@ describe("createImpressionQueue", () => {
       flushMs: 3000,
       scheduler: c.s,
     });
-    q.add(1, 1, "t");
-    q.add(1, 2, "t");
+    q.add(1, 1);
+    q.add(1, 2);
     expect(sent).toEqual([]);
-    q.add(1, 3, "t");
+    q.add(1, 3);
     expect(sent).toEqual([3]);
-    q.add(1, 4, "t");
+    q.add(1, 4);
     c.tick(3000);
     expect(sent).toEqual([3, 1]);
   });

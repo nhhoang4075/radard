@@ -21,9 +21,9 @@ export function FeedFilters({
   onDate(d: string): void;
   scope: FeedScope;
   onScope(s: FeedScope): void;
-  topics: { id: number; name: string }[];
-  selected: ReadonlySet<number>;
-  onSelected(next: Set<number>): void;
+  topics: string[];
+  selected: ReadonlySet<string>;
+  onSelected(next: Set<string>): void;
 }) {
   const f = strings.feed.filters;
   const today = todayVN();
@@ -33,7 +33,7 @@ export function FeedFilters({
   }));
   const inline = topics.slice(0, INLINE_TOPICS);
   const rest = topics.slice(INLINE_TOPICS);
-  const toggle = (id: number) => {
+  const toggle = (id: string) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -56,18 +56,17 @@ export function FeedFilters({
         {f.topicAll}
       </Chip>
       {inline.map((t) => (
-        <Chip key={t.id} pressed={selected.has(t.id)} onClick={() => toggle(t.id)}>
-          {t.name}
+        <Chip key={t} pressed={selected.has(t)} onClick={() => toggle(t)}>
+          {t}
         </Chip>
       ))}
       {rest.length > 0 ? (
         <MultiSelect
-          values={new Set([...selected].filter((id) => rest.some((t) => t.id === id)).map(String))}
-          options={rest.map((t) => ({ value: String(t.id), label: t.name }))}
-          onChange={(next) => {
-            const keep = [...selected].filter((id) => !rest.some((t) => t.id === id));
-            onSelected(new Set([...keep, ...[...next].map(Number)]));
-          }}
+          values={new Set([...selected].filter((n) => rest.includes(n)))}
+          options={rest.map((n) => ({ value: n, label: n }))}
+          onChange={(next) =>
+            onSelected(new Set([...[...selected].filter((n) => !rest.includes(n)), ...next]))
+          }
           triggerLabel={f.more(rest.length)}
           searchPlaceholder={f.searchTopic}
           emptyLabel={f.noTopic}

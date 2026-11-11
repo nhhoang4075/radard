@@ -1,58 +1,20 @@
 /**
- * Kiểu dữ liệu Feed phía web, theo hợp đồng mục 4 của docs/cau-truc-web.html.
- * GIẢ ĐỊNH cho trường của `items[]` (hợp đồng chỉ nêu tên trường cấp trên): cần backend xác nhận khi làm route.
- * Chỗ này là nguồn duy nhất của kiểu; đổi hợp đồng thì sửa ở đây và ở `lib/feed-client.ts`.
+ * Kiểu dữ liệu Feed lấy thẳng từ API Hono (`hc<AppType>`): đổi hợp đồng ở server thì web báo lỗi kiểu lúc build.
+ * Chỉ thêm kiểu cục bộ cho thứ không đi qua API.
  */
-export type FeedFeedbackKind = "up" | "down";
+import type { InferResponseType } from "hono/client";
+import type { api } from "../../lib/api.ts";
 
-export type FeedItem = {
-  feedItemId: number;
-  /** Vị trí trong bản chụp (1..K), khoá chống trùng lượt hiện. */
-  position: number;
-  eventId: number;
-  title: string;
-  /** Tóm tắt dùng chung; null khi chưa có thì hiện tiêu đề gốc. */
-  summary: string | null;
-  topic: { id: number; name: string } | null;
-  source: { id: number; name: string };
-  /** ISO. */
-  occurredAt: string;
-  score: number;
-  /** Tin nằm trong điểm tin đã gửi Telegram (notifyPosition ≠ null). */
-  inDigest: boolean;
-  /** Sự kiện đã có thêm bài so với lần trước (nhãn "Cập nhật"). */
-  isUpdate: boolean;
-  feedback: FeedFeedbackKind | null;
-};
-
-export type FeedPage = {
-  snapshotId: number;
-  /** YYYY-MM-DD theo giờ Việt Nam. */
-  date: string;
-  total: number;
-  items: FeedItem[];
-  nextCursor: string | null;
-};
-
-export type FeedDates = { dates: { date: string; total: number }[] };
-
-export type EventDetail = {
-  eventId: number;
-  title: string;
-  summary: string | null;
-  topic: { id: number; name: string } | null;
-  articles: { title: string; url: string; source: string; publishedAt: string }[];
-  /** Điểm thành phần của bản chụp, mỗi số 0..1. */
-  components: { r: number; p: number; c: number; a: number; f: number; u: number };
-  score: number;
-  penalty: number;
-};
-
+export type FeedPage = InferResponseType<typeof api.feed.$get, 200>;
+export type FeedItem = FeedPage["items"][number];
+export type FeedDates = InferResponseType<(typeof api.feed.dates)["$get"], 200>;
+export type EventDetail = InferResponseType<(typeof api.events)[":id"]["$get"], 200>;
+export type FeedbackState = FeedItem["feedback"]; // "like" | "dislike" | "none"
+export type FeedbackKind = Exclude<FeedbackState, "none">;
 export type ForMe = { text: string; cached: boolean };
+export type ImpressionInput = { snapshotId: number; position: number };
 
-export type ImpressionInput = { snapshotId: number; position: number; seenAt: string };
-
-/** Lỗi gọi "Với tôi?" phân loại theo mã HTTP đã có ở backend: 429 hết hạn mức, 503 model chưa sẵn sàng. */
+/** Lỗi "Với tôi?" theo mã HTTP của backend: 429 hết hạn mức, 503 model chưa sẵn sàng. */
 export class ForMeError extends Error {
   constructor(readonly kind: "limit" | "unavailable" | "other") {
     super(kind);

@@ -1,8 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
+import { HttpError } from "../../lib/api.ts";
 import { todayVN } from "../../lib/format.ts";
 import { queryKeys } from "../../lib/query-keys.ts";
 import { strings } from "../../lib/strings.vi.ts";
+import { safeUrl } from "../../lib/url.ts";
 import { ShellPanel, useShellPanel } from "../../shell/app-shell.tsx";
 import { Button, Skeleton, State } from "../../ui/index.ts";
 import { EndOfFeed } from "./end-of-feed.tsx";
@@ -16,7 +18,7 @@ import { useFeed, useFeedDates } from "./use-feed.ts";
 import { useFeedKeys } from "./use-feed-keys.ts";
 import { useImpressions } from "./use-impressions.ts";
 
-export type FeedSearch = { date?: string; scope?: FeedScope; topics?: number[]; item?: number };
+export type FeedSearch = { date?: string; scope?: FeedScope; topics?: string[]; item?: number };
 
 export function FeedPage({
   search,
@@ -40,18 +42,14 @@ export function FeedPage({
   const date = first?.date ?? search.date ?? today;
   const fullyLoaded = feed.isSuccess && !feed.hasNextPage;
 
-  const topics = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const i of all) if (i.topic) m.set(i.topic.id, i.topic.name);
-    return [...m].map(([id, name]) => ({ id, name }));
-  }, [all]);
+  const topics = useMemo(() => [...new Set(all.flatMap((i) => (i.topic ? [i.topic] : [])))], [all]);
 
   const visible = useMemo(
     () =>
       all.filter(
         (i) =>
           (scope === "all" || i.inDigest) &&
-          (selectedTopics.size === 0 || (i.topic !== null && selectedTopics.has(i.topic.id))),
+          (selectedTopics.size === 0 || (i.topic !== null && selectedTopics.has(i.topic))),
       ),
     [all, scope, selectedTopics],
   );
@@ -89,7 +87,7 @@ export function FeedPage({
     prev: () => move(-1),
     open: () => {
       const url = selected
-        ? qc.getQueryData<EventDetail>(queryKeys.event(selected.eventId))?.articles[0]?.url
+        ? safeUrl(qc.getQueryData<EventDetail>(queryKeys.event(selected.eventId))?.docs[0]?.url)
         : undefined;
       if (url) window.open(url, "_blank", "noopener,noreferrer");
     },
@@ -97,11 +95,13 @@ export function FeedPage({
 
   const observe = useImpressions(first?.snapshotId);
   const dateList = dates.data?.dates.map((d) => d.date) ?? [];
-  const noSnapshot = feed.isSuccess && first !== undefined && first.snapshotId === 0;
-  const waitingToday =
-    (search.date === undefined || search.date === today) &&
-    !dateList.includes(today) &&
-    dates.isSuccess;
+  const noSnapshot = feed.isError && feed.error instanceof HttpError && feed.error.status === 404;
+  // Bản chụp hôm nay vừa có (hỏi lại 5 giây của danh sách ngày thấy nó): tải lại Feed đang báo 404.
+  const hasToday = dateList.includes(today);
+  useEffect(() => {
+    if (noSnapshot && hasToday) void feed.refetch();
+  }, [noSnapshot, hasToday, feed.refetch]);
+  const waitingToday = (search.date === undefined || search.date === today) && !hasToday;
 
   const setSearch = (patch: Partial<FeedSearch>) =>
     onSearch({ ...search, ...patch, item: undefined });
@@ -137,20 +137,17 @@ export function FeedPage({
         </div>
       ) : null}
 
-      {feed.isError ? (
+      {feed.isError && !noSnapshot ? (
         <State title={strings.feed.loadError}>
           <Button variant="secondary" size="sm" onClick={() => void feed.refetch()}>
             {strings.feed.retry}
           </Button>
         </State>
       ) : null}
-
-      {feed.isSuccess && waitingToday && all.length === 0 ? (
+      {noSnapshot && waitingToday ? (
         <State title={strings.feed.waiting.title}>{strings.feed.waiting.body}</State>
       ) : null}
-      {feed.isSuccess &&
-      !waitingToday &&
-      (noSnapshot || (all.length === 0 && !feed.hasNextPage)) ? (
+      {noSnapshot && !waitingToday ? (
         <State title={strings.feed.noSnapshot.title}>{strings.feed.noSnapshot.body}</State>
       ) : null}
       {feed.isSuccess && all.length > 0 && visible.length === 0 && !feed.hasNextPage ? (

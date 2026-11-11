@@ -19,24 +19,20 @@ export function useImpressions(snapshotId: number | undefined) {
   if (!state.current) {
     const queue = createImpressionQueue((batch) => {
       // Khi trang đang đóng/ẩn dùng sendBeacon (không bị huỷ); còn lại gọi qua client (có thể là fixtures).
-      if (
-        document.visibilityState === "hidden" &&
-        "sendBeacon" in navigator &&
-        (!import.meta.env.DEV || import.meta.env.VITE_FEED_API === "1")
-      ) {
+      if (document.visibilityState === "hidden" && "sendBeacon" in navigator) {
         navigator.sendBeacon(
           "/api/impressions",
-          new Blob([JSON.stringify(batch)], { type: "application/json" }),
+          new Blob([JSON.stringify({ items: batch })], { type: "text/plain" }),
         );
         return;
       }
       void getFeedClient()
-        .then((c) => c.postImpressions(batch))
+        .postImpressions(batch)
         .catch(() => {});
     });
     const dwell = createDwell((key) => {
       const snap = snapRef.current;
-      if (snap) queue.add(snap, Number(key), new Date().toISOString());
+      if (snap) queue.add(snap, Number(key));
     });
     state.current = { queue, dwell };
   }

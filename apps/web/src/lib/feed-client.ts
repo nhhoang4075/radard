@@ -1,83 +1,66 @@
 /**
- * Máy khách Feed: một giao diện, hai cài đặt.
- *  - `fetchClient`: gọi route thật (hợp đồng mục 4 docs/cau-truc-web.html).
- *  - fixtures: dữ liệu giả, CHỈ khi chạy dev và chưa bật `VITE_FEED_API=1` (backend còn thiếu route feed).
- * "Với tôi?" luôn gọi route thật vì đã có ở backend.
+ * Máy khách Feed: một giao diện, cài đặt thật dùng `hc<AppType>` (có kiểu). Có thể thay bằng dữ liệu giả
+ * (`setFeedClient(fixtureClient)`), chỉ dùng cho trang xem trước dev `/_design/feed` không cần đăng nhập.
  */
 import type {
   EventDetail,
+  FeedbackKind,
   FeedDates,
-  FeedFeedbackKind,
   FeedPage,
   ForMe,
   ImpressionInput,
 } from "../features/feed/types.ts";
 import { ForMeError } from "../features/feed/types.ts";
-import { HttpError } from "./api.ts";
+import { api, HttpError } from "./api.ts";
 
 export interface FeedClient {
   getFeed(q: { date?: string; cursor?: string | null }): Promise<FeedPage>;
   getDates(): Promise<FeedDates>;
   getEvent(eventId: number): Promise<EventDetail>;
-  putFeedback(q: { feedItemId: number; kind: FeedFeedbackKind | "clear" }): Promise<void>;
+  /** Bấm lại đúng nút đang chọn thì server bỏ chọn; trả trạng thái mới. */
+  putFeedback(q: { feedItemId: number; kind: FeedbackKind }): Promise<"like" | "dislike" | "none">;
   postImpressions(batch: ImpressionInput[]): Promise<void>;
   forMe(eventId: number): Promise<ForMe>;
 }
 
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) throw new HttpError(res.status);
-  return (await res.json()) as T;
-}
-
-const forMe = async (eventId: number): Promise<ForMe> => {
-  const res = await fetch(`/api/events/${eventId}/for-me`, { method: "POST" });
-  if (res.status === 429) throw new ForMeError("limit");
-  if (res.status === 503) throw new ForMeError("unavailable");
-  if (!res.ok) throw new ForMeError("other");
-  return (await res.json()) as ForMe;
-};
-
 export const fetchClient: FeedClient = {
   async getFeed({ date, cursor }) {
-    const p = new URLSearchParams();
-    if (date) p.set("date", date);
-    if (cursor) p.set("cursor", cursor);
-    return json(await fetch(`/api/feed?${p}`));
-  },
-  async getDates() {
-    return json(await fetch("/api/feed/dates"));
-  },
-  async getEvent(eventId) {
-    return json(await fetch(`/api/events/${eventId}`));
-  },
-  async putFeedback(body) {
-    const res = await fetch("/api/feedback", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+    const res = await api.feed.$get({
+      query: { ...(date ? { date } : {}), ...(cursor ? { cursor } : {}) },
     });
     if (!res.ok) throw new HttpError(res.status);
+    return res.json();
   },
-  async postImpressions(batch) {
-    // keepalive để lô cuối không mất khi trang đóng; lỗi lượt hiện không làm phiền người dùng.
-    await fetch("/api/impressions", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(batch),
-      keepalive: true,
-    });
+  async getDates() {
+    const res = await api.feed.dates.$get();
+    if (!res.ok) throw new HttpError(res.status);
+    return res.json();
   },
-  forMe,
+  async getEvent(eventId) {
+    const res = await api.events[":id"].$get({ param: { id: String(eventId) } });
+    if (!res.ok) throw new HttpError(res.status);
+    return res.json();
+  },
+  async putFeedback(json) {
+    const res = await api.feedback.$put({ json });
+    if (!res.ok) throw new HttpError(res.status);
+    return (await res.json()).state;
+  },
+  async postImpressions(items) {
+    const res = await api.impressions.$post({ json: { items } });
+    if (!res.ok) throw new HttpError(res.status);
+  },
+  async forMe(eventId) {
+    const res = await api.events[":id"]["for-me"].$post({ param: { id: String(eventId) } });
+    if (res.status === 429) throw new ForMeError("limit");
+    if (res.status === 503) throw new ForMeError("unavailable");
+    if (!res.ok) throw new ForMeError("other");
+    return (await res.json()) as ForMe;
+  },
 };
 
-let cached: FeedClient | null = null;
-export async function getFeedClient(): Promise<FeedClient> {
-  if (cached) return cached;
-  if (import.meta.env.DEV && import.meta.env.VITE_FEED_API !== "1") {
-    const { fixtureClient } = await import("../features/feed/fixtures.ts");
-    cached = { ...fixtureClient, forMe };
-  } else {
-    cached = fetchClient;
-  }
-  return cached;
-}
+let current: FeedClient = fetchClient;
+export const getFeedClient = (): FeedClient => current;
+export const setFeedClient = (c: FeedClient): void => {
+  current = c;
+};

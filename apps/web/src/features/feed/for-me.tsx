@@ -14,7 +14,7 @@ export function ForMeZone({ eventId }: { eventId: number }) {
   const t = strings.feed.forMe;
   const q = useQuery({
     queryKey: queryKeys.forMe(eventId),
-    queryFn: async () => (await getFeedClient()).forMe(eventId),
+    queryFn: async () => getFeedClient().forMe(eventId),
     enabled: false,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,

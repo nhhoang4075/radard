@@ -1,5 +1,5 @@
 import type { Ref } from "react";
-import { formatDateTime, formatScore } from "../../lib/format.ts";
+import { formatScore } from "../../lib/format.ts";
 import { strings } from "../../lib/strings.vi.ts";
 import { FeedbackButtons } from "./feedback-buttons.tsx";
 import type { FeedItem } from "./types.ts";
@@ -24,18 +24,20 @@ export function EventCard({
           <span className="fd-title">{item.title}</span>
           {item.summary ? <span className="fd-sum">{item.summary}</span> : null}
           <span className="fd-meta">
-            <span>{item.topic?.name ?? s.noTopic}</span>
+            <span>{item.topic ?? s.noTopic}</span>
             <span aria-hidden="true">·</span>
-            <span>{item.source.name}</span>
-            <span aria-hidden="true">·</span>
-            <span>{formatDateTime(item.occurredAt)}</span>
+            <span>
+              {item.sources.length > 1
+                ? s.mergedFrom(item.sources.length)
+                : (item.sources[0] ?? "")}
+            </span>
             {item.inDigest ? <span className="fd-tag">{s.inDigest}</span> : null}
-            {item.isUpdate ? <span className="fd-tag">{s.update}</span> : null}
+            {item.updated ? <span className="fd-tag">{s.update}</span> : null}
           </span>
         </span>
       </button>
       <div className="fd-side">
-        <span className="fd-score rd-mono">{formatScore(item.score)}</span>
+        <span className="fd-score rd-mono">{formatScore(item.score.s)}</span>
         <FeedbackButtons feedItemId={item.feedItemId} value={item.feedback} />
       </div>
     </div>

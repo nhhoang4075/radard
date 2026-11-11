@@ -6,7 +6,9 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // Trạng thái Feed nằm trên URL: ?date=&scope=&topics=&item=
 function validateSearch(s: Record<string, unknown>): FeedSearch {
   const topics = Array.isArray(s.topics)
-    ? s.topics.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+    ? s.topics
+        .filter((t): t is string => typeof t === "string" && t.length > 0 && t.length <= 100)
+        .slice(0, 20)
     : [];
   const item = Number(s.item);
   return {

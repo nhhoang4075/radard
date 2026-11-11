@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { getFeedClient } from "../../lib/feed-client.ts";
 import { todayVN } from "../../lib/format.ts";
 import { queryKeys } from "../../lib/query-keys.ts";
-import type { FeedFeedbackKind, FeedItem, FeedPage } from "./types.ts";
+import type { FeedbackState, FeedItem, FeedPage } from "./types.ts";
 
 /** Chu kỳ hỏi lại khi chưa có bản chụp hôm nay (quyết định 10/11/2026); có rồi thì dừng. */
 export const POLL_MS = 5000;
@@ -10,7 +10,7 @@ export const POLL_MS = 5000;
 export function useFeedDates() {
   return useQuery({
     queryKey: queryKeys.feedDates,
-    queryFn: async () => (await getFeedClient()).getDates(),
+    queryFn: () => getFeedClient().getDates(),
     refetchInterval: (q) =>
       q.state.data?.dates.some((d) => d.date === todayVN()) ? false : POLL_MS,
   });
@@ -22,7 +22,7 @@ export function useFeed(date: string | undefined) {
     queryKey: queryKeys.feed(date),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
-      (await getFeedClient()).getFeed({ ...(date ? { date } : {}), cursor: pageParam }),
+      getFeedClient().getFeed({ ...(date ? { date } : {}), cursor: pageParam }),
     getNextPageParam: (last: FeedPage) => last.nextCursor ?? undefined,
   });
 }
@@ -30,7 +30,7 @@ export function useFeed(date: string | undefined) {
 /** Cập nhật lạc quan phản hồi của một tin trong mọi trang đã tải; trả hàm hoàn lại. */
 export function useFeedbackPatch() {
   const qc = useQueryClient();
-  return (feedItemId: number, next: FeedFeedbackKind | null) => {
+  return (feedItemId: number, next: FeedbackState) => {
     const snapshots = qc.getQueriesData<{ pages: FeedPage[]; pageParams: unknown[] }>({
       queryKey: ["feed"],
     });

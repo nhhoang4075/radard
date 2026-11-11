@@ -104,6 +104,7 @@ export const strings = {
       noTopic: "Không có chủ đề",
     },
     card: {
+      mergedFrom: (n: number) => `Gộp từ ${n} nguồn`,
       inDigest: "Trong điểm tin",
       update: "Cập nhật",
       readDetail: "Đọc chi tiết",
@@ -137,7 +138,7 @@ export const strings = {
         c: "Độ phủ",
         a: "Uy tín nguồn",
         f: "Tin theo dõi",
-        u: "Độ mới",
+        u: "Hợp gu của bạn",
       },
     },
     forMe: {

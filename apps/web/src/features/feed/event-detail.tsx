@@ -4,6 +4,7 @@ import { getFeedClient } from "../../lib/feed-client.ts";
 import { formatDateTime, formatScore } from "../../lib/format.ts";
 import { queryKeys } from "../../lib/query-keys.ts";
 import { strings } from "../../lib/strings.vi.ts";
+import { safeUrl } from "../../lib/url.ts";
 import { Badge, IconButton, Skeleton, State } from "../../ui/index.ts";
 import { FeedbackButtons } from "./feedback-buttons.tsx";
 import { ForMeZone } from "./for-me.tsx";
@@ -11,7 +12,7 @@ import type { FeedItem } from "./types.ts";
 
 const KEYS = ["r", "p", "c", "a", "f", "u"] as const;
 
-/** Panel phải: tóm tắt, "Với tôi?", các bài đã gộp, vì sao được chọn (điểm thành phần đã lưu, không tính lại). */
+/** Panel phải: tóm tắt, "Với tôi?", các bài đã gộp, vì sao được chọn (điểm đã lưu trong bản chụp, không tính lại). */
 export function EventDetailPanel({
   item,
   onClose,
@@ -23,16 +24,17 @@ export function EventDetailPanel({
   const q = useQuery({
     queryKey: queryKeys.event(item?.eventId ?? 0),
     enabled: item !== null,
-    queryFn: async () => (await getFeedClient()).getEvent(item?.eventId ?? 0),
+    queryFn: () => getFeedClient().getEvent(item?.eventId ?? 0),
   });
   if (!item) return <State>{t.empty}</State>;
   const d = q.data;
+  const firstUrl = safeUrl(d?.docs[0]?.url);
   return (
     <article className="fd-detail">
       <header className="fd-detail-head">
         <div className="fd-detail-tags">
           {item.inDigest ? <Badge status="run">{strings.feed.card.inDigest}</Badge> : null}
-          <Badge status="off">{item.topic?.name ?? strings.feed.card.noTopic}</Badge>
+          <Badge status="off">{item.topic ?? strings.feed.card.noTopic}</Badge>
           <span className="fd-detail-close">
             <IconButton label={t.close} onClick={onClose}>
               <X aria-hidden />
@@ -54,49 +56,63 @@ export function EventDetailPanel({
         ) : null}
         {q.isError ? <State>{t.loadError}</State> : null}
         {d ? (
-          <>
-            <section className="fd-sec">
-              <span className="rd-label">{t.merged}</span>
-              <ul className="fd-tl">
-                {d.articles.map((a) => (
+          <section className="fd-sec">
+            <span className="rd-label">{t.merged}</span>
+            <ul className="fd-tl">
+              {d.docs.map((a) => {
+                const href = safeUrl(a.url);
+                return (
                   <li key={a.url}>
-                    <span className="rd-mono">{formatDateTime(a.publishedAt)}</span>
-                    <a href={a.url} target="_blank" rel="noopener noreferrer">
-                      {a.title} <em>{a.source}</em>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section className="fd-sec">
-              <span className="rd-label">{t.why}</span>
-              <div className="fd-scores">
-                {KEYS.map((k) => (
-                  <div key={k} className="fd-sc">
-                    <span>{t.components[k]}</span>
-                    <span className="fd-bar" aria-hidden="true">
-                      <i style={{ width: `${Math.round(d.components[k] * 100)}%` }} />
+                    <span className="rd-mono">
+                      {a.publishedAt ? formatDateTime(a.publishedAt) : ""}
                     </span>
-                    <span className="rd-mono">{formatScore(d.components[k])}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="rd-muted fd-total">
-                {t.score} <b className="rd-mono">{formatScore(d.score)}</b> · {t.penalty}{" "}
-                <span className="rd-mono">{formatScore(d.penalty)}</span>
-              </p>
-            </section>
-          </>
+                    {href ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer">
+                        {a.title} <em>{a.sourceName}</em>
+                      </a>
+                    ) : (
+                      <span>
+                        {a.title} <em>{a.sourceName}</em>
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         ) : null}
+
+        <section className="fd-sec">
+          <span className="rd-label">{t.why}</span>
+          {d?.why ? <p className="rd-muted fd-why">{d.why}</p> : null}
+          <div className="fd-scores">
+            {KEYS.map((k) => (
+              <div key={k} className="fd-sc">
+                <span>{t.components[k]}</span>
+                <span className="fd-bar" aria-hidden="true">
+                  <i
+                    style={{
+                      width: `${Math.round(Math.min(Math.max(item.score[k], 0), 1) * 100)}%`,
+                    }}
+                  />
+                </span>
+                <span className="rd-mono">{formatScore(item.score[k])}</span>
+              </div>
+            ))}
+          </div>
+          <p className="rd-muted fd-total">
+            {t.score} <b className="rd-mono">{formatScore(item.score.s)}</b>
+          </p>
+        </section>
 
         <div className="fd-detail-actions">
           <FeedbackButtons feedItemId={item.feedItemId} value={item.feedback} />
-          {d?.articles[0] ? (
+          {firstUrl ? (
             <a
               className="rd-btn"
               data-variant="secondary"
               data-size="sm"
-              href={d.articles[0].url}
+              href={firstUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
