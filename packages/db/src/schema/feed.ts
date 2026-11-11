@@ -1,19 +1,19 @@
 /**
- * Feed web (quyết định 10/11/2026, mo-hinh-de-xuat.html: "feed web là nguồn chính, Telegram chỉ là
- * kênh thông báo"):
+ * Web feed (decision 10/11/2026, mo-hinh-de-xuat.html: "the web feed is the main source, Telegram is only a
+ * notification channel"):
  *
- * - `feed_snapshots`: MỘT bản chụp mỗi (hồ sơ, khung 07:00 VN). Dựng một lần, không dựng lại trong
- *   ngày; chạy lại cùng (hồ sơ, khung) dùng lại bản đã lưu. Hạt giống chọn lưu NGAY khi tạo dòng,
- *   trước khi chọn (cùng kiểu `digests.meta.selectSeed`).
- * - `feed_items`: danh sách có thứ tự (vị trí 1..n) của bản chụp, kèm điểm S, phạt, thành phần điểm.
- * - `feed_impressions`: lượt hiện của một vị trí trong bản chụp, mỗi (bản chụp, vị trí) một dòng.
+ * - `feed_snapshots`: ONE snapshot per (profile, 07:00 VN window). Built once, not rebuilt during the
+ *   day; a re-run for the same (profile, window) reuses the saved snapshot. The selection seed is saved RIGHT when the row is created,
+ *   before selecting (same as `digests.meta.selectSeed`).
+ * - `feed_items`: the ordered list (position 1..n) of the snapshot, with score S, penalties and score components.
+ * - `feed_impressions`: views of a position in the snapshot, one row per (snapshot, position).
  *
- * Như `deliveries` và `candidate_pool`, không khoá ngoại vào `events` (dẫn xuất, `events rebuild` đổi
- * id): `document_ids` chụp lại tài liệu của sự kiện lúc chọn.
+ * Like `deliveries` and `candidate_pool`, no foreign key to `events` (derived, `events rebuild` changes
+ * ids): `document_ids` snapshots the event's documents at selection time.
  *
- * Cách ly hồ sơ ở mức DB: `feed_items` trỏ (snapshot_id, profile_id) vào `feed_snapshots`, và
- * `feed_impressions` trỏ (profile_id, snapshot_id, position) vào `feed_items`. Một dòng của hồ sơ A
- * không thể trỏ vào bản chụp của hồ sơ B, kể cả khi code quên lọc.
+ * Profile isolation at the DB level: `feed_items` points (snapshot_id, profile_id) at `feed_snapshots`, and
+ * `feed_impressions` points (profile_id, snapshot_id, position) at `feed_items`. A row of profile A
+ * cannot point at a snapshot of profile B, even if the code forgets to filter.
  */
 import { sql } from "drizzle-orm";
 import {
@@ -40,29 +40,29 @@ export const feedSnapshots = pgTable(
     profileId: integer("profile_id")
       .notNull()
       .references(() => profile.id),
-    /** Khoảng 24 giờ của bản chụp; `period_end` là khung 07:00 VN. */
+    /** The 24-hour window of the snapshot; `period_end` is the 07:00 VN window. */
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
     periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
-    /** building (đã có hạt giống, chưa có tin) | ready (đã lưu đủ danh sách). */
+    /** building (seed set, no items yet) | ready (full list saved). */
     status: text("status").notNull().default("building"),
-    /** Hạt giống chọn Gumbel top-k (số nguyên không dấu 32 bit, crypto), lưu trước khi chọn. */
+    /** Gumbel top-k selection seed (unsigned 32-bit integer, crypto), saved before selecting. */
     selectSeed: bigint("select_seed", { mode: "number" }).notNull(),
-    /** Số tin của bản chụp (≤ feedMaxItems); NULL khi chưa dựng xong. */
+    /** Number of items in the snapshot (≤ feedMaxItems); NULL until built. */
     itemCount: integer("item_count"),
-    /** Sàn feed và sàn thông báo đã dùng (giá trị). Chi tiết (nguồn, q, n, ngày) ở `meta.floors`. */
+    /** Feed floor and notification floor used (values). Details (source, q, n, date) in `meta.floors`. */
     feedFloor: doublePrecision("feed_floor"),
     notifyFloor: doublePrecision("notify_floor"),
-    /** Cấu hình đã đưa vào `select` (K, trần nguồn, T, MMR, sàn…), để tái hiện được lần chọn. */
+    /** Config passed into `select` (K, source cap, T, MMR, floors…), so the selection can be reproduced. */
     config: jsonb<Record<string, unknown>>("config").notNull().default(sql`'{}'::jsonb`),
-    /** `floors`, `ranking` (số đếm, mặt bằng, cổng vùng xám), `learning` (p_i/p_ij của tin báo). */
+    /** `floors`, `ranking` (counts, baselines, grey-zone gate), `learning` (p_i/p_ij of the notified items). */
     meta: jsonb<Record<string, unknown>>("meta").notNull().default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     builtAt: timestamp("built_at", { withTimezone: true }),
   },
   (t) => [
-    // Một bản chụp mỗi (hồ sơ, khung): chạy lại không dựng bản thứ hai.
+    // One snapshot per (profile, window): re-runs do not build a second one.
     unique("feed_snapshots_once_uq").on(t.profileId, t.periodEnd),
-    // Đích của khoá ngoại ghép từ feed_items (cách ly hồ sơ).
+    // Target of the composite foreign key from feed_items (profile isolation).
     unique("feed_snapshots_owner_uq").on(t.id, t.profileId),
     check("feed_snapshots_status_ck", sql`${t.status} in ('building', 'ready')`),
     check("feed_snapshots_seed_ck", sql`${t.selectSeed} >= 0 and ${t.selectSeed} < 4294967296`),
@@ -75,19 +75,19 @@ export const feedItems = pgTable(
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
     profileId: integer("profile_id").notNull(),
     snapshotId: bigint("snapshot_id", { mode: "number" }).notNull(),
-    /** Vị trí trong bản chụp, 1..n, theo S − phạt (thứ tự `select` trả về). */
+    /** Position in the snapshot, 1..n, by S − penalty (the order `select` returns). */
     position: integer("position").notNull(),
-    /** Tham khảo, KHÔNG có khoá ngoại: sẽ sai sau khi dựng lại sự kiện. */
+    /** For reference, NO foreign key: becomes wrong after the event is rebuilt. */
     eventId: bigint("event_id", { mode: "number" }).notNull(),
-    /** Ảnh chụp `documents.id` của sự kiện mà bước xếp hạng đã xét: mối nối bền với dữ liệu gốc. */
+    /** Snapshot of `documents.id` of the event that the ranking step considered: a join that stays stable against the source data. */
     documentIds: bigint("document_ids", { mode: "number" }).array().notNull().default(sql`'{}'`),
-    /** Nguồn của sự kiện (nguồn của tài liệu cho R cao nhất, `Components.sourceId`). */
+    /** Source of the event (source of the document with the highest R, `Components.sourceId`). */
     sourceId: integer("source_id").notNull(),
-    /** Chủ đề cho R cao nhất; NULL khi không khớp chủ đề nào. */
+    /** Topic with the highest R; NULL when no topic matches. */
     topicId: integer("topic_id"),
-    /** Tiêu đề sự kiện lúc chọn (dự phòng khi hiển thị). */
+    /** Event title at selection time (fallback for display). */
     title: text("title").notNull(),
-    /** S (chưa trừ phạt) và phạt trùng MMR. */
+    /** S (before penalty) and MMR duplicate penalty. */
     score: doublePrecision("score").notNull(),
     penalty: doublePrecision("penalty").notNull(),
     r: doublePrecision("r").notNull(),
@@ -97,16 +97,16 @@ export const feedItems = pgTable(
     f: doublePrecision("f").notNull(),
     u: doublePrecision("u").notNull(),
     n: doublePrecision("n").notNull(),
-    /** Tin vào nhờ chỗ giữ cho nguồn. */
+    /** Item got in thanks to the source reservation. */
     reserved: boolean("reserved").notNull(),
     /**
-     * Vị trí trong bản thông báo (Telegram, 1..7) nếu tin được chọn để báo; NULL nếu không. Lớp thông
-     * báo chỉ đọc bản chụp, không ảnh hưởng việc chọn feed.
+     * Position in the notification message (Telegram, 1..7) if the item is picked for notifying; NULL otherwise. The notification layer
+     * only reads the snapshot and does not affect feed selection.
      */
     notifyPosition: integer("notify_position"),
     /**
-     * Tóm tắt chung (`event_summaries`) đúng như lúc dựng bản chụp, ổn định dù sự kiện về sau có thêm
-     * bài. NULL khi chưa có (model lỗi hoặc chưa cấu hình): tin hiện bằng tiêu đề gốc.
+     * Shared summary (`event_summaries`) exactly as when the snapshot was built, stable even if the event later gains
+     * articles. NULL when not available (model error or not configured): the item shows its original title.
      */
     summaryId: bigint("summary_id", { mode: "number" }).references(() => eventSummaries.id, {
       onDelete: "set null",
@@ -116,7 +116,7 @@ export const feedItems = pgTable(
   (t) => [
     unique("feed_items_position_uq").on(t.snapshotId, t.position),
     unique("feed_items_event_uq").on(t.snapshotId, t.eventId),
-    // Đích của khoá ngoại ghép từ deliveries/feedback (id, hồ sơ) và feed_impressions (cách ly hồ sơ).
+    // Target of the composite foreign keys from deliveries/feedback (id, profile) and feed_impressions (profile isolation).
     unique("feed_items_id_owner_uq").on(t.id, t.profileId),
     unique("feed_items_owner_uq").on(t.profileId, t.snapshotId, t.position),
     foreignKey({
@@ -131,9 +131,9 @@ export const feedItems = pgTable(
 );
 
 /**
- * Lượt hiện: tin ở `position` của bản chụp đã hiện trên màn hình (ngưỡng hiện do web đo). Một dòng
- * mỗi (bản chụp, vị trí): ghi lại lần nữa không thêm dòng. Độ sâu cuộn mỗi ngày = vị trí lớn nhất
- * đã hiện của bản chụp ngày đó (`scrollDepths` trong packages/db/src/feed.ts), phục vụ θk sau này.
+ * Impression: the item at `position` of the snapshot shown on screen (the visibility threshold is measured by the web). One row
+ * per (snapshot, position): recording again adds no row. Daily scroll depth = the largest
+ * position shown of that day's snapshot (`scrollDepths` in packages/db/src/feed.ts), used later for θk.
  */
 export const feedImpressions = pgTable(
   "feed_impressions",

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { estimateCost, gatewayPriceBook, parsePrice } from "../src/gateway-pricing.ts";
 
-/** Mục `pricing` thật của anthropic/claude-haiku-5.5 trên ai-gateway.vercel.sh/v1/models, 11/10/2026. */
+/** Real `pricing` entry of anthropic/claude-haiku-5.5 from ai-gateway.vercel.sh/v1/models, 11/10/2026. */
 const HAIKU = {
   input: "0.0000001",
   input_tiers: [

@@ -1,5 +1,5 @@
--- Gắn người nhận với hồ sơ. Thêm cột cho phép trống, điền các dòng cũ bằng hồ sơ hiện có (hiện chỉ
--- có một người dùng; không có dòng profile thì dùng 1), rồi mới đặt NOT NULL và khoá ngoại.
+-- Attach recipients to a profile. Add a nullable column, backfill old rows with the existing profile (currently only
+-- one user exists; if there is no profile row, use 1), then set NOT NULL and the foreign key.
 ALTER TABLE "deliveries" ADD COLUMN "profile_id" integer;--> statement-breakpoint
 ALTER TABLE "digests" ADD COLUMN "profile_id" integer;--> statement-breakpoint
 ALTER TABLE "feedback" ADD COLUMN "profile_id" integer;--> statement-breakpoint

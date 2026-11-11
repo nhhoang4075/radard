@@ -1,6 +1,6 @@
 /**
- * Ghi mỗi lời gọi model vào `llm_calls`. Đặt ở đây vì chỉ package db biết cấu trúc bảng;
- * adapter AI chỉ biết interface `UsageSink` của lõi.
+ * Records each model call into `llm_calls`. Placed here because only the db package knows the table structure;
+ * AI adapters only know the core's `UsageSink` interface.
  */
 import type { UsageSink } from "@radard/core";
 import type { Database } from "./client.ts";

@@ -1,11 +1,11 @@
 /**
- * Bể ứng viên: mọi sự kiện đã qua cổng trong một lần xếp hạng của một hồ sơ, được chọn hay không.
+ * Candidate pool: every event that passed the gate in one ranking run of a profile, whether picked or not.
  *
- * Kế hoạch gửi (`digests.meta.plan`) chỉ giữ điểm của tin ĐƯỢC CHỌN, nên không đủ để tính sàn theo
- * phân vị của S trên mọi sự kiện qua cổng. Bảng này giữ phần còn thiếu.
+ * The send plan (`digests.meta.plan`) keeps scores only for picked items, so it is not enough to compute the floor by
+ * percentile of S over every event that passed the gate. This table keeps the missing part.
  *
- * Như `deliveries`, không khoá ngoại vào `events` (dẫn xuất, `events rebuild` đổi id): `url_canonicals`
- * chụp lại URL các tài liệu của sự kiện lúc xếp hạng để nhận ra sự kiện sau khi dựng lại.
+ * Like `deliveries`, no foreign key to `events` (derived, `events rebuild` changes ids): `url_canonicals`
+ * snapshots the URLs of the event's documents at ranking time to recognize the event after a rebuild.
  */
 import {
   bigint,
@@ -27,12 +27,12 @@ export const candidatePool = pgTable(
     profileId: integer("profile_id")
       .notNull()
       .references(() => profile.id),
-    /** Khoảng xếp hạng, khớp `RankPeriod`. */
+    /** Ranking period, matches `RankPeriod`. */
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
     periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
     eventId: bigint("event_id", { mode: "number" }).notNull(),
     urlCanonicals: text("url_canonicals").array().notNull(),
-    /** Nguồn của tài liệu cho R cao nhất (`Components.sourceId`). */
+    /** Source of the document with the highest R (`Components.sourceId`). */
     sourceId: integer("source_id").notNull(),
     r: doublePrecision("r").notNull(),
     p: doublePrecision("p").notNull(),
@@ -40,14 +40,14 @@ export const candidatePool = pgTable(
     a: doublePrecision("a").notNull(),
     f: doublePrecision("f").notNull(),
     n: doublePrecision("n").notNull(),
-    /** Điểm gu U (0 khi chưa có cụm active); NULL ở dòng ghi trước khi có U (S theo công thức cũ). */
+    /** Taste score U (0 when there is no active cluster yet); NULL on rows written before U existed (S by the old formula). */
     u: doublePrecision("u"),
-    /** S, điểm chưa trừ phạt trùng. */
+    /** S, the score before the duplicate penalty. */
     score: doublePrecision("score").notNull(),
-    /** Phạt MMR; chỉ có với tin được chọn, còn lại NULL. */
+    /** MMR penalty; only set for picked items, NULL otherwise. */
     penalty: doublePrecision("penalty"),
     selected: boolean("selected").notNull(),
-    /** Lý do bị loại (`floor`, `not_new`, `source_cap`, `not_picked`); NULL khi được chọn. */
+    /** Reason for exclusion (`floor`, `not_new`, `source_cap`, `not_picked`); NULL when picked. */
     rejectReason: text("reject_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

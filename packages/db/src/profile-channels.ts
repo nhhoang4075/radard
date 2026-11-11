@@ -1,5 +1,5 @@
 /**
- * Tra và seed ánh xạ người nhận → hồ sơ (bảng `profile_channels`). Không gắn kênh nào cụ thể.
+ * Lookup and seed of the recipient → profile mapping (table `profile_channels`). Does not bind any specific channel.
  */
 import { and, asc, eq } from "drizzle-orm";
 import type { Database } from "./client.ts";
@@ -7,8 +7,8 @@ import { profile } from "./schema/profile.ts";
 import { profileChannels } from "./schema/profile-channels.ts";
 
 /**
- * Hồ sơ của người nhận, hoặc `null` nếu không có trong bảng hay đã tắt. `null` nghĩa là KHÔNG có
- * quyền: người gọi phải bỏ qua, không đọc hay ghi dữ liệu của hồ sơ nào.
+ * The recipient's profile, or `null` if not in the table or disabled. `null` means NO
+ * access: the caller must skip it, reading or writing no profile's data.
  */
 export async function profileOf(
   db: Database,
@@ -28,7 +28,7 @@ export async function profileOf(
   return row?.profileId ?? null;
 }
 
-/** Mọi người nhận đang bật của một kênh, kèm hồ sơ; thứ tự ổn định theo id. */
+/** All enabled recipients of a channel, with profiles; stable order by id. */
 export async function enabledRecipients(
   db: Database,
   channel: string,
@@ -41,8 +41,8 @@ export async function enabledRecipients(
 }
 
 /**
- * Nối người nhận với hồ sơ nếu hồ sơ tồn tại; chạy lại nhiều lần không đổi gì (người nhận đã có
- * dòng, thuộc hồ sơ nào cũng giữ nguyên). Trả `true` khi vừa thêm dòng mới.
+ * Links the recipient to the profile if the profile exists; running it again changes nothing (a recipient that already has
+ * a row keeps whichever profile it belongs to). Returns `true` when a new row was just added.
  */
 export async function seedProfileChannel(
   db: Database,

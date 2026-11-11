@@ -1,6 +1,6 @@
 /**
- * Tải trang và rút chữ: robots.txt, kiểu nội dung, lỗi HTTP; Readability bỏ menu và chân trang.
- * HttpClient giả, không gọi mạng.
+ * Fetching pages and extracting text: robots.txt, content type, HTTP errors; Readability drops the menu and footer.
+ * Fake HttpClient, no network calls.
  */
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { type HttpClient, HttpError, type HttpResponse } from "@radard/core";
@@ -33,7 +33,7 @@ function fakeHttp(
   };
 }
 
-/** DNS giả: mọi tên miền công khai trừ vài tên được dặn riêng. */
+/** Fake DNS: every domain is public except a few names set up separately. */
 const table: Record<string, string[]> = {
   "mixed.example": ["93.184.216.34", "10.0.0.5"],
   "internal.example": ["192.168.1.10"],
@@ -108,7 +108,7 @@ describe("createPageFetcher", () => {
     await f.fetch("https://old1.com/x");
     await f.fetch("https://old2.com/x");
     expect(f.robotsCacheSize?.()).toBe(2);
-    setSystemTime(new Date("2026-10-31T01:00:00Z")); // quá 24 giờ
+    setSystemTime(new Date("2026-10-31T01:00:00Z")); // over 24 hours
     await f.fetch("https://new.com/x");
     expect(f.robotsCacheSize?.()).toBe(1);
   });
@@ -263,7 +263,7 @@ describe("createPageFetcher: SSRF", () => {
       expect(res.status).toBe("deferred");
       expect(res.error).toContain("robots.txt");
       expect(http.asked).toEqual(["https://c.com/robots.txt"]);
-      expect(f.robotsCacheSize?.()).toBe(0); // lỗi không được nhớ: lần sau thử lại
+      expect(f.robotsCacheSize?.()).toBe(0); // errors are not remembered: the next run retries
     }
   });
 
@@ -288,7 +288,7 @@ describe("createPageFetcher: SSRF", () => {
       "https://c.com/p": () => html(ARTICLE),
     });
     const res = await createPageFetcher({ http, resolve }).fetch("https://c.com/p");
-    expect(res.status).toBe("failed"); // chặn chủ động, không phải lỗi tạm
+    expect(res.status).toBe("failed"); // an active block, not a temporary error
     expect(res.error).toContain("127.0.0.1");
     expect(http.asked).not.toContain("https://c.com/p");
   });

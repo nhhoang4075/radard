@@ -1,9 +1,9 @@
 /**
- * Đọc/ghi feed cho vai trò web (endpoint HTTP do phần web làm). Mọi hàm nhận `profileId` của người
- * đang đăng nhập và LỌC theo nó: không có hàm nào đọc hay ghi dữ liệu của hồ sơ khác (fail-closed).
- * Đầu vào sai (bản chụp của hồ sơ khác, vị trí không tồn tại) thì không ghi gì.
+ * Read/write feed for the web role (HTTP endpoints built by the web part). Every function takes the `profileId` of the
+ * logged-in user and FILTERS by it: no function reads or writes another profile's data (fail-closed).
+ * Invalid input (another profile's snapshot, a non-existent position) writes nothing.
  *
- * Bản chụp do daemon dựng (apps/daemon/src/jobs/feed.ts); ở đây chỉ đọc bản `ready`.
+ * Snapshots are built by the daemon (apps/daemon/src/jobs/feed.ts); here we only read `ready` ones.
  */
 import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 import type { Database } from "./client.ts";
@@ -16,7 +16,7 @@ import { eventSummaries } from "./schema/summaries.ts";
 export type FeedSnapshot = typeof feedSnapshots.$inferSelect;
 export type FeedItem = typeof feedItems.$inferSelect;
 
-/** Bản chụp `ready` mới nhất của hồ sơ (hoặc của đúng khung `periodEnd`), `null` nếu chưa có. */
+/** The latest `ready` snapshot of the profile (or of the exact `periodEnd` window), `null` if none. */
 export async function latestFeedSnapshot(
   db: Database,
   profileId: number,
@@ -38,8 +38,8 @@ export async function latestFeedSnapshot(
 }
 
 /**
- * Một trang của bản chụp theo con trỏ vị trí: các tin có vị trí > `after`, tối đa `limit`. Bản chụp
- * không thuộc hồ sơ thì trả rỗng. `done` = đã hết K tin của bản chụp ("hết tin hôm nay").
+ * One page of the snapshot by position cursor: items with position > `after`, up to `limit`. A snapshot
+ * not belonging to the profile returns empty. `done` = all K items of the snapshot have been served ("no more items today").
  */
 export async function feedPage(
   db: Database,
@@ -73,10 +73,10 @@ export type ImpressionResult =
   | { ok: false; invalid: ImpressionInput[] };
 
 /**
- * Ghi một lô lượt hiện. Kiểm trước khi ghi: mọi (bản chụp, vị trí) phải là tin có thật của bản chụp
- * thuộc `profileId`; có MỘT mục sai thì không ghi gì và trả các mục sai. Idempotent: (bản chụp, vị
- * trí) đã có lượt hiện thì bỏ qua, giữ `seen_at` đầu tiên. `seen_at` là giờ máy chủ (không tin giờ
- * của trình duyệt). Khoá ngoại ghép (profile_id, snapshot_id, position) chặn thêm một lần ở DB.
+ * Writes a batch of impressions. Check before writing: every (snapshot, position) must be a real item of the snapshot
+ * belonging to `profileId`; if ONE entry is wrong, nothing is written and the wrong entries are returned. Idempotent: (snapshot, position)
+ * that already has an impression is skipped, keeping the first `seen_at`. `seen_at` is server time (not
+ * the browser's clock). The composite foreign key (profile_id, snapshot_id, position) blocks it once more in the DB.
  */
 export async function recordImpressions(
   db: Database,
@@ -117,17 +117,17 @@ export async function recordImpressions(
 export interface ScrollDepth {
   snapshotId: number;
   periodEnd: Date;
-  /** Số tin của bản chụp (K của ngày đó). */
+  /** Number of items in the snapshot (K of that day). */
   itemCount: number;
-  /** Vị trí lớn nhất đã hiện; 0 khi ngày đó không có lượt hiện nào. */
+  /** Largest position shown; 0 when that day has no impressions. */
   deepestPosition: number;
-  /** Cuộn hết bản chụp: dữ liệu bị chặn (không biết người dùng còn muốn đọc thêm bao nhiêu). */
+  /** Scrolled through the whole snapshot: data is capped (we do not know how much more the user wants to read). */
   censored: boolean;
 }
 
 /**
- * Độ sâu cuộn tối đa mỗi ngày (mỗi bản chụp `ready` có `period_end` trong [from, to)) của hồ sơ, cũ
- * đến mới. Dữ liệu để ước lượng h của θk = (1 − h)^(k−1) sau này; chưa dùng ở đâu.
+ * Maximum scroll depth per day (each `ready` snapshot with `period_end` in [from, to)) of the profile, oldest
+ * to newest. Data for estimating h of θk = (1 − h)^(k−1) later; not used anywhere yet.
  */
 export async function scrollDepths(
   db: Database,
@@ -171,7 +171,7 @@ export async function scrollDepths(
   });
 }
 
-/** Kênh ghi vào `feedback.channel` cho phản hồi từ web. */
+/** Channel written to `feedback.channel` for feedback from the web. */
 export const WEB_FEEDBACK_CHANNEL = "web";
 
 export type FeedFeedbackResult =
@@ -179,11 +179,11 @@ export type FeedFeedbackResult =
   | { ok: false; reason: "not_found" };
 
 /**
- * Phản hồi 👍/👎 từ web cho một tin feed. Cùng quy ước với phản hồi Telegram (jobs/feedback.ts):
- * chỉ ghi thêm; bấm lại đúng nút đang chọn là bỏ chọn (dòng `clear`). Ý kiến hiện tại của tin là dòng
- * mới nhất có `feed_item_id` này, dù đến từ Telegram hay web. Tin không thuộc `profileId` thì
- * `not_found`, không ghi gì. Tin đã gửi qua Telegram thì dòng mới cũng mang `delivery_id` của tin đó,
- * để phần đọc phản hồi theo delivery hiện có (cụm gu) thấy cả phản hồi từ web.
+ * 👍/👎 feedback from the web on a feed item. Same convention as Telegram feedback (jobs/feedback.ts):
+ * append only; pressing the same button again clears it (a `clear` row). The current opinion on an item is the row
+ * with the latest `feed_item_id`, whether it came from Telegram or the web. An item not belonging to `profileId` gives
+ * `not_found`, and nothing is written. For an item sent via Telegram, the new row also carries that item's `delivery_id`,
+ * so the existing per-delivery feedback reader (taste clusters) also sees the web feedback.
  */
 export async function recordFeedFeedback(
   db: Database,
@@ -238,12 +238,12 @@ export async function recordFeedFeedback(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Đọc cho route /api/feed (mọi hàm bắt buộc `profileId` và lọc theo nó)
+// Reads for the /api/feed route (every function requires `profileId` and filters by it)
 // ---------------------------------------------------------------------------------------------
 
 export type FeedbackState = "like" | "dislike" | "none";
 
-/** Ngày giờ VN (YYYY-MM-DD) của một thời điểm. */
+/** VN date (YYYY-MM-DD) of a moment. */
 export function vnDate(d: Date): string {
   return new Date(d.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
 }
@@ -252,8 +252,8 @@ const vnDateSql = (col: typeof feedSnapshots.periodEnd) =>
   sql<string>`to_char(${col} at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')`;
 
 /**
- * Bản chụp `ready` của hồ sơ có `period_end` rơi vào ngày VN `date` (YYYY-MM-DD); `null` nếu không có.
- * `date` không phải ngày thật (ví dụ 2026-02-31) cũng là `null`.
+ * The `ready` snapshot of the profile whose `period_end` falls on VN date `date` (YYYY-MM-DD); `null` if none.
+ * A `date` that is not a real day (e.g. 2026-02-31) is also `null`.
  */
 export async function feedSnapshotOnDate(
   db: Database,
@@ -279,7 +279,7 @@ export async function feedSnapshotOnDate(
   return row ?? null;
 }
 
-/** Các ngày có bản chụp `ready` của hồ sơ, mới nhất trước. */
+/** Days that have a `ready` snapshot of the profile, newest first. */
 export async function feedDates(
   db: Database,
   q: { profileId: number; limit?: number },
@@ -299,8 +299,8 @@ export async function feedDates(
 }
 
 /**
- * Trạng thái phản hồi hiện tại của hồ sơ cho các tin: dòng mới nhất (like/dislike/clear) của từng
- * `feed_item_id`, bất kể kênh (cùng quy ước `recordFeedFeedback`). Không có dòng thì `none`.
+ * Current feedback state of the profile for items: the latest row (like/dislike/clear) of each
+ * `feed_item_id`, regardless of channel (same convention as `recordFeedFeedback`). No row gives `none`.
  */
 export async function feedbackStates(
   db: Database,
@@ -337,9 +337,9 @@ export interface FeedItemView {
   title: string;
   summary: string | null;
   topic: string | null;
-  /** Số tên nguồn khác nhau (= sources.length). */
+  /** Number of distinct source names (= sources.length). */
   sourceCount: number;
-  /** Số bài khác nhau (distinct url_canonical). */
+  /** Number of distinct articles (distinct url_canonical). */
   articleCount: number;
   sources: string[];
   updated: boolean;
@@ -349,7 +349,7 @@ export interface FeedItemView {
   score: { s: number; r: number; p: number; c: number; a: number; f: number; u: number; n: number };
 }
 
-/** Tên chủ đề, tóm tắt chung của các dòng feed (chỉ nhận dòng đã lọc theo hồ sơ). */
+/** Topic name and shared summary of feed rows (accepts only rows already filtered by profile). */
 async function decorate(
   db: Database,
   profileId: number,
@@ -414,8 +414,8 @@ async function decorate(
 }
 
 /**
- * Một trang tin của bản chụp để hiện: `feedPage` (đã lọc hồ sơ) kèm tóm tắt chung, nhãn chủ đề, tên
- * nguồn và phản hồi hiện tại. Bản chụp không thuộc hồ sơ thì rỗng.
+ * One page of items of the snapshot to show: `feedPage` (profile-filtered) with the shared summary, topic label, name
+ * of source and current feedback. A snapshot not belonging to the profile is empty.
  */
 export async function feedItemsView(
   db: Database,
@@ -430,8 +430,8 @@ export async function feedItemsView(
 }
 
 /**
- * Tin feed MỚI NHẤT của hồ sơ cho một sự kiện (kèm các trường như `feedItemsView`) và các
- * `documentIds` đã chụp; `null` nếu sự kiện không nằm trong feed của hồ sơ.
+ * The LATEST feed item of the profile for an event (with fields like `feedItemsView`) and the
+ * captured `documentIds`; `null` if the event is not in the profile's feed.
  */
 export async function feedItemForEvent(
   db: Database,

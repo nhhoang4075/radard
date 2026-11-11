@@ -1,5 +1,5 @@
 /**
- * Bảng vận hành: không phải dữ liệu nghiệp vụ, mà là số đo để biết hệ thống tốn bao nhiêu.
+ * Operational tables: not business data, but measurements showing how much the system costs.
  */
 import {
   bigint,
@@ -12,7 +12,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-/** Mỗi lời gọi model một dòng: chi phí thật đo được, theo từng việc của pipeline. */
+/** One row per model call: real measured cost, per pipeline step. */
 export const llmCalls = pgTable(
   "llm_calls",
   {
@@ -25,7 +25,7 @@ export const llmCalls = pgTable(
     outputTokens: integer("output_tokens").notNull(),
     reasoningTokens: integer("reasoning_tokens").notNull(),
     costUsd: numeric("cost_usd", { precision: 12, scale: 8, mode: "number" }).notNull(),
-    /** gateway (số Gateway báo) | estimate (tính từ bảng giá có bậc) | unknown. Trước 11/10: trống. */
+    /** gateway (the number Gateway reports) | estimate (computed from a tiered price table) | unknown. Before 11/10: empty. */
     costSource: text("cost_source"),
     generationId: text("generation_id"),
     latencyMs: integer("latency_ms").notNull(),

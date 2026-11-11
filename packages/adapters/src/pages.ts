@@ -1,15 +1,15 @@
 /**
- * Tải trang được link tới và rút phần chữ chính.
+ * Fetches the linked page and extracts its main text.
  *
- * - Chặn SSRF: chỉ http/https cổng 80/443, mọi địa chỉ DNS phải công khai, redirect đi tay tối đa 5
- *   bước và mỗi đích kiểm lại (xem `@radard/core` url-guard).
- * - Tôn trọng robots.txt theo host của TỪNG bước (nên là host cuối sau redirect), đọc một lần mỗi
- *   host trong mỗi tiến trình, giữ 24 giờ. Theo RFC 9309: 4xx = không có luật, cho tải; 5xx hoặc
- *   không kết nối được = không tải trang.
- * - Chỉ đọc HTML, tối đa `maxBytes`; PDF, ảnh, video bỏ qua.
- * - Rút chữ bằng Readability (bộ "chế độ đọc" của Firefox) trên DOM của linkedom. Thử trên 40 link
- *   HN thật ngày 13/10/2026: 30 trang rút được chữ (trung vị 7.800 ký tự), 4 trang chặn bằng
- *   401/403 (WSJ, Reuters, NYT), 6 trang gần như không có chữ (YouTube, trang chỉ chạy JS).
+ * - Blocks SSRF: only http/https on ports 80/443, every DNS address must be public, manual redirects up to 5
+ *   steps, and each target is checked again (see `@radard/core` url-guard).
+ * - Honors robots.txt per host of EACH step (so the final host after redirects), read once per
+ *   host in each process, cached for 24 hours. Per RFC 9309: 4xx = no rules, fetching allowed; 5xx or
+ *   unreachable = do not fetch the page.
+ * - Reads HTML only, up to `maxBytes`; PDFs, images and videos are skipped.
+ * - Extracts text with Readability (Firefox's "reader mode" engine) on the linkedom DOM. Tried on 40 links
+ *   real HN links on 13/10/2026: 30 pages yielded text (median 7.800 characters), 4 pages blocked with
+ *   401/403 (WSJ, Reuters, NYT), 6 pages had almost no text (YouTube, pages that only run JS).
  */
 import { Readability } from "@mozilla/readability";
 import {
@@ -31,21 +31,21 @@ import {
 import { parseHTML } from "linkedom";
 import robotsParser from "robots-parser";
 
-/** Tên bot trong robots.txt (khớp phần đầu User-Agent của HttpClient). */
+/** Bot name in robots.txt (matches the start of the HttpClient User-Agent). */
 const BOT = "radard";
-/** Số địa chỉ tối đa thử khi kết nối không được. */
+/** Maximum number of addresses to try when connecting fails. */
 const MAX_PIN_ATTEMPTS = 3;
 const ROBOTS_TTL_MS = 24 * 3_600_000;
-/** Dưới mức này coi như không rút được gì: trang chỉ có khung, cần JavaScript. */
+/** Below this level nothing counts as extracted: the page is only a shell and needs JavaScript. */
 const MIN_TEXT_CHARS = 300;
 
 export function createPageFetcher(opts: {
   http: HttpClient;
   maxBytes?: number;
   timeoutMs?: number;
-  /** Phân giải DNS; tiêm được để test không cần mạng. Mặc định `node:dns/promises`. */
+  /** DNS resolver; injectable so tests need no network. Default `node:dns/promises`. */
   resolve?: AddressResolver;
-  /** Kết nối thẳng tới địa chỉ đã kiểm (mặc định `true`); chỉ tắt trong test dùng client giả. */
+  /** Connects directly to the checked address (default `true`); only disabled in tests that use a fake client. */
   pinAddress?: boolean;
 }): PageFetcher {
   type Rules = { at: number; allowed: (url: string) => boolean };
@@ -53,8 +53,8 @@ export function createPageFetcher(opts: {
   const resolve = opts.resolve ?? defaultResolver;
 
   /**
-   * GET kết nối thẳng tới một địa chỉ ĐÃ KIỂM (chống DNS rebinding). Thử lần lượt tối đa
-   * `MAX_PIN_ATTEMPTS` địa chỉ khi không kết nối được (như happy eyeballs thô); lỗi HTTP thì dừng.
+   * GET connects directly to a CHECKED address (prevents DNS rebinding). Tries in turn up to
+   * `MAX_PIN_ATTEMPTS` addresses when connecting fails (a crude happy eyeballs); an HTTP error stops.
    */
   async function getPinned(
     url: string,
@@ -76,9 +76,9 @@ export function createPageFetcher(opts: {
   }
 
   /**
-   * GET một URL, đi theo redirect bằng tay tối đa `MAX_REDIRECTS` bước. MỖI đích (kể cả đích đầu)
-   * qua `assertPublicUrl` (lược đồ, cổng, mọi địa chỉ) rồi mới gửi request; `gate` chạy trước mỗi
-   * request để robots.txt tính theo đúng host của bước đó. Trả `null` khi `gate` từ chối.
+   * GETs a URL, following redirects manually for up to `MAX_REDIRECTS` steps. EACH target (including the first)
+   * goes through `assertPublicUrl` (scheme, port, every address) before a request is sent; `gate` runs before each
+   * request, so robots.txt is checked against that step's host. Returns `null` when `gate` refuses.
    */
   async function guardedGet(
     start: string,
@@ -102,7 +102,7 @@ export function createPageFetcher(opts: {
     for (const [key, entry] of robots) if (now - entry.at >= ROBOTS_TTL_MS) robots.delete(key);
   }
 
-  /** `unreachable`: robots.txt 5xx, quá giờ hoặc không kết nối được → không tải trang (RFC 9309 §2.3.1.4). */
+  /** `unreachable`: robots.txt 5xx, timed out or not reachable → do not fetch the page (RFC 9309 §2.3.1.4). */
   async function robotsFor(url: string): Promise<Rules | "unreachable"> {
     const origin = new URL(url).origin;
     const hit = robots.get(origin);
@@ -118,15 +118,15 @@ export function createPageFetcher(opts: {
         const parsed = robotsParser(`${origin}/robots.txt`, got.res.body);
         check = (u) => parsed.isAllowed(u, BOT) !== false;
       }
-      // Các mã 3xx còn lại (không có location): coi như không có luật.
+      // Other 3xx codes (no location): treated as no rules.
     } catch (err) {
-      // 4xx (404…): không có robots.txt, được tải. 5xx, lỗi mạng, bị chặn: không được tải.
-      // Bị url-guard chặn (redirect vào địa chỉ riêng...) là chặn chủ động, không phải lỗi tạm: lỗi
-      // này bay lên `fetch` và thành `failed`.
+      // 4xx (404…): no robots.txt, fetching allowed. 5xx, network error, blocked: fetching not allowed.
+      // Blocked by url-guard (a redirect into a private address...) is an active block, not a temporary error: the error
+      // propagates out of `fetch` and becomes `failed`.
       if (err instanceof UrlBlockedError) throw err;
       if (!(err instanceof HttpError) || err.status >= 500) return "unreachable";
     }
-    // Mục hết hạn của host không gặp lại sẽ không bao giờ bị ghi đè, nên dọn ở đây để Map không phình.
+    // Expired entries of a host that is not seen again are never overwritten, so clean them up here to keep the Map from growing.
     const now = Date.now();
     sweepExpired(now);
     const rules = { at: now, allowed: check };
@@ -138,7 +138,7 @@ export function createPageFetcher(opts: {
     robotsCacheSize: () => robots.size,
     async fetch(url) {
       try {
-        // Kiểm lược đồ và cổng trước mọi thứ khác: URL sai thì không có request nào ra mạng.
+        // Check scheme and port before anything else: a bad URL sends no request to the network.
         checkUrlShape(url);
         const got = await guardedGet(
           url,
@@ -150,7 +150,7 @@ export function createPageFetcher(opts: {
           async (hopUrl) => {
             const rules = await robotsFor(hopUrl);
             if (rules === "unreachable") {
-              // Hoãn: job không ghi dòng nào, lần chạy sau tự chọn lại URL này.
+              // Defer: the job writes no row, and the next run picks this URL again.
               return { status: "deferred", error: "robots.txt không đọc được (5xx hoặc lỗi mạng)" };
             }
             return rules.allowed(hopUrl)
@@ -183,7 +183,7 @@ export function createPageFetcher(opts: {
 export const extractPageText: PageExtractor = (html, url) => {
   try {
     const { document } = parseHTML(html);
-    // Readability đọc `baseURI` để giải link tương đối; linkedom không có, nên gắn thẻ <base>.
+    // Readability reads `baseURI` to resolve relative links; linkedom does not have it, so a <base> tag is attached.
     const base = document.createElement("base");
     base.setAttribute("href", url);
     document.head?.appendChild(base);

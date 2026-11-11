@@ -11,19 +11,19 @@ ALTER TABLE "doc_topic_scores" ADD COLUMN "topic_id" bigint;--> statement-breakp
 ALTER TABLE "topics" ADD CONSTRAINT "topics_owner_profile_id_profile_id_fk" FOREIGN KEY ("owner_profile_id") REFERENCES "public"."profile"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "baselines" ADD CONSTRAINT "baselines_topic_id_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "doc_topic_scores" ADD CONSTRAINT "doc_topic_scores_topic_id_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
--- Chuyển dữ liệu sang mô hình mới (13/10/2026): embedding nằm ở `topics`, chủ đề tự thêm thành một dòng
--- `topics`, điểm và mặt bằng khoá theo `topic_id`. Cột cũ bỏ ở migration 0014.
--- 1. Embedding của chủ đề thư viện đã chọn chuyển sang `topics`.
+-- Moves data to the new model (13/10/2026): embeddings live in `topics`, user-added topics become one row in
+-- `topics`, scores and baselines keyed by `topic_id`. Old columns are dropped in migration 0014.
+-- 1. Embeddings of the chosen library topics move to `topics`.
 UPDATE "topics" t SET "embedding" = pt."embedding", "embedding_model" = pt."embedding_model"
 FROM "profile_topics" pt WHERE pt."topic_id" = t."id" AND pt."embedding" IS NOT NULL;--> statement-breakpoint
--- 2. Chủ đề tự thêm thành dòng `topics` của hồ sơ, rồi `profile_topics` trỏ về dòng đó.
+-- 2. User-added topics become a `topics` row of the profile, then `profile_topics` points at that row.
 ALTER TABLE "topics" ADD COLUMN "legacy_profile_topic_id" bigint;--> statement-breakpoint
 INSERT INTO "topics" ("label_vi", "description_en", "description_user", "origin", "owner_profile_id", "embedding", "embedding_model", "legacy_profile_topic_id")
 SELECT "label", "description_en", "description_user", 'custom', "profile_id", "embedding", "embedding_model", "id"
 FROM "profile_topics" WHERE "origin" = 'custom';--> statement-breakpoint
 UPDATE "profile_topics" pt SET "topic_id" = t."id" FROM "topics" t WHERE t."legacy_profile_topic_id" = pt."id";--> statement-breakpoint
 ALTER TABLE "topics" DROP COLUMN "legacy_profile_topic_id";--> statement-breakpoint
--- 3. Điểm và mặt bằng giữ nguyên giá trị, chỉ đổi khoá sang `topic_id`.
+-- 3. Scores and baselines keep their values; only the key changes to `topic_id`.
 UPDATE "doc_topic_scores" s SET "topic_id" = pt."topic_id" FROM "profile_topics" pt WHERE pt."id" = s."profile_topic_id";--> statement-breakpoint
 UPDATE "baselines" b SET "topic_id" = pt."topic_id" FROM "profile_topics" pt WHERE pt."id" = b."profile_topic_id";--> statement-breakpoint
 CREATE UNIQUE INDEX "topics_custom_label_uq" ON "topics" USING btree ("owner_profile_id",lower("label_vi")) WHERE "topics"."origin" = 'custom';--> statement-breakpoint

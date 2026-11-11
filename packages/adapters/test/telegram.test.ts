@@ -1,6 +1,6 @@
 /**
- * Adapter Telegram không gọi mạng: một transformer chặn mọi lời gọi Bot API (ghi lại và trả kết
- * quả giả), update giả đưa vào bằng `bot.handleUpdate`.
+ * Telegram adapter without network calls: a transformer intercepts every Bot API call (records it and returns a
+ * fake result), fake updates are fed in via `bot.handleUpdate`.
  */
 import { describe, expect, test } from "bun:test";
 import {
@@ -45,7 +45,7 @@ const botInfo = {
 
 type Call = { method: string; payload: Record<string, unknown> };
 
-/** Transformer giả: ghi lời gọi; `fail` trả lỗi Telegram cho phương thức đó. */
+/** Fake transformer: records the call; `fail` returns a Telegram error for that method. */
 function fakeApi(fail: Record<string, string> = {}) {
   const calls: Call[] = [];
   const t: Transformer = async (_prev, method, payload) => {
@@ -443,7 +443,7 @@ describe("bot: chọn chủ đề", () => {
       ["Tự thêm chủ đề", "Xong"],
     ]);
     expect(kb[0]?.[1]?.callback_data).toBe("tp:t:l:2");
-    // Màu: đang bật xanh lá, đang tắt mặc định, hai nút hành động xanh dương.
+    // Colours: enabled is green, disabled is default, the two action buttons are blue.
     expect(kb.map((row) => row.map((b) => (b as { style?: string }).style ?? "-"))).toEqual([
       ["success", "-"],
       ["success"],
@@ -523,9 +523,9 @@ describe("bot: /profile", () => {
       { key: "l:5", label: "Xây ứng dụng LLM", tier: "preselect", checked: true },
       { key: "l:2", label: "Huấn luyện và tối ưu model", tier: "preselect", checked: true },
       { key: "l:11", label: "An toàn và bảo mật AI", tier: "maybe", checked: false },
-      // Đang bật từ trước: tích sẵn dù ở mức "có thể quan tâm".
+      // Already enabled before: pre-ticked even at the "may interest" level.
       { key: "l:13", label: "ML nền tảng", tier: "maybe", checked: true },
-      // Đang theo dõi nhưng không được gợi ý: vẫn hiện, tích sẵn.
+      // Followed but not suggested: still shown, pre-ticked.
       { key: "l:9", label: "Trợ lý và ứng dụng AI", tier: "followed", checked: true },
     ],
     newTopics: [
@@ -617,7 +617,7 @@ describe("bot: /profile", () => {
       ['Thêm "Ngôn ngữ, runtime và cơ sở dữ liệu"'],
       ["Lưu"],
     ]);
-    // Mọi callback_data ≤ 64 byte.
+    // Every callback_data ≤ 64 bytes.
     for (const row of keyboardOf(msg))
       for (const b of row) expect(Buffer.byteLength(b.callback_data)).toBeLessThanOrEqual(64);
     expect(JSON.stringify(calls)).not.toMatch(/✅|✔️|➕|digest/);
@@ -635,7 +635,7 @@ describe("bot: /profile", () => {
     expect(calls.at(-1)?.payload.text).toBe(
       "Đã lưu: bạn đang theo dõi 7 chủ đề. Điểm tin lần tới sẽ dùng các chủ đề này.",
     );
-    // Đã lưu thì tin hết hiệu lực: bấm lại không áp dụng lần nữa.
+    // Once saved, the message is no longer valid: pressing again does not apply anything again.
     await bot.handleUpdate(press("pf:save"));
     expect(applied).toHaveLength(1);
   });
@@ -773,7 +773,7 @@ describe("keepPolling", () => {
           calls++;
           if (calls <= 2) throw new Error("409: Conflict: terminated by other getUpdates request");
           onStarted();
-          stopped = true; // daemon tắt: lần lỗi sau không chạy lại
+          stopped = true; // daemon stopped: the next error does not run again
           done();
           throw new Error("đã dừng");
         },

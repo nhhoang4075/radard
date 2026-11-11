@@ -1,6 +1,6 @@
 /**
- * Notifier giả trong bộ nhớ, không gọi mạng: test đọc `sent` để kiểm. `failAfter` làm lần gửi thứ
- * (failAfter + 1) ném lỗi, để thử "chết giữa chừng rồi chạy lại thì gửi tiếp".
+ * In-memory fake notifier, no network calls: tests read `sent` to check. `failAfter` makes send number
+ * (failAfter + 1) throw, to test "dies midway, then re-runs and keeps sending".
  */
 import type { Message, Notifier } from "@radard/core";
 

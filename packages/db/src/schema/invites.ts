@@ -1,8 +1,8 @@
 /**
- * Danh sách mời: chỉ email có ở đây (hoặc email trong `BOOTSTRAP_OWNER_EMAILS` khi chưa có owner) mới đăng ký được. Hook "trước khi
- * tạo user" của Better Auth tra bảng này và từ chối khi không thấy hoặc khi lỗi (fail-closed).
+ * Invite list: only emails listed here (or emails in `BOOTSTRAP_OWNER_EMAILS` while there is no owner yet) can sign up. The "before
+ * create user" hook of Better Auth looks up this table and rejects when not found or on error (fail-closed).
  *
- * `email` luôn chữ thường (ràng buộc CHECK) để so sánh không phụ thuộc cách gõ hoa/thường.
+ * `email` is always lowercase (CHECK constraint) so comparison does not depend on letter case.
  */
 import { sql } from "drizzle-orm";
 import { check, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
@@ -13,14 +13,14 @@ export const invites = pgTable(
   {
     id: serial("id").primaryKey(),
     email: text("email").notNull().unique(),
-    /** Hồ sơ của người mời; trống khi chủ dự án thêm trực tiếp. */
+    /** Profile of the inviter; empty when the project owner adds directly. */
     invitedByProfileId: integer("invited_by_profile_id").references(() => profile.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    /** Lúc người được mời đăng ký xong; trống = chưa dùng. */
+    /** When the invitee finishes signing up; empty = not used yet. */
     usedAt: timestamp("used_at", { withTimezone: true }),
-    /** Vai trò cấp khi người được mời đăng ký: `member` (mặc định) hoặc `owner`. */
+    /** Role granted when the invitee signs up: `member` (default) or `owner`. */
     role: text("role").notNull().default("member"),
   },
   (t) => [

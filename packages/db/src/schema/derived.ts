@@ -1,11 +1,11 @@
 /**
- * Dữ liệu dẫn xuất (MVP-0): văn bản đã chuẩn hoá, embedding, sự kiện.
+ * Derived data (MVP-0): normalized text, embeddings, events.
  *
- * Mọi thứ ở đây DẪN XUẤT từ dữ liệu thu thập (collected.ts): xoá đi và chạy lại được. Mỗi dòng
- * ghi model embedding đã tạo ra nó, để khi đổi model biết phải tính lại những gì.
+ * Everything here is DERIVED from the collected data (collected.ts): it can be deleted and rebuilt. Each row
+ * records the embedding model that produced it, so when the model changes we know what to recompute.
  *
- * Ở đây không có gì phụ thuộc hồ sơ người dùng (quyết định D4, 12/10/2026): mọi tài liệu được
- * embed và gộp thành sự kiện. Điểm theo chủ đề của người dùng nằm ở `scores.ts`.
+ * Nothing here depends on user profiles (decision D4, 12/10/2026): every document is
+ * embedded and merged into events. Per-user topic scores live in `scores.ts`.
  */
 import {
   bigint,
@@ -21,8 +21,8 @@ import {
 import { documents } from "./collected.ts";
 
 /**
- * Số chiều của `alibaba/qwen3-embedding-0.6b`. CHƯA kiểm chứng qua Gateway (cần khoá API):
- * adapter từ chối vector khác số chiều, nên sai thì hỏng sớm ở lần gọi đầu, không hỏng dữ liệu.
+ * Dimensions of `alibaba/qwen3-embedding-0.6b`. NOT yet verified through Gateway (needs an API key):
+ * the adapter rejects vectors of other dimensions, so a mistake fails early on the first call instead of corrupting data.
  */
 export const EMBED_DIMENSIONS = 1024;
 
@@ -30,19 +30,19 @@ export const docText = pgTable("doc_text", {
   documentId: bigint("document_id", { mode: "number" })
     .primaryKey()
     .references(() => documents.id, { onDelete: "cascade" }),
-  /** Văn bản đầy đủ (gồm phần chữ của trang nếu có), ngôn ngữ gốc, đã NFC. Digest trích từ đây. */
+  /** Full text (including the page's text if any), original language, NFC-normalized. The digest is extracted from here. */
   text: text("text").notNull(),
-  /** Mã ISO 639-3 do franc đoán (`eng`, `vie`…); `und` khi quá ngắn để đoán. */
+  /** ISO 639-3 code guessed by franc (`eng`, `vie`…); `und` when too short to guess. */
   lang: text("lang").notNull(),
   /**
-   * Vector của bản thô của nguồn (tiêu đề, abstract, ghi chú phát hành): dùng để GỘP sự kiện.
-   * Ngưỡng gộp 0,9 được chỉnh trên vector này; vector có nội dung trang thì hai bài cùng chuyện ở
-   * hai trang khác nhau chỉ còn cosine 0,6–0,88 (đo 13/10/2026 trên 292 cặp), gộp hỏng.
+   * Vector of the source's raw text (title, abstract, release notes): used to MERGE events.
+   * The merge threshold 0,9 is tuned on this vector; with page content in the vector, two articles on the same story at
+   * two different pages only reach cosine 0,6–0,88 (measured 13/10/2026 on 292 pairs), so merging breaks.
    */
   embedding: halfvec("embedding", { dimensions: EMBED_DIMENSIONS }).notNull(),
   /**
-   * Vector của bản thô CỘNG phần chữ chính của trang được link tới (job `pages`): dùng để CHẤM
-   * chủ đề. Trống khi không có trang (arXiv, Ask HN, trang chặn bot): chấm bằng `embedding`.
+   * Vector of the raw text PLUS the main text of the linked page (`pages` job): used to SCORE
+   * topics. Empty when there is no page (arXiv, Ask HN, bot-blocked pages): scored by `embedding`.
    */
   contentEmbedding: halfvec("content_embedding", { dimensions: EMBED_DIMENSIONS }),
   embeddingModel: text("embedding_model").notNull(),
@@ -53,16 +53,16 @@ export const events = pgTable(
   "events",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-    /** Tạm lấy tiêu đề tài liệu đầu tiên; MVP-1 sẽ viết lại bằng LLM, bằng tiếng Anh. */
+    /** Temporarily takes the first document's title; MVP-1 will rewrite it with an LLM, in English. */
     title: text("title").notNull(),
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
-    /** Số tài liệu thuộc sự kiện, kể cả gộp vì cùng URL: đo mức được nhắc tới, để xếp hạng. */
+    /** Number of documents in the event, including merges for the same URL: measures how much it is mentioned, for ranking. */
     nDocs: integer("n_docs").notNull().default(1),
     /**
-     * Số vector đã góp vào `centroid` (seed + gộp theo vector hoặc theo model quyết định), là
-     * trọng số cho `runningMean`.
-     * Khác `nDocs`: gộp vì cùng URL thêm tài liệu nhưng không đổi tâm.
+     * Number of vectors contributed to `centroid` (seed + merged by vector or by the decision model), used as the
+     * weight for `runningMean`.
+     * Differs from `nDocs`: merging for the same URL adds documents but does not change the centroid.
      */
     nVectors: integer("n_vectors").notNull().default(1),
     centroid: halfvec("centroid", { dimensions: EMBED_DIMENSIONS }).notNull(),
@@ -83,11 +83,11 @@ export const eventDocuments = pgTable(
     documentId: bigint("document_id", { mode: "number" })
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
-    /** Cosine tới tâm cụm lúc gộp; 1 nếu là tài liệu mở đầu, hoặc gộp vì cùng URL. */
+    /** Cosine to the cluster centroid at merge time; 1 if it is the opening document, or merged for the same URL. */
     similarity: real("similarity").notNull(),
     /**
-     * `seed` (mở sự kiện) · `url` (cùng url_canonical) · `vector` (gần tâm cụm) · `decision` (vùng
-     * xám dưới ngưỡng vector, model quyết định trả lời cùng một tin; góp vào tâm như `vector`).
+     * `seed` (opens the event) · `url` (same url_canonical) · `vector` (near the centroid) · `decision` (grey
+     * zone below the vector threshold, the decision model answers that it is the same story; merged into the centroid like `vector`).
      */
     reason: text("reason").notNull(),
   },

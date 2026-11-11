@@ -1,6 +1,6 @@
 /**
- * Kết nối Postgres qua SQL client có sẵn của Bun (driver `bun-sql` của Drizzle).
- * Một tiến trình một pool; CLI và test tự tạo rồi đóng.
+ * Postgres connection through Bun's built-in SQL client (Drizzle's `bun-sql` driver).
+ * One pool per process; the CLI and tests create and close it themselves.
  */
 import { SQL } from "bun";
 import { drizzle } from "drizzle-orm/bun-sql";

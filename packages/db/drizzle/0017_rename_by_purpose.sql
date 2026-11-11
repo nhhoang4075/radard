@@ -1,5 +1,5 @@
--- Đổi tên cột theo mục đích dùng: `description` luôn là chữ người viết, cột máy dùng thì nói rõ dùng để làm gì.
--- Postgres tự đổi tên cột bên trong index và check constraint (topics_custom_label_uq, topics_source_ck).
+-- Rename columns by purpose: `description` is always the human-written text; machine-used columns state what they are for.
+-- Postgres itself renames the columns inside indexes and check constraints (topics_custom_label_uq, topics_source_ck).
 ALTER TABLE "topics" RENAME COLUMN "label_vi" TO "name";--> statement-breakpoint
 ALTER TABLE "topics" RENAME COLUMN "group_vi" TO "group_name";--> statement-breakpoint
 ALTER TABLE "topics" RENAME COLUMN "description_user" TO "description";--> statement-breakpoint

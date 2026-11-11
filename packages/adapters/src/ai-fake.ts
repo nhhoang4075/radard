@@ -1,8 +1,8 @@
 /**
- * Embedding giả, tất định, không gọi mạng: băm từng từ vào một chiều của vector.
+ * Fake embedding, deterministic, no network calls: hashes each word into one dimension of the vector.
  *
- * Hai văn bản có nhiều từ chung thì cosine cao, nên đủ để test logic lọc và gộp mà không
- * tốn tiền hay cần khoá API. Không dùng để đo chất lượng: ngưỡng thật phải chỉnh trên model thật.
+ * Two texts with many shared words get a high cosine, so it is enough to test filtering and merging logic without
+ * spending money or needing an API key. Do not use it to measure quality: real thresholds must be tuned on the real model.
  */
 import type {
   DecisionProvider,
@@ -51,8 +51,8 @@ export function fakeEmbedding(opts: { dimensions: number; sink?: UsageSink }): E
 }
 
 /**
- * LLM giả, không gọi mạng: trả đúng chuỗi do test cung cấp (hàm của prompt), và ghi một lời
- * gọi vào `sink` như adapter thật.
+ * Fake LLM, no network calls: returns the exact string the test provides (a function of the prompt), and records one call
+ * into `sink`, like the real adapter.
  */
 export function fakeLlm(opts: {
   reply: (prompt: string, system?: string) => string | Promise<string>;
@@ -80,8 +80,8 @@ export function fakeLlm(opts: {
 }
 
 /**
- * Câu trả lời của model quyết định giả cho một câu hỏi: số là xác suất của câu `boolean`; chuỗi
- * là phương án được chọn của câu `choice` (xác suất 1); hoặc ghi đủ phương án và xác suất.
+ * Fake decision-model answer to a question: a number is the probability for a `boolean` question; a string
+ * is the option chosen for a `choice` question (probability 1); or lists every option and its probability.
  */
 export type FakeDecisionReply =
   | number
@@ -89,9 +89,9 @@ export type FakeDecisionReply =
   | { choice: string; probabilities: Record<string, number> };
 
 /**
- * Model quyết định giả, tất định, không gọi mạng: hàm `answer` của test trả lời từng câu. Kiểm
- * kiểu câu trả lời như adapter thật (chọn phương án không có trong `criteria` thì lỗi), và ghi
- * một lời gọi vào `sink`.
+ * Fake decision model, deterministic, no network calls: the test's `answer` function answers each question. Checks
+ * the answer type like the real adapter does (choosing an option not in `criteria` is an error), and records
+ * one call into `sink`.
  */
 export function fakeDecision(opts: {
   answer: (
@@ -100,7 +100,7 @@ export function fakeDecision(opts: {
     state: DecisionState,
   ) => FakeDecisionReply | Promise<FakeDecisionReply>;
   sink?: UsageSink;
-  /** Chi phí giả mỗi lời gọi, để test phần cộng chi phí. */
+  /** Fake cost per call, to test cost summation. */
   costUsd?: number;
 }): DecisionProvider {
   return {
