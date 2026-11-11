@@ -1,6 +1,6 @@
 /**
- * Lớp đọc dữ liệu của bộ chấm bất biến trên DB thử (`TEST_DATABASE_URL`): nhãn mới nhất thắng,
- * `clear` thành "chưa bấm", nhãn gắn theo URL chuẩn, ngày theo giờ Việt Nam, bộ lọc người nhận.
+ * Read layer of the frozen evaluator on the test DB (`TEST_DATABASE_URL`): latest label wins,
+ * `clear` becomes not pressed, labels are attached by canonical URL, days use Vietnam time, recipient filter.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -63,11 +63,11 @@ const score = (R: number) => ({ S: R, penalty: 0, R, P: 0.3, C: 0.2, A: 0.5, F: 
 interface Item {
   url: string;
   R: number;
-  /** Bỏ qua item này trong plan (plan cũ không có điểm). */
+  /** Skip this item in the plan (old plans have no score). */
   noScore?: boolean;
 }
 
-/** Digest có các tin sự kiện ở vị trí 1…n (kèm tin mở đầu vị trí 0). Trả `deliveries.id` theo thứ tự. */
+/** Digest with the event items at positions 1…n (plus the opening item at position 0). Returns `deliveries.id` in order. */
 async function addDigest(
   periodEnd: string,
   items: Item[],
@@ -134,7 +134,7 @@ async function press(
   ...kinds: ("like" | "dislike" | "clear" | "comment")[]
 ): Promise<void> {
   for (const kind of kinds) {
-    // created_at tăng dần để thứ tự không phụ thuộc đồng hồ máy
+    // created_at increases so the order does not depend on the machine clock
     clock += 60_000;
     await db.insert(feedback).values({
       profileId: 1,
@@ -162,8 +162,8 @@ describe("loadDays", () => {
     await press(ids[1] as number, "like", "clear");
     await press(ids[2] as number, "like", "dislike");
     await press(ids[3] as number, "dislike", "like", "dislike", "like");
-    await press(ids[4] as number, "comment"); // chỉ có nhận xét: chưa bấm
-    await press(ids[5] as number, "dislike", "comment"); // nhận xét sau không làm mất 👎
+    await press(ids[4] as number, "comment"); // comment only: not tapped
+    await press(ids[5] as number, "dislike", "comment"); // a comment afterwards does not remove 👎
 
     const { days, skipped } = await loadDays(db);
     expect(skipped).toBe(0);

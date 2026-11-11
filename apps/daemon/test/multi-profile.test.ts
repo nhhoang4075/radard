@@ -1,6 +1,6 @@
 /**
- * Chủ đề và bối cảnh theo từng hồ sơ: hai hồ sơ (id 1 và 2) không đụng nhau khi bật tắt chủ đề,
- * khi sửa bối cảnh, và khi liệt kê chủ đề của mình.
+ * Topics and context per profile: two profiles (id 1 and 2) do not interfere when toggling topics,
+ * when editing context, and when listing their own topics.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { createDatabase, profile, runMigrations } from "@radard/db";
@@ -57,7 +57,7 @@ describe("chủ đề theo hồ sơ", () => {
 
     const mine = await listProfileTopics(db, 1);
     expect(mine.map((t) => t.active)).toEqual([true]);
-    // Hồ sơ 2 không bật tắt được dòng profile_topics của hồ sơ 1.
+    // Profile 2 cannot toggle profile 1's profile_topics row.
     expect(await setTopicActive(db, 2, mine[0]?.id ?? 0, false)).toBe(false);
     expect(await chosenKeys(1)).toEqual(["agents"]);
   });

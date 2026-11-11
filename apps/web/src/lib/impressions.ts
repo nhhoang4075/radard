@@ -1,16 +1,16 @@
 /**
- * Logic thuần của ghi lượt hiện (hợp đồng mục 4: ngưỡng 0,5, hẹn 1 giây, huỷ khi rời màn hình hoặc tab ẩn,
- * chống trùng theo (snapshot, position), gom lô). Không đụng DOM nên test được; hook ở `use-impressions.ts` nối vào DOM.
+ * Pure logic for recording impressions (contract section 4: threshold 0,5, 1-second timer, cancelled when leaving the screen or the tab is hidden,
+ * dedup by (snapshot, position), batching). No DOM access, so it is testable; the hook in `use-impressions.ts` connects it to the DOM.
  */
 import type { ImpressionInput } from "../features/feed/types.ts";
 
-/** Hằng số một nơi, chỉnh được. */
+/** Constants in one place, adjustable. */
 export const IMPRESSION = {
-  /** Tỉ lệ thẻ nằm trong khung nhìn để tính là "hiện". */
+  /** Share of the card inside the viewport to count as "shown". */
   threshold: 0.5,
-  /** Phải hiện liên tục bấy lâu (ms) mới ghi. */
+  /** Must stay visible for this long (ms) before it is recorded. */
   dwellMs: 1000,
-  /** Gửi khi đủ bấy nhiêu mục hoặc sau bấy lâu (ms) kể từ mục đầu của lô. */
+  /** Send when this many items are queued or after this long (ms) since the first item of the batch. */
   batchSize: 10,
   flushMs: 3000,
 } as const;
@@ -22,7 +22,7 @@ const realScheduler: Scheduler = {
   clear: (t) => clearTimeout(t as ReturnType<typeof setTimeout>),
 };
 
-/** Hẹn giờ theo từng khoá: `enter` bắt đầu đếm, `leave` huỷ; đủ `ms` thì gọi `onDwell` đúng một lần. */
+/** Timer per key: `enter` starts counting, `leave` cancels; after `ms` it calls `onDwell` exactly once. */
 export function createDwell(
   onDwell: (key: string) => void,
   ms: number = IMPRESSION.dwellMs,
@@ -46,7 +46,7 @@ export function createDwell(
       s.clear(t);
       timers.delete(key);
     },
-    /** Huỷ tất cả (tab ẩn, rời trang). */
+    /** Cancel all (tab hidden, leaving the page). */
     clear() {
       for (const t of timers.values()) s.clear(t);
       timers.clear();
@@ -54,7 +54,7 @@ export function createDwell(
   };
 }
 
-/** Hàng đợi: chống trùng (snapshot, position) ở phía client, gom lô. */
+/** Queue: client-side dedup by (snapshot, position), batching. */
 export function createImpressionQueue(
   send: (batch: ImpressionInput[]) => void,
   opts: { batchSize?: number; flushMs?: number; scheduler?: Scheduler } = {},

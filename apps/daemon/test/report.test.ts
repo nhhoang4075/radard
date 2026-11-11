@@ -1,6 +1,6 @@
 /**
- * Báo cáo nghiệm thu trên DB thử (`TEST_DATABASE_URL`): ngày thiếu digest, digest muộn, tin thử không
- * tính, lượt bấm mới nhất thắng, tỉ lệ fetch tách theo nguồn, chi phí theo ngày lịch giờ VN.
+ * Acceptance report on the test DB (`TEST_DATABASE_URL`): days missing a digest, late digests, test items not
+ * counted, latest tap wins, fetch rate split by source, cost by Vietnam-time calendar day.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -21,15 +21,15 @@ import { buildReport, formatReport, type Report, reportWindow } from "../src/job
 
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
-/** Người nhận giả, không phải chat id thật. */
+/** Fake recipient, not a real chat id. */
 const ME = "100000001";
 const H = 3_600_000;
 const MIN = 60_000;
-/** 07:15 giờ VN ngày 20/10: khung cuối là 07:00 ngày 20/10, cửa sổ từ 07:00 ngày 13/10. */
+/** 07:15 Vietnam time on 20/10: the last slot is 07:00 on 20/10, the window starts at 07:00 on 13/10. */
 const NOW = new Date("2026-10-20T00:15:00Z");
 const END = new Date("2026-10-20T00:00:00Z");
 const START = new Date("2026-10-13T00:00:00Z");
-/** Khung 07:00 giờ VN của ngày thứ `i` trong cửa sổ (1…7: 14/10 … 20/10). */
+/** The 07:00 Vietnam-time slot of day `i` in the window (1…7: 14/10 … 20/10). */
 const slot = (i: number) => new Date(START.getTime() + i * 24 * H);
 
 let hn = 0;
@@ -146,7 +146,7 @@ async function addEvent(firstSeenAt: string) {
     .values({ title: "e", firstSeenAt: at, lastSeenAt: at, centroid: v, embeddingModel: "m" });
 }
 
-/** Các delivery sự kiện của digest ngày 1 và ngày 2, kèm một tin thử và một tin ngoài cửa sổ. */
+/** The event deliveries of the day 1 and day 2 digests, plus one test item and one item outside the window. */
 const ev: Record<string, number> = {};
 
 beforeAll(async () => {
@@ -169,7 +169,7 @@ beforeEach(async () => {
   hn = rows[0]?.id ?? 0;
   trending = rows[1]?.id ?? 0;
 
-  // HN: 19/20 thành công (95%, vừa đạt). Trending: 2/5 (2 lỗi, 1 lượt kẹt ở running).
+  // HN: 19/20 succeeded (95%, just passes). Trending: 2/5 (2 errors, 1 run stuck in running).
   await addRuns(hn, "ok", 15);
   await addRuns(hn, "not_modified", 3);
   await addRuns(hn, "behind", 1);
@@ -177,10 +177,10 @@ beforeEach(async () => {
   await addRuns(trending, "ok", 2);
   await addRuns(trending, "error", 2, "selector không khớp");
   await addRuns(trending, "running", 1);
-  // Ngoài cửa sổ (trước 07:00 ngày 13/10): không tính.
+  // Outside the window (before 07:00 on 13/10): not counted.
   await addRuns(hn, "error", 5, "cũ", new Date(START.getTime() - 10 * H));
 
-  // Digest: ngày 3 thiếu, ngày 5 muộn 25 phút, ngày 6 lỗi; khung đầu cửa sổ (13/10) không tính.
+  // Digest: day 3 missing, day 5 25 minutes late, day 6 errored; the first slot of the window (13/10) is not counted.
   const d1 = await addDigest(slot(1), "sent", 2, { candidates: 120, passedGate: 30 });
   const d2 = await addDigest(slot(2), "sent", 9.5, { candidates: 80, passedGate: 0 });
   await addDigest(slot(4), "sent", 3);
@@ -195,24 +195,24 @@ beforeEach(async () => {
   ev.test = await addDelivery(null, 0);
   ev.old = await addDelivery(old, 1);
 
-  await press(ev.d1p1 ?? 0, "like", "dislike"); // đổi ý: 👎
+  await press(ev.d1p1 ?? 0, "like", "dislike"); // changed mind: 👎
   await press(ev.d1p2 ?? 0, "like");
-  await press(ev.d1p3 ?? 0, "dislike", "like", "comment"); // đổi ý: 👍; nhận xét không tính
-  await press(ev.d2p1 ?? 0, "comment"); // chỉ nhận xét: chưa bấm
+  await press(ev.d1p3 ?? 0, "dislike", "like", "comment"); // changed mind: 👍; comment not counted
+  await press(ev.d2p1 ?? 0, "comment"); // comment only: not tapped
   await press(ev.test ?? 0, "like", "like", "like");
   await press(ev.old ?? 0, "like");
 
-  // Chi phí: ngày lịch 13/10 giờ VN bắt đầu 12/10 17:00 UTC.
-  await addCall("2026-10-12T16:59:00Z", "digest", 5); // 12/10 23:59 VN: ngoài
+  // Cost: the 13/10 calendar day in Vietnam time starts at 12/10 17:00 UTC.
+  await addCall("2026-10-12T16:59:00Z", "digest", 5); // 12/10 23:59 VN: outside
   await addCall("2026-10-12T17:00:00Z", "digest", 0.03); // 13/10 00:00 VN
   await addCall("2026-10-13T16:59:00Z", "embed", 0.001); // 13/10 23:59 VN
   await addCall("2026-10-15T03:00:00Z", "digest", 0.08);
-  await addCall("2026-10-15T04:00:00Z", "topic", 0.04); // 15/10: 0,12 > trần
+  await addCall("2026-10-15T04:00:00Z", "topic", 0.04); // 15/10: 0,12 > cap
 
   await addDoc(hn, "2026-10-13T01:00:00Z");
   await addDoc(hn, "2026-10-13T02:00:00Z");
   await addDoc(trending, "2026-10-13T18:00:00Z"); // 14/10 01:00 VN
-  await addDoc(hn, "2026-10-19T17:00:00Z"); // 20/10 00:00 VN: ngoài
+  await addDoc(hn, "2026-10-19T17:00:00Z"); // 20/10 00:00 VN: outside
   await addEvent("2026-10-13T05:00:00Z");
   await addEvent("2026-10-13T06:00:00Z");
   await addEvent("2026-10-18T10:00:00Z");
@@ -339,10 +339,10 @@ describe("buildReport", () => {
   });
 
   test("digest: đo theo tin mở đầu, không theo digests.sent_at", async () => {
-    // Ngày 3 (16/10, đang thiếu): tin mở đầu 1 phút nhưng digests.sent_at muộn 40 phút -> đúng giờ.
+    // Day 3 (16/10, missing): opening item 1 minute but digests.sent_at 40 minutes late -> on time.
     const onTime = await addDigest(slot(3), "sent", 40);
     await addDelivery(onTime, 0, new Date(slot(3).getTime() + MIN));
-    // Ngày 5: digests.sent_at chỉ 1 phút nhưng tin mở đầu muộn 15 phút -> không đúng giờ.
+    // Day 5: digests.sent_at only 1 minute but the opening item 15 minutes late -> not on time.
     await db.execute(sql`update digests set sent_at = period_end + interval '1 minute'
       where period_end = ${slot(5)}`);
     const late = await db.execute<{ id: number }>(
@@ -360,7 +360,7 @@ describe("buildReport", () => {
 
   test("digest: chưa có tin mở đầu thì dùng digests.sent_at và ghi chú", async () => {
     const days = (await report()).digests.days;
-    // Ngày 1 có tin mở đầu; ngày 2 (digest 9,5 phút) chưa có.
+    // Day 1 has an opening item; day 2 (digest 9,5 minutes) does not.
     expect([days[0]?.delayMin, days[0]?.headerFallback]).toEqual([2, false]);
     expect([days[1]?.delayMin, days[1]?.onTime, days[1]?.headerFallback]).toEqual([
       9.5,
@@ -376,7 +376,7 @@ describe("buildReport", () => {
 
   test("phản hồi: chỉ tin sự kiện trong cửa sổ, lượt bấm mới nhất thắng", async () => {
     const f = (await report()).feedback;
-    // 5 tin sự kiện (tin thử và tin của khung ngoài cửa sổ không tính); 3 tin đã bấm.
+    // 5 event items (test items and items from slots outside the window not counted); 3 items tapped.
     expect(f).toEqual({
       pass: false,
       deliveries: 5,
@@ -421,7 +421,7 @@ describe("buildReport", () => {
   });
 
   test("số liệu: tài liệu theo ngày đăng, bài lấy bù tính về ngày đăng; 'lấy về' theo fetched_at", async () => {
-    // Lấy bù: đăng 17/10 10:00 VN, tải về 19/10 10:00 VN.
+    // Backfill: published 17/10 10:00 VN, downloaded 19/10 10:00 VN.
     await addDoc(hn, "2026-10-19T03:00:00Z", "2026-10-17T03:00:00Z");
     const m = (await report()).metrics;
     const day = (d: string) => m.docsPerDay.find((x) => x.day === d);
@@ -437,7 +437,7 @@ describe("buildReport", () => {
       total: 0,
       fetched: 1,
     });
-    // Không có published_at (3 tài liệu cũ) thì đếm theo fetched_at ở cả hai cột.
+    // Without published_at (3 old documents) they are counted by fetched_at in both columns.
     expect(day("2026-10-13")).toMatchObject({ total: 2, fetched: 2 });
     expect(day("2026-10-14")).toMatchObject({ total: 1, fetched: 1 });
     const block = formatReport(await report()).find(

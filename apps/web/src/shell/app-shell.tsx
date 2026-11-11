@@ -20,13 +20,13 @@ const PanelCtx = createContext<{
   setOpen: () => {},
 });
 
-/** Nội dung của panel phải: render ở bất kỳ đâu trong shell, hiện trong cột panel. */
+/** Content of the right panel: render anywhere in the shell, shown in the panel column. */
 export function ShellPanel({ children }: { children: ReactNode }) {
   const { el } = useContext(PanelCtx);
   return el ? createPortal(children, el) : null;
 }
 
-/** Mở/đóng panel phải khi màn hình hẹp (<1100px panel là tấm trượt). */
+/** Open/close the right panel on narrow screens (<1100px the panel is a slide-in sheet). */
 export const useShellPanel = () => {
   const { open, setOpen } = useContext(PanelCtx);
   return { open, setOpen };

@@ -1,6 +1,6 @@
-/* Token 3 tầng, chỉ giao diện sáng. NƠI DUY NHẤT được có mã màu thô (test/rules.test.ts).
-   Tầng 1 (primitive, --rd-gray-*...): chỉ file này đọc. Tầng 2 (semantic, --rd-color-*): ui/, shell/, features/ đọc.
-   Tầng 3 (component-local, ví dụ --rd-btn-bg): khai trong css của từng component. */
+/* 3-tier tokens, light theme only. The ONLY place allowed to have raw color codes (test/rules.test.ts).
+   Tier 1 (primitive, --rd-gray-*...): only this file reads it. Tier 2 (semantic, --rd-color-*): read by ui/, shell/, features/.
+   Tier 3 (component-local, e.g. --rd-btn-bg): declared in each component's css. */
 :root {
   color-scheme: light;
 
@@ -72,12 +72,12 @@
   --rd-radius-md: 10px;
   --rd-radius-lg: 16px;
   --rd-radius-xl: 24px;
-  --rd-shadow-sm: none; /* phong cách phẳng: không đổ bóng */
+  --rd-shadow-sm: none; /* flat style: no shadow */
   --rd-shadow-frame: none;
   --rd-duration-fast: 120ms;
   --rd-duration-base: 200ms;
 
-  --rd-control-height: 32px; /* nút, ô nhập, chip, ô tìm kiếm cùng chiều cao */
+  --rd-control-height: 32px; /* buttons, inputs, chips, search boxes share one height */
   --rd-control-radius: 10px;
   --rd-shell-sidebar-width: 232px;
   --rd-shell-rail-width: 48px;
@@ -86,7 +86,7 @@
   --rd-z-menu: 30;
   --rd-z-overlay: 50;
 
-  /* nền lưới màu (Điểm tin, đầu panel chi tiết) */
+  /* colored grid background ("Điểm tin" page, detail panel header) */
   --rd-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --rd-mesh-blue:
     var(--rd-grain), radial-gradient(92% 95% at 6% 6%, #8fc1f7 0%, rgb(143 193 247 / 0) 66%),

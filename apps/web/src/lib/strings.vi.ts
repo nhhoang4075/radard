@@ -1,4 +1,4 @@
-/** Toàn bộ chữ hiển thị (tiếng Việt). Không viết chữ Việt cứng trong .tsx (test `strings.test.ts`). */
+/** All displayed text (Vietnamese). No hard-coded Vietnamese text in .tsx (test `strings.test.ts`). */
 export const strings = {
   appName: "radard",
   login: {

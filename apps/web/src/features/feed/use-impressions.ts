@@ -3,8 +3,8 @@ import { getFeedClient } from "../../lib/feed-client.ts";
 import { createDwell, createImpressionQueue, IMPRESSION } from "../../lib/impressions.ts";
 
 /**
- * Ghi lượt hiện (use-impressions, mục 4 docs/cau-truc-web.html). Trả `observe(position)` dùng làm ref của thẻ.
- * Thẻ cao hơn nửa khung nhìn: điều kiện thay thế là phần thẻ trong khung chiếm ≥ 50% chiều cao khung nhìn.
+ * Impression recording (use-impressions, section 4 of docs/cau-truc-web.html). Returns `observe(position)`, used as the card's ref.
+ * For cards taller than half the viewport: the alternative condition is that the visible part of the card is ≥ 50% of the viewport height.
  */
 export function useImpressions(snapshotId: number | undefined) {
   const snapRef = useRef(snapshotId);
@@ -18,7 +18,7 @@ export function useImpressions(snapshotId: number | undefined) {
   } | null>(null);
   if (!state.current) {
     const queue = createImpressionQueue((batch) => {
-      // Khi trang đang đóng/ẩn dùng sendBeacon (không bị huỷ); còn lại gọi qua client (có thể là fixtures).
+      // When the page is closing/hidden, use sendBeacon (not cancelled); otherwise call through the client (may be fixtures).
       if (document.visibilityState === "hidden" && "sendBeacon" in navigator) {
         navigator.sendBeacon(
           "/api/impressions",

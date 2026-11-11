@@ -1,6 +1,6 @@
 /**
- * Test tích hợp chủ đề trên `radard_test`: thư viện, chọn, tự thêm, bật tắt, embed. Embedding
- * và LLM đều GIẢ, không gọi mạng.
+ * Integration test for topics on `radard_test`: library, selection, custom add, on/off, embed. Embedding
+ * and LLM are both fake, no network calls.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeEmbedding, fakeLlm } from "@radard/adapters/ai-fake";
@@ -59,7 +59,7 @@ describe("thư viện chủ đề", () => {
     await pickTopics(db, 1, ["agents"]);
     await embedPendingTopics(db, embedder);
     await db.update(topics).set({ embedText: "cũ" }).where(eq(topics.key, "agents"));
-    // Code giữ câu thật; seed lại đưa câu thật trở về và xoá embedding cũ của đúng chủ đề đó.
+    // Code keeps the real sentence; reseeding restores the real sentence and deletes the old embedding of that topic.
     const r = await seedLibrary(db);
     expect(r.refreshed).toBe(1);
     const rows = await db.select().from(topics);
@@ -86,7 +86,7 @@ describe("thư viện chủ đề", () => {
     const rows = await db.select().from(topics);
     expect(rows.every((t) => t.embeddingRecipe === TOPIC_RECIPE)).toBe(true);
     expect(await embedPendingTopics(db, embedder)).toBe(0);
-    // Vector cũ từ trước khi có chỉ dẫn (recipe trống) phải được tính lại.
+    // Old vectors from before instructions existed (empty recipe) must be recomputed.
     await db.update(topics).set({ embeddingRecipe: null }).where(eq(topics.key, "agents"));
     expect(await embedPendingTopics(db, embedder)).toBe(1);
   });
@@ -106,7 +106,7 @@ describe("thư viện chủ đề", () => {
   test("đổi tên llm_models (16/10/2026): nhãn mới, giữ khoá và embedding, không embed lại", async () => {
     await pickTopics(db, 1, ["llm_models"]);
     await embedPendingTopics(db, embedder);
-    // Dòng như trước khi đổi tên: nhãn và phạm vi cũ, câu mô tả không đổi.
+    // Row as before the rename: old label and scope, description sentence unchanged.
     await db
       .update(topics)
       .set({ name: "LLM: model và hành vi", labelGuide: "cũ" })
@@ -120,10 +120,10 @@ describe("thư viện chủ đề", () => {
     expect(after?.labelGuide).toContain("vision-language models (VLMs)");
     expect(after?.embedding).toEqual(before?.embedding ?? []);
     expect(after?.embeddingModel).toBe(embedder.model);
-    // Lựa chọn của bạn vẫn trỏ đúng chủ đề đó.
+    // Your selection still points to that topic.
     const mine = await listProfileTopics(db, 1);
     expect(mine.map((t) => t.label)).toContain("Model AI: phát hành và hành vi");
-    // Phạm vi của "Ảnh, video và âm thanh" trỏ sang nhãn mới.
+    // The scope of "Ảnh, video và âm thanh" points to the new label.
     const media = TOPIC_LIBRARY.find((t) => t.key === "multimodal");
     expect(media?.labelGuide).toContain("→ Model AI: phát hành và hành vi");
   });
@@ -139,7 +139,7 @@ describe("thư viện chủ đề", () => {
 });
 
 describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
-  /** Bộ thư viện trước 15/10/2026, theo thứ tự cũ. */
+  /** The library set before 15/10/2026, in the old order. */
   const OLD_KEYS = [
     "agents",
     "llm_apps",
@@ -160,7 +160,7 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
     "ai_policy",
   ];
 
-  /** Lựa chọn của hồ sơ 1: [khoá, đang bật] cho mọi dòng `profile_topics`. */
+  /** Profile 1's selections: [key, enabled] for every `profile_topics` row. */
   async function selections(): Promise<[string, boolean][]> {
     const rows = await db
       .select({ key: topics.key, active: profileTopics.active })
@@ -186,7 +186,7 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
       )
       .returning({ id: topics.id, key: topics.key });
     const id = (key: string) => old.find((t) => t.key === key)?.id ?? 0;
-    // Đúng trạng thái DB trên máy: 9 chủ đề bật, `evals` và `mlops` đã chọn rồi tắt.
+    // Matches the DB state on this machine: 9 topics on, `evals` and `mlops` were selected then turned off.
     const on = [
       "agents",
       "llm_apps",
@@ -207,7 +207,7 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
       ]);
 
     const first = await seedLibrary(db);
-    // Tắt 4 lựa chọn cũ: rag_search, new_models, ml_research, open_source_tools.
+    // Turn off 4 old selections: rag_search, new_models, ml_research, open_source_tools.
     expect(first.carried).toBe(4);
     const after = await selections();
     const active = after.filter(([, a]) => a).map(([k]) => k);
@@ -233,7 +233,7 @@ describe("chuyển lựa chọn từ bộ 17 chủ đề cũ", () => {
       "ai_products",
       "ml_foundations",
     ]);
-    // Chủ đề cũ đã rút vẫn giữ dòng (không mất lịch sử), nhưng tắt.
+    // A withdrawn old topic keeps its row (history is kept), but is off.
     for (const k of ["rag_search", "new_models", "ml_research", "open_source_tools", "evals"]) {
       expect(after).toContainEqual([k, false]);
     }
@@ -320,7 +320,7 @@ describe("tự thêm chủ đề", () => {
       .from(profileTopics)
       .innerJoin(topics, eq(topics.id, profileTopics.topicId))
       .where(eq(profileTopics.id, id));
-    // Chủ đề tự thêm là một dòng `topics` của hồ sơ, được chọn và bật ngay.
+    // A custom topic is a `topics` row of the profile, selected and turned on at once.
     expect(row?.topic.origin).toBe("custom");
     expect(row?.topic.ownerProfileId).toBe(1);
     expect(row?.topic.key).toBeNull();
@@ -342,7 +342,7 @@ describe("tự thêm chủ đề", () => {
   });
 
   test("DB chặn chủ đề tự thêm thiếu lời của người dùng", async () => {
-    // Query của Drizzle chỉ là "thenable", bọc trong async để expect bắt được lỗi.
+    // A Drizzle query is only "thenable", wrap it in async so expect can catch the error.
     const insert = async () => {
       await db
         .insert(topics)

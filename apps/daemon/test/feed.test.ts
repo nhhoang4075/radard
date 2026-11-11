@@ -1,9 +1,9 @@
 /**
- * Bản chụp feed (quyết định 10/11/2026, mo-hinh-de-xuat.html: "feed web là nguồn chính, Telegram chỉ
- * là kênh thông báo"). Giá trị kỳ vọng lấy từ spec: K = feedMaxItems = 30 là trần, không phải mục
- * tiêu; feedMaxPerSource = 10; giữ chỗ mỗi nguồn giữ nguyên; Telegram ≤ 7 tin đầu qua sàn thông báo,
- * 5 tin/nguồn; một bản chụp mỗi (hồ sơ, ngày), chạy lại không dựng lại; lượt hiện idempotent, cách ly
- * hồ sơ; "đã thấy" (lượt hiện) làm N như "đã gửi".
+ * Feed snapshot (decision 10/11/2026, mo-hinh-de-xuat.html: "the web feed is the main source, Telegram is only
+ * the notification channel"). Expected values come from the spec: K = feedMaxItems = 30 is a cap, not a target;
+ * feedMaxPerSource = 10; per-source slots stay unchanged; Telegram ≤ 7 first items past the notification floor,
+ * 5 items per source; one snapshot per (profile, day), rerunning does not rebuild; impressions are idempotent, isolated
+ * per profile; "seen" (impressions) counts as N like "sent".
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -49,7 +49,7 @@ const db = createDatabase(TEST_URL, { max: 2 });
 const fails = (q: PromiseLike<unknown>) => Promise.resolve().then(() => q);
 const A = "100000001";
 const B = "100000002";
-/** 07:00 giờ VN ngày 06/10 và ngày 07/10. */
+/** 07:00 Vietnam time on 06/10 and 07/10. */
 const SLOT = new Date("2026-10-06T00:00:00Z");
 const SLOT2 = new Date("2026-10-07T00:00:00Z");
 const IN = new Date("2026-10-05T12:00:00Z");
@@ -101,7 +101,7 @@ async function addDoc(eventId: number, sourceId: number, score: number, at: Date
   return d?.id ?? 0;
 }
 
-/** Một sự kiện một tài liệu; centroid trực giao nhau nên không có phạt trùng. */
+/** One event with one document; centroids are orthogonal so there is no overlap penalty. */
 async function addEvent(sourceId: number, score = 0.79, at = IN): Promise<number> {
   const v = new Array(1024).fill(0);
   v[(seq + 1) % 1024] = 1;
@@ -181,7 +181,7 @@ describe("bản chụp feed", () => {
         .sort(),
     ).toEqual([...srcs].sort());
     expect(items.every((i) => i.profileId === 1 && i.documentIds.length === 1)).toBe(true);
-    // Thứ tự theo S − phạt giảm dần.
+    // Order by S − penalty, descending.
     const keys = items.map((i) => i.score - i.penalty);
     expect(keys).toEqual([...keys].sort((a, b) => b - a));
     expect(snapshot.config).toMatchObject({ maxItems: 30, maxPerSource: 10, temperature: 0.03 });
@@ -192,7 +192,7 @@ describe("bản chụp feed", () => {
   test("K là trần, không phải mục tiêu: hết tin đạt sàn thì dừng", async () => {
     const hn = await addSource("HN");
     for (let i = 0; i < 3; i++) await addEvent(hn);
-    await addEvent(hn, 0.66); // qua cổng, S dưới sàn 0,59
+    await addEvent(hn, 0.66); // passes the gate, S below the floor 0,59
     const { items } = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
     expect(items).toHaveLength(3);
   });
@@ -204,7 +204,7 @@ describe("bản chụp feed", () => {
     expect(items).toHaveLength(10);
     const notify = items.filter((i) => i.notifyPosition !== null);
     expect(notify.map((i) => i.notifyPosition)).toEqual([1, 2, 3, 4, 5]);
-    // Thông báo lấy các tin ĐẦU của bản chụp.
+    // Notifications take the FIRST items of the snapshot.
     expect(notify.map((i) => i.position)).toEqual([1, 2, 3, 4, 5]);
   });
 
@@ -217,7 +217,7 @@ describe("bản chụp feed", () => {
     expect(items).toHaveLength(30);
     const it = items.find((i) => i.eventId === only);
     expect(it?.reserved).toBe(true);
-    // Điểm thấp nhất nên đứng cuối bản chụp.
+    // The lowest score should be at the end of the snapshot.
     expect(it?.position).toBe(30);
   });
 
@@ -233,7 +233,7 @@ describe("bản chụp feed", () => {
     expect(items).toHaveLength(12);
     const notified = items.filter((i) => i.notifyPosition !== null);
     expect(notified).toHaveLength(7);
-    // Tin gửi: header + 7; mỗi tin sự kiện nối tới tin feed của đúng vị trí báo.
+    // Sent items: header + 7; each event item links to the feed item at the reported position.
     expect(notifier.sent).toHaveLength(8);
     const dls = await db
       .select()
@@ -267,13 +267,13 @@ describe("một bản chụp mỗi ngày", () => {
     await runDigestAll({ db, llm: null, notifier }, SLOT);
     const [first] = await snapshotRows();
     const before = await itemsOf(first?.id ?? 0);
-    await addEvent(hn, 0.8); // tin đến sau khi đã dựng
+    await addEvent(hn, 0.8); // item arrives after it was built
     await runDigestAll({ db, llm: null, notifier }, SLOT);
     const again = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
     expect(again.built).toBe(false);
     expect(await snapshotRows()).toHaveLength(1);
     expect(again.items.map((i) => [i.id, i.eventId])).toEqual(before.map((i) => [i.id, i.eventId]));
-    // Hai người nhận cùng nhận đúng các tin của bản chụp.
+    // Both recipients receive exactly the snapshot's items.
     const per = await db
       .select({ recipient: deliveries.recipient, feedItemId: deliveries.feedItemId })
       .from(deliveries)
@@ -322,7 +322,7 @@ describe("một bản chụp mỗi ngày", () => {
     const notifier = fakeNotifier({ failAfter: 2 });
     const deps = { db, profileId: 1, llm: null, notifier, recipient: A };
     await expect(runDigest(deps, SLOT)).rejects.toThrow();
-    await db.update(digests).set({ meta: {} }); // plan mất: phải dựng lại từ bản chụp
+    await db.update(digests).set({ meta: {} }); // plan lost: must be rebuilt from the snapshot
     await db.delete(deliveries);
     await addEvent(hn, 0.8);
     notifier.failAfter = undefined;
@@ -425,7 +425,7 @@ describe("lượt hiện", () => {
     const bad = await recordImpressions(db, 1, [{ snapshotId: one, position: 0 }]);
     expect(bad.ok).toBe(false);
     expect(await db.select().from(feedImpressions)).toHaveLength(0);
-    // Khoá ngoại ghép chặn cả khi code bỏ qua bước kiểm.
+    // The composite foreign key blocks writes even when the code skips the check.
     await expect(
       fails(db.insert(feedImpressions).values({ profileId: 1, snapshotId: two, position: 1 })),
     ).rejects.toThrow();
@@ -472,14 +472,14 @@ describe("lượt hiện", () => {
     const { snapshot, items } = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
     const pos = items.find((i) => i.eventId === seen)?.position ?? 0;
     await recordImpressions(db, 1, [{ snapshotId: snapshot.id, position: pos }]);
-    // Ngày hôm sau mỗi sự kiện có thêm một bài mới (URL mới).
+    // The next day each event gets one more new article (new URL).
     await addDoc(seen, hn, 0.79, IN2);
     await addDoc(unseen, hn, 0.79, IN2);
-    // Lượt hiện ghi lúc chạy test (sau SLOT2) nên đặt lại về trước khung hôm sau.
+    // Impressions are written at test run time (after SLOT2), so move them back to before the next day's slot.
     await db.update(feedImpressions).set({ seenAt: IN2 });
     const r = await rankPeriod(db, periodEndingAt(SLOT2), { profileId: 1 });
     const N = (id: number) => r.scored.find((s) => s.event.eventId === id)?.c.N;
-    expect(N(seen)).toBe(0.75); // một nửa URL đã thấy: 0,5 + 0,5 × 0,5
+    expect(N(seen)).toBe(0.75); // half of the URLs seen: 0,5 + 0,5 × 0,5
     expect(N(unseen)).toBe(1);
   });
 });
@@ -513,7 +513,7 @@ describe("phản hồi từ web", () => {
       [1, id, "like", "web"],
       [1, id, "clear", "web"],
     ]);
-    // Khoá ngoại ghép: phản hồi của hồ sơ 1 không thể trỏ vào tin feed của hồ sơ 2.
+    // Composite foreign key: profile 1's feedback cannot point to profile 2's feed item.
     await expect(
       fails(
         db.insert(feedback).values({

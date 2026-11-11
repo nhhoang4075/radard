@@ -1,6 +1,6 @@
 /**
- * `rankPeriod` trên `radard_test`: đọc ứng viên đúng khoảng, chỉ lấy lại tín hiệu cho sự kiện qua
- * cổng R, và không gửi lại tin đã gửi không có gì mới. Dữ liệu dựng tay, Algolia giả.
+ * `rankPeriod` on `radard_test`: reads candidates in the right range, only re-fetches signals for events that pass
+ * gate R, and does not resend already-sent items with nothing new. Hand-built data, fake Algolia.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeDecision } from "@radard/adapters/ai-fake";
@@ -34,7 +34,7 @@ let hn = 0;
 let topic = 0;
 let seq = 0;
 
-/** Một sự kiện một tài liệu HN, điểm chủ đề `score`. */
+/** One HN event with one document, topic score `score`. */
 async function addEvent(
   score: number,
   at = IN,
@@ -104,7 +104,7 @@ beforeEach(async () => {
     embedText: "AI for software development: coding assistants",
     active: false,
   });
-  // Mặt bằng: cosine 0,4 là bình thường, 0,8 là hiếm. 0,64 → z = 0,6 (đúng cổng).
+  // Baseline: cosine 0,4 is normal, 0,8 is rare. 0,64 → z = 0,6 (exactly at the gate).
   await db.insert(baselines).values([
     {
       metric: "relevance",
@@ -127,8 +127,8 @@ afterAll(async () => {
 describe("rankPeriod", () => {
   test("chỉ lấy lại điểm HN cho sự kiện qua cổng R; bài ngoài khoảng không là ứng viên", async () => {
     const hot = await addEvent(0.79);
-    await addEvent(0.5); // z = 0,25: dưới cổng
-    await addEvent(0.79, new Date("2026-10-03T00:00:00Z")); // ngoài khoảng 24 giờ
+    await addEvent(0.5); // z = 0,25: below the gate
+    await addEvent(0.79, new Date("2026-10-03T00:00:00Z")); // outside the 24-hour range
     const asked: string[] = [];
     const http: HttpClient = {
       post: () => Promise.reject(new Error("test này không POST")),
@@ -150,7 +150,7 @@ describe("rankPeriod", () => {
     expect(asked).toHaveLength(1);
     expect(decodeURIComponent(asked[0] ?? "")).toContain(`story_${hot.docId})`);
     expect(r.picked.map((p) => p.event.eventId)).toEqual([hot.eventId]);
-    // P lấy từ điểm vừa lấy lại: ln(1 + 300 + 50) so với mặt bằng (1, 7).
+    // P taken from the score just fetched: ln(1 + 300 + 50) compared with the baseline (1, 7).
     expect(r.picked[0]?.c.P ?? 0).toBeCloseTo((Math.log1p(350) - 1) / 6, 6);
     expect(r.rejected.map((x) => x.reason)).toEqual(["gate"]);
   });
@@ -226,7 +226,7 @@ describe("rankPeriod", () => {
       body: "đã gửi",
       sentAt: old,
     });
-    // Hôm nay một bài HN khác đăng lại đúng bài đó: tài liệu mới, URL cũ.
+    // Today another HN post reposts the same article: new document, old URL.
     const [repost] = await db
       .insert(documents)
       .values({
@@ -250,11 +250,11 @@ describe("rankPeriod", () => {
   });
 });
 
-/** R = (cosine − 0,4) / 0,4 theo mặt bằng của test. */
+/** R = (cosine − 0,4) / 0,4 using the test's baseline. */
 const scoreForR = (R: number) => 0.4 + 0.4 * R;
 
 describe("cổng vùng xám bằng model quyết định", () => {
-  // Sàn S = 0 để chỉ cổng quyết định tin nào được chọn.
+  // Floor S = 0 so that only the gate decides which items are chosen.
   const config = { floorS: 0 };
 
   test("R ≥ 0,7 qua không hỏi; vùng xám theo xác suất; R < 0,5 bị loại không hỏi", async () => {
@@ -300,8 +300,8 @@ describe("cổng vùng xám bằng model quyết định", () => {
     expect(byEvent.get(lowYes.eventId)?.R).toBeCloseTo(0.55, 6);
     expect(byEvent.get(midNo.eventId)).toMatchObject({ probability: 0.4, pass: false });
 
-    // Trạng thái như lúc đo: tiêu đề + 400 ký tự đầu; tên chủ đề tiếng Anh, phạm vi không còn
-    // tên tiếng Việt của chủ đề khác.
+    // State as at measurement time: title + first 400 characters; English topic names, scope no longer
+    // the Vietnamese name of another topic.
     expect(states[0]).toEqual({
       item: expect.objectContaining({ title: expect.stringMatching(/^story \d+$/) }),
       topic: {
@@ -338,7 +338,7 @@ describe("cổng vùng xám bằng model quyết định", () => {
   });
 
   describe("nhiều hồ sơ", () => {
-    // Hồ sơ 2 chỉ bật chủ đề "Rust"; hồ sơ 1 chỉ bật "Agent" (dựng ở beforeEach).
+    // Profile 2 only enables the "Rust" topic; profile 1 only enables "Agent" (built in beforeEach).
     let rustTopic = 0;
     beforeEach(async () => {
       await db.insert(profile).values({ id: 2, promptContext: "y" });
@@ -363,7 +363,7 @@ describe("cổng vùng xám bằng model quyết định", () => {
       expect([...b.topicLabels.values()]).toEqual(["Rust"]);
     });
 
-    // Gửi tin `e` cho hồ sơ `profileId` từ trước kỳ xếp hạng.
+    // Send item `e` to profile `profileId` before the ranking period.
     async function sendTo(
       profileId: number,
       recipient: string,
@@ -396,7 +396,7 @@ describe("cổng vùng xám bằng model quyết định", () => {
     }
 
     test("tin đã gửi cho A không làm B coi là đã thấy, vẫn làm A coi là đã thấy", async () => {
-      // Cả hai hồ sơ cùng chấm điểm cao cho tài liệu này.
+      // Both profiles score this document highly.
       const e = await addEvent(0.79);
       await db
         .insert(docTopicScores)

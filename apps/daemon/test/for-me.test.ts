@@ -1,6 +1,6 @@
 /**
- * "Với tôi?" (explainForProfile, POST /api/events/:id/for-me): phân quyền fail-closed theo hồ sơ,
- * cache, hạn mức mỗi ngày, chống đua, và route web. Tin của hồ sơ dựng thẳng vào feed_items.
+ * "Với tôi?" (explainForProfile, POST /api/events/:id/for-me): fail-closed per-profile authorization,
+ * cache, daily quota, race protection, and the web route. The profile's items are built directly into feed_items.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeLlm } from "@radard/adapters/ai-fake";
@@ -50,7 +50,7 @@ function replier(delayMs = 0) {
   return { llm, calls };
 }
 
-/** Một tin trong bản chụp của hồ sơ: tài liệu thật, feed_items thật (snapshot `ready`). */
+/** One item in the profile's snapshot: a real document, real feed_items (snapshot `ready`). */
 async function addFeedItem(
   profileId: number,
   opts: { eventId?: number; title?: string; summary?: string } = {},
@@ -159,7 +159,7 @@ afterAll(async () => {
 describe("explainForProfile", () => {
   test("viết một lần rồi cache: lượt hai không gọi model; prompt có hồ sơ, tóm tắt chung và tài liệu", async () => {
     const { eventId } = await addFeedItem(1, { summary: "Tóm tắt chung của sự kiện này." });
-    // Tin đã 👍 (mới nhất là like) vào prompt; tin 👎 thì không.
+    // Liked items (latest label is like) go into the prompt; disliked items do not.
     const liked = await addFeedItem(1, { title: "Tin đã thích" });
     const disliked = await addFeedItem(1, { title: "Tin đã chê" });
     await db.insert(feedback).values([
@@ -190,7 +190,7 @@ describe("explainForProfile", () => {
     expect(prompt).toContain("Original title 1");
     expect(prompt).toContain("- Tin đã thích");
     expect(prompt).not.toContain("Tin đã chê");
-    // Yêu cầu của prompt hệ thống: 2-4 câu, chỉ dùng sự thật có sẵn, nói thẳng khi không liên quan, ghi rõ suy luận.
+    // System prompt requirements: 2-4 sentences, only use existing facts, say so plainly when not relevant, state inference clearly.
     const system = calls[0]?.system ?? "";
     expect(system).toContain("2-4 sentences");
     expect(system).toContain("Use only the facts in the input");
@@ -208,7 +208,7 @@ describe("explainForProfile", () => {
     const mine = await addFeedItem(1);
     const { llm, calls } = replier();
     const deps = { db, llm };
-    // Hồ sơ 2 đòi sự kiện của hồ sơ 1.
+    // Profile 2 requests events of profile 1.
     expect(await explainForProfile(deps, { profileId: 2, eventId: mine.eventId })).toEqual({
       status: "not_found",
     });
@@ -220,7 +220,7 @@ describe("explainForProfile", () => {
     });
     expect(calls).toHaveLength(0);
     expect(await db.select().from(eventForProfile)).toHaveLength(0);
-    // Cache của hồ sơ 1 không lộ sang hồ sơ 2.
+    // Profile 1's cache does not leak to profile 2.
     await explainForProfile(deps, { profileId: 1, eventId: mine.eventId });
     expect(await explainForProfile(deps, { profileId: 2, eventId: mine.eventId })).toEqual({
       status: "not_found",
@@ -244,24 +244,24 @@ describe("explainForProfile", () => {
     const items = [await addFeedItem(1), await addFeedItem(1), await addFeedItem(1)];
     const other = await addFeedItem(2);
     const { llm, calls } = replier();
-    const now = new Date(); // created_at của dòng cache là giờ thật
+    const now = new Date(); // created_at of the cache row is the real time
     const deps = { db, llm, dailyLimit: 2, now: () => now };
     const ask = (i: number) =>
       explainForProfile(deps, { profileId: 1, eventId: items[i]?.eventId ?? 0 });
 
     expect((await ask(0)).status).toBe("ok");
-    expect((await ask(0)).status).toBe("ok"); // cache hit, không tính
+    expect((await ask(0)).status).toBe("ok"); // cache hit, not counted
     expect((await ask(1)).status).toBe("ok");
     expect(calls).toHaveLength(2);
     expect(await ask(2)).toEqual({ status: "limit" });
     expect(calls).toHaveLength(2);
-    // Cache hit vẫn trả lời dù đã hết hạn mức.
+    // Cache hit still answers even when the quota is used up.
     expect(await ask(0)).toMatchObject({ status: "ok", cached: true });
-    // Hạn mức theo hồ sơ: hồ sơ 2 không bị ảnh hưởng.
+    // Per-profile quota: profile 2 is not affected.
     expect((await explainForProfile(deps, { profileId: 2, eventId: other.eventId })).status).toBe(
       "ok",
     );
-    // Sang ngày mới (giờ VN): đếm lại.
+    // New day (Vietnam time): counted again.
     const tomorrow = { ...deps, now: () => new Date(now.getTime() + 25 * 3_600_000) };
     expect(
       (await explainForProfile(tomorrow, { profileId: 1, eventId: items[2]?.eventId ?? 0 })).status,
@@ -301,7 +301,7 @@ describe("explainForProfile", () => {
     const { llm, calls } = replier();
     const deps = { db, llm };
     await explainForProfile(deps, { profileId: 1, eventId });
-    // Thích thêm một tin: context_hash không gồm tin đã thích.
+    // Liking one more item: context_hash does not include the liked items.
     const liked = await addFeedItem(1);
     await db.insert(feedback).values({
       profileId: 1,
@@ -400,10 +400,10 @@ describe("Telegram: forMeFor (nút Với tôi?)", () => {
     expect(await forMeFor(deps, ev)).toMatchObject({ status: "ok" });
     expect(await forMeFor(deps, ev)).toMatchObject({ status: "ok" });
     expect(calls).toHaveLength(1);
-    // Message id không có / của người nhận khác.
+    // Message id missing or belonging to another recipient.
     expect(await forMeFor(deps, { ...ev, messageId: "999" })).toEqual({ status: "not_found" });
     expect(await forMeFor(deps, { ...ev, recipient: "200" })).toEqual({ status: "not_found" });
-    // Hồ sơ 2 bấm vào tin của hồ sơ 1 (cùng chat/message id): không tra được qua profile_id.
+    // Profile 2 taps an item of profile 1 (same chat/message id): cannot be looked up via profile_id.
     expect(await forMeFor({ ...deps, profileId: 2 }, ev)).toEqual({ status: "not_found" });
     expect(calls).toHaveLength(1);
   });
@@ -432,7 +432,7 @@ describe("Telegram: forMeFor (nút Với tôi?)", () => {
   });
 });
 
-// Daemon không import grammY (chỉ packages/adapters được): lấy kiểu từ chính adapter.
+// The daemon does not import grammY (only packages/adapters may): take the type from the adapter itself.
 type RouterOpts = Parameters<typeof createTelegramRouter>[0];
 type Transformer = NonNullable<RouterOpts["transformer"]>;
 type UserFromGetMe = NonNullable<RouterOpts["botInfo"]>;
@@ -578,8 +578,8 @@ describe("POST /api/events/:id/for-me", () => {
 
   test("200 { text, cached }; lượt hai cached; 404 sự kiện của hồ sơ khác; 401 khi chưa đăng nhập", async () => {
     await db.insert(invites).values({ email: "khach@example.com" });
-    const ownerHeaders = await login(OWNER); // nối hồ sơ 1
-    const guestHeaders = await login("khach@example.com"); // hồ sơ 3 (1 và 2 đã có)
+    const ownerHeaders = await login(OWNER); // links profile 1
+    const guestHeaders = await login("khach@example.com"); // profile 3 (1 and 2 already exist)
     const mine = await addFeedItem(1);
     const theirs = await addFeedItem(2);
     const { llm, calls } = replier();
@@ -597,7 +597,7 @@ describe("POST /api/events/:id/for-me", () => {
     });
     expect(calls).toHaveLength(1);
 
-    // Khách đòi sự kiện của hồ sơ 1 hoặc 2: 404, không gọi model, không ghi cache.
+    // Guest requests events of profile 1 or 2: 404, no model call, no cache write.
     for (const id of [mine.eventId, theirs.eventId, 424242, "abc", "1e3"]) {
       expect((await post(app, id, guestHeaders)).status).toBe(404);
     }

@@ -1,4 +1,4 @@
-/** Đọc câu trả lời của LLM cho tin giả định của chủ đề (HyDE). */
+/** Read the LLM's answer for a topic's hypothetical item (HyDE). */
 import { describe, expect, test } from "bun:test";
 import { EXAMPLES_PER_TOPIC, parseExamples } from "../src/jobs/topic-examples.ts";
 

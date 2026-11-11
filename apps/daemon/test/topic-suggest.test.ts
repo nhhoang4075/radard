@@ -1,7 +1,7 @@
 /**
- * Gợi ý chủ đề trên DB test: model quyết định và LLM đều giả, không gọi mạng. Model quyết định giả
- * trả xác suất theo id chủ đề cho câu có/không (chấm thư viện), và quan hệ theo tên đề xuất cho câu
- * `choice` (soát chủ đề gần giống).
+ * Topic suggestions on the test DB: the decision model and LLM are both fake, no network calls. The fake decision model
+ * returns probabilities by topic id for the yes/no question (library scoring), and relations by suggested name for the
+ * `choice` question (near-duplicate check).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { type FakeDecisionReply, fakeDecision, fakeLlm } from "@radard/adapters/ai-fake";
@@ -63,8 +63,8 @@ interface Seen {
 }
 
 /**
- * Model quyết định giả: câu có/không theo id chủ đề (`probs`), câu quan hệ theo tên tiếng Anh của
- * đề xuất (`relations`, mặc định "khác").
+ * Fake decision model: yes/no question by topic id (`probs`), relation question by the English name of the
+ * suggestion (`relations`, default "khác").
  */
 function decider(
   probs: Record<number, number>,
@@ -103,7 +103,7 @@ const proposal = (name: string, topicName: string) => ({
   why: "Bạn làm ở công ty fintech.",
 });
 
-/** Dạng LLM trả về: khoá trên dây giữ nguyên `labelVi`/`descriptionEn` (chỉ cột DB đổi tên). */
+/** Shape the LLM returns: the wire keys keep `labelVi`/`descriptionEn` (only the DB columns were renamed). */
 const wire = (p: ReturnType<typeof proposal>) => ({
   labelVi: p.name,
   descriptionEn: p.embedText,
@@ -227,7 +227,7 @@ describe("suggestTopics: chủ đề mới", () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.prompt).toContain(READER);
     expect(prompts[0]?.prompt).toContain("- Ứng dụng LLM | Topic a: things about a");
-    // Đề xuất hẹp hơn hay trùng chủ đề có sẵn đều bị bỏ: chỉ giữ chủ đề khác mọi chủ đề có sẵn.
+    // Suggestions narrower than or duplicating an existing topic are dropped: only keep topics that differ from every existing topic.
     expect(res.newTopics).toHaveLength(0);
     expect(res.dropped).toEqual([
       {

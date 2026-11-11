@@ -7,14 +7,14 @@ import { strings } from "../lib/strings.vi.ts";
 import { AppShell } from "../shell/app-shell.tsx";
 import { Button } from "../ui/index.ts";
 
-// Khung đã đăng nhập: app shell + chân sidebar (tên, đăng xuất). Trang con render trong <Outlet/>.
+// Signed-in frame: app shell + sidebar footer (name, sign out). Child pages render inside <Outlet/>.
 function Layout() {
   const { data } = useSession();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const onSignOut = async () => {
     await authClient.signOut();
-    queryClient.clear(); // bỏ dữ liệu đã lưu đệm của người vừa đăng xuất
+    queryClient.clear(); // drop cached data of the user who just signed out
     await navigate({ to: "/login" });
   };
   return (

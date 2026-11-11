@@ -1,4 +1,4 @@
-/** Luật giữ bằng máy cho apps/web (docs/cau-truc-web.html mục 6). */
+/** Machine-enforced rules for apps/web (docs/cau-truc-web.html section 6). */
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";

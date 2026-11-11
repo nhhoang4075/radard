@@ -1,7 +1,7 @@
 /**
- * Tóm tắt dùng chung (summaries.ts, quyết định 11/11/2026): prompt không có câu "với bạn", cache theo
- * (sự kiện, ngôn ngữ, docs_hash), tính lại khi sự kiện có thêm bài, hai hồ sơ dùng chung một dòng, lỗi
- * một lô không làm hỏng cả bản chụp, và `feed_items.summary_id` ổn định.
+ * Shared summaries (summaries.ts, decision 11/11/2026): the prompt has no "với bạn" phrase, cache by
+ * (event, language, docs_hash), recompute when the event gets more articles, two profiles share one row, an error
+ * in one batch does not break the whole snapshot, and `feed_items.summary_id` is stable.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeLlm } from "@radard/adapters/ai-fake";
@@ -57,7 +57,7 @@ async function addDoc(): Promise<number> {
   return d?.id ?? 0;
 }
 
-/** Sự kiện thật (cho bản chụp feed): một tài liệu điểm chủ đề cao. */
+/** Real event (for the feed snapshot): one document with a high topic score. */
 async function addEvent(): Promise<{ eventId: number; docId: number }> {
   const docId = await addDoc();
   const v = new Array(1024).fill(0);
@@ -80,7 +80,7 @@ async function addEvent(): Promise<{ eventId: number; docId: number }> {
   return { eventId, docId };
 }
 
-/** LLM giả: mỗi `Story n` một tóm tắt mang tên tiêu đề tài liệu đầu tiên; ghi lại mọi lời gọi. */
+/** Fake LLM: each `Story n` gets one summary named after the first document's title; records every call. */
 function summaryLlm(opts: { failWhen?: (prompt: string) => boolean } = {}) {
   const calls: { prompt: string; system?: string }[] = [];
   const llm = fakeLlm({
@@ -165,7 +165,7 @@ describe("ensureSharedSummaries", () => {
     const { llm, calls } = summaryLlm();
     const first = await ensureSharedSummaries({ db, llm }, items, "vi");
     expect(first).toMatchObject({ requested: 3, failed: 0 });
-    expect(calls).toHaveLength(1); // một lô
+    expect(calls).toHaveLength(1); // one batch
     expect(calls[0]?.system).not.toContain("this reader");
     expect(calls[0]?.prompt).not.toContain("why it matters");
     const rows = await db.select().from(eventSummaries);
@@ -178,7 +178,7 @@ describe("ensureSharedSummaries", () => {
     expect([...second.byEvent.values()].map((s) => s.id).sort()).toEqual(
       [...first.byEvent.values()].map((s) => s.id).sort(),
     );
-    // Ngôn ngữ khác là bản khác.
+    // A different language is a different row.
     await ensureSharedSummaries({ db, llm }, items, "en");
     expect(calls).toHaveLength(2);
     expect(await db.select().from(eventSummaries)).toHaveLength(6);
@@ -194,7 +194,7 @@ describe("ensureSharedSummaries", () => {
     expect(calls).toHaveLength(2);
     expect(b.byEvent.get(it.eventId)?.id).not.toBe(old?.id);
     expect(await db.select().from(eventSummaries)).toHaveLength(2);
-    // Tập tài liệu cũ vẫn ra đúng dòng cũ (không gọi model).
+    // The old document set still returns the old row (no model call).
     const again = await ensureSharedSummaries({ db, llm }, [it], "vi");
     expect(again.byEvent.get(it.eventId)?.id).toBe(old?.id);
     expect(calls).toHaveLength(2);
@@ -205,13 +205,13 @@ describe("ensureSharedSummaries", () => {
   test("lỗi một lô (thử lại đúng một lần) chỉ làm tin của lô đó thiếu tóm tắt; lô khác vẫn có", async () => {
     const items = [];
     for (let i = 0; i < SUMMARY_BATCH_SIZE + 2; i++) items.push(await item());
-    // Lô đầu có "Story 10"; lô sau chỉ có Story 1-2.
+    // The first batch has "Story 10"; the next batch only has Story 1-2.
     const { llm, calls } = summaryLlm({ failWhen: (p) => p.includes("Story 10") });
     const res = await ensureSharedSummaries({ db, llm }, items, "vi");
     expect(res).toMatchObject({ requested: 12, failed: SUMMARY_BATCH_SIZE });
     expect(res.byEvent.size).toBe(2);
-    expect(calls).toHaveLength(3); // lô lỗi 2 lần + lô tốt 1 lần
-    // Lần sau chỉ hỏi lại 10 tin còn thiếu.
+    expect(calls).toHaveLength(3); // batch failed twice + good batch once
+    // Next time only the 10 missing items are asked again.
     const retry = await ensureSharedSummaries({ db, llm: summaryLlm().llm }, items, "vi");
     expect(retry).toMatchObject({ requested: 10, failed: 0 });
   });
@@ -277,7 +277,7 @@ describe("bản chụp feed", () => {
     expect(res.items).toHaveLength(1);
     expect(res.items[0]?.summaryId).toBeNull();
     expect(await db.select().from(eventSummaries)).toHaveLength(0);
-    // Không llm: cũng dựng được.
+    // No llm: still builds.
     const none = await ensureFeedSnapshot(
       { db, profileId: 1, llm: null },
       new Date("2026-10-07T00:00:00Z"),

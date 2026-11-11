@@ -1,4 +1,4 @@
-/* Reset, chữ mặc định, vòng focus, giảm chuyển động. Chỉ đọc token tầng 2. */
+/* Reset, default text, focus ring, reduced motion. Only reads tier-2 tokens. */
 *,
 *::before,
 *::after {

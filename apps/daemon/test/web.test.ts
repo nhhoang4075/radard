@@ -1,4 +1,4 @@
-/** Theo dõi lượt mở link: token, route /o/:token, ghi `link_opens`. Không mở cổng thật. */
+/** Track link opens: token, route /o/:token, writes `link_opens`. No real port is opened. */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import { createDatabase, deliveries, digests, linkOpens, profile, runMigrations } from "@radard/db";
@@ -15,7 +15,7 @@ const TARGET_0 = "https://example.org/bai-chinh?a=1";
 const TARGET_1 = "http://example.net:8080/bai-lien-quan";
 
 let clock = new Date("2026-11-10T00:00:00Z");
-/** Mọi app tạo trong test: lượt ghi `link_opens` chạy nền, phải chờ xong trước khi test sau `truncate`. */
+/** Every app created in a test: `link_opens` writes run in the background and must finish before the next test after `truncate`. */
 const created: Array<{ idle: () => Promise<void> }> = [];
 const makeApp = (secret: string | undefined) => {
   const w = createWebApp({ db, secret, now: () => clock });
@@ -120,7 +120,7 @@ describe("GET /o/:token", () => {
     const rows = await opens();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      profileId: 2, // = deliveries.profile_id, không phải hằng 1
+      profileId: 2, // = deliveries.profile_id, not the constant 1
       deliveryId: 1,
       linkIndex: 1,
       userAgent: "Mozilla/5.0",
@@ -144,16 +144,16 @@ describe("GET /o/:token", () => {
     const [v, d, p, k, mac] = good.split(".") as [string, string, string, string, string];
     const flip = (c: string) => (c === "a" ? "b" : "a");
     const bad = [
-      `${v}.${d}.${p}.${k}.${flip(mac[0] as string)}${mac.slice(1)}`, // sửa 1 ký tự của MAC
-      `${v}.2.${p}.${k}.${mac}`, // sửa digest_id
-      `${v}.${d}.2.${k}.${mac}`, // sửa position
-      `${v}.${d}.${p}.1.${mac}`, // sửa k
-      `${v}.${d}.${p}.${k}`, // thiếu MAC
-      `${v}.${d}.${p}.${mac}`, // thiếu phần k
-      `v2.${d}.${p}.${k}.${mac}`, // sai tiền tố
-      `${v}.${d}.${p}.${k}.${mac.slice(0, 21)}`, // MAC ngắn
-      `${v}.${d}.${p}.${k}.${mac}A`, // MAC dài
-      `${v}.01.${p}.${k}.${mac}`, // số dạng không chuẩn
+      `${v}.${d}.${p}.${k}.${flip(mac[0] as string)}${mac.slice(1)}`, // change 1 character of the MAC
+      `${v}.2.${p}.${k}.${mac}`, // change digest_id
+      `${v}.${d}.2.${k}.${mac}`, // change position
+      `${v}.${d}.${p}.1.${mac}`, // change k
+      `${v}.${d}.${p}.${k}`, // MAC missing
+      `${v}.${d}.${p}.${mac}`, // k part missing
+      `v2.${d}.${p}.${k}.${mac}`, // wrong prefix
+      `${v}.${d}.${p}.${k}.${mac.slice(0, 21)}`, // short MAC
+      `${v}.${d}.${p}.${k}.${mac}A`, // long MAC
+      `${v}.01.${p}.${k}.${mac}`, // non-canonical number form
       `${v}.${d}.${p}.-0.${mac}`,
       "rac",
     ];
@@ -183,11 +183,11 @@ describe("GET /o/:token", () => {
     expect((await open(w, t)).status).toBe(302);
     await w.idle();
     expect(await opens()).toHaveLength(1);
-    // link khác cùng tin là một cặp khác
+    // a different link on the same item is a different pair
     await open(w, tokenOf(1));
     await w.idle();
     expect(await opens()).toHaveLength(2);
-    clock = new Date(clock.getTime() + 2 * 3600_000); // tổng 25 giờ kể từ lần đầu
+    clock = new Date(clock.getTime() + 2 * 3600_000); // 25 hours total since the first time
     await open(w, t);
     await w.idle();
     expect((await opens()).filter((r) => r.linkIndex === 0)).toHaveLength(2);

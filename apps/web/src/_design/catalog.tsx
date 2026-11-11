@@ -1,4 +1,4 @@
-/** Trang danh mục thành phần (/_design), chỉ build dev. Mọi thứ ghép từ ui/, không viết style riêng ngoài bố cục. */
+/** Component catalog page (/_design), dev build only. Everything is composed from ui/, with no custom styles beyond layout. */
 import { Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { strings } from "../lib/strings.vi.ts";

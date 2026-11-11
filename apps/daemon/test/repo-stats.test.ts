@@ -1,7 +1,7 @@
 /**
- * `repo_stats` trên database test thật: chụp số sao qua GraphQL (HTTP giả, không gọi mạng), tập repo
- * theo dõi, tăng 24 giờ với luật ≥ 20 giờ, tăng tốc, cách tạm khi mới có một lần đo, ghi lần đọc
- * trang Trending lúc fetch, và tín hiệu `gh_gain_24h` mà job signals ghi cho xếp hạng.
+ * `repo_stats` on the real test database: captures star counts via GraphQL (fake HTTP, no network calls), the repo set
+ * being tracked, 24-hour gain with the ≥ 20-hour rule, acceleration, the temporary fallback when only one measurement exists, recording reads
+ * of the Trending page at fetch time, and the `gh_gain_24h` signal that the signals job writes for ranking.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
@@ -39,7 +39,7 @@ const db = createDatabase(TEST_URL, { max: 2 });
 const HOUR = 3_600_000;
 const TRENDING = await Bun.file(`${import.meta.dir}/fixtures/github-trending.html`).text();
 
-/** GraphQL giả: trả sao theo tên repo trong truy vấn; repo trong `gone` coi như đã bị xoá. */
+/** Fake GraphQL: returns stars by repo name in the query; repos in `gone` count as deleted. */
 function fakeGraphql(stars: Record<string, number>, gone: string[] = []) {
   const queries: string[] = [];
   const http: HttpClient = {
@@ -190,7 +190,7 @@ describe("tập theo dõi", () => {
     await addDoc("github_new_repos", "dave/bad", "https://github.com/dave/bad", {
       meta: { suspicious: true },
     });
-    // Cùng repo đáng ngờ được HN link tới: vẫn bỏ.
+    // Same suspicious repo linked from HN: still dropped.
     await addDoc("hn", "105", "https://github.com/dave/bad");
     await addDoc("github_new_repos", "eve/old", "https://github.com/eve/old", {
       fetchedAt: new Date(now.getTime() - 40 * 24 * HOUR),
@@ -225,7 +225,7 @@ describe("runRepoStats", () => {
       ["bob/two", 3400, 7, "github_stars", null],
     ]);
 
-    // Một giờ sau (chạy tay, hay pg-boss thử lại): repo đã chụp được bỏ qua, chỉ hỏi lại repo thiếu.
+    // One hour later (manual run, or pg-boss retry): repos already captured are skipped, only missing repos are queried again.
     const again = await runRepoStats({ db, http, now: () => new Date(now.getTime() + HOUR) });
     expect(again).toEqual({ tracked: 3, fresh: 2, observed: 0, missing: 1 });
     expect(queries[2]).not.toContain('"alice"');
@@ -250,7 +250,7 @@ describe("growthOf", () => {
   const now = new Date("2026-10-13T23:20:00Z");
 
   test("tham chiếu là lần đo gần nhất cách ≥ 20 giờ, bỏ qua lần đo sát nhau", () => {
-    // Trending 06:10 và tự chụp 06:20 hôm nay; hôm qua chụp 06:20; một lần chạy tay 14 giờ trước.
+    // Trending at 06:10 and self-capture at 06:20 today; yesterday captured at 06:20; one manual run 14 hours ago.
     const g = growthOf([
       obs(0, 1500, now),
       obs(1 / 6, 1480, now),
@@ -335,7 +335,7 @@ describe("tín hiệu cho xếp hạng", () => {
     ]);
     const s = Object.fromEntries(signals.map((r) => [r.metric, r.value]));
     expect(githubNewReposSource.engagement?.(s)).toBe(50);
-    // Chưa đủ hai lần đo: sao / tuổi như trước.
+    // Fewer than two measurements: stars / age as before.
     expect(githubNewReposSource.engagement?.({ gh_stars: 900, gh_age_days: 3 })).toBe(300);
     expect(githubTrendingSource.engagement?.({ gh_gain_24h: 40, gh_stars_today: 978 })).toBe(40);
     expect(githubTrendingSource.engagement?.({ gh_gain_24h: -5 })).toBe(0);

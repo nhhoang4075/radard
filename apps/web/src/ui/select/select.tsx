@@ -5,7 +5,7 @@ import "./select.css";
 
 export type SelectOption<T extends string> = { value: T; label: string };
 
-/** Chọn một giá trị. Hành vi (mở/đóng, focus, Esc, nhấp ra ngoài) do Radix Popover; giao diện là rd-*. */
+/** Pick one value. Behaviour (open/close, focus, Esc, click outside) is handled by Radix Popover; the look is rd-*. */
 export function Select<T extends string>({
   value,
   options,
@@ -15,7 +15,7 @@ export function Select<T extends string>({
   value: T;
   options: readonly SelectOption<T>[];
   onChange: (v: T) => void;
-  label: string; // tên đọc của ô chọn
+  label: string; // accessible name of the select
 }) {
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.value === value);
@@ -58,7 +58,7 @@ export function Select<T extends string>({
   );
 }
 
-/** Nút "+N" chọn nhiều, có ô tìm. Menu ở lại khi chọn; đóng bằng Esc hoặc nhấp ra ngoài. */
+/** "+N" multi-select button, with a search box. The menu stays open when selecting; close with Esc or a click outside. */
 export function MultiSelect<T extends string>({
   values,
   options,
@@ -70,7 +70,7 @@ export function MultiSelect<T extends string>({
   values: ReadonlySet<T>;
   options: readonly SelectOption<T>[];
   onChange: (next: Set<T>) => void;
-  triggerLabel: string; // ví dụ "+5"
+  triggerLabel: string; // e.g. "+5"
   searchPlaceholder: string;
   emptyLabel: string;
 }) {

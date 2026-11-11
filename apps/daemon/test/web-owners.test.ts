@@ -1,4 +1,4 @@
-/** Owner nằm trong DB: middleware isOwner (phiên thật), CLI owners/relink/revoke. */
+/** Owner in the DB: isOwner middleware (real session), CLI owners/relink/revoke. */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
   createDatabase,
@@ -144,9 +144,9 @@ describe("invites add --role / revoke", () => {
 
 describe("profiles relink", () => {
   test("không --yes chỉ báo; có --yes nối, user cũ mất hồ sơ; hồ sơ/user lạ hoặc user đã có hồ sơ khác bị từ chối", async () => {
-    const a = await signUp(BOOT); // hồ sơ 1
+    const a = await signUp(BOOT); // profile 1
     await addInvite(db, "b@example.com");
-    const b = await signUp("b@example.com"); // hồ sơ 2
+    const b = await signUp("b@example.com"); // profile 2
     await db
       .insert(userTable)
       .values({ id: "u-c", name: "c", email: "c@example.com", emailVerified: true });

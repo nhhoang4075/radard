@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import "./icon-button.css";
 
 export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> & {
-  label: string; // tên đọc cho trình đọc màn hình, bắt buộc
+  label: string; // accessible name for screen readers, required
   pressed?: boolean;
   children: ReactNode;
 };

@@ -1,4 +1,4 @@
-/** Ghi lượt bấm vào `feedback` trên `radard_test`. */
+/** Record taps into `feedback` on `radard_test`. */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { createDatabase, deliveries, feedback, profile, runMigrations } from "@radard/db";
 import { asc, sql } from "drizzle-orm";
@@ -58,7 +58,7 @@ describe("recordFeedback", () => {
     expect(await db.select().from(feedback)).toHaveLength(1);
   });
 
-  // Lùi thời điểm mọi dòng phản hồi để lượt bấm kế tiếp không bị coi là bấm đúp.
+  // Move back the time of every feedback row so the next tap is not treated as a double tap.
   const ageRows = () =>
     db.execute(sql`update feedback set created_at = created_at - interval '1 minute'`);
 
@@ -82,7 +82,7 @@ describe("recordFeedback", () => {
       state: "none",
     });
     await ageRows();
-    // Đã bỏ chọn thì bấm 👍 là chọn lại, không phải bỏ chọn lần nữa.
+    // After clearing, tapping 👍 selects it again instead of clearing again.
     expect((await recordFeedback(db, ev("like", "cb:3"), 1)).state).toBe("like");
     const rows = await db.select().from(feedback).orderBy(asc(feedback.id));
     expect(rows.map((r) => r.kind)).toEqual(["like", "clear", "like"]);
@@ -109,7 +109,7 @@ describe("recordFeedback", () => {
   test("phản hồi mang profile_id của tin; tin lạ thì dùng hồ sơ được truyền", async () => {
     await db.insert(profile).values({ id: 2, promptContext: "y" });
     await db.update(deliveries).set({ profileId: 2 });
-    // Người nối dây truyền 1, nhưng tin thuộc hồ sơ 2: phản hồi theo tin.
+    // The connector passes profile 1, but the item belongs to profile 2: feedback follows the item.
     await recordFeedback(db, ev("like", "cb:1"), 1);
     await recordFeedback(db, ev("like", "cb:9", "777"), 1);
     const rows = await db.select().from(feedback).orderBy(asc(feedback.id));

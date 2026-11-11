@@ -1,4 +1,4 @@
-/** Dữ liệu giả cho trang xem trước dev `/_design/feed` (không cần đăng nhập). Có kiểu như API thật. */
+/** Fake data for the dev preview page `/_design/feed` (no sign-in needed). Typed like the real API. */
 import type { FeedClient } from "../../lib/feed-client.ts";
 import { todayVN } from "../../lib/format.ts";
 import type { EventDetail, FeedbackState, FeedItem, FeedPage } from "./types.ts";

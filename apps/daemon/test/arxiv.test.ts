@@ -11,7 +11,7 @@ import {
 
 const fixture = await Bun.file(new URL("./fixtures/arxiv-query.xml", import.meta.url)).text();
 
-/** Dựng một entry tối giản với thời điểm công bố cho trước. */
+/** Build a minimal entry with the given publication time. */
 const entry = (id: string, published: string) => `<entry>
   <id>http://arxiv.org/abs/${id}v1</id><title>Bài ${id}</title><summary>s</summary>
   <published>${published}</published><updated>${published}</updated>
@@ -19,8 +19,8 @@ const entry = (id: string, published: string) => `<entry>
 </entry>`;
 
 /**
- * arXiv giả: hiểu `submittedDate:[YYYYMMDDHHMM TO YYYYMMDDHHMM]` (hai đầu tính cả), `start`,
- * `max_results`, trả `opensearch:totalResults` như API thật.
+ * Fake arXiv: understands `submittedDate:[YYYYMMDDHHMM TO YYYYMMDDHHMM]` (both ends inclusive), `start`,
+ * `max_results`, and returns `opensearch:totalResults` like the real API.
  */
 function fakeArxiv(papers: Array<{ id: string; published: string }>) {
   const urls: string[] = [];

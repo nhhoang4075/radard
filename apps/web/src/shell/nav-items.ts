@@ -3,12 +3,12 @@ import type { ComponentType } from "react";
 
 export type NavItem = {
   id: "feed" | "search" | "profile" | "sources" | "engine";
-  to: "/" | null; // null = chưa có trang
+  to: "/" | null; // null = no page yet
   Icon: ComponentType<{ "aria-hidden"?: boolean }>;
   group: "main" | "owner";
 };
 
-// Trang nào có route thì điền `to`; chưa có thì null (hiện xám, nhãn "Sắp có").
+// Pages with a route fill `to`; without one it is null (shown grey, label "Sắp có").
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: "feed", to: "/", Icon: FileText, group: "main" },
   { id: "search", to: null, Icon: Search, group: "main" },

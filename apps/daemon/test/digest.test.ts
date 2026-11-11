@@ -1,6 +1,6 @@
 /**
- * Job điểm tin trên `radard_test` với Notifier giả và LLM giả: chạy lại không gửi trùng, chết giữa
- * chừng thì gửi tiếp phần thiếu, LLM hỏng thì gửi bản không tóm tắt, ngày yên ắng vẫn có tin.
+ * Item scoring job on `radard_test` with a fake Notifier and fake LLM: rerunning does not send duplicates, a crash in the middle
+ * resumes by sending the missing part, a broken LLM sends the version without summaries, quiet days still have items.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { fakeDecision, fakeLlm } from "@radard/adapters/ai-fake";
@@ -43,7 +43,7 @@ import { addTopic } from "./topic-fixture.ts";
 const TEST_URL = process.env.TEST_DATABASE_URL ?? "postgres://localhost:5432/radard_test";
 const db = createDatabase(TEST_URL, { max: 2 });
 const RECIPIENT = "100000001";
-/** 07:00 giờ VN ngày 06/10. */
+/** 07:00 Vietnam time on 06/10. */
 const SLOT = new Date("2026-10-06T00:00:00Z");
 const IN = new Date("2026-10-05T12:00:00Z");
 let hn = 0;
@@ -86,8 +86,8 @@ async function addEvent(score = 0.79, sourceId = hn): Promise<{ eventId: number;
 }
 
 /**
- * LLM giả. Hai loại lời gọi: tóm tắt CHUNG (system "news summaries": mỗi `Story n` một tóm tắt) và gán
- * nhãn + lời mở đầu theo hồ sơ (system "label the stories": mỗi `Story n: tiêu đề` một nhãn).
+ * Fake LLM. Two kinds of calls: shared summaries (system "news summaries": one summary per `Story n`) and assign
+ * labels + an opening line per profile (system "label the stories": one label per `Story n: title`).
  */
 function goodLlm(topicOf: (n: number) => string | undefined = () => undefined) {
   const calls: { prompt: string; system?: string }[] = [];
@@ -172,13 +172,13 @@ describe("hồ sơ thứ hai", () => {
     const two = goodLlm();
     const plan = await buildPlan({ db, profileId: 2, llm: two.llm }, SLOT);
     expect(plan.items.length).toBeGreaterThan(0);
-    // Gán nhãn và lời mở đầu theo hồ sơ: bối cảnh và ngôn ngữ của đúng hồ sơ đó.
+    // Labels and opening line per profile: context and language of that exact profile.
     expect(one.labelCalls[0]?.system).toContain("I build AI agents.");
     expect(one.labelCalls[0]?.system).toContain("Write in Vietnamese");
     expect(two.labelCalls[0]?.system).toContain("I study robotics.");
     expect(two.labelCalls[0]?.system).not.toContain("I build AI agents.");
     expect(two.labelCalls[0]?.system).toContain("Write in English");
-    // Tóm tắt chung viết theo ngôn ngữ, không mang bối cảnh người đọc nào.
+    // Shared summary is written in the language, carrying no reader's context.
     expect(one.summaryCalls[0]?.system).toContain("Write in Vietnamese");
     expect(two.summaryCalls[0]?.system).toContain("Write in English");
     expect(two.summaryCalls[0]?.system).not.toContain("I study robotics.");
@@ -220,8 +220,8 @@ describe("runDigest", () => {
       "Tóm tắt tin số 1, đủ dài để qua kiểm tra.",
       "Chủ đề: Agent AI · HN",
     ]);
-    // Bài gốc (tên miền, link đầy đủ) và trang thảo luận HN do adapter khai báo.
-    // Thứ tự tin do chọn Gumbel (T > 0) nên tin đầu có thể là bất kỳ tin nào trong 4 tin gần điểm nhau.
+    // Original article (domain, full link) and the HN discussion page declared by the adapter.
+    // Item order comes from Gumbel selection (T > 0), so the first item can be any of the 4 items with close scores.
     const label = item?.links?.[0]?.label ?? "";
     expect(label).toMatch(/^site[1-4]\.com$/);
     expect(item?.links?.map((l) => l.role)).toEqual(["main", "discussion"]);
@@ -230,7 +230,7 @@ describe("runDigest", () => {
       `https://news.ycombinator.com/item?id=${1000 + Number(label.slice(4, 5))}`,
     );
     expect(item?.actions?.map((a) => a.id)).toEqual(["like", "dislike", "for_me"]);
-    // Lời gọi gán nhãn đọc bối cảnh từ hồ sơ, không viết cứng.
+    // The labeling call reads context from the profile, not hard-coded.
     expect(labelCalls[0]?.system).toContain("I build AI agents.");
     expect(labelCalls[0]?.system).toContain("Vietnamese");
 
@@ -244,7 +244,7 @@ describe("runDigest", () => {
     const again = await runDigest(deps, SLOT);
     expect(again).toMatchObject({ status: "already_sent", sentNow: 0 });
     expect(notifier.sent).toHaveLength(5);
-    // Một lô tóm tắt chung + một lời gọi gán nhãn; chạy lại không gọi gì thêm.
+    // One shared-summary batch + one labeling call; rerunning makes no further calls.
     expect(calls).toHaveLength(2);
   });
 
@@ -259,7 +259,7 @@ describe("runDigest", () => {
     expect(failed?.status).toBe("failed");
     expect(await positions()).toEqual([0, 1, 2]);
 
-    // Trong lúc chờ có thêm sự kiện mới: plan đã lưu nên không chọn lại.
+    // Meanwhile new events arrive: the saved plan is used, so no re-selection.
     await addEvent(0.8);
     notifier.failAfter = undefined;
     const out = await runDigest(deps, SLOT);
@@ -287,7 +287,7 @@ describe("runDigest", () => {
     const notifier = fakeNotifier();
     const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     expect(out).toMatchObject({ status: "sent", summarized: false, items: 1 });
-    // Mỗi việc (tóm tắt chung, gán nhãn) thử đúng hai lần.
+    // Each job (shared summary, labeling) is tried exactly twice.
     expect(calls).toBe(4);
     const [header, item] = notifier.sent.map((s) => s.msg);
     expect(header?.lines.join(" ")).toContain("Bản không tóm tắt");
@@ -300,7 +300,7 @@ describe("runDigest", () => {
   test("Telegram dùng đúng tóm tắt đã chụp trong bản chụp, không gọi model tóm tắt riêng", async () => {
     await addEvent();
     await addEvent();
-    // Bản chụp dựng không có model: tin không có summary_id.
+    // Snapshot built without a model: item has no summary_id.
     await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
     const { llm, summaryCalls, labelCalls } = goodLlm();
     const notifier = fakeNotifier();
@@ -313,7 +313,7 @@ describe("runDigest", () => {
   });
 
   test("ngày không có tin nào vượt sàn: một tin ngắn, không gọi LLM (D5)", async () => {
-    await addEvent(0.5); // dưới cổng R
+    await addEvent(0.5); // below gate R
     let calls = 0;
     const llm = fakeLlm({
       reply() {
@@ -332,7 +332,7 @@ describe("runDigest", () => {
   });
 
   test("ngày yên ắng có tin thuộc chủ đề nhưng dưới sàn: nói rõ số tin đó", async () => {
-    await addEvent(0.66); // z = 0,65: qua cổng R, S ≈ 0,5 dưới sàn 0,59
+    await addEvent(0.66); // z = 0,65: passes gate R, S ≈ 0,5 below the floor 0,59
     await addEvent(0.66);
     const notifier = fakeNotifier();
     await runDigest({ db, profileId: 1, llm: null, notifier, recipient: RECIPIENT }, SLOT);
@@ -343,7 +343,7 @@ describe("runDigest", () => {
 
   test("nhãn chủ đề: lấy chủ đề LLM chọn nếu nằm trong danh sách, không thì nhãn embedding", async () => {
     const infra = await addTopic(db, "GPU & inference", { embedText: "inference" });
-    // Chủ đề thư viện có phạm vi; chủ đề tự thêm ("Agent AI" ở đây) chỉ có tên.
+    // Library topics have a scope; custom topics ("Agent AI" here) have only a name.
     await db
       .update(topics)
       .set({ labelGuide: "GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI)." })
@@ -359,10 +359,10 @@ describe("runDigest", () => {
     expect(system).toContain(
       '  - "Agent AI"\n  - "GPU & inference": GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI).\n',
     );
-    // Hai quy tắc phân xử khi tin hợp hai chủ đề.
+    // Two arbitration rules when an item matches two topics.
     expect(system).toContain("A more specific topic beats a general one");
     expect(system).toContain("The application domain beats the data modality");
-    // Nhãn embedding không được đưa vào prompt.
+    // Embedding labels must not be put into the prompt.
     expect(labelCalls[0]?.prompt).not.toContain("Agent AI");
     expect(notifier.sent[1]?.msg.lines.at(-1)).toBe("Chủ đề: GPU & inference · HN");
     expect(notifier.sent[2]?.msg.lines.at(-1)).toBe("Chủ đề: Agent AI · HN");
@@ -374,7 +374,7 @@ describe("runDigest", () => {
   });
 
   test("plan ghi lại cổng vùng xám: từng sự kiện đã hỏi, xác suất, qua hay loại", async () => {
-    await addEvent(); // R ≈ 0,98: qua không hỏi
+    await addEvent(); // R ≈ 0,98: passes without asking
     const yes = await addEvent(0.62); // R = 0,55
     const no = await addEvent(0.66); // R = 0,65
     for (const d of [yes, no]) {
@@ -433,7 +433,7 @@ describe("hàm thuần", () => {
     expect(digestSlot(new Date("2026-10-06T00:00:00Z"))).toEqual(SLOT);
     expect(digestSlot(new Date("2026-10-06T16:59:00Z"))).toEqual(SLOT); // 23:59 VN
     expect(digestSlot(new Date("2026-10-05T23:59:00Z"))).toEqual(new Date("2026-10-05T00:00:00Z"));
-    expect(digestSlot(new Date("2026-10-06T17:30:00Z"))).toEqual(SLOT); // 00:30 VN ngày 07
+    expect(digestSlot(new Date("2026-10-06T17:30:00Z"))).toEqual(SLOT); // 00:30 Vietnam time on day 07
     expect(vnDate(SLOT)).toBe("06/10");
   });
 
@@ -473,7 +473,7 @@ describe("hàm thuần", () => {
       ["related", "d.com"],
       ["discussion", "HN"],
     ]);
-    // Thảo luận: lượt đăng nhiều người quan tâm nhất.
+    // Discussion: the post with the most interest.
     expect(links.at(-1)?.url).toBe("https://news.ycombinator.com/item?id=2");
     expect(moreRelated).toBe(1);
   });
@@ -510,7 +510,7 @@ describe("chọn Gumbel top-k trong luồng thật", () => {
       learning?: SelectionLearning;
     };
   };
-  /** 12 tin giống điểm nhau trên hai nguồn (mỗi nguồn tối đa 5 tin, nên cần hai nguồn mới đủ 7 tin). */
+  /** 12 items with similar scores from two sources (at most 5 per source, so two sources are needed for 7 items). */
   const many = async () => {
     const [s2] = await db
       .insert(sources)
@@ -554,7 +554,7 @@ describe("chọn Gumbel top-k trong luồng thật", () => {
     expect(l?.pool.length).toBe(12);
     expect(l?.pool.filter((x) => x.sent).length).toBe(7);
     expect(l?.pool.every((x) => x.p >= 0 && x.p <= 1)).toBe(true);
-    // Tin đã gửi phải có p > 0 (chính lần chọn thật cho thấy nó có thể được chọn).
+    // Sent items must have p > 0 (the real selection itself shows it can be chosen).
     expect(l?.pool.filter((x) => x.sent).every((x) => x.p > 0)).toBe(true);
     expect(l?.pairs.length).toBe(21);
     expect(l?.pairs.every((x) => x.a < x.b && x.p >= 0 && x.p <= 1)).toBe(true);
@@ -590,7 +590,7 @@ describe("chọn Gumbel top-k trong luồng thật", () => {
     const deps = { db, profileId: 1, llm: null, notifier: fakeNotifier(), recipient: RECIPIENT };
     await runDigest(deps, SLOT);
     const first = await metaOf();
-    // Giả lập chết sau khi lưu hạt nhưng trước khi lưu plan.
+    // Simulate a crash after saving the seed but before saving the plan.
     await db.delete(deliveries);
     await db.update(digests).set({ status: "sending", meta: { selectSeed: first.selectSeed } });
     await db.execute(sql`truncate candidate_pool`);

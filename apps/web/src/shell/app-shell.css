@@ -130,7 +130,7 @@
   border-top: 1px solid var(--rd-color-border);
 }
 
-/* sidebar gập thành thanh 48px: chỉ còn icon; rê vào logo hiện nút mở */
+/* sidebar collapses to a 48px bar: icons only; hovering the logo shows the open button */
 .rd-shell[data-collapsed] .rd-side .rd-nav-label,
 .rd-shell[data-collapsed] .rd-side .rd-nav-tag,
 .rd-shell[data-collapsed] .rd-side .rd-nav-head,
@@ -166,7 +166,7 @@
   opacity: 1;
 }
 
-/* ---- khung chính ---- */
+/* ---- main frame ---- */
 .rd-main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -235,7 +235,7 @@
   overflow: auto;
 }
 
-/* ---- panel phải: cột ≥1100px, tấm trượt dưới đó; ẩn khi trống ---- */
+/* ---- right panel: column at ≥1100px, slide-in sheet below that; hidden when empty ---- */
 .rd-panel:empty {
   display: none;
 }
@@ -275,7 +275,7 @@
   }
 }
 
-/* ---- ngăn kéo <900px ---- */
+/* ---- drawer <900px ---- */
 .rd-scrim {
   position: fixed;
   inset: 0;

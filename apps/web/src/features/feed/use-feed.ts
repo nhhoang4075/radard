@@ -4,7 +4,7 @@ import { todayVN } from "../../lib/format.ts";
 import { queryKeys } from "../../lib/query-keys.ts";
 import type { FeedbackState, FeedItem, FeedPage } from "./types.ts";
 
-/** Chu kỳ hỏi lại khi chưa có bản chụp hôm nay (quyết định 10/11/2026); có rồi thì dừng. */
+/** Polling interval while today's snapshot does not exist yet (decision 10/11/2026); stops once it exists. */
 export const POLL_MS = 5000;
 
 export function useFeedDates() {
@@ -16,7 +16,7 @@ export function useFeedDates() {
   });
 }
 
-/** Feed của một ngày theo con trỏ; `date` rỗng = ngày gần nhất mà server chọn. */
+/** Feed for one day by cursor; empty `date` = the latest day the server picks. */
 export function useFeed(date: string | undefined) {
   return useInfiniteQuery({
     queryKey: queryKeys.feed(date),
@@ -27,7 +27,7 @@ export function useFeed(date: string | undefined) {
   });
 }
 
-/** Cập nhật lạc quan phản hồi của một tin trong mọi trang đã tải; trả hàm hoàn lại. */
+/** Optimistic update of an item's feedback across all loaded pages; returns a rollback function. */
 export function useFeedbackPatch() {
   const qc = useQueryClient();
   return (feedItemId: number, next: FeedbackState) => {

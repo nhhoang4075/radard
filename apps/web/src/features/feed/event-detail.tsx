@@ -12,7 +12,7 @@ import type { FeedItem } from "./types.ts";
 
 const KEYS = ["r", "p", "c", "a", "f", "u"] as const;
 
-/** Panel phải: tóm tắt, "Với tôi?", các bài đã gộp, vì sao được chọn (điểm đã lưu trong bản chụp, không tính lại). */
+/** Right panel: summary, "Với tôi?", merged articles, why it was picked (scores saved in the snapshot, not recomputed). */
 export function EventDetailPanel({
   item,
   onClose,

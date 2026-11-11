@@ -1,7 +1,7 @@
 import { dayLabel, todayVN } from "../../lib/format.ts";
 import { strings } from "../../lib/strings.vi.ts";
 
-/** `nextCursor === null`: hết bản chụp. */
+/** `nextCursor === null`: end of the snapshot. */
 export function EndOfFeed({ date, count }: { date: string; count: number }) {
   const label =
     date === todayVN()

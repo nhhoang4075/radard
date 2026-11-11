@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
-// Chỉ dev: bản build production không có trang này (nhánh DEV bị loại khi build).
+// Dev only: the production build does not include this page (the DEV branch is stripped at build time).
 const Catalog = import.meta.env.DEV
   ? lazy(() => import("../../_design/catalog.tsx").then((m) => ({ default: m.Catalog })))
   : null;

@@ -5,7 +5,7 @@ import { Chip, MultiSelect, Select } from "../../ui/index.ts";
 export type FeedScope = "digest" | "all";
 const INLINE_TOPICS = 4;
 
-/** Chọn ngày, phạm vi, chip chủ đề chọn nhiều (+N là select có ô tìm). Trạng thái nằm trên URL (do trang cha giữ). */
+/** Pick date, scope, and multi-select topic chips (+N is a select with a search box). State lives in the URL (kept by the parent page). */
 export function FeedFilters({
   dates,
   date,

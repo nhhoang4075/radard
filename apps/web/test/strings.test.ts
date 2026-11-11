@@ -1,4 +1,4 @@
-/** Không chữ Việt cứng trong .tsx: mọi chữ hiển thị nằm trong lib/strings.vi.ts. */
+/** No hard-coded Vietnamese text in .tsx: all displayed text lives in lib/strings.vi.ts. */
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
