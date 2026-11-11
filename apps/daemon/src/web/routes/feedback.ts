@@ -1,6 +1,6 @@
 /**
  * PUT /api/feedback { feedItemId, kind: "like"|"dislike" } → 200 { state } · 404 not_found · 400.
- * Bấm lại đúng nút đang chọn thì bỏ chọn ("none"). Mount sau `sessionMiddleware`.
+ * Clicking the currently selected button again deselects it ("none"). Mounted after `sessionMiddleware`.
  */
 import { type Database, recordFeedFeedback } from "@radard/db";
 import { Hono } from "hono";

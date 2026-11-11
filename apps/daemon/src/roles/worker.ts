@@ -1,5 +1,5 @@
 /**
- * Vai trò worker: nhận job `fetch` (thu thập) và `process` (xử lý) từ pg-boss.
+ * Worker role: receives `fetch` (collect) and `process` (process) jobs from pg-boss.
  */
 import { createLogger } from "@radard/core";
 import type { PgBoss } from "pg-boss";
@@ -69,7 +69,7 @@ export async function startWorker(
 
   const pagesDeps = opts.pages;
   await boss.work(QUEUE.pages, { localConcurrency: 1 }, async () => {
-    // Hai ngày: bài lấy về muộn (con trỏ lùi, daemon tắt một lúc) vẫn được tải trang.
+    // Two days: items fetched late (cursor moved back, daemon was down for a while) still get their pages downloaded.
     await fetchPages(pagesDeps, { since: new Date(Date.now() - 2 * 86_400_000), limit: 300 });
   });
   log.info("đang nhận job", { queue: QUEUE.pages });
@@ -88,7 +88,7 @@ export async function startWorker(
     return;
   }
   await boss.work(QUEUE.process, { localConcurrency: 1 }, async () => {
-    // Daemon giới hạn số lô mỗi lượt; CLI `process` thì chạy tới hết.
+    // The daemon caps the number of batches per run; the CLI `process` command runs until done.
     await runProcess({
       ...processDeps,
       maxBatches: env.processMaxBatches,

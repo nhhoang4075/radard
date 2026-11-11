@@ -1,37 +1,37 @@
 /**
- * arXiv qua API Atom (`export.arxiv.org/api/query`), lấy bài mới theo thể loại.
+ * arXiv via the Atom API (`export.arxiv.org/api/query`), fetching new papers by category.
  *
- * Luật của arXiv: mỗi request cách nhau ≥ 3 giây (đặt ở HttpClient theo host), và bài mới
- * được công bố một đợt mỗi ngày, nên nguồn này chỉ cần chạy ngày một lần.
+ * arXiv rule: each request must be at least 3 seconds apart (set in HttpClient per host), and new papers
+ * are published once a day, so this source only needs to run once a day.
  *
- * BẪY đã gặp (28/09/2026): `published` là lúc tác giả NỘP bài, nhưng bài chỉ hiện trong API
- * sau khi arXiv CÔNG BỐ, trễ 1–3 ngày (cuối tuần không công bố). Con trỏ "chỉ lấy bài mới hơn
- * lần trước" sẽ bỏ sót vĩnh viễn bài công bố muộn. Nên mỗi lượt đọc lại cả một cửa sổ
- * `lookbackDays` tính lùi từ con trỏ; bài đã có thì khoá (source_id, external_id) bỏ đi.
- * 5 ngày ≈ 950 bài cho cs.CL/AI/LG/MA, khoảng 5 trang, ~15 giây.
+ * PITFALL hit (28/09/2026): `published` is when the author SUBMITTED the paper, but it only appears in the API
+ * after arXiv PUBLISHES it, 1–3 days later (nothing is published on weekends). A cursor that "only fetches papers newer
+ * than last time" would permanently miss late-published papers. So each run re-reads a whole window
+ * of `lookbackDays` back from the cursor; papers already present are dropped by the (source_id, external_id) key.
+ * 5 days ≈ 950 papers for cs.CL/AI/LG/MA, about 5 pages, ~15 seconds.
  *
- * Lấy theo cửa sổ `submittedDate` (độ chính xác phút), mỗi cửa sổ không quá 2.000 bài, đi
- * tiến tới hiện tại; con trỏ chỉ dời tới cuối cửa sổ đã lấy đủ (xem `walkWindows`). Trước
- * 06/10/2026 adapter lấy "2.000 bài mới nhất" rồi dời con trỏ lên bài mới nhất: daemon tắt
- * lâu thì phần cũ hơn bị bỏ vĩnh viễn.
+ * Fetches by `submittedDate` window (minute precision), each window at most 2.000 papers, moving
+ * forward to the present; the cursor only advances to the end of a window that was fully fetched (see `walkWindows`). Before
+ * 06/10/2026 the adapter fetched the "2.000 newest papers" and then moved the cursor up to the newest one: a daemon that was
+ * down for a long time permanently lost the older part.
  *
- * Bản thô là đúng khối `<entry>…</entry>` trong phản hồi, không phải JSON đã parse: giữ
- * nguyên văn để job process đọc lại được mọi trường, kể cả trường hôm nay chưa dùng.
+ * The raw copy is the exact `<entry>…</entry>` block in the response, not parsed JSON: keep it
+ * verbatim so the process job can re-read every field, including fields not used today.
  */
 import { type RawItem, type SourceAdapter, walkWindows } from "@radard/core";
 import { XMLParser } from "fast-xml-parser";
 
 export interface ArxivConfig {
-  /** Ví dụ `["cs.CL", "cs.AI"]`. */
+  /** Example: `["cs.CL", "cs.AI"]`. */
   categories: string[];
-  /** Đọc lại bao nhiêu ngày tính lùi từ con trỏ (lần đầu: từ bây giờ). Mặc định 5. */
+  /** How many days back to re-read from the cursor (first run: from now). Default 5. */
   lookbackDays?: number;
-  /** Trần số bài mỗi lượt khi bắt kịp sau thời gian tắt (mỗi 200 bài một request, cách 3 giây). */
+  /** Upper bound on papers per run when catching up after downtime (one request per 200 papers, 3 seconds apart). */
   maxPerRun?: number;
 }
 
 export interface ArxivState {
-  /** Mọi bài nộp (`published`) tới mốc này đã được đọc đủ (ISO). Lượt sau đọc lùi từ đây. */
+  /** Every submission (`published`) up to this mark (ISO) has been fully read. The next run reads back from here. */
   lastPublished: string;
 }
 
@@ -41,7 +41,7 @@ const WINDOW_CAP = 2000;
 const DEFAULT_MAX = 10_000;
 const MINUTE = 60_000;
 
-/** Phút Unix → `YYYYMMDDHHMM` (giờ GMT) cho `submittedDate:[… TO …]`. */
+/** Unix minutes → `YYYYMMDDHHMM` (GMT) for `submittedDate:[… TO …]`. */
 export function arxivMinute(min: number): string {
   return new Date(min * MINUTE).toISOString().slice(0, 16).replace(/[-T:]/g, "");
 }
@@ -84,7 +84,7 @@ export function entryToItem(rawEntry: string): RawItem & { publishedIso: string 
   const pdf = e.link?.find((l) => l.title === "pdf")?.href;
   return {
     externalId: id,
-    // Không kèm phiên bản: bài sửa (v2, v3) vẫn là cùng một bài.
+    // No version: a revised paper (v2, v3) is still the same paper.
     url: `https://arxiv.org/abs/${id}`,
     title: oneLine(e.title),
     publishedAt: new Date(e.published),
@@ -149,7 +149,7 @@ export const arxivSource: SourceAdapter<ArxivConfig, ArxivState> = {
         });
       },
     });
-    // Không lùi con trỏ (cửa sổ bắt đầu lùi 5 ngày, nên coveredUntil chưa chắc đã vượt mốc cũ).
+    // Do not move the cursor (the window starts 5 days back, so coveredUntil may not have passed the old mark).
     const covered = Math.max(walked.coveredUntil * MINUTE, state ? from : 0);
     return {
       items: walked.items,

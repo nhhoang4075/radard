@@ -1,5 +1,5 @@
 /**
- * Dựng các phụ thuộc dùng chung cho daemon và CLI, để hai nơi chạy job giống hệt nhau.
+ * Builds the shared dependencies for the daemon and the CLI, so both run jobs in exactly the same way.
  */
 
 import { fakeEmbedding } from "@radard/adapters/ai-fake";
@@ -34,7 +34,7 @@ export function createDeps(): FetchDeps {
   };
 }
 
-/** Kho bản thô theo `OBJECT_STORE`; thiếu biến R2 thì dừng ngay, không âm thầm ghi ra đĩa. */
+/** Raw-content store chosen by `OBJECT_STORE`; missing R2 variables stop startup immediately rather than silently writing to disk. */
 export function createObjectStore(): ObjectStore {
   if (env.objectStore === "fs") return fsObjectStore(env.dataDir);
   const { endpoint, bucket, accessKeyId, secretAccessKey } = env.r2;
@@ -45,7 +45,7 @@ export function createObjectStore(): ObjectStore {
   return r2ObjectStore({ endpoint, bucket, accessKeyId, secretAccessKey });
 }
 
-/** Một bảng giá dùng chung cho cả tiến trình: đọc từ Gateway tối đa một lần mỗi ngày. */
+/** One price table shared by the whole process: read from the Gateway at most once a day. */
 const priceBook = gatewayPriceBook();
 
 export function createEmbedder(db: Database): EmbeddingProvider | null {
@@ -66,7 +66,7 @@ export function createEmbedder(db: Database): EmbeddingProvider | null {
   }
 }
 
-/** Model sinh văn bản qua AI Gateway; `null` khi chưa có khoá (digest sẽ báo lỗi rõ ràng). */
+/** Text-generation model via the AI Gateway; `null` when there is no key (the digest will report a clear error). */
 export function createLlm(db: Database): LlmProvider | null {
   if (!process.env.AI_GATEWAY_API_KEY) return null;
   return gatewayLlm({
@@ -76,13 +76,13 @@ export function createLlm(db: Database): LlmProvider | null {
   });
 }
 
-/** Model ra quyết định qua AI Gateway; `null` khi chưa có khoá (nơi dùng phải tự bỏ qua bước hỏi). */
+/** Decision model via the AI Gateway; `null` when there is no key (callers must skip the question step themselves). */
 export function createDecider(db: Database): DecisionProvider | null {
   if (!process.env.AI_GATEWAY_API_KEY) return null;
   return gatewayDecision({ model: env.decisionModel, sink: dbUsageSink(db), priceBook });
 }
 
-/** `null` khi chưa cấu hình embedder: job process bỏ qua, thu thập vẫn chạy bình thường. */
+/** `null` when no embedder is configured: the process job is skipped, while collection still runs normally. */
 export function createProcessDeps(base: FetchDeps): ProcessDeps | null {
   const embedder = createEmbedder(base.db);
   if (!embedder) return null;
@@ -91,7 +91,7 @@ export function createProcessDeps(base: FetchDeps): ProcessDeps | null {
     store: base.store,
     embedder,
     thresholds: env.thresholds,
-    // Vùng xám của gộp sự kiện; không có khoá thì gộp như trước (chỉ theo ngưỡng vector).
+    // The grey zone of event merging; without a key, merge as before (by vector threshold only).
     decider: createDecider(base.db),
     llm: createLlm(base.db),
     extractPage: extractPageText,
@@ -99,24 +99,24 @@ export function createProcessDeps(base: FetchDeps): ProcessDeps | null {
 }
 
 /**
- * Hồ sơ mặc định của CLI (lệnh một người dùng: `topics`, `feedback`, `report`…): hồ sơ id 1.
- * KHÔNG dùng trong luồng chạy thật (digest, bot, web): ở đó hồ sơ suy ra từ người nhận qua
+ * Default profile for the CLI (single-user commands: `topics`, `feedback`, `report`…): profile id 1.
+ * NOT used in the real flows (digest, bot, web): there the profile is derived from the recipient via
  * `profile_channels` (`profileOf`, `enabledRecipients`).
  */
 export function cliDefaultProfileId(): number {
   return 1;
 }
 
-/** Kênh gửi digest; `null` khi chưa đặt TELEGRAM_BOT_TOKEN. Người nhận lấy từ `profile_channels`. */
+/** Digest delivery channel; `null` when TELEGRAM_BOT_TOKEN is not set. Recipients come from `profile_channels`. */
 export function createNotifier(): Notifier | null {
   if (!env.telegramToken) return null;
   return telegramNotifier({ token: env.telegramToken });
 }
 
 /**
- * Phụ thuộc của job digest; `null` khi chưa có kênh gửi. Chưa gắn hồ sơ và người nhận: `runDigestAll`
- * chạy cho từng người nhận đang bật của kênh, mỗi người với hồ sơ của họ. Không có LLM thì gửi bản
- * không tóm tắt; không có model quyết định thì cổng chủ đề dùng luật R ≥ gateR.
+ * Dependencies of the digest job; `null` when there is no delivery channel. Profile and recipient are not bound here: `runDigestAll`
+ * runs once for each enabled recipient of the channel, each with their own profile. Without an LLM it sends the
+ * digest without summaries; without a decision model the topic gate uses the rule R ≥ gateR.
  */
 export function createDigestDeps(base: FetchDeps): DigestJobDeps | null {
   const notifier = createNotifier();
@@ -126,7 +126,7 @@ export function createDigestDeps(base: FetchDeps): DigestJobDeps | null {
     http: base.http,
     llm: createLlm(base.db),
     decider: createDecider(base.db),
-    // Chỉ bật khi đủ cả hai biến; thiếu một thì tin giữ link trực tiếp như trước.
+    // Enabled only when both variables are set; if one is missing, the message keeps the direct link as before.
     tracking:
       env.publicBaseUrl && env.linkSecret
         ? { baseUrl: env.publicBaseUrl, secret: env.linkSecret }
@@ -139,7 +139,7 @@ export function createPagesDeps(base: FetchDeps): PagesDeps {
   return { db: base.db, store: base.store, fetcher: createPageFetcher({ http: base.http }) };
 }
 
-/** Kênh nhận lượt bấm; `null` khi chưa đặt token. Ai được dùng bot do `profile_channels` quyết định. */
+/** Callback channel for button presses; `null` when no token is set. Who may use the bot is decided by `profile_channels`. */
 export function createChatChannel(): ChatChannel | null {
   if (!env.telegramToken) return null;
   return telegramChat({ token: env.telegramToken });

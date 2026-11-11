@@ -1,20 +1,20 @@
 /**
- * Thư viện chủ đề: các chủ đề radard soạn sẵn để người dùng bấm chọn, không phải tự viết gì.
+ * Topic library: topics radard prepares for users to pick, so they do not have to write anything themselves.
  *
- * Bộ 14 chủ đề từ 15/10/2026 (docs/bo-chu-de-moi.html) chia theo đúng một câu hỏi: tin này chủ
- * yếu nói về cái gì. Bộ 17 chủ đề cũ trộn nhiều cách chia (đối tượng, hoạt động, tính chất, loại
- * tin) nên một tin rơi vào nhiều ô cùng lúc.
+ * The 14-topic set from 15/10/2026 (docs/bo-chu-de-moi.html) is split by exactly one question: what the news is
+ * mainly about. The old 17-topic set mixed several ways of splitting (audience, activity, property, kind of
+ * news), so one story fell into several boxes at once.
  *
- * Người dùng chỉ thấy `name`. `embedText` là câu dùng để embed: viết bằng tiếng Anh cho
- * khớp dữ liệu, chỉ gồm phần "Gồm" với tên sản phẩm, kỹ thuật cụ thể. Embedding không hiểu phủ
- * định: viết "không gồm X" vào câu lại kéo nó gần X hơn. Các câu đã được đo trên 16.203 tin AI của
- * 30 ngày; sửa câu nào thì đo lại.
+ * Users only see `name`. `embedText` is the sentence used for embedding: written in English to
+ * match the data, and lists only the included scope, with product names and specific techniques. Embedding does not understand negation:
+ * writing "not X" into the sentence pulls it closer to X. These sentences were measured on 16.203 AI stories from
+ * the last 30 days; editing any sentence means measuring again.
  *
- * `labelGuide` là phạm vi của chủ đề (gồm gì, không gồm gì, tin lấn sang thì thuộc chủ đề nào), chỉ
- * đưa cho LLM khi nó gắn nhãn cho tin trong điểm tin; không embed.
+ * `labelGuide` is the scope of the topic (what it includes and excludes, and which topic a story that overlaps belongs to); it is only
+ * passed to the LLM when it labels stories in a digest; it is not embedded.
  *
- * Sửa một câu mô tả ở đây rồi chạy `topics seed`: thư viện được cập nhật, chủ đề người dùng đã
- * chọn từ thư viện nhận câu mới và được embed lại. Sửa `labelGuide` thì không phải embed lại.
+ * To change a description sentence here, run `topics seed`: the library is updated, and the user topics that
+ * were picked from the library receive the new sentence and are re-embedded. Changing `labelGuide` does not need re-embedding.
  */
 export interface LibraryTopic {
   key: string;
@@ -28,8 +28,8 @@ export const TOPIC_LIBRARY: LibraryTopic[] = [
   {
     key: "llm_models",
     groupName: "Model",
-    // "LLM: …" bỏ sót SLM, model chạy trên máy và VLM (16/10/2026); khoá và câu mô tả giữ nguyên:
-    // đổi câu mô tả cho rộng ra thì đo lại kém hơn.
+    // "LLM: …" missed SLMs, on-device models and VLMs (16/10/2026); the key and the description sentence stay the same:
+    // widening the description sentence would measure worse.
     name: "Model AI: phát hành và hành vi",
     embedText:
       "Large language models themselves: new model releases and open-weight models, model architecture, reasoning and chain of thought, model behavior, hallucination and faithfulness, interpretability, benchmarks and evaluations of LLMs",
@@ -156,10 +156,10 @@ export const TOPIC_LIBRARY: LibraryTopic[] = [
 ];
 
 /**
- * Chủ đề đã rút khỏi thư viện → chủ đề mới thay nó (15/10/2026: bộ 17 chủ đề cũ sang bộ 14).
- * `topics seed` chuyển lựa chọn theo bảng này: ai đang bật chủ đề cũ thì được bật chủ đề mới, chủ
- * đề cũ tắt đi (dòng cũ giữ lại, không mất lịch sử). Chủ đề giữ khoá cũ (`agents`, `training`…)
- * không nằm ở đây: nó vẫn là chính nó, chỉ đổi tên và câu mô tả.
+ * A topic removed from the library → a new topic replaces it (15/10/2026: the old 17-topic set becomes the 14-topic set).
+ * `topics seed` moves selections using this table: whoever has an old topic enabled gets the new topic enabled, and the old
+ * topic is turned off (the old row is kept, so history is not lost). Topics that keep their old key (`agents`, `training`…)
+ * are not listed here: they stay the same topic, only renamed and given a new description sentence.
  */
 export const TOPIC_SUCCESSORS: Record<string, string> = {
   new_models: "llm_models",
@@ -173,35 +173,35 @@ export const TOPIC_SUCCESSORS: Record<string, string> = {
 };
 
 /**
- * Tên tiếng Anh của từng chủ đề thư viện: đúng tên model quyết định (Jev) thấy ở mọi chỗ cần tên
- * chủ đề (cổng chủ đề, chủ đề nhắc tới trong phạm vi, soát chủ đề gần giống). Model chỉ được hãng
- * bảo đảm với tiếng Anh, nên không đưa tên tiếng Việt cho nó. Chủ đề tự thêm không có ở đây: dùng
- * phần "Tên:" đầu câu mô tả (`englishName` trong topic-overlap.ts).
+ * English name of each library topic: the exact name the decision model (Jev) sees everywhere it needs a topic name
+ * (the topic gate, topics mentioned in a scope, checking for similar topics). The model is only guaranteed to work with
+ * English, so Vietnamese names are not given to it. Custom topics are not here: use the
+ * "Name:" part at the start of the description sentence (`englishName` in topic-overlap.ts).
  *
- * Tám chủ đề có đánh dấu "đã đo" giữ đúng tên của thử nghiệm 13–16/10/2026 (cổng chủ đề: Jev khớp
- * nhãn tham chiếu 84%); sáu chủ đề còn lại chưa đo, đặt tên ngắn cùng kiểu. Sửa tên đã đo thì đo
- * lại.
+ * Eight topics marked "measured" keep the exact names from the 13–16/10/2026 experiment (topic gate: Jev matches
+ * the reference labels 84%); the other six are not measured yet and get short names in the same style. Changing a measured name means measuring
+ * again.
  */
 export const TOPIC_NAMES_EN: Record<string, string> = {
-  // Đã đo với "LLMs: models and behavior"; CỐ Ý đổi theo nhãn mới "Model AI: phát hành và hành vi"
-  // (16/10/2026), để tên khớp phạm vi mới gồm cả SLM, model chạy trên máy và VLM.
+  // Measured with "LLMs: models and behavior"; DELIBERATELY renamed to the new label "Model AI: phát hành và hành vi"
+  // (16/10/2026), so the name matches the new scope, which now includes SLMs, on-device models and VLMs.
   llm_models: "AI models: releases and behavior",
-  training: "Training and optimizing models", // đã đo
-  agents: "AI agents", // đã đo
-  ai_coding: "Programming with AI", // đã đo
-  llm_apps: "Building LLM applications", // đã đo
-  multimodal: "Image, video and audio AI", // đã đo
+  training: "Training and optimizing models", // measured
+  agents: "AI agents", // measured
+  ai_coding: "Programming with AI", // measured
+  llm_apps: "Building LLM applications", // measured
+  multimodal: "Image, video and audio AI", // measured
   robotics: "Robotics and physical AI",
   ai_infra: "AI infrastructure",
-  ai_products: "AI assistants and apps", // đã đo
+  ai_products: "AI assistants and apps", // measured
   ai_industry: "AI business",
   ai_safety: "AI safety and security",
   ai_policy: "AI policy and society",
-  ml_foundations: "ML foundations", // đã đo
+  ml_foundations: "ML foundations", // measured
   ai_science: "AI in science and medicine",
 };
 
-/** Hai quy tắc khi một tin hợp hai chủ đề; viết vào prompt gắn nhãn của điểm tin. */
+/** Two rules for when a story fits two topics; written into the labelling prompt of the digest. */
 export const TOPIC_TIE_BREAKS = [
   'A more specific topic beats a general one: an agent that writes code belongs to the coding topic ("Lập trình với AI"), not to "Agent AI".',
   'The application domain beats the data modality: medical imaging belongs to science and medicine ("AI trong khoa học và y tế"), not to "Ảnh, video và âm thanh".',

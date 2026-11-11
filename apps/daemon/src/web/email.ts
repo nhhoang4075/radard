@@ -1,4 +1,4 @@
-/** Chuẩn hoá email để so sánh: bỏ khoảng trắng đầu cuối, chữ thường. Không phải email thì `null`. */
+/** Normalizes an email for comparison: trims whitespace at both ends, lowercases. Not an email → `null`. */
 export function normalizeEmail(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const email = raw.trim().toLowerCase();

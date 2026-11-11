@@ -1,8 +1,8 @@
 /**
- * Vai trò scheduler: đồng bộ lịch cron từ bảng `sources` sang pg-boss.
+ * Scheduler role: syncs cron schedules from the `sources` table to pg-boss.
  *
- * Nguồn là dữ liệu trong DB chứ không phải code, nên sửa lịch hay tắt một nguồn chỉ cần
- * sửa một dòng; lần đồng bộ kế tiếp sẽ áp dụng mà không phải khởi động lại daemon.
+ * Sources are data in the DB, not code, so changing a schedule or turning off a source takes only
+ * one line edit; the next sync applies it without restarting the daemon.
  */
 import { createLogger } from "@radard/core";
 import { type Database, sources } from "@radard/db";
@@ -21,12 +21,12 @@ import {
 const log = createLogger("scheduler");
 const RESYNC_MS = 5 * 60_000;
 
-/** Phần pg-boss mà scheduler dùng. Hẹp lại để test truyền bản giả được. */
+/** The part of pg-boss that the scheduler uses. Narrowed so tests can pass a fake. */
 export type ScheduleApi = Pick<PgBoss, "schedule" | "getSchedules" | "unschedule">;
 
 export interface SyncResult {
   scheduled: number;
-  /** Nguồn có `cadence` pg-boss không nhận; lịch cũ của chúng (nếu có) được giữ nguyên. */
+  /** Sources whose `cadence` pg-boss does not accept; their old schedules (if any) are kept as they are. */
   failed: Array<{ sourceId: number; cadence: string; error: string }>;
 }
 
@@ -38,16 +38,16 @@ export async function syncSchedules(boss: ScheduleApi, db: Database): Promise<Sy
   for (const s of rows) {
     if (!s.enabled) continue;
     const key = String(s.id);
-    // Đánh dấu "cần giữ" TRƯỚC khi đăng ký: cadence mới sai thì lịch cũ vẫn chạy tiếp,
-    // thay vì bị vòng gỡ lịch bên dưới xoá mất và nguồn im lặng không ai biết.
+    // Mark "keep" BEFORE registering: if the new cadence is wrong, the old schedule keeps running,
+    // instead of being deleted by the unschedule loop below and the source going silent unnoticed.
     wanted.add(key);
     const data: FetchJob = { sourceId: s.id };
     try {
-      // `singletonKey` theo nguồn để chính sách `stately` của queue chặn job chồng nhau.
+      // `singletonKey` per source, so the queue's `stately` policy blocks overlapping jobs.
       await boss.schedule(QUEUE.fetch, s.cadence, data, { key, singletonKey: key, tz: "UTC" });
       result.scheduled++;
     } catch (err) {
-      // Một nguồn sai không được làm hỏng lịch của các nguồn đứng sau nó trong vòng lặp.
+      // One bad source must not break the schedules of the sources after it in the loop.
       const error = err instanceof Error ? err.message : String(err);
       result.failed.push({ sourceId: s.id, cadence: s.cadence, error });
       log.error("cadence không hợp lệ, giữ lịch cũ", { sourceId: s.id, cadence: s.cadence, error });

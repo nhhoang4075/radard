@@ -1,4 +1,4 @@
-/** Vai trò `web`: mở cổng HTTP phục vụ `/healthz`, `/o/:token`, `/api/*` (đăng nhập) và file build của `apps/web`. */
+/** `web` role: opens the HTTP port serving `/healthz`, `/o/:token`, `/api/*` (sign-in required) and the build files of `apps/web`. */
 import { createLogger, type LlmProvider } from "@radard/core";
 import type { Database } from "@radard/db";
 import { createWebApp } from "../web/app.ts";
@@ -12,7 +12,7 @@ export function startWeb(opts: {
   port: number;
   secret: string | undefined;
   auth: RawAuthEnv;
-  /** Model viết "Với tôi?"; thiếu thì `POST /api/events/:id/for-me` trả 503. */
+  /** Model that writes "Với tôi?"; if missing, `POST /api/events/:id/for-me` returns 503. */
   llm?: LlmProvider | null;
   forMeDailyLimit?: number;
 }): () => Promise<void> {

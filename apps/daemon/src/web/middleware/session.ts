@@ -1,8 +1,8 @@
 /**
- * Middleware phiên (fail-closed): đọc phiên Better Auth, tra hồ sơ theo `profile.user_id`, đặt
- * `c.set("profileId")`. Chưa có phiên (hoặc lỗi không xác định được người dùng) → 401; có phiên nhưng
- * chưa có hồ sơ → 403. Mọi route dưới `routes/` (trừ `link.ts`) phải mount SAU middleware này; test
- * `web-routes-rule.test.ts` giữ luật đó. Hàm xử lý chỉ đọc `profileId` từ context, không từ request.
+ * Session middleware (fail-closed): reads the Better Auth session, looks up the profile by `profile.user_id`, sets
+ * `c.set("profileId")`. No session (or a user that cannot be identified) → 401; a session with no
+ * profile → 403. Every route under `routes/` (except `link.ts`) must be mounted AFTER this middleware; the test
+ * `web-routes-rule.test.ts` enforces that rule. Handlers read `profileId` only from the context, never from the request.
  */
 import { createLogger } from "@radard/core";
 import { type Database, profile, userRoles } from "@radard/db";
@@ -19,7 +19,7 @@ export interface SessionEnv {
     userName: string;
     userEmail: string;
     emailVerified: boolean;
-    /** Có dòng `user_roles` role `owner`, tra DB mỗi request (không cache trong phiên). */
+    /** Has a `user_roles` row with role `owner`, looked up in the DB on every request (not cached in the session). */
     isOwner: boolean;
   };
 }
@@ -44,7 +44,7 @@ export const sessionMiddleware = (deps: { db: Database; auth: Auth }) =>
         .limit(1);
       isOwner = role !== undefined;
     } catch (err) {
-      // Không xác định được người dùng thì không cho qua.
+      // If the user cannot be identified, do not let the request through.
       log.error("đọc phiên lỗi", { err: err instanceof Error ? err.name : "unknown" });
       return c.json({ error: "unauthenticated" }, 401);
     }

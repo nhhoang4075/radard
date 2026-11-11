@@ -1,11 +1,11 @@
 /**
- * Phục vụ file build của `apps/web` cùng origin với API, kèm SPA fallback: đường dẫn không phải file
- * thì trả `index.html` để TanStack Router tự xử lý. Chỉ GET/HEAD. Thư mục build thiếu thì 404 trơn.
+ * Serves the build files of `apps/web` from the same origin as the API, with an SPA fallback: a path that is not a file
+ * returns `index.html` so TanStack Router can handle it. GET/HEAD only. If the build directory is missing, return a plain 404.
  */
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import type { Context } from "hono";
 
-/** `apps/web/dist`, tính từ vị trí file này (apps/daemon/src/web). */
+/** `apps/web/dist`, resolved from this file's location (apps/daemon/src/web). */
 export const DEFAULT_WEB_DIST = resolve(
   dirname(new URL(import.meta.url).pathname),
   "../../../web/dist",
@@ -44,7 +44,7 @@ export function createStaticHandler(distDir: string) {
       return notFound();
     }
     if (pathname.includes("\0")) return notFound();
-    // Chặn thoát khỏi thư mục build (`..`, đường dẫn tuyệt đối).
+    // Block escaping the build directory (`..`, absolute paths).
     const target = resolve(join(root, normalize(`.${pathname}`)));
     const inside = target === root || target.startsWith(root + sep);
     const isFileRequest = /\.[a-z0-9]+$/i.test(pathname);
@@ -52,7 +52,7 @@ export function createStaticHandler(distDir: string) {
     if (inside && pathname !== "/" && isFileRequest) {
       const res = await fileResponse(target, pathname.startsWith("/assets/"));
       if (res) return res;
-      return notFound(); // file có đuôi mà không có: không fallback về trang chủ
+      return notFound(); // a file-like path with no file: do not fall back to the home page
     }
     return (await fileResponse(join(root, "index.html"), false)) ?? notFound();
   };

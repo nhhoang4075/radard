@@ -1,16 +1,16 @@
 /**
- * Token theo dõi link: `v1.<digest_id>.<position>.<k>.<mac>`.
+ * Link-tracking token: `v1.<digest_id>.<position>.<k>.<mac>`.
  *
- * `mac` = HMAC-SHA256 trên chuỗi `v1.<digest_id>.<position>.<k>`, cắt còn 128 bit, mã base64url
- * (22 ký tự). Nằm trong `apps/daemon` vì chỉ daemon dựng link (soạn tin) và kiểm link (route web);
- * hàm thuần, không đọc env, để test được.
+ * `mac` = HMAC-SHA256 over the string `v1.<digest_id>.<position>.<k>`, cut to 128 bits, base64url-encoded
+ * (22 characters). It lives in `apps/daemon` because only the daemon builds links (composes messages) and checks them (web route);
+ * a pure function with no env reads, so it can be tested.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const TOKEN_VERSION = "v1";
 const MAC_BYTES = 16;
-const MAC_CHARS = 22; // 16 byte → base64url không đệm
-const MAX_DIGITS = 15; // trong khoảng số nguyên an toàn của JS
+const MAC_CHARS = 22; // 16 bytes → base64url without padding
+const MAX_DIGITS = 15; // within JS's safe integer range
 
 export interface TokenParts {
   digestId: number;
@@ -28,13 +28,13 @@ function macOf(secret: string, payload: string): string {
     .toString("base64url");
 }
 
-/** Số nguyên không âm dạng chuẩn (không số 0 đứng đầu, không dấu), hoặc null. */
+/** Canonical non-negative integer (no leading zero, no sign), or null. */
 function parseCount(s: string): number | null {
   if (!/^(0|[1-9]\d*)$/.test(s) || s.length > MAX_DIGITS) return null;
   return Number(s);
 }
 
-/** Token đầy đủ. Ném lỗi nếu tham số không phải số nguyên không âm hoặc thiếu khoá. */
+/** Full token. Throws if a parameter is not a non-negative integer or the key is missing. */
 export function signToken(secret: string, p: TokenParts): string {
   if (!secret) throw new Error("thiếu khoá bí mật");
   if (!isCount(p.digestId) || !isCount(p.position) || !isCount(p.k))
@@ -43,7 +43,7 @@ export function signToken(secret: string, p: TokenParts): string {
   return `${payload}.${macOf(secret, payload)}`;
 }
 
-/** Kiểm token; trả các phần nếu hợp lệ, `null` nếu sai bất kỳ điều gì (không phân biệt lý do). */
+/** Verifies a token; returns the parts if valid, `null` if anything is wrong (without saying which). */
 export function verifyToken(secret: string | undefined, token: string): TokenParts | null {
   if (!secret) return null;
   const parts = token.split(".");
@@ -60,7 +60,7 @@ export function verifyToken(secret: string | undefined, token: string): TokenPar
   return { digestId, position, k };
 }
 
-/** URL theo dõi: `<baseUrl>/o/<token>` (bỏ dấu `/` cuối của baseUrl). */
+/** Tracking URL: `<baseUrl>/o/<token>` (trailing `/` of baseUrl removed). */
 export function buildTrackingUrl(opts: { baseUrl: string; secret: string } & TokenParts): string {
   const { baseUrl, secret, ...parts } = opts;
   return `${baseUrl.replace(/\/+$/, "")}/o/${signToken(secret, parts)}`;

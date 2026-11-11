@@ -1,4 +1,4 @@
-/** GET /api/me: tên và hồ sơ của phiên hiện tại. Mount sau `sessionMiddleware`. */
+/** GET /api/me: name and profile of the current session. Mounted after `sessionMiddleware`. */
 import { Hono } from "hono";
 import type { SessionEnv } from "../middleware/session.ts";
 

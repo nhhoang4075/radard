@@ -1,14 +1,14 @@
 /**
- * Máy chủ HTTP (Hono) của vai trò `web`.
+ * HTTP server (Hono) for the `web` role.
  *
  *   GET /healthz   → 200
- *   GET /o/:token  → ghi lượt mở rồi 302 tới URL lấy từ DB
- *   /api/auth/*    → Better Auth (đăng nhập GitHub/Google, phiên)
- *   /api/*         → API Hono; mọi route trừ `providers` đi qua `sessionMiddleware` (401/403)
- *   còn lại        → file build của `apps/web` (SPA fallback), cùng origin nên cookie phiên đơn giản
+ *   GET /o/:token  → records the open, then 302 to the URL taken from the DB
+ *   /api/auth/*    → Better Auth (GitHub/Google sign-in, sessions)
+ *   /api/*         → Hono API; every route except `providers` goes through `sessionMiddleware` (401/403)
+ *   everything else → build files of `apps/web` (SPA fallback), same origin so the session cookie stays simple
  *
- * Fail-closed: không có `LINK_SECRET` thì `/o/*` luôn 404. URL đích chỉ lấy từ `deliveries.meta`,
- * không bao giờ từ request. Mọi lỗi (token sai, không tìm thấy, URL lạ) đều là 404 trơn, không nêu lý do.
+ * Fail-closed: without `LINK_SECRET`, `/o/*` always returns 404. The target URL is taken only from `deliveries.meta`,
+ * never from the request. Every error (wrong token, not found, odd URL) is a plain 404, with no reason given.
  */
 import { createLogger, type LlmProvider } from "@radard/core";
 import { type Database, deliveries } from "@radard/db";
@@ -32,34 +32,34 @@ const UA_MAX = 200;
 
 export interface WebOptions {
   db: Database;
-  /** `LINK_SECRET`; thiếu thì `/o/*` trả 404. */
+  /** `LINK_SECRET`; if missing, `/o/*` returns 404. */
   secret: string | undefined;
-  /** Đăng nhập; thiếu (cấu hình chưa đủ) thì mọi `/api/*` trả 503, các route khác vẫn chạy. */
+  /** Sign-in; if missing (config incomplete), every `/api/*` returns 503 while the other routes still run. */
   auth?: { auth: Auth; providers: SocialProviderId[] } | null;
-  /** Thư mục build của `apps/web`; mặc định `apps/web/dist`. */
+  /** Build directory of `apps/web`; defaults to `apps/web/dist`. */
   webDist?: string;
-  /** Model viết "Với ttôi?"... */
+  /** Model that writes "Với ttôi?"... */
   llm?: LlmProvider | null;
-  /** Hạn mức "Với tôi?" mỗi hồ sơ mỗi ngày. */
+  /** Quota for "Với tôi?" per profile per day. */
   forMeDailyLimit?: number;
-  /** Đồng hồ, tiêm vào để test giả lập thời gian. */
+  /** Clock, injected so tests can simulate time. */
   now?: () => Date;
 }
 
-/** UA bot xem trước thường gặp (Telegram…) hoặc header prefetch. Chỉ là cờ. */
+/** Common preview-bot user agents (Telegram…) or prefetch headers. A flag only. */
 export function isPrefetchRequest(headers: Headers): boolean {
   const purpose = `${headers.get("purpose") ?? ""} ${headers.get("sec-purpose") ?? ""} ${headers.get("x-moz") ?? ""}`;
   if (/prefetch|prerender/i.test(purpose)) return true;
   return /TelegramBot|bot\b|crawler|spider|preview/i.test(headers.get("user-agent") ?? "");
 }
 
-/** Mã lỗi ngắn để log: thông điệp lỗi của driver kèm cả tham số truy vấn (có UA), nên không ghi. */
+/** Short error code for the log: the driver's error message includes the query parameters (with the UA), so it is not logged. */
 function errCode(err: unknown): string {
   const cause = (err as { cause?: { code?: unknown } } | null)?.cause;
   return typeof cause?.code === "string" ? cause.code : err instanceof Error ? err.name : "unknown";
 }
 
-/** Chỉ chuyển hướng tới http/https; không giới hạn cổng (khác `checkUrlShape`, vốn dành cho việc tải trang). */
+/** Redirects only to http/https; any port is allowed (unlike `checkUrlShape`, which is for fetching pages). */
 function safeHttpUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   try {
@@ -71,8 +71,8 @@ function safeHttpUrl(raw: unknown): string | null {
 }
 
 /**
- * Ghi một lượt mở, bỏ qua nếu cùng (delivery, link) đã có dòng trong 24 giờ qua. Khoá tư vấn theo cặp
- * làm hai request đồng thời nối đuôi nhau, nên kiểm-rồi-ghi không bị lách.
+ * Records an open, skipped if the same (delivery, link) already has a row in the last 24 hours. An advisory lock per pair so
+ * two concurrent requests queue up, so check-then-write cannot be bypassed.
  */
 export async function recordLinkOpen(
   db: Database,
@@ -105,9 +105,9 @@ export async function recordLinkOpen(
 }
 
 /**
- * API dưới `/api`. `providers` là route công khai duy nhất; `sessionMiddleware` đứng ngay sau nó nên
- * mọi route thêm sau (qua `.route(...)` bên dưới) đều bị 401/403 khi chưa có phiên và hồ sơ.
- * Giữ ở dạng một chuỗi gọi liền để `AppType` suy ra được cho client `hc` của `apps/web`.
+ * API under `/api`. `providers` is the only public route; `sessionMiddleware` comes right after it, so
+ * every route added later (via `.route(...)` below) returns 401/403 when there is no session and profile.
+ * Kept as one chained call so that `AppType` can be inferred for the `hc` client of `apps/web`.
  */
 export function buildApi(deps: {
   db: Database;
@@ -120,7 +120,7 @@ export function buildApi(deps: {
   return (
     new Hono<SessionEnv>()
       .get("/providers", (c) => c.json({ providers: deps.providers }))
-      // CSRF: Origin lạ trên POST/PUT… là 403 (kể cả khi chưa có phiên).
+      // CSRF: an unknown Origin on POST/PUT… returns 403 (even without a session).
       .use("*", originGuard(deps.auth.options.baseURL ?? ""))
       .use("*", sessionMiddleware(deps))
       .route("/me", meRoute)
@@ -174,7 +174,7 @@ export function createWebApp(opts: WebOptions) {
     const target = safeHttpUrl(link?.url);
     if (!row || !target) return notFound();
 
-    // Ghi sau khi đã có đích; lỗi ghi chỉ log, không làm hỏng chuyển hướng.
+    // Written after the target is known; a write error is only logged and does not break the redirect.
     const { id: deliveryId, profileId } = row;
     const task = recordLinkOpen(db, {
       profileId,
@@ -194,7 +194,7 @@ export function createWebApp(opts: WebOptions) {
     });
   });
 
-  // --- API và đăng nhập. Thứ tự đăng ký quan trọng: route công khai trước, `requireProfile` sau. ---
+  // --- API and sign-in. Registration order matters: public routes first, `requireProfile` after. ---
   const { auth } = opts;
   if (auth) {
     const authHandler = auth.auth.handler;
@@ -219,7 +219,7 @@ export function createWebApp(opts: WebOptions) {
 
   return {
     app,
-    /** Chờ các lượt ghi đang dở (test và lúc tắt máy). */
+    /** Waits for in-flight writes to finish (tests and shutdown). */
     idle: async () => {
       await Promise.all([...pending]);
     },

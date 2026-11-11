@@ -1,9 +1,9 @@
 /**
- * Cấu hình đăng nhập từ biến môi trường, kiểm bằng zod.
+ * Sign-in config from environment variables, validated with zod.
  *
- * Fail-closed nhưng không làm sập daemon (vai trò `all` còn chạy scheduler, worker, bot): thiếu hoặc sai
- * `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL` thì `loadAuthConfig` trả `null` và web trả 503 cho mọi
- * `/api/*`. Provider thiếu client id hoặc secret thì chỉ provider đó tắt.
+ * Fail-closed but does not crash the daemon (the `all` role still runs the scheduler, worker, and bot): if
+ * `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL` is missing or wrong, `loadAuthConfig` returns `null` and web returns 503 for every
+ * `/api/*`. A provider missing its client id or secret is disabled on its own.
  */
 import { z } from "zod";
 import { normalizeEmail } from "./email.ts";
@@ -11,23 +11,23 @@ import { normalizeEmail } from "./email.ts";
 export type SocialProviderId = "github" | "google";
 
 export interface AuthConfig {
-  /** Khoá ký cookie và mã hoá token của Better Auth (từ 32 ký tự). */
+  /** Signing key for cookies and token encryption of Better Auth (at least 32 characters). */
   secret: string;
-  /** Địa chỉ công khai của web, không có dấu `/` cuối; `https` thì cookie có `Secure`. */
+  /** Public address of the web app, without a trailing `/`; with `https` the cookie gets `Secure`. */
   baseURL: string;
   /**
-   * Email được phép KHỞI TẠO owner đầu tiên (chuẩn hoá chữ thường, bỏ trùng và rỗng). Chỉ có tác dụng
-   * khi DB chưa có owner nào; có owner rồi thì danh sách này bị bỏ qua. Trống = không có đường khởi tạo.
+   * Emails allowed to CREATE the first owner (lowercased, deduplicated, empty entries removed). Only has effect
+   * while the DB has no owner; once there is an owner this list is ignored. Empty = no bootstrap path.
    */
   bootstrapOwnerEmails: string[];
   providers: Partial<Record<SocialProviderId, { clientId: string; clientSecret: string }>>;
 }
 
-/** Biến môi trường thô, giữ nguyên chuỗi người dùng đặt (có thể rỗng). */
+/** Raw environment variables, keeping the strings the user set as they are (may be empty). */
 export interface RawAuthEnv {
   secret?: string;
   baseURL?: string;
-  /** Danh sách email phân tách dấu phẩy (`BOOTSTRAP_OWNER_EMAILS`). */
+  /** Comma-separated email list (`BOOTSTRAP_OWNER_EMAILS`). */
   bootstrapOwnerEmails?: string;
   githubClientId?: string;
   githubClientSecret?: string;
@@ -42,7 +42,7 @@ const schema = z.object({
     .transform((u) => u.replace(/\/+$/, "")),
 });
 
-/** Danh sách email phân tách dấu phẩy: chuẩn hoá chữ thường, bỏ rỗng, bỏ trùng. Phần tử sai trả về ở `invalid`. */
+/** Comma-separated email list: lowercased, empty entries removed, deduplicated. Invalid entries are returned in `invalid`. */
 const emailList = z.string().transform((raw) => {
   const emails: string[] = [];
   const invalid: string[] = [];
@@ -57,7 +57,7 @@ const emailList = z.string().transform((raw) => {
 
 export interface LoadResult {
   config: AuthConfig | null;
-  /** Lý do tắt hoặc cảnh báo, để log. */
+  /** Reason for disabling or a warning, for the log. */
   problems: string[];
 }
 

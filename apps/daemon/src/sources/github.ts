@@ -1,23 +1,23 @@
 /**
- * GitHub releases của một danh sách repo, qua REST API.
+ * GitHub releases of a list of repos, via the REST API.
  *
- * Mỗi repo một request, có `If-None-Match` theo ETag lần trước: repo không có gì mới thì
- * GitHub trả 304 rỗng. Có `GITHUB_TOKEN` thì 304 không bị trừ quota (và quota là 5.000
- * thay vì 60 request/giờ); không có token vẫn chạy được với vài chục repo mỗi giờ.
+ * One request per repo, sending `If-None-Match` with the last ETag: a repo with nothing new gets an empty
+ * 304 from GitHub. With `GITHUB_TOKEN`, a 304 is not charged against the quota (the quota is 5,000
+ * instead of 60 requests per hour); without a token it still works for a few dozen repos per hour.
  */
 import { type HttpClient, HttpError, type RawItem, type SourceAdapter } from "@radard/core";
 
 export interface GithubConfig {
-  /** Dạng `owner/repo`. */
+  /** `owner/repo` form. */
   repos: string[];
-  /** Số release mới nhất đọc mỗi repo; release cũ hơn đã có từ lần trước. */
+  /** Number of latest releases read per repo; older releases were already stored by an earlier run. */
   perRepo?: number;
 }
 
 export interface GithubState {
-  /** ETag lần trước của từng repo. */
+  /** Last ETag of each repo. */
   etags: Record<string, string>;
-  /** Repo trả 404 ở lượt gần nhất (đổi tên, xoá): hiện ra để bạn sửa danh sách. */
+  /** Repos that returned 404 in the most recent run (renamed or deleted): shown so you can fix the list. */
   missingRepos?: string[];
 }
 
@@ -37,7 +37,7 @@ export function releaseToItem(repo: string, r: Release): RawItem {
   return {
     externalId: String(r.id),
     url: r.html_url,
-    // `name` hay để trống; khi đó tag chính là tên phiên bản.
+    // `name` is often empty; in that case the tag is the version name.
     title: `${repo} ${r.name?.trim() || r.tag_name}`,
     publishedAt: r.published_at ? new Date(r.published_at) : undefined,
     body: JSON.stringify(r),
@@ -52,8 +52,8 @@ type RepoResult =
   | { kind: "missing" };
 
 /**
- * Một repo, một request. 404 (đổi tên, xoá) trả `missing` để các repo khác vẫn chạy; lỗi
- * khác (mạng, 5xx, hết quota) ném ra để pg-boss thử lại cả lượt.
+ * One repo, one request. A 404 (renamed, deleted) returns `missing` so the other repos still run; other errors
+ * (network, 5xx, quota exhausted) are thrown so pg-boss retries the whole run.
  */
 async function fetchRepo(
   http: HttpClient,
@@ -78,7 +78,7 @@ async function fetchRepo(
   }
 }
 
-/** Ghi chú phát hành có thể rất dài (changelog cả nghìn dòng); phần đầu đủ nói nó là gì. */
+/** Release notes can be very long (changelogs of thousands of lines); the first part should say what it is. */
 const RELEASE_NOTES_CHARS = 1500;
 
 export const githubSource: SourceAdapter<GithubConfig, GithubState> = {

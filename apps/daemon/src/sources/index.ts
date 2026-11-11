@@ -1,6 +1,6 @@
 /**
- * Danh bạ adapter nguồn theo `sources.kind`. Thêm một kiểu nguồn = viết một file adapter
- * và thêm một dòng ở đây; job `fetch` không cần sửa.
+ * Directory of source adapters by `sources.kind`. To add a source type, write one adapter file
+ * and add one line here; the `fetch` job needs no changes.
  */
 import type { SourceAdapter } from "@radard/core";
 import { arxivSource } from "./arxiv.ts";
@@ -22,14 +22,14 @@ export function adapterFor(kind: string): SourceAdapter {
 }
 
 /**
- * Host có luật tốc độ riêng. arXiv ghi rõ trong hướng dẫn API: không quá một request mỗi
- * 3 giây.
+ * Hosts with their own rate limits. arXiv states in its API guide: no more than one request every
+ * 3 seconds.
  */
 export const HOST_INTERVALS_MS: Record<string, number> = { "export.arxiv.org": 3000 };
 
 /**
- * Bối cảnh TẠM của người dùng, chỉ dùng trong prompt digest (câu "vì sao đáng chú ý với bạn"),
- * không dùng để lọc: lọc theo chủ đề (`topics`). Thay bằng `bun run cli profile set "…"`.
+ * TEMPORARY per-user context, used only in the digest prompt (the sentence "why it's worth your attention"),
+ * not for filtering: filtering uses topics (`topics`). Replace it with `bun run cli profile set "…"`.
  */
 export const DEFAULT_PROFILE = [
   "AI engineering news and research: large language models, AI agents and agent frameworks,",
@@ -39,8 +39,8 @@ export const DEFAULT_PROFILE = [
 ].join(" ");
 
 /**
- * Nguồn mặc định của MVP-0. `seed` chỉ thêm nguồn chưa có, không ghi đè cấu hình bạn đã sửa.
- * `trustScore` là uy tín nguồn (A) trong điểm digest: HN 0,6, arXiv 0,6, releases 0,8.
+ * Default sources for MVP-0. `seed` adds only sources that do not exist yet, and does not overwrite configuration you have edited.
+ * `trustScore` is the source's credibility (A) in the digest score: HN 0.6, arXiv 0.6, releases 0.8.
  */
 export const DEFAULT_SOURCES = [
   {
@@ -49,13 +49,13 @@ export const DEFAULT_SOURCES = [
     cadence: "*/15 * * * *",
     config: { backfillHours: 24 },
     defaultRole: "community",
-    // Uy tín nguồn = thành phần A của điểm digest (xep-hang.html tab 02).
+    // Source credibility = component A of the digest score (xep-hang.html tab 02).
     trustScore: 0.6,
   },
   {
     kind: "arxiv",
     name: "arXiv cs.CL/AI/LG/MA",
-    // arXiv công bố đợt mới khoảng 20:00 giờ New York (00:00–01:00 UTC), Chủ nhật tới thứ Năm.
+    // arXiv publishes its new batch around 20:00 New York time (00:00–01:00 UTC), Sunday through Thursday.
     cadence: "30 1 * * *",
     config: {
       categories: ["cs.CL", "cs.AI", "cs.LG", "cs.MA"],
@@ -68,7 +68,7 @@ export const DEFAULT_SOURCES = [
     kind: "github",
     name: "GitHub releases",
     cadence: "0 * * * *",
-    // Danh sách TẠM theo stack đang dùng; sửa trong bảng `sources` (cột config) cho đúng ý bạn.
+    // TEMPORARY list based on the current stack; edit it in the `sources` table (config column) to match what you want.
     config: {
       repos: [
         "oven-sh/bun",
@@ -82,7 +82,7 @@ export const DEFAULT_SOURCES = [
         "huggingface/transformers",
         "langchain-ai/langgraph",
       ],
-      // Mỗi phiên bản là một sự kiện riêng.
+      // Each version is a separate event.
       vectorJoin: false,
     },
     defaultRole: "technical",
@@ -91,18 +91,18 @@ export const DEFAULT_SOURCES = [
   {
     kind: "github_new_repos",
     name: "GitHub repo mới",
-    // 06:00 giờ VN, trước điểm tin 07:00: còn thời gian cho job pages (README) và process.
+    // 06:00 Vietnam time, before the 07:00 digest: leaves time for the pages job (README) and process.
     cadence: "0 23 * * *",
     config: { createdDays: 7, minStars: 50, maxRepos: 100, vectorJoin: false },
     defaultRole: "technical",
-    // Thấp hơn HN: Search API lẫn repo sao giả (18% ngày 11/10/2026), dù đã có luật lọc rác.
+    // Lower than HN: both the Search API and repos with fake stars (18% on 11/10/2026) are noisy, even with the spam filter rules.
     trustScore: 0.5,
   },
   {
     kind: "github_trending",
     name: "GitHub Trending",
     cadence: "10 23 * * *",
-    // Repo khác nhau mô tả gần giống nhau không phải cùng một chuyện: chỉ gộp theo URL.
+    // Different repos with nearly identical descriptions are not the same thing: merge only by URL.
     config: { vectorJoin: false },
     defaultRole: "community",
     trustScore: 0.6,

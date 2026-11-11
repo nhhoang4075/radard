@@ -1,16 +1,16 @@
 /**
- * Chỉ dẫn nhiệm vụ cho vector chủ đề. Qwen3-Embedding nhận chỉ dẫn ở phía truy vấn theo dạng
- * `Instruct: …\nQuery: …`, phía tài liệu thì để nguyên. Trong radard chủ đề là truy vấn, tin là
- * tài liệu, nên chỉ vector chủ đề có tiền tố này; vector tin không đổi.
+ * Task instruction for the topic vector. Qwen3-Embedding takes the instruction on the query side in the form
+ * `Instruct: …\nQuery: …`, while the document side is left as is. In radard a topic is the query and a story is
+ * a document, so only topic vectors get this prefix; story vectors do not change.
  *
- * `TOPIC_RECIPE` ghi trên mỗi chủ đề đã embed (`topics.embedding_recipe`): đổi chỉ dẫn thì đổi
- * giá trị này, và job process sẽ embed lại các chủ đề (chỉ vài chục, không đụng vector tin).
+ * `TOPIC_RECIPE` is recorded for every embedded topic (`topics.embedding_recipe`): changing the instruction changes
+ * this value, and the process job re-embeds the topics (only a few dozen; story vectors are untouched).
  */
 export const TOPIC_INSTRUCTION = "Given a topic description, retrieve news items about that topic";
 
 export const TOPIC_RECIPE = "instruct-v1";
 
-/** Văn bản đưa cho embedder khi embed một chủ đề (hoặc bản nháp chủ đề). */
+/** Text given to the embedder when embedding a topic (or a topic draft). */
 export function topicQueryText(embedText: string): string {
   return `Instruct: ${TOPIC_INSTRUCTION}\nQuery: ${embedText}`;
 }

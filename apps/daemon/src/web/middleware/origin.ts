@@ -1,7 +1,7 @@
 /**
- * Chống CSRF lớp hai (cookie đã SameSite=Lax): với method không an toàn (POST/PUT/PATCH/DELETE), có
- * header `Origin` mà khác origin của `BETTER_AUTH_URL` thì 403. Không có `Origin` (sendBeacon cùng
- * origin đôi khi vắng) thì cho qua; `Origin: null` (iframe sandbox…) là có Origin và khác nên bị chặn.
+ * Second-layer CSRF protection (cookies are already SameSite=Lax): for unsafe methods (POST/PUT/PATCH/DELETE), if there is an
+ * `Origin` header that differs from the origin of `BETTER_AUTH_URL`, return 403. With no `Origin` (sendBeacon from the same
+ * origin is sometimes missing) the request is let through; `Origin: null` (sandboxed iframe…) does have an Origin and differs, so it is blocked.
  */
 import { createMiddleware } from "hono/factory";
 
