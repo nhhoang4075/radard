@@ -1,7 +1,7 @@
 /**
  * Mọi chuỗi MỚI người dùng thấy ở nút "Với tôi?" (Telegram và web), gom một chỗ để chủ dự án duyệt
  * câu chữ (quyết định 11/11/2026: "câu chữ của hai nút và định dạng tin Telegram chủ dự án duyệt").
- * TẠM, CHƯA DUYỆT: đổi ở đây là đổi mọi nơi.
+ * Đã được chủ dự án duyệt (11/11/2026). Đổi ở đây là đổi mọi nơi.
  */
 export const FOR_ME_LABELS = {
   /** Nhãn nút trong tin Telegram. */
