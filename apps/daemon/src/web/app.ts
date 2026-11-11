@@ -16,8 +16,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Auth } from "./auth.ts";
 import type { SocialProviderId } from "./auth-config.ts";
+import { originGuard } from "./middleware/origin.ts";
 import { type SessionEnv, sessionMiddleware } from "./middleware/session.ts";
 import { eventsRoute } from "./routes/events.ts";
+import { feedRoute } from "./routes/feed.ts";
+import { feedbackRoute } from "./routes/feedback.ts";
+import { impressionsRoute } from "./routes/impressions.ts";
 import { meRoute } from "./routes/me.ts";
 import { createStaticHandler, DEFAULT_WEB_DIST } from "./static.ts";
 import { verifyToken } from "./token.ts";
@@ -113,19 +117,26 @@ export function buildApi(deps: {
   forMeDailyLimit?: number;
   now?: () => Date;
 }) {
-  return new Hono<SessionEnv>()
-    .get("/providers", (c) => c.json({ providers: deps.providers }))
-    .use("*", sessionMiddleware(deps))
-    .route("/me", meRoute)
-    .route(
-      "/events",
-      eventsRoute({
-        db: deps.db,
-        llm: deps.llm ?? null,
-        ...(deps.forMeDailyLimit === undefined ? {} : { dailyLimit: deps.forMeDailyLimit }),
-        ...(deps.now ? { now: deps.now } : {}),
-      }),
-    );
+  return (
+    new Hono<SessionEnv>()
+      .get("/providers", (c) => c.json({ providers: deps.providers }))
+      // CSRF: Origin lạ trên POST/PUT… là 403 (kể cả khi chưa có phiên).
+      .use("*", originGuard(deps.auth.options.baseURL ?? ""))
+      .use("*", sessionMiddleware(deps))
+      .route("/me", meRoute)
+      .route("/feed", feedRoute({ db: deps.db }))
+      .route("/feedback", feedbackRoute({ db: deps.db }))
+      .route("/impressions", impressionsRoute({ db: deps.db }))
+      .route(
+        "/events",
+        eventsRoute({
+          db: deps.db,
+          llm: deps.llm ?? null,
+          ...(deps.forMeDailyLimit === undefined ? {} : { dailyLimit: deps.forMeDailyLimit }),
+          ...(deps.now ? { now: deps.now } : {}),
+        }),
+      )
+  );
 }
 export type AppType = ReturnType<typeof buildApi>;
 

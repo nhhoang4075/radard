@@ -23,6 +23,8 @@ export interface ItemDoc {
   kind: string;
   externalId: string;
   title: string | null;
+  /** Giờ đăng của bài (null khi nguồn không cho). */
+  publishedAt: Date | null;
   url: string;
   urlCanonical: string;
   excerpt: string;
@@ -102,6 +104,7 @@ export async function loadItemDocs(
       sourceId: documents.sourceId,
       externalId: documents.externalId,
       title: documents.title,
+      publishedAt: documents.publishedAt,
       url: documents.url,
       urlCanonical: documents.urlCanonical,
       text: docText.text,
@@ -130,6 +133,7 @@ export async function loadItemDocs(
         kind,
         externalId: r.externalId,
         title: r.title,
+        publishedAt: r.publishedAt,
         url: r.url,
         urlCanonical: r.urlCanonical,
         excerpt: excerptOf(r.text, r.title),

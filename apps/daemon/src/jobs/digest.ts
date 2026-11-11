@@ -175,7 +175,7 @@ function discussionUrlOf(d: ItemDoc): string | null {
 }
 
 /** "3 bài từ HN, arXiv" hoặc "HN" khi chỉ một bài. */
-function sourcesLine(docs: readonly ItemDoc[]): string {
+export function sourcesLine(docs: readonly ItemDoc[]): string {
   const names = [...new Set(docs.map((d) => d.sourceName))].join(", ");
   const n = new Set(docs.map((d) => d.urlCanonical)).size;
   return n > 1 ? `${n} bài từ ${names}` : names;
