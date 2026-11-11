@@ -1,12 +1,12 @@
 /**
- * Interface AI. Lõi chỉ biết những kiểu này; Vercel AI Gateway, gọi thẳng provider hay model
- * chạy local đều là adapter (ports & adapters).
+ * AI interface. The core only knows these types; Vercel AI Gateway, direct provider calls or models
+ * running locally are all adapters (ports & adapters).
  *
- * Mọi lời gọi báo về một `UsageSink` để ghi vào bảng `llm_calls`: chi phí thật đo được, không
- * phải ước tính. Model reasoning có token suy nghĩ ẩn tính theo giá output, nên phải đo.
+ * Every call reports to a `UsageSink` that writes to the `llm_calls` table: the cost is measured, not
+ * estimated. Reasoning models have hidden thinking tokens billed at the output price, so they must be measured.
  */
 
-/** Việc mà lời gọi phục vụ, để xem chi phí theo từng bước pipeline. */
+/** The task a call serves, so cost can be broken down per pipeline step. */
 export type AiTask = "embed_document" | "embed_profile" | "digest" | (string & {});
 
 export interface UsageEvent {
@@ -18,12 +18,12 @@ export interface UsageEvent {
   reasoningTokens: number;
   costUsd: number;
   /**
-   * `gateway`: số tiền Gateway báo cho đúng lời gọi này (đã tính bậc giá theo độ dài prompt,
-   * cache, vùng). `estimate`: tính từ bảng giá có bậc của Gateway, khi Gateway không báo số
-   * tiền. `unknown`: không có cả bảng giá, chi phí ghi 0.
+   * `gateway`: amount Gateway reports for this exact call (already tiered by prompt length,
+   * cache, region). `estimate`: computed from Gateway's tiered price table, when Gateway reports no
+   * amount. `unknown`: no price table either, cost recorded as 0.
    */
   costSource?: "gateway" | "estimate" | "unknown";
-  /** Id lời gọi phía Gateway, để đối chiếu với trang quản lý của Vercel. */
+  /** Call id on the Gateway side, to match against the Vercel dashboard. */
   generationId?: string;
   latencyMs: number;
   ok: boolean;
@@ -35,7 +35,7 @@ export type UsageSink = (event: UsageEvent) => Promise<void>;
 export interface EmbeddingProvider {
   readonly provider: string;
   readonly model: string;
-  /** Số chiều cố định; adapter phải từ chối vector khác số chiều để không làm hỏng cột DB. */
+  /** Fixed dimension; adapters must reject other sizes to avoid corrupting the DB column. */
   readonly dimensions: number;
   embed(texts: string[], task: AiTask): Promise<number[][]>;
 }
@@ -52,12 +52,12 @@ export interface LlmProvider {
 }
 
 /**
- * Câu hỏi cho model ra quyết định (Jev và loại tương tự): model không viết văn bản, chỉ trả đúng
- * kiểu được hỏi kèm xác suất. `boolean`: xác suất câu trả lời là "có". `choice`: chọn một tên
- * trong `criteria` (tên → mô tả phương án), kèm xác suất cho từng phương án.
+ * Questions for models that make decisions (Jev and similar): the model writes no text, it only returns the
+ * requested type with probabilities. `boolean`: probability the answer is "yes". `choice`: pick one name
+ * from `criteria` (name → option description), with a probability for each option.
  *
- * Mỗi câu chỉ hỏi một điều (lời khuyên trong tài liệu Jev); nhiều câu về cùng một trạng thái thì
- * gửi chung một lời gọi.
+ * Each question asks one thing (advice from the Jev doc); several questions about the same state
+ * are sent in one call.
  */
 export type DecisionQuestion =
   | { readonly type: "boolean"; readonly instructions: string }
@@ -74,7 +74,7 @@ export type DecisionAnswer<Q extends DecisionQuestion> = Q extends {
   ? {
       type: "choice";
       choice: Extract<keyof C, string>;
-      /** Đủ mọi phương án, tổng xấp xỉ 1. */
+      /** Covers every option; the sum is approximately 1. */
       probabilities: Record<Extract<keyof C, string>, number>;
     }
   : { type: "boolean"; probability: number };
@@ -82,17 +82,17 @@ export type DecisionAnswer<Q extends DecisionQuestion> = Q extends {
 export interface DecisionResult<Qs extends Record<string, DecisionQuestion>> {
   answers: { [K in keyof Qs]: DecisionAnswer<Qs[K]> };
   usage: { inputTokens: number; costUsd: number };
-  /** Id model đã trả lời (provider có thể trả bản cụ thể hơn id đã cấu hình). */
+  /** Id of the model that answered (the provider may return a more specific id than configured). */
   model: string;
 }
 
-/** Trạng thái chung mà mọi câu hỏi cùng xét: văn bản, hoặc một object JSON. */
+/** Shared state that all questions consider: text, or a JSON object. */
 export type DecisionState = string | { readonly [key: string]: unknown };
 
 export interface DecisionProvider {
   readonly provider: string;
   readonly model: string;
-  /** Một lời gọi cho mọi câu hỏi. Lỗi, hay model từ chối trả lời câu nào, thì cả lời gọi lỗi. */
+  /** One call for all questions. An error, or the model refusing any question, fails the whole call. */
   decide<const Qs extends Record<string, DecisionQuestion>>(opts: {
     task: AiTask;
     state: DecisionState;

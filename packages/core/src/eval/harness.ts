@@ -1,6 +1,6 @@
 /**
- * Bộ chấm: chia ngày (thường / khoá kín / không thông tin), chạy biến thể bỏ-một-ngày, so với
- * baseline bằng hiệu NDCG theo ngày kèm khoảng tin cậy bootstrap. Hàm thuần, xác định.
+ * Scorer: splits days (normal / locked / uninformative), runs leave-one-day-out variants, compares against
+ * the baseline by per-day NDCG difference with a bootstrap confidence interval. Pure, deterministic functions.
  */
 import { sha256 } from "../hash.ts";
 import { bootstrapMean, type MeanInterval, mean, type Verdict, verdictOf } from "./bootstrap.ts";
@@ -14,18 +14,18 @@ import {
 import { type EvalDay, isInformative } from "./types.ts";
 import { type AnyVariant, baselineVariant } from "./variants.ts";
 
-/** Ngày thứ k (đếm từ 0, trong các ngày có thông tin, theo thời gian) là khoá kín nếu k % 4 === 3. */
+/** The k-th informative day (0-based, in time order) is a locked day if k % 4 === 3. */
 export const CLOSED_EVERY = 4;
 export const CLOSED_REMAINDER = 3;
-/** Ít hơn số ngày này thì không đủ để lấy khoảng tin cậy: báo "chưa đủ dữ liệu", không kết luận. */
+/** Fewer days than this is not enough for a confidence interval: report "not enough data", no verdict. */
 export const MIN_DAYS_FOR_INTERVAL = 5;
 
 export interface DaySplit {
-  /** Ngày dùng để fit và chấm bỏ-một-ngày. */
+  /** Days used to fit and for leave-one-day-out scoring. */
   regular: EvalDay[];
-  /** Tập khoá kín: không bao giờ dùng để fit hay chọn tham số. */
+  /** Locked set: never used to fit or to choose parameters. */
   closed: EvalDay[];
-  /** Ngày mọi tin cùng mức: loại khỏi trung bình. */
+  /** Days where all items share the same level: excluded from the mean. */
   uninformative: EvalDay[];
 }
 
@@ -73,7 +73,7 @@ function summarize(days: DayScore[]): SetScore {
   };
 }
 
-/** Bỏ-một-ngày trên tập thường: mỗi ngày d, fit trên các ngày thường còn lại rồi chấm d. */
+/** Leave-one-day-out on the normal set: for each day d, fit on the other normal days, then score d. */
 export function scoreRegular(variant: AnyVariant, regular: readonly EvalDay[]): SetScore {
   const days = regular.map((d) => {
     const params = variant.fit?.(regular.filter((x) => x !== d));
@@ -82,7 +82,7 @@ export function scoreRegular(variant: AnyVariant, regular: readonly EvalDay[]): 
   return summarize(days);
 }
 
-/** Tập khoá kín: fit trên TOÀN BỘ ngày thường (không có ngày khoá kín nào), rồi chấm. */
+/** Locked set: fit on ALL normal days (no locked day included), then score. */
 export function scoreClosed(
   variant: AnyVariant,
   regular: readonly EvalDay[],
@@ -93,13 +93,13 @@ export function scoreClosed(
 }
 
 export interface Comparison {
-  /** Hiệu NDCG theo ngày (biến thể − baseline) và khoảng tin cậy 95% của trung bình. */
+  /** Per-day NDCG difference (variant − baseline) and the 95% confidence interval of its mean. */
   interval: MeanInterval;
-  /** `null`: quá ít ngày để có khoảng tin cậy ("chưa đủ dữ liệu"). */
+  /** `null`: too few days for a confidence interval ("not enough data"). */
   verdict: Verdict | null;
 }
 
-/** So hai kết quả trên CÙNG danh sách ngày (cùng thứ tự). */
+/** Compares two results over the SAME list of days (same order). */
 export function compareSets(variant: SetScore, base: SetScore): Comparison {
   const diffs = variant.days.map((d, i) => d.ndcg - (base.days[i]?.ndcg ?? 0));
   const interval = bootstrapMean(diffs);
@@ -112,12 +112,12 @@ export function compareSets(variant: SetScore, base: SetScore): Comparison {
 export interface VariantReport {
   name: string;
   regular: SetScore;
-  /** Chỉ có khi chạy với `includeClosed`. */
+  /** Only present when run with `includeClosed`. */
   closed?: SetScore;
-  /** So với baseline; vắng ở chính baseline. */
+  /** Compared with the baseline; absent for the baseline itself. */
   vsBaselineRegular?: Comparison;
   vsBaselineClosed?: Comparison;
-  /** "Nhận" cần thắng ở cả hai tập; chỉ có khi `includeClosed`. */
+  /** "Accept" requires a win on both sets; only present with `includeClosed`. */
   accepted?: "accept" | "reject" | "insufficient";
 }
 
@@ -131,7 +131,7 @@ export interface DataFingerprint {
   dislikes: number;
 }
 
-/** Vân tay dữ liệu: sha256 của danh sách (ngày, url chuẩn, mức) đã sắp xếp, cộng các số đếm. */
+/** Data fingerprint: sha256 of the sorted list (day, canonical url, level), plus the counts. */
 export function fingerprintOf(days: readonly EvalDay[]): DataFingerprint {
   const lines: string[] = [];
   let samples = 0;
@@ -162,16 +162,16 @@ export interface EvalReport {
   fingerprint: DataFingerprint;
   split: { regular: number; closed: number; uninformative: number };
   closedIncluded: boolean;
-  /** Phần tử đầu luôn là baseline. */
+  /** The first element is always the baseline. */
   variants: VariantReport[];
 }
 
 export interface EvalOptions {
-  /** Chấm cả tập khoá kín và đưa kết luận "nhận". Mặc định: chỉ tập thường. */
+  /** Also score the locked set and produce the "accept" verdict. Default: normal set only. */
   includeClosed?: boolean;
 }
 
-/** Kết luận chung: thắng ở cả hai tập mới nhận; tập khoá kín quá nhỏ thì chưa đủ dữ liệu. */
+/** Overall verdict: accept only if it wins on both sets; if the locked set is too small, not enough data. */
 export function acceptOf(
   regular: Verdict | null,
   closed: Verdict | null,
@@ -211,7 +211,7 @@ function reportVariant(
   return r;
 }
 
-/** Chạy baseline (luôn đứng đầu) rồi các biến thể còn lại. Biến thể trùng tên baseline bị bỏ qua. */
+/** Runs the baseline (always first), then the other variants. Variants named like the baseline are skipped. */
 export function runEval(
   days: readonly EvalDay[],
   variants: readonly AnyVariant[],

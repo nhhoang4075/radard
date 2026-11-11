@@ -71,7 +71,7 @@ const PRIVATE = [
   "100::1",
   "fbff:ffff::1",
   "fe00::1",
-  // Không phải địa chỉ hợp lệ: coi là không an toàn.
+  // Not a valid address: treat as unsafe.
   "garbage",
   "",
   "1.2.3",
@@ -192,10 +192,10 @@ describe("assertPublicUrl", () => {
   });
   test("IP viết lạ: URL chuẩn hoá về dạng chuẩn rồi mới kiểm", async () => {
     expect(new URL("http://2130706433/").hostname).toBe("127.0.0.1");
-    await blocked("http://2130706433/"); // thập phân
-    await blocked("http://0x7f000001/"); // thập lục phân
-    await blocked("http://0177.0.0.1/"); // bát phân
-    await blocked("http://127.1/"); // rút gọn
+    await blocked("http://2130706433/"); // decimal
+    await blocked("http://0x7f000001/"); // hexadecimal
+    await blocked("http://0177.0.0.1/"); // octal
+    await blocked("http://127.1/"); // shortened
     await blocked("http://0/");
     await blocked("http://[::1]/");
     await blocked("http://[::ffff:127.0.0.1]/");

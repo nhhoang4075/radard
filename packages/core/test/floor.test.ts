@@ -15,7 +15,7 @@ describe("percentileFloor", () => {
   });
 
   test("n = 40 → q = 0,7; 20 điểm 1…20 trong 0,5 ngày? dùng 2 ngày × 20 điểm", () => {
-    // 40 điểm 1..40 trong 1 ngày (minDays 1): n = 40, q = 0,7, vị trí 39 × 0,7 = 27,3 → 28 + 0,3 = 28,3.
+    // 40 points 1..40 in 1 day (minDays 1): n = 40, q = 0,7, position 39 × 0,7 = 27,3 → 28 + 0,3 = 28,3.
     const scores = Array.from({ length: 40 }, (_, i) => i + 1);
     const r = percentileFloor({ scores, days: 1, fixed: 0.59, minDays: 1 });
     expect(r.q).toBeCloseTo(0.7, 12);
@@ -31,7 +31,7 @@ describe("percentileFloor", () => {
 
   test("n rất lớn: q kẹp ở 0,99", () => {
     const scores = Array.from({ length: 5000 }, (_, i) => i);
-    // n = 5000, 1 − 12/5000 = 0,9976 → 0,99; vị trí 4999 × 0,99 = 4949,01.
+    // n = 5000, 1 − 12/5000 = 0,9976 → 0,99; position 4999 × 0,99 = 4949,01.
     const r = percentileFloor({ scores, days: 1, fixed: 0.59, minDays: 1 });
     expect(r.q).toBe(0.99);
     expect(r.value).toBeCloseTo(4949.01, 6);

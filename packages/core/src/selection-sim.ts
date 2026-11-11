@@ -1,25 +1,25 @@
 /**
- * Mô phỏng xác suất được chọn của từng tin (p_i) và của từng cặp tin (p_ij) khi chọn có nhiễu
- * Gumbel. Chạy CHÍNH hàm `select` thật nhiều lần với nhiễu mới mỗi lần: không làm trơn, không
- * xấp xỉ, nên cùng một hàm phục vụ sản xuất và mô phỏng.
+ * Simulates the selection probability of each item (p_i) and each item pair (p_ij) under noisy selection
+ * Gumbel. Runs the REAL `select` function many times with fresh noise each time: no smoothing, no
+ * approximation, so the same function serves production and simulation.
  */
 import { mulberry32 } from "./eval/bootstrap.ts";
 import { type RankConfig, type RankEvent, type Scored, type Selection, select } from "./ranking.ts";
 import { cosine } from "./vector.ts";
 
 export interface SimulateOptions {
-  /** Số lần chạy Monte Carlo (mặc định 10.000). */
+  /** Number of Monte Carlo runs (default 10,000). */
   runs?: number;
-  /** Hạt giống: cùng hạt giống cùng kết quả. */
+  /** Seed: the same seed gives the same result. */
   seed: number;
-  /** Tin cần quan tâm; mặc định mọi sự kiện trong `scored`. Tin ngoài tập này không được đếm. */
+  /** Items of interest; default all events in `scored`. Items outside this set are not counted. */
   focusEventIds?: readonly number[];
-  /** Độ giống giữa hai sự kiện; mặc định cosine giữa tâm (được tính trước một lần cho cả mô phỏng). */
+  /** Similarity between two events; default the cosine between centers (computed once for the whole simulation). */
   sim?: (a: RankEvent, b: RankEvent) => number;
   /**
-   * Từ kết quả một lần `select`, các sự kiện được tính là "được chọn" (mặc định: mọi tin `picked`).
-   * Luồng feed truyền lớp thông báo (≤ 7 tin đầu qua sàn thông báo) để p_i, p_ij là xác suất được
-   * GỬI, đúng với tin đã gửi; hàm phải thuần (chỉ phụ thuộc kết quả chọn).
+   * From one `select` result, the events counted as "picked" (default: every `picked` item).
+   * The feed flow passes the notification layer (first ≤ 7 items through the notification floor) so that p_i, p_ij are the probability of being
+   * SENT, matching what was actually sent; the function must be pure (depend only on the selection result).
    */
   chosen?: (selection: Selection) => readonly number[];
 }
@@ -27,18 +27,18 @@ export interface SimulateOptions {
 export interface InclusionResult {
   seed: number;
   runs: number;
-  /** p̂_i: tỉ lệ số lần tin i được chọn trên tổng số lần chạy. */
+  /** p̂_i: fraction of runs in which item i was picked. */
   selectionProb: Map<number, number>;
-  /** p̂_ij, khoá `"i:j"` với i < j: tỉ lệ số lần CẢ HAI tin cùng được chọn. */
+  /** p̂_ij, key `"i:j"` with i < j: fraction of runs in which BOTH items were picked. */
   pairProb: Map<string, number>;
 }
 
-/** Khoá cặp có thứ tự: i < j. */
+/** Ordered pair key: i < j. */
 export function pairKey(a: number, b: number): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
 
-/** Ma trận độ giống tính trước một lần cho mọi cặp; trả hàm tra bảng cho `select`. */
+/** Similarity matrix computed once for all pairs; returns a lookup function for `select`. */
 function cachedSimilarity(
   scored: readonly Scored[],
   baseSim: (a: RankEvent, b: RankEvent) => number,
@@ -101,32 +101,32 @@ export function simulateInclusion(
   return { seed: opts.seed, runs, selectionProb, pairProb };
 }
 
-/** Trần mặc định của trọng số nghịch đảo xác suất. */
+/** Default cap on the inverse-probability weight. */
 export const DEFAULT_WEIGHT_CAP = 20;
 
 /**
- * weight = min(1 / p̂, cap): CẮT trần, không làm trơn. p̂ = 0 (cặp không bao giờ quan sát được
- * trong mô phỏng) thì 1/p̂ vô hạn nên trả đúng `cap`, tức trọng số lớn nhất cho phép; không loại.
+ * weight = min(1 / p̂, cap): CLIPS at the cap, no smoothing. When p̂ = 0 (a pair never observed
+ * in the simulation), 1/p̂ is infinite, so it returns exactly `cap`, the largest allowed weight; not dropped.
  */
 export function inverseProbWeight(p: number, cap = DEFAULT_WEIGHT_CAP): number {
   return p > 0 ? Math.min(1 / p, cap) : cap;
 }
 
 /**
- * Hạt giống mô phỏng suy ra từ hạt giống chọn (hàm thuần): biết hạt chọn là tái hiện được hạt mô
- * phỏng, nên chỉ cần lưu một số. Khác hạt chọn để dòng số ngẫu nhiên của mô phỏng không trùng dòng
- * của lần chọn thật.
+ * The simulation seed is derived from the selection seed (pure function): knowing the selection seed lets you reproduce
+ * the simulation seed, so only one number needs saving. It differs from the selection seed so that the simulation's
+ * random stream does not coincide with the stream of the real selection.
  */
 export function deriveSimSeed(selectSeed: number): number {
   return (Math.imul((selectSeed ^ 0x5bd1e995) >>> 0, 0x9e3779b1) ^ 0x85ebca6b) >>> 0;
 }
 
 /**
- * ln P của danh sách có thứ tự `order` (chỉ số vào `scores`) theo mô hình Plackett–Luce với
- * logit = S / T (mo-hinh-de-xuat.html, tab Gumbel top-k): mỗi bước = logit đã chọn − logsumexp
- * của các tin còn lại. LÀ XẤP XỈ cho chọn thật: bỏ qua phạt MMR, chỗ giữ cho nguồn và trần mỗi
- * nguồn; spec chỉ giữ để đánh giá offline cả danh sách (IPW dùng p_ij, không dùng logP).
- * T ≤ 0 thì không có phân phối: trả null.
+ * ln P of the ordered list `order` (indices into `scores`) under the Plackett–Luce model with
+ * logit = S / T (mo-hinh-de-xuat.html, Gumbel top-k tab): each step = chosen logit − logsumexp
+ * of the remaining items. It is an APPROXIMATION of the real selection: it ignores the MMR penalty, the per-source reserved slots and the per-source
+ * cap; the spec keeps it only for offline evaluation of the whole list (IPW uses p_ij, not logP).
+ * With T ≤ 0 there is no distribution: returns null.
  */
 export function orderedListLogProb(
   scores: readonly number[],

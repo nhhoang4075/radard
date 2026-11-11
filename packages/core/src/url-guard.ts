@@ -1,20 +1,20 @@
 /**
- * Chặn SSRF cho đường tải trang lạ: địa chỉ do người lạ đăng (HN) không được dẫn radard vào mạng
- * nội bộ, dịch vụ metadata của đám mây hay một cổng không phải web.
+ * SSRF protection for the untrusted-page fetch path: addresses posted by strangers (HN) must not lead radard into the internal
+ * network, the cloud metadata service, or a non-web port.
  *
- * Phần thuần (lược đồ, cổng, `isPublicAddress`) tách khỏi I/O; phần phân giải DNS được tiêm vào
- * (`AddressResolver`) để test không cần mạng.
+ * The pure parts (scheme, port, `isPublicAddress`) are separated from I/O; DNS resolution is injected
+ * (`AddressResolver`) so tests need no network.
  */
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-/** Phân giải tên miền thành MỌI địa chỉ của nó (A lẫn AAAA). */
+/** Resolves a hostname to ALL of its addresses (both A and AAAA). */
 export type AddressResolver = (host: string) => Promise<string[]>;
 
 export const defaultResolver: AddressResolver = async (host) =>
   (await lookup(host, { all: true })).map((a) => a.address);
 
-/** Địa chỉ không được phép (lược đồ, cổng hay địa chỉ IP); `reason` ghi vào cột lỗi. */
+/** Address not allowed (scheme, port or IP address); `reason` is written to the error column. */
 export class UrlBlockedError extends Error {
   constructor(
     readonly reason: string,
@@ -26,10 +26,10 @@ export class UrlBlockedError extends Error {
 
 const ALLOWED_PORTS = new Set([80, 443]);
 
-/** Số hop redirect tối đa khi đi theo tay. */
+/** Max number of redirect hops when following them manually. */
 export const MAX_REDIRECTS = 5;
 
-/** Chỉ http/https và cổng 80/443; không I/O. Trả về URL đã parse. */
+/** Only http/https and ports 80/443; no I/O. Returns the parsed URL. */
 export function checkUrlShape(raw: string): URL {
   let u: URL;
   try {
@@ -45,14 +45,14 @@ export function checkUrlShape(raw: string): URL {
   return u;
 }
 
-/** Tên host để phân giải: bỏ ngoặc vuông của IPv6 và dấu chấm cuối (`example.com.`). */
+/** Host name to resolve: strips IPv6 square brackets and the trailing dot (`example.com.`). */
 export function hostnameOf(u: URL): string {
   let h = u.hostname;
   if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);
   return h.replace(/\.$/, "");
 }
 
-/** Bốn byte của IPv4 dạng `a.b.c.d`, hoặc null. */
+/** The four bytes of an IPv4 address in the form `a.b.c.d`, or null. */
 function parseIPv4(s: string): [number, number, number, number] | null {
   const parts = s.split(".");
   if (parts.length !== 4) return null;
@@ -66,7 +66,7 @@ function parseIPv4(s: string): [number, number, number, number] | null {
   return out as [number, number, number, number];
 }
 
-/** Tám nhóm 16 bit của IPv6 (hiểu `::` và đuôi IPv4 dạng chấm), hoặc null. */
+/** The eight 16-bit groups of an IPv6 address (handles `::` and a dotted IPv4 tail), or null. */
 function parseIPv6(input: string): number[] | null {
   const s = input.split("%")[0] ?? "";
   if (!s.includes(":")) return null;
@@ -78,7 +78,7 @@ function parseIPv6(input: string): number[] | null {
     const v4 = parseIPv4(last);
     if (!v4) return null;
     tail4 = [(v4[0] << 8) | v4[1], (v4[2] << 8) | v4[3]];
-    head = `${s.slice(0, lastColon + 1)}0:0`; // giữ chỗ cho hai nhóm, thay sau
+    head = `${s.slice(0, lastColon + 1)}0:0`; // placeholder for two groups, replaced later
   }
   const halves = head.split("::");
   if (halves.length > 2) return null;
@@ -107,22 +107,22 @@ function parseIPv6(input: string): number[] | null {
   return groups;
 }
 
-/** Dải IPv4 không công khai: [địa chỉ đầu, độ dài tiền tố]. */
+/** Non-public IPv4 ranges: [start address, prefix length]. */
 const PRIVATE_V4: [string, number][] = [
-  ["0.0.0.0", 8], // trên Linux 0.0.0.0 trỏ về chính máy mình
+  ["0.0.0.0", 8], // on Linux 0.0.0.0 points to the machine itself
   ["10.0.0.0", 8],
   ["100.64.0.0", 10], // CGNAT
   ["127.0.0.0", 8],
-  ["169.254.0.0", 16], // gồm 169.254.169.254 (metadata)
+  ["169.254.0.0", 16], // includes 169.254.169.254 (metadata)
   ["172.16.0.0", 12],
   ["192.0.0.0", 24],
   ["192.0.2.0", 24], // TEST-NET-1
-  ["192.88.99.0", 24], // 6to4 relay cũ
+  ["192.88.99.0", 24], // old 6to4 relay
   ["192.168.0.0", 16],
   ["198.18.0.0", 15], // benchmark
   ["198.51.100.0", 24], // TEST-NET-2
   ["203.0.113.0", 24], // TEST-NET-3
-  ["224.0.0.0", 3], // multicast, dành riêng, broadcast (224.0.0.0 – 255.255.255.255)
+  ["224.0.0.0", 3], // multicast, reserved, broadcast (224.0.0.0 – 255.255.255.255)
 ];
 
 const v4ToInt = ([a, b, c, d]: readonly [number, number, number, number]) =>
@@ -139,8 +139,8 @@ function isPublicIPv4(octets: [number, number, number, number]): boolean {
 }
 
 /**
- * IPv6 chỉ công khai khi nằm trong 2000::/3 (danh sách cho phép: mọi dải khác như fc00::/7,
- * fe80::/10, ff00::/8 đều không), trừ Teredo 2001::/32, tài liệu 2001:db8::/32 và 3fff::/20.
+ * IPv6 is public only within 2000::/3 (an allow-list: every other range such as fc00::/7,
+ * fe80::/10, ff00::/8 is not), except Teredo 2001::/32, documentation 2001:db8::/32 and 3fff::/20.
  */
 function isPublicGlobalV6(g0: number, g1: number): boolean {
   if (g0 < 0x2000 || g0 > 0x3fff) return false;
@@ -149,8 +149,8 @@ function isPublicGlobalV6(g0: number, g1: number): boolean {
 }
 
 /**
- * `true` khi `address` (chuỗi IPv4 hoặc IPv6) là địa chỉ công khai. Chuỗi không phải địa chỉ thì
- * `false` (an toàn khi lỗi). Hàm thuần.
+ * `true` when `address` (an IPv4 or IPv6 string) is a public address. A string that is not an address gives
+ * `false` (fail-safe on errors). Pure function.
  */
 export function isPublicAddress(address: string): boolean {
   const v4 = parseIPv4(address);
@@ -167,34 +167,34 @@ export function isPublicAddress(address: string): boolean {
     lo & 255,
   ];
   const firstFiveZero = g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0;
-  // ::, ::1 và IPv4 tương thích (::a.b.c.d): 96 bit đầu bằng 0.
+  // ::, ::1 and IPv4-compatible (::a.b.c.d): first 96 bits are zero.
   if (firstFiveZero && g5 === 0) {
     return g6 === 0 && g7 === 0 ? false : isPublicIPv4(embedded(g6, g7));
   }
-  // IPv4 nhúng: ::ffff:a.b.c.d
+  // Embedded IPv4: ::ffff:a.b.c.d
   if (firstFiveZero && g5 === 0xffff) return isPublicIPv4(embedded(g6, g7));
-  // NAT64 64:ff9b::/96 mang IPv4 ở 32 bit cuối.
+  // NAT64 64:ff9b::/96 carries IPv4 in the last 32 bits.
   if (g0 === 0x64 && g1 === 0xff9b && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) {
     return isPublicIPv4(embedded(g6, g7));
   }
-  // ::ffff:0:a.b.c.d (IPv4-translated, ::ffff:0:0:0/96): không dùng trên đường công khai.
+  // ::ffff:0:a.b.c.d (IPv4-translated, ::ffff:0:0:0/96): not used on the public path.
   if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0xffff && g5 === 0) return false;
   if (g0 === 0x2002) return isPublicIPv4(embedded(g1, g2)); // 6to4
-  return isPublicGlobalV6(g0, g1); // gồm cả 64:ff9b:1::/48 → không công khai
+  return isPublicGlobalV6(g0, g1); // includes 64:ff9b:1::/48 → not public
 }
 
-/** Kết quả kiểm một URL: URL đã parse và các địa chỉ ĐÃ KIỂM (đều công khai) để ghim vào kết nối. */
+/** Result of checking a URL: the parsed URL and the CHECKED addresses (all public) to pin to the connection. */
 export interface CheckedUrl {
   url: URL;
   addresses: string[];
-  /** `true`: host đã là địa chỉ IP viết thẳng, không cần ghim. */
+  /** `true`: the host is already a bare IP address, no pinning needed. */
   literal: boolean;
 }
 
 /**
- * Kiểm một URL trước khi gửi request: lược đồ, cổng, rồi MỌI địa chỉ của host phải là công khai.
- * Trả kèm các địa chỉ đã kiểm để người gọi kết nối thẳng tới đúng chúng (chống DNS rebinding:
- * `GetOptions.connectTo`), thay vì để `fetch` phân giải lại.
+ * Checks a URL before sending a request: scheme, port, then EVERY address of the host must be public.
+ * Also returns the checked addresses so the caller can connect directly to exactly them (prevents DNS rebinding:
+ * `GetOptions.connectTo`), instead of letting `fetch` resolve again.
  */
 export async function resolvePublicUrl(
   raw: string,
@@ -223,7 +223,7 @@ export async function resolvePublicUrl(
   return { url: u, addresses, literal };
 }
 
-/** Như `resolvePublicUrl` nhưng chỉ trả URL (khi không cần ghim). */
+/** Like `resolvePublicUrl` but only returns the URL (when pinning is not needed). */
 export async function assertPublicUrl(
   raw: string,
   resolve: AddressResolver = defaultResolver,

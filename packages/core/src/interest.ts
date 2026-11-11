@@ -1,11 +1,11 @@
-// Lõi THUẦN của điểm gu U: gom các tin 👍 thành vài "tâm" sở thích rồi chấm độ hợp gu của một tin.
-// Không DB, không gọi model, không đọc env, không ngẫu nhiên: cùng đầu vào cho cùng đầu ra.
+// Pure core of the taste score U: groups 👍 items into a few interest "centers", then scores how well an item fits.
+// No DB, no model calls, no env reads, no randomness: the same input always gives the same output.
 //
-// TODO(spec: cụm 👎 sau ~30 👎): chưa dựng cụm cho tin 👎; hàm ở đây chỉ nhận tin 👍.
+// TODO(spec: 👎 clusters after ~30 👎): clusters are not built for 👎 items yet; this function only accepts 👍 items.
 
 export type InterestItem = {
   id: string;
-  /** Vector cả tài liệu, đã chuẩn hoá L2. */
+  /** Vector of the whole document, L2-normalized. */
   vector: readonly number[];
   ageDays: number;
 };
@@ -13,33 +13,33 @@ export type InterestItem = {
 export type PreviousCluster = { name: string | null; center: readonly number[] };
 
 export type InterestCluster = {
-  /** `active` (>= minMembers tin) tham gia tính U; `pending` (chờ) thì không. */
+  /** `active` (>= minMembers items) counts toward U; `pending` (waiting) does not. */
   status: "active" | "pending";
-  /** Tên mang từ lần chạy trước; null nếu không có. Chỉ cụm active mới nhận tên. */
+  /** Name carried from the previous run; null if none. Only active clusters receive a name. */
   name: string | null;
-  /** Trung bình có trọng số của vector thành viên, rồi chuẩn hoá L2. */
+  /** Weighted mean of the member vectors, then L2-normalized. */
   center: number[];
-  /** I_k: tổng trọng số theo tuổi của các tin trong cụm. */
+  /** I_k: total age-weighted weight of the items in the cluster. */
   importance: number;
-  /** Id tin gần `center` nhất (cosine), để chủ dự án xem cụm này là gì. */
+  /** Id of the item closest to `center` (cosine), so the project owner can see what the cluster is. */
   medoid: string;
-  /** Id các thành viên, sắp tăng dần. */
+  /** Member ids, sorted ascending. */
   memberIds: string[];
 };
 
 export type ClusterInterestsOptions = {
-  /** Ngưỡng cắt cây theo chiều cao Ward (xem `wardHeight`). BẮT BUỘC, không có mặc định. */
+  /** Tree cut threshold on the Ward height (see `wardHeight`). REQUIRED, no default. */
   distanceThreshold: number;
-  /** Trần số cụm: cắt theo ngưỡng ra nhiều hơn thì gộp tiếp tới mức này. */
+  /** Cluster cap: if the threshold cut yields more, keep merging until this count. */
   maxClusters?: number;
-  /** Số tin tối thiểu (đếm tin, không đếm trọng số) để cụm thành `active`. */
+  /** Minimum number of items (counted, not weighted) for a cluster to become `active`. */
   minMembers?: number;
   halfLifeDays?: number;
-  /** Tin có trọng số nhỏ hơn mức này bị bỏ. */
+  /** Items with weight below this are dropped. */
   dropBelowWeight?: number;
-  /** Các cụm của lần chạy trước, dùng để giữ tên. */
+  /** Clusters from the previous run, used to keep names. */
   previous?: readonly PreviousCluster[];
-  /** Cosine tối thiểu để một cụm mới nhận tên cụm cũ. Bắt buộc khi có `previous`. */
+  /** Minimum cosine for a new cluster to inherit an old cluster's name. Required when `previous` is given. */
   nameCarryMinCosine?: number;
 };
 
@@ -48,7 +48,7 @@ export const DEFAULT_MIN_CLUSTER_MEMBERS = 3;
 export const DEFAULT_HALF_LIFE_DAYS = 60;
 export const DEFAULT_DROP_BELOW_WEIGHT = 0.1;
 
-/** Trọng số theo tuổi: nửa đời `halfLifeDays` ngày. Tuổi âm coi như 0. */
+/** Age weight: half-life `halfLifeDays` days. A negative age counts as 0. */
 export function ageWeight(ageDays: number, halfLifeDays = DEFAULT_HALF_LIFE_DAYS): number {
   return 0.5 ** (Math.max(0, ageDays) / halfLifeDays);
 }
@@ -71,9 +71,9 @@ function compareId(a: string, b: string): number {
 }
 
 /**
- * Chiều cao Ward giữa hai cụm khối lượng mA, mB, tâm cách nhau `centerDist2` (bình phương):
- * sqrt(2·mA·mB/(mA+mB) · |cA−cB|²). Hai tin khối lượng 1 cho đúng khoảng cách Euclid giữa chúng
- * (cùng quy ước với scipy `linkage(method="ward")`). Dưới đây ta giữ bình phương chiều cao.
+ * Ward height between two clusters with masses mA, mB and centers `centerDist2` apart (squared):
+ * sqrt(2·mA·mB/(mA+mB) · |cA−cB|²). Two items of mass 1 give exactly the Euclidean distance between them
+ * (same convention as scipy `linkage(method="ward")`). Below we keep the squared height.
  */
 function wardHeight2(mA: number, mB: number, centerDist2: number): number {
   return ((2 * mA * mB) / (mA + mB)) * centerDist2;
@@ -90,7 +90,7 @@ function squaredDistance(a: readonly number[], b: readonly number[]): number {
   return d2;
 }
 
-/** Ma trận bình phương chiều cao Ward giữa mọi cặp tin. */
+/** Matrix of squared Ward heights between every pair of items. */
 function initialHeights(
   vectors: readonly (readonly number[])[],
   masses: readonly number[],
@@ -108,7 +108,7 @@ function initialHeights(
   return h2;
 }
 
-/** Cặp cụm còn sống có chiều cao nhỏ nhất; hoà thì cặp (i, j) nhỏ nhất theo chỉ số. */
+/** The live cluster pair with the smallest height; on a tie, the pair (i, j) with the smallest indices. */
 function closestPair(nodes: readonly (Node | null)[], h2: readonly number[][]) {
   let bi = -1;
   let bj = -1;
@@ -127,7 +127,7 @@ function closestPair(nodes: readonly (Node | null)[], h2: readonly number[][]) {
   return { bi, bj, best };
 }
 
-/** Gộp cụm bj vào bi và cập nhật h2 theo Lance–Williams. */
+/** Merge cluster bj into bi and update h2 by Lance–Williams. */
 function mergeNodes(nodes: (Node | null)[], h2: number[][], bi: number, bj: number, best: number) {
   const ni = nodes[bi] as Node;
   const nj = nodes[bj] as Node;
@@ -147,10 +147,10 @@ function mergeNodes(nodes: (Node | null)[], h2: number[][], bi: number, bj: numb
 }
 
 /**
- * Ward có trọng số bằng công thức Lance–Williams trên bình phương chiều cao:
+ * Weighted Ward via the Lance–Williams formula on squared heights:
  * h²(k, i∪j) = ((mk+mi)·h²(k,i) + (mk+mj)·h²(k,j) − mk·h²(i,j)) / (mi+mj+mk).
- * Dừng khi chiều cao nhỏ nhất > τ và số cụm <= maxClusters. Hoà: cặp (i, j) nhỏ nhất theo chỉ số
- * (các tin đã sắp theo id nên kết quả không phụ thuộc thứ tự đầu vào).
+ * Stop when the smallest height > τ and the cluster count <= maxClusters. Ties: the pair (i, j) with the smallest indices
+ * (items are sorted by id, so the result does not depend on input order).
  */
 function wardCut(
   vectors: readonly (readonly number[])[],
@@ -183,7 +183,7 @@ function carryNames(
       if (cos >= minCos) pairs.push({ c, p, cos });
     });
   });
-  // Tham lam theo cosine giảm dần; hoà thì theo chỉ số cụm mới rồi cụm cũ (xác định).
+  // Greedy by descending cosine; ties by new cluster index, then old one (deterministic).
   pairs.sort((x, y) => y.cos - x.cos || x.c - y.c || x.p - y.p);
   const usedC = new Set<number>();
   const usedP = new Set<number>();
@@ -196,8 +196,8 @@ function carryNames(
 }
 
 /**
- * Gom các tin 👍 thành cụm sở thích, từ đầu mỗi lần gọi. Trả về cả cụm `active` và `pending`,
- * sắp theo importance giảm dần, hoà thì theo id nhỏ nhất của thành viên.
+ * Groups 👍 items into interest clusters, rebuilt from scratch on every call. Returns both `active` and `pending` clusters,
+ * sorted by importance descending, ties by the smallest member id.
  */
 export function clusterInterests(
   items: readonly InterestItem[],
@@ -238,7 +238,7 @@ export function clusterInterests(
   );
 
   const clusters: InterestCluster[] = groups.map((idx) => {
-    const members = [...idx].sort((a, b) => a - b); // chỉ số đã theo id
+    const members = [...idx].sort((a, b) => a - b); // indices are already in id order
     const sum = new Array<number>(dim).fill(0);
     let importance = 0;
     for (const m of members) {
@@ -281,8 +281,8 @@ export function clusterInterests(
 }
 
 /**
- * Điểm gu U của một vector tin: max trên cụm active của sqrt(π_k) · max(0, cos(vector, center_k)),
- * với π_k = I_k / I_max. Cosine âm kẹp về 0 để U nằm trong [0, 1]. Không có cụm active thì 0.
+ * Taste score U of an item vector: max over active clusters of sqrt(π_k) · max(0, cos(vector, center_k)),
+ * with π_k = I_k / I_max. Negative cosines are clamped to 0 so U lies in [0, 1]. With no active cluster, 0.
  */
 export function interestScore(
   vector: readonly number[],

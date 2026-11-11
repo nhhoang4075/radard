@@ -1,4 +1,4 @@
-/** Định dạng kết quả bộ chấm thành văn bản tiếng Việt (hàm thuần, để test được). */
+/** Formats scorer results as Vietnamese text (pure function, so it can be tested). */
 import type { Verdict } from "./bootstrap.ts";
 import type { Comparison, EvalReport, SetScore, VariantReport } from "./harness.ts";
 import { pairAccuracy } from "./metrics.ts";

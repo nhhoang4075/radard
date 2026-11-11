@@ -1,23 +1,23 @@
 /**
- * Interface thông báo. Lõi (job digest) chỉ biết các kiểu này; Telegram, Discord, Web Push là
- * adapter. Tin lưu và truyền ở dạng TRUNG LẬP: văn bản thuần, không HTML hay markdown riêng của
- * kênh nào; mỗi adapter tự render (radard-thiet-ke.html, quy tắc 2).
+ * Notification interface. The core (digest job) only knows these types; Telegram, Discord, Web Push are
+ * adapters. Items are stored and passed in a NEUTRAL form: plain text, no HTML or markdown specific to any
+ * channel; each adapter renders it itself (radard-thiet-ke.html, rule 2).
  */
 
-/** Phản hồi bằng nút. Khớp `feedback.kind`; `comment` (nhận xét bằng chữ) để sau. */
+/** Button feedback. Matches `feedback.kind`; `comment` (a text comment) comes later. */
 export type FeedbackKind = "like" | "dislike";
 
-/** Ý kiến hiện tại của một tin sau lượt bấm: `none` = chưa chọn hoặc đã bỏ chọn. */
+/** An item's current opinion after a tap: `none` = not chosen, or unselected. */
 export type FeedbackState = FeedbackKind | "none";
 
-/** Một link của tin. Job quyết định có link nào, nhãn gì; adapter chỉ quyết cách trình bày. */
+/** One link of an item. The job decides which links exist and their labels; the adapter only decides presentation. */
 export interface Link {
   url: string;
-  /** Chữ hiện ra, ví dụ tên miền "openai.com". Link thật vẫn là `url` đầy đủ. */
+  /** Visible text, e.g. the domain name "openai.com". The real link is still the full `url`. */
   label: string;
   /**
-   * main: bài nên đọc nhất · related: bài viết khác về cùng chuyện · discussion: trang thảo luận
-   * (bình luận HN…).
+   * main: the most worth-reading article · related: other articles on the same topic · discussion: discussion page
+   * (HN comments…).
    */
   role: "main" | "related" | "discussion";
 }
@@ -25,52 +25,52 @@ export interface Link {
 export interface Message {
   kind: "digest" | "system";
   title: string;
-  /** Mỗi phần tử một đoạn, văn bản thuần. */
+  /** Each element is one paragraph, plain text. */
   lines: string[];
-  /** Mọi link của tin; tin không có trường link nào khác. */
+  /** All links of the item; an item has no other link fields. */
   links?: Link[];
-  /** Số bài liên quan KHÔNG có trong `links` (hiện "+N bài"). */
+  /** Number of related articles NOT in `links` (shown as "+N articles"). */
   moreRelated?: number;
-  /** `for_me`: nút "Với tôi?" (không phải phản hồi, không ghi `feedback`). */
+  /** `for_me`: the "Với tôi?" button (not feedback, does not write `feedback`). */
   actions?: { id: FeedbackKind | "for_me"; label: string }[];
 }
 
 export interface Notifier {
   readonly channel: string;
-  /** Gửi một tin; trả về id tin phía kênh, job ghi vào `deliveries.message_id`. */
+  /** Send one item; returns the channel-side message id, which the job writes to `deliveries.message_id`. */
   send(recipient: string, msg: Message): Promise<{ messageId: string }>;
 }
 
-/** Một lượt bấm nút, đã quy về dạng trung lập. */
+/** One button tap, normalized to a neutral form. */
 export interface FeedbackEvent {
   channel: string;
   recipient: string;
-  /** Tin được bấm: nối về `deliveries` qua (channel, recipient, message_id). */
+  /** The tapped item: linked back to `deliveries` via (channel, recipient, message_id). */
   messageId: string;
   kind: FeedbackKind;
   /**
-   * Id của CHÍNH lượt bấm phía kênh (Telegram: `callback_query.id`). Kênh giao lại cùng lượt bấm
-   * (bot khởi động lại trước khi kịp xác nhận) thì id trùng, nên không ghi hai lần.
+   * The channel-side id of THIS tap (Telegram: `callback_query.id`). If the channel redelivers the same tap
+   * (the bot restarts before it can confirm), the id is the same, so it is not written twice.
    */
   sourceId: string;
 }
 
-/** Một lượt bấm "Với tôi?" trên một tin. */
+/** One "Với tôi?" tap on an item. */
 export interface ForMeEvent {
   channel: string;
   recipient: string;
-  /** Tin được bấm: nối về `deliveries` qua (channel, recipient, message_id). */
+  /** The tapped item: linked back to `deliveries` via (channel, recipient, message_id). */
   messageId: string;
 }
 
-/** Kết quả "Với tôi?"; `status` khác `ok` thì kênh báo lỗi tương ứng, không có `text`. */
+/** Result of "Với tôi?"; if `status` is not `ok`, the channel reports the matching error and there is no `text`. */
 export type ForMeResult =
   | { status: "ok"; text: string }
   | { status: "not_found" | "limit" | "unavailable" };
 
-/** Một chủ đề hiện trong danh sách chọn: từ thư viện hoặc do người dùng tự thêm. */
+/** A topic shown in the selection list: from the library, or added by the user. */
 export interface TopicItem {
-  /** Khoá ổn định để bật tắt: `l:<topics.id>` (thư viện) hoặc `c:<profile_topics.id>` (tự thêm). */
+  /** Stable key for toggling: `l:<topics.id>` (library) or `c:<profile_topics.id>` (user-added). */
   key: string;
   label: string;
   chosen: boolean;
@@ -78,108 +78,108 @@ export interface TopicItem {
 
 export interface CustomTopicDraft {
   label: string;
-  /** Lời của người dùng, giữ nguyên ngôn ngữ họ viết. */
+  /** The user's own words, kept in the language they wrote. */
   description: string;
-  /** Câu tiếng Anh để embed, do LLM viết từ lời người dùng. */
+  /** English phrase for embedding, written by the LLM from the user's words. */
   embedText: string;
 }
 
-/** Lệnh về chủ đề mà kênh chat chuyển vào lõi (bước 5, tuần 3). */
+/** Topic command that the chat channel passes to the core (step 5, week 3). */
 export interface TopicHandlers {
   list(): Promise<TopicItem[]>;
-  /** Bật/tắt; trả về trạng thái mới. */
+  /** On/off; returns the new state. */
   toggle(key: string): Promise<boolean>;
-  /** Viết câu mô tả tiếng Anh (một lời gọi LLM). Chưa lưu gì. */
+  /** Write an English description (one LLM call). Saves nothing yet. */
   describe(label: string, text: string): Promise<string>;
-  /** Lưu chủ đề tự thêm (đang bật). */
+  /** Save the user-added topic (now on). */
   addCustom(draft: CustomTopicDraft): Promise<void>;
 }
 
-/** Mô tả về người dùng, như lệnh /profile hiện ra. */
+/** Description of the user, as shown by the /profile command. */
 export interface ProfileView {
-  /** Lời người dùng tự viết về mình (giữ nguyên ngôn ngữ); `null`: chưa viết. */
+  /** The text the user wrote about themselves (kept in their language); `null`: not written yet. */
   description: string | null;
-  /** Bối cảnh tiếng Anh radard đang dùng; chuỗi rỗng: chưa có. */
+  /** English context radard is using; empty string: none yet. */
   promptContext: string;
 }
 
-/** Một chủ đề thư viện hiện trong tin gợi ý, kèm trạng thái tích ban đầu. */
+/** A library topic shown in the suggestion message, with its initial checkbox state. */
 export interface SuggestedTopic {
-  /** Cùng dạng khoá với `TopicItem` (`l:<topics.id>`). */
+  /** Same key form as `TopicItem` (`l:<topics.id>`). */
   key: string;
   label: string;
   /**
-   * preselect: nên theo dõi · maybe: có thể bạn quan tâm · followed: không được gợi ý nhưng người
-   * dùng đang theo dõi (vẫn hiện, để tin gợi ý cho thấy đủ mọi chủ đề thư viện đang bật).
+   * preselect: should follow · maybe: you may be interested · followed: not suggested, but the user
+   * already follows it (still shown, so the suggestions cover every enabled library topic).
    */
   tier: "preselect" | "maybe" | "followed";
-  /** Tích sẵn: mức "nên theo dõi", hoặc người dùng đang bật chủ đề này. */
+  /** Pre-checked: the "should follow" level, or the user already has this topic on. */
   checked: boolean;
 }
 
-/** Chủ đề mới (chưa có trong thư viện) mà radard đề xuất. */
+/** A new topic (not yet in the library) that radard suggests. */
 export interface ProposedTopicItem {
   label: string;
-  /** Vì sao đề xuất, một câu tiếng Việt (hiện cho người dùng). */
+  /** Why it is suggested, one sentence in Vietnamese (shown to the user). */
   why: string;
-  /** Câu tiếng Anh để embed. */
+  /** English phrase for embedding. */
   embedText: string;
 }
 
 export interface ProfileSuggestions {
-  /** Nên theo dõi, rồi có thể bạn quan tâm (mỗi mức cao trước), rồi đang theo dõi. */
+  /** Should follow first, then may be interested (higher level first), then already followed. */
   topics: SuggestedTopic[];
   newTopics: ProposedTopicItem[];
 }
 
-/** Lệnh /profile: mô tả về người dùng và gợi ý chủ đề. */
+/** The /profile command: description of the user and topic suggestions. */
 export interface ProfileHandlers {
   get(): Promise<ProfileView>;
   /**
-   * Lưu lời người dùng, rồi nhờ LLM viết lại bối cảnh tiếng Anh. `rewritten = false`: không viết
-   * được (thiếu LLM hay lời gọi lỗi), lời người dùng vẫn được lưu, bối cảnh cũ giữ nguyên.
+   * Save the user's words, then ask the LLM to rewrite the English context. `rewritten = false`: could not
+   * (no LLM, or the call failed); the user's words are still saved, and the old context is kept.
    */
   saveDescription(text: string): Promise<{ rewritten: boolean }>;
-  /** Gợi ý theo bối cảnh đang lưu. `null`: tạm không gợi ý được. */
+  /** Suggestions based on the saved context. `null`: cannot suggest for now. */
   suggest(): Promise<ProfileSuggestions | null>;
   /**
-   * Lưu tin gợi ý: tạo (và bật) các chủ đề mới `add`, bật các chủ đề `on`, tắt các chủ đề `off`
-   * (khoá `l:<id>`). Trả về số chủ đề đang theo dõi, kể cả chủ đề vừa tạo.
+   * Save the suggested topics: create (and enable) new `add` topics, enable `on` topics, disable `off` topics
+   * (key `l:<id>`). Returns the number of followed topics, including the ones just created.
    */
   apply(on: string[], off: string[], add: ProposedTopicItem[]): Promise<number>;
 }
 
 export interface ChatHandlers {
   /**
-   * Ghi phản hồi. `recorded = false`: đã ghi từ trước (lượt bấm bị giao lại). `state` = ý kiến
-   * hiện tại của tin sau lượt bấm (bấm lại đúng nút đang chọn thì là `none`); bỏ trống thì kênh
-   * coi là nút vừa bấm.
+   * Write feedback. `recorded = false`: already written earlier (the tap was redelivered). `state` = the item's
+   * current opinion after the tap (tapping the already-selected button again gives `none`); if omitted, the channel
+   * treats it as the button just tapped.
    */
   onFeedback(ev: FeedbackEvent): Promise<{ recorded: boolean; state?: FeedbackState }>;
   /**
-   * Nút "Với tôi?": tin được bấm tra về hồ sơ của người bấm ở phía lõi (fail-closed). Không có thì
-   * kênh coi nút là nút lạ.
+   * "Với tôi?" button: the tapped item is looked up to the tapper's profile in the core (fail-closed). Without it, the
+   * channel treats the button as unknown.
    */
   onForMe?(ev: ForMeEvent): Promise<ForMeResult>;
-  /** Không có thì kênh không nhận lệnh chọn chủ đề. */
+  /** Without it, the channel does not accept topic selection commands. */
   topics?: TopicHandlers;
-  /** Không có thì kênh không nhận lệnh /profile. */
+  /** Without it, the channel does not accept /profile commands. */
   profile?: ProfileHandlers;
 }
 
 /**
- * Đa người dùng: tra người nhận (chat id) → bộ xử lý của đúng hồ sơ đó. `null` = người nhận không có
- * quyền: kênh bỏ qua update, không trả lời, không gọi bất kỳ handler nào (fail-closed).
- * `scope` định danh hồ sơ đứng sau bộ xử lý (kênh dùng nó để biết khi nào phải dựng lại bộ xử lý).
+ * Multi-user: look up the recipient (chat id) → handler of that exact profile. `null` = the recipient has no
+ * permission: the channel ignores the update, does not reply and calls no handler (fail-closed).
+ * `scope` identifies the profile behind the handler (the channel uses it to know when to rebuild the handler).
  */
 export type ChatResolver = (
   recipient: string,
 ) => Promise<{ scope: string; handlers: ChatHandlers } | null>;
 
-/** Chiều về: nhận lượt bấm (sau này: lệnh, tin nhắn) từ một kênh. */
+/** Inbound side: receives taps (later: commands, messages) from a channel. */
 export interface ChatChannel {
   readonly channel: string;
-  /** Bắt đầu nhận; trả về ngay, việc nhận chạy nền cho tới `stop()`. */
+  /** Start receiving; returns immediately, receiving runs in the background until `stop()`. */
   start(handlers: ChatHandlers | ChatResolver): Promise<void>;
   stop(): Promise<void>;
 }

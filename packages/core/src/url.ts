@@ -1,26 +1,26 @@
 /**
- * Chuẩn hoá URL để hai link cùng trỏ một bài được nhận ra là một.
+ * Normalizes URLs so two links pointing to the same article are recognized as one.
  *
- * Chỉ bỏ những thứ chắc chắn không đổi nội dung: tham số theo dõi, fragment, `www.`,
- * dấu `/` cuối, thứ tự tham số. Tham số khác giữ nguyên, vì nhiều trang dùng query để
- * chọn bài (`?id=123`), bỏ đi là gộp nhầm hai bài khác nhau.
+ * Only removes things that certainly do not change content: tracking parameters, fragment, `www.`,
+ * trailing `/`, parameter order. Other parameters are kept, because many sites use the query to
+ * pick the article (`?id=123`); removing it would wrongly merge two different articles.
  */
 const TRACKING = new RegExp(
   `^(${[
-    "utm_\\w+", // chuẩn UTM (Google Analytics và gần như mọi công cụ marketing)
-    // Mã click do nền tảng quảng cáo tự gắn: mỗi lần click một mã khác nhau.
+    "utm_\\w+", // UTM standard (Google Analytics and almost every marketing tool)
+    // Click IDs added automatically by ad platforms: a different ID on every click.
     "fbclid", // Facebook
-    "gclid|dclid|gbraid|wbraid", // Google Ads, Campaign Manager, biến thể cho iOS
+    "gclid|dclid|gbraid|wbraid", // Google Ads, Campaign Manager, iOS variants
     "msclkid", // Microsoft Advertising (Bing)
     "twclid", // X Ads
     "ttclid", // TikTok Ads
     "li_fat_id", // LinkedIn
     "yclid", // Yandex Direct
-    // Email marketing: nhiều mã gắn với TỪNG người nhận, không nên làm khoá hay lan đi.
+    // Email marketing: many IDs attached to EACH recipient; they should not become a key or spread.
     "mc_cid|mc_eid", // Mailchimp
     "_hsenc|_hsmi", // HubSpot
     "mkt_tok", // Marketo
-    // Chia sẻ trên mạng xã hội.
+    // Social network sharing.
     "ref_src", // X
     "igshid", // Instagram
   ].join("|")})$`,
@@ -28,8 +28,8 @@ const TRACKING = new RegExp(
 );
 
 /**
- * Tham số chỉ là theo dõi trên vài host cụ thể. `ref` KHÔNG có ở đây: trên GitHub nó là tên
- * nhánh hoặc tag (`?ref=v2`), bỏ đi là gộp hai phiên bản khác nhau thành một.
+ * Tracking-only parameters on a few specific hosts. `ref` is NOT here: on GitHub it is the branch
+ * or tag name (`?ref=v2`); removing it would merge two different versions into one.
  */
 const TRACKING_BY_HOST: Record<string, RegExp> = {
   "youtube.com": /^si$/i,
@@ -50,7 +50,7 @@ export function canonicalizeUrl(input: string): string {
   }
   url.hash = "";
   url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-  // Chỉ dùng làm khoá so sánh, không dùng để tải, nên gộp http và https là an toàn.
+  // Only used as a comparison key, never to fetch, so merging http and https is safe.
   if (url.protocol === "http:") url.protocol = "https:";
 
   const kept = [...url.searchParams.entries()]
