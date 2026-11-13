@@ -64,7 +64,7 @@ export function EventDetailPanel({
                 return (
                   <li key={a.url}>
                     <span>{a.publishedAt ? formatTime(a.publishedAt) : ""}</span>
-                    <div>
+                    <div title={`${hostOf(a.url) ?? a.sourceName} · ${a.title}`}>
                       {hostOf(a.url) ?? a.sourceName} ·{" "}
                       {href ? (
                         <a href={href} target="_blank" rel="noopener noreferrer">
