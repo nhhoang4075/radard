@@ -17,6 +17,7 @@ import type { EventDetail, FeedItem } from "./types.ts";
 import { useFeed, useFeedDates } from "./use-feed.ts";
 import { useFeedKeys } from "./use-feed-keys.ts";
 import { useImpressions } from "./use-impressions.ts";
+import { useMedia } from "./use-media.ts";
 
 export type FeedSearch = { date?: string; scope?: FeedScope; topics?: string[]; item?: number };
 
@@ -71,7 +72,10 @@ export function FeedPage({
     return () => io.disconnect();
   }, [feed.hasNextPage, feed.isFetchingNextPage, feed.fetchNextPage]);
 
-  const selected = visible.find((i) => i.feedItemId === search.item) ?? null;
+  // Like the demo, the wide layout always shows a detail card: default to the first visible item.
+  const wide = useMedia("(min-width: 1100px)");
+  const selected =
+    visible.find((i) => i.feedItemId === search.item) ?? (wide ? (visible[0] ?? null) : null);
   const select = (id: number | undefined) => {
     onSearch({ ...search, ...(id === undefined ? { item: undefined } : { item: id }) });
     panel.setOpen(id !== undefined);
@@ -154,23 +158,32 @@ export function FeedPage({
         <State>{strings.feed.noMatch}</State>
       ) : null}
 
-      <div className="fd-list">
-        {visible.map((i) => (
-          <EventCard
-            key={i.feedItemId}
-            item={i}
-            selected={i === selected}
-            onSelect={() => select(i.feedItemId)}
-            innerRef={observe(i.position)}
-          />
-        ))}
+      <div className="fd-grid">
+        <div>
+          <div className="fd-list">
+            {visible.map((i) => (
+              <EventCard
+                key={i.feedItemId}
+                item={i}
+                selected={i === selected}
+                onSelect={() => select(i.feedItemId)}
+                innerRef={observe(i.position)}
+              />
+            ))}
+          </div>
+          <div ref={sentinel} aria-hidden="true" />
+          {fullyLoaded && all.length > 0 ? <EndOfFeed date={date} count={visible.length} /> : null}
+        </div>
+        {wide ? (
+          <aside className="fd-detail-card" aria-label={strings.feed.detail.label}>
+            <EventDetailPanel item={selected} onClose={() => select(undefined)} />
+          </aside>
+        ) : (
+          <ShellPanel>
+            <EventDetailPanel item={selected} onClose={() => select(undefined)} />
+          </ShellPanel>
+        )}
       </div>
-      <div ref={sentinel} aria-hidden="true" />
-      {fullyLoaded && all.length > 0 ? <EndOfFeed date={date} count={visible.length} /> : null}
-
-      <ShellPanel>
-        <EventDetailPanel item={selected} onClose={() => select(undefined)} />
-      </ShellPanel>
     </div>
   );
 }

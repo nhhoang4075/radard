@@ -26,7 +26,6 @@ export function ForMeZone({ eventId }: { eventId: number }) {
       <div className="fd-forme-row">
         <Button
           variant="secondary"
-          size="sm"
           icon={<Sparkles aria-hidden />}
           disabled={loading}
           aria-busy={loading}
@@ -34,13 +33,7 @@ export function ForMeZone({ eventId }: { eventId: number }) {
         >
           {loading ? t.loading : t.button}
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<MessageSquare aria-hidden />}
-          disabled
-          title={t.soon}
-        >
+        <Button variant="secondary" icon={<MessageSquare aria-hidden />} disabled title={t.soon}>
           {t.learnMore}
         </Button>
         <span className="fd-tag">{t.soonTag}</span>

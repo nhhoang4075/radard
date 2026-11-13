@@ -10,6 +10,7 @@
   --rd-gray-100: #f7f7f8;
   --rd-gray-150: #f2f2f2;
   --rd-gray-175: #ebebed;
+  --rd-gray-125: #e9e9ec;
   --rd-gray-200: #e4e4e7;
   --rd-gray-300: #d4d4d8;
   --rd-gray-500: #71717a;
@@ -26,6 +27,7 @@
   --rd-violet-700: #5b46b5;
   --rd-violet-100: #e4dcfa;
   --rd-blue-400: #8fc1f7;
+  --rd-blue-500: #5b7fd6;
   --rd-violet-400: #b9a5f2;
   --rd-white-a72: rgb(255 255 255 / 0.72);
   --rd-white-a75: rgb(255 255 255 / 0.75);
@@ -61,6 +63,8 @@
   --rd-color-info-soft: var(--rd-blue-100);
   --rd-color-about: var(--rd-violet-700);
   --rd-color-about-soft: var(--rd-violet-100);
+  --rd-color-bar-track: var(--rd-gray-125);
+  --rd-color-bar-fill: var(--rd-blue-500);
   --rd-color-brand-a: var(--rd-blue-400);
   --rd-color-brand-b: var(--rd-violet-400);
 

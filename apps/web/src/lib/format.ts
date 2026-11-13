@@ -36,3 +36,13 @@ export function formatDateTime(iso: string): string {
   const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   return `${g("hour")}:${g("minute")} · ${g("day")}/${g("month")}`;
 }
+
+/** "23:58" in Vietnam time (the merged-articles list shows only the time of day). */
+export function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: VN,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(iso));
+}
