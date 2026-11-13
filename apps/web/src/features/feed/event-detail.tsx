@@ -4,7 +4,7 @@ import { getFeedClient } from "../../lib/feed-client.ts";
 import { formatScore, formatTime } from "../../lib/format.ts";
 import { queryKeys } from "../../lib/query-keys.ts";
 import { strings } from "../../lib/strings.vi.ts";
-import { safeUrl } from "../../lib/url.ts";
+import { hostOf, safeUrl } from "../../lib/url.ts";
 import { IconButton, Skeleton, State } from "../../ui/index.ts";
 import { ForMeZone } from "./for-me.tsx";
 import type { FeedItem } from "./types.ts";
@@ -65,7 +65,7 @@ export function EventDetailPanel({
                   <li key={a.url}>
                     <span>{a.publishedAt ? formatTime(a.publishedAt) : ""}</span>
                     <div>
-                      {a.sourceName} ·{" "}
+                      {hostOf(a.url) ?? a.sourceName} ·{" "}
                       {href ? (
                         <a href={href} target="_blank" rel="noopener noreferrer">
                           {a.title}
