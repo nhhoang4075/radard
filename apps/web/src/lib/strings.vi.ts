@@ -90,7 +90,12 @@ export const strings = {
       eyebrow: "Điểm tin",
       title: "Điểm tin sáng nay",
       titleOther: (label: string) => `Điểm tin ${label}`,
-      stats: { total: "Tin trong ngày", digest: "Trong điểm tin", topics: "Chủ đề" },
+      stats: {
+        events: "Sự kiện mới",
+        total: "Tin trong ngày",
+        digest: "Trong điểm tin",
+        topics: "Chủ đề",
+      },
     },
     filters: {
       label: "Bộ lọc",

@@ -98,6 +98,8 @@ const daysAgo = (n: number): string => {
 };
 const SNAPS: Record<string, number> = { [daysAgo(0)]: 1, [daysAgo(1)]: 2, [daysAgo(3)]: 3 };
 const PAGE = 8;
+const INTRO =
+  "Nổi bật là đợt mở trọng số của các model lớn và nhỏ hướng tới agent chạy cục bộ. Bên cạnh đó có một nghiên cứu sinh văn bản song song và vài công cụ cho lập trình với AI.";
 const fb = new Map<number, FeedbackState>();
 
 function items(date: string): FeedItem[] {
@@ -132,10 +134,11 @@ export const fixtureClient: FeedClient = {
     const next = start + PAGE;
     return {
       snapshotId: SNAPS[d] ?? 0,
+      // Today has an intro and an event count; other days stay null to preview the hidden-banner-parts case.
+      intro: d === daysAgo(0) ? INTRO : null,
+      eventCount: d === daysAgo(0) ? 141 : null,
       date: d,
       total: all.length,
-      intro: null,
-      eventCount: null,
       items: all.slice(start, next),
       nextCursor: next < all.length ? String(next) : null,
     };

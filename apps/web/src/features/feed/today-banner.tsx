@@ -5,11 +5,17 @@ import { strings } from "../../lib/strings.vi.ts";
 export function TodayBanner({
   date,
   total,
+  intro,
+  eventCount,
   digestCount,
   topicCount,
 }: {
   date: string;
   total: number;
+  /** Opening paragraph written by the model; null (snapshot before 13/11/2026 or model failure) hides the paragraph. */
+  intro: string | null;
+  /** Number of events measured from data (not model output); null hides the stat. */
+  eventCount: number | null;
   digestCount: number | null;
   topicCount: number | null;
 }) {
@@ -21,8 +27,15 @@ export function TodayBanner({
       <div className="fd-hero-text">
         <span className="fd-pill">{b.eyebrow}</span>
         <h1 id="fd-hero-title">{isToday ? b.title : b.titleOther(dayLabel(date))}</h1>
+        {intro ? <p>{intro}</p> : null}
       </div>
       <dl className="fd-stats">
+        {eventCount === null ? null : (
+          <div>
+            <dd>{eventCount}</dd>
+            <dt>{b.stats.events}</dt>
+          </div>
+        )}
         <div>
           <dd>{total}</dd>
           <dt>{b.stats.total}</dt>
