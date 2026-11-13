@@ -123,7 +123,7 @@ function items(date: string): FeedItem[] {
 
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
-export const fixtureClient: Omit<FeedClient, "forMe"> = {
+export const fixtureClient: FeedClient = {
   async getFeed({ date, cursor }): Promise<FeedPage> {
     await wait();
     const d = date ?? daysAgo(0);
@@ -176,4 +176,11 @@ export const fixtureClient: Omit<FeedClient, "forMe"> = {
     return next;
   },
   async postImpressions() {},
+  async forMe() {
+    await wait(600);
+    return {
+      text: "Liên quan trực tiếp đến chủ đề bạn theo dõi về model mở và agent chạy cục bộ.",
+      cached: false,
+    };
+  },
 };
