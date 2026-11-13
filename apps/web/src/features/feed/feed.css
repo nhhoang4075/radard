@@ -223,11 +223,18 @@
   padding: 8px 0;
   border-bottom: 1px solid var(--rd-color-border);
 }
+.fd-tl li.fd-tl-notime {
+  grid-template-columns: 1fr;
+}
+/* Clamp long titles to two lines with an ellipsis. */
 .fd-tl li > div {
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .fd-tl li span {
   font-family: var(--rd-font-mono);

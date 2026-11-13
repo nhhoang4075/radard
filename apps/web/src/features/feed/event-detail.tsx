@@ -62,8 +62,8 @@ export function EventDetailPanel({
               {d.docs.map((a) => {
                 const href = safeUrl(a.url);
                 return (
-                  <li key={a.url}>
-                    <span>{a.publishedAt ? formatTime(a.publishedAt) : ""}</span>
+                  <li key={a.url} className={a.publishedAt ? undefined : "fd-tl-notime"}>
+                    {a.publishedAt ? <span>{formatTime(a.publishedAt)}</span> : null}
                     <div title={`${hostOf(a.url) ?? a.sourceName} · ${a.title}`}>
                       {hostOf(a.url) ?? a.sourceName} ·{" "}
                       {href ? (
