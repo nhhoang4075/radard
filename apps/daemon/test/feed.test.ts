@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fakeLlm } from "@radard/adapters/ai-fake";
 import { fakeNotifier } from "@radard/adapters/notify-fake";
 import { DEFAULT_RANK_CONFIG } from "@radard/core";
 import {
@@ -34,6 +35,7 @@ import {
   recordImpressions,
   runMigrations,
   scrollDepths,
+  snapshotIntroMeta,
   sources,
 } from "@radard/db";
 import { asc, eq, sql } from "drizzle-orm";
@@ -332,6 +334,68 @@ describe("một bản chụp mỗi ngày", () => {
     const sent = await db.select().from(deliveries).where(eq(deliveries.kind, "event"));
     expect(new Set(sent.map((d) => d.eventId))).toEqual(new Set(notified.map((i) => i.eventId)));
     expect(sent).toHaveLength(4);
+  });
+});
+
+describe("lời mở đầu của bản chụp", () => {
+  const seedDay = async () => {
+    const hn = await addSource("HN");
+    for (let i = 0; i < 3; i++) await addEvent(hn);
+  };
+  const introLlm = (introReply: string) => {
+    const intros: string[] = [];
+    const llm = fakeLlm({
+      reply(prompt, system) {
+        if (system?.includes("opening line")) {
+          intros.push(prompt);
+          return introReply;
+        }
+        const n = (prompt.match(/^Story \d+$/gm) ?? []).length;
+        const items = Array.from({ length: n }, (_, i) => ({
+          n: i + 1,
+          title: `Tiêu đề ${i + 1}`,
+          summary: `Tóm tắt tin số ${i + 1}, đủ dài để qua kiểm tra.`,
+        }));
+        return JSON.stringify({ items });
+      },
+    });
+    return { llm, intros };
+  };
+
+  test("viết một lần khi dựng, lưu ở meta.intro cùng meta.eventCount; chạy lại không gọi model", async () => {
+    await seedDay();
+    const { llm, intros } = introLlm('{"intro":"Hôm nay nổi bật là agent."}');
+    const first = await ensureFeedSnapshot({ db, profileId: 1, llm }, SLOT);
+    expect(first.snapshot.meta.intro).toBe("Hôm nay nổi bật là agent.");
+    // 3 events in the window all belong to the profile's topic.
+    expect(first.snapshot.meta.eventCount).toBe(3);
+    expect(intros).toHaveLength(1);
+    // The model sees the item titles in position order (shared summary titles when present).
+    expect(intros[0]).toBe("Story 1: Tiêu đề 1\nStory 2: Tiêu đề 2\nStory 3: Tiêu đề 3");
+
+    const again = await ensureFeedSnapshot({ db, profileId: 1, llm }, SLOT);
+    expect(again.built).toBe(false);
+    expect(again.snapshot.meta.intro).toBe("Hôm nay nổi bật là agent.");
+    expect(intros).toHaveLength(1);
+  });
+
+  test("model hỏng hai lần: bản chụp vẫn dựng xong, không có meta.intro, eventCount vẫn lưu", async () => {
+    await seedDay();
+    const { llm, intros } = introLlm("không phải JSON");
+    const res = await ensureFeedSnapshot({ db, profileId: 1, llm }, SLOT);
+    expect(res.snapshot.status).toBe("ready");
+    expect(res.items).toHaveLength(3);
+    expect(res.snapshot.meta.intro).toBeUndefined();
+    expect(res.snapshot.meta.eventCount).toBe(3);
+    expect(intros).toHaveLength(2); // one try plus exactly one retry
+    expect(snapshotIntroMeta(res.snapshot)).toEqual({ intro: null, eventCount: 3 });
+  });
+
+  test("không có model: không có intro", async () => {
+    await seedDay();
+    const res = await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
+    expect(res.snapshot.status).toBe("ready");
+    expect(snapshotIntroMeta(res.snapshot).intro).toBeNull();
   });
 });
 

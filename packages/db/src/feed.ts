@@ -38,6 +38,21 @@ export async function latestFeedSnapshot(
 }
 
 /**
+ * Opening paragraph and event count stored in the snapshot meta by the daemon (`meta.intro`, `meta.eventCount`).
+ * Each is `null` when absent (snapshots built before 13/11/2026, or the intro model failed).
+ */
+export function snapshotIntroMeta(s: Pick<FeedSnapshot, "meta">): {
+  intro: string | null;
+  eventCount: number | null;
+} {
+  const { intro, eventCount } = s.meta;
+  return {
+    intro: typeof intro === "string" && intro.length > 0 ? intro : null,
+    eventCount: typeof eventCount === "number" && Number.isFinite(eventCount) ? eventCount : null,
+  };
+}
+
+/**
  * One page of the snapshot by position cursor: items with position > `after`, up to `limit`. A snapshot
  * not belonging to the profile returns empty. `done` = all K items of the snapshot have been served ("no more items today").
  */

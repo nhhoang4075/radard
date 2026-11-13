@@ -251,6 +251,23 @@ describe("401 khi chưa có phiên", () => {
 });
 
 describe("GET /api/feed", () => {
+  test("intro và eventCount lấy từ meta của bản chụp; bản chụp cũ hoặc của hồ sơ khác thì null", async () => {
+    await db
+      .update(feedSnapshots)
+      .set({ meta: { intro: "Hôm nay nổi bật là X.", eventCount: 132 } })
+      .where(sql`id = ${A.snap10}`);
+    const today = await (await get("/api/feed?limit=1", hA)).json();
+    expect(today).toMatchObject({ intro: "Hôm nay nổi bật là X.", eventCount: 132 });
+    // The old snapshot (09/11) has no meta.intro: both fields are null, not missing.
+    const old = await (await get("/api/feed?date=2026-11-09", hA)).json();
+    expect(old.intro).toBeNull();
+    expect(old.eventCount).toBeNull();
+    // Another profile's snapshot of the same day never shows A's values.
+    const other = await (await get("/api/feed?limit=1", hB)).json();
+    expect(other.intro).toBeNull();
+    expect(other.eventCount).toBeNull();
+  });
+
   test("trang đầu: hình dạng item đúng với dữ liệu dựng sẵn", async () => {
     const res = await get("/api/feed?limit=3", hA);
     expect(res.status).toBe(200);
