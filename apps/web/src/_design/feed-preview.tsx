@@ -1,4 +1,4 @@
-/** Xem trước trang Feed (dữ liệu giả) không cần đăng nhập, chỉ dev: /_design/feed. */
+/** Feed page preview (fake data), no sign-in needed, dev only: /_design/feed. */
 import { useEffect, useState } from "react";
 import { FeedPage, type FeedSearch } from "../features/feed/feed-page.tsx";
 import { fixtureClient } from "../features/feed/fixtures.ts";
