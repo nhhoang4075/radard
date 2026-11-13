@@ -12,7 +12,7 @@
  * the gate, floor or `not_new` have p = 0 so are not written. p_ij is written only for pairs within the sent items.
  *
  * Since the feed existed (decision 10/11/2026): `select` picks K items from the snapshot, and "sent" is the notification
- * layer (the first ≤ 7 items of the snapshot that pass the notification floor, `pickNotify`). The simulation runs BOTH steps (select then
+ * layer (the first ≤ 7 items of the snapshot by position, per-source cap 5, `pickNotify`; no floor of its own). The simulation runs BOTH steps (select then
  * pickNotify) so p_i, p_ij remain the probability of being SENT for exactly 7 items, as before. Snapshot items
  * that are not sent are in the pool with `sent = false`. Learning by feed position (θk) is for later.
  */
@@ -57,7 +57,6 @@ export function notifiedEventIds(selection: Selection, rule: NotifyRule): number
   return pickNotify(
     selection.picked.map((p, i) => ({
       position: i + 1,
-      S: p.S,
       sourceId: p.c.sourceId,
       eventId: p.event.eventId,
     })),
@@ -65,10 +64,9 @@ export function notifiedEventIds(selection: Selection, rule: NotifyRule): number
   ).map((x) => x.eventId);
 }
 
-/** The notification layer of one ranking run: the cap of `config.notify` and the notification floor `floor`. */
+/** The notification layer of one ranking run: the caps of `config.notify`. */
 export function notifyRuleOf(rank: RankResult): NotifyRule {
   return {
-    floor: rank.floor.value,
     maxItems: rank.config.notify.maxItems,
     maxPerSource: rank.config.notify.maxPerSource,
   };

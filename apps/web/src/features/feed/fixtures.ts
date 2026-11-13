@@ -134,6 +134,8 @@ export const fixtureClient: FeedClient = {
       snapshotId: SNAPS[d] ?? 0,
       date: d,
       total: all.length,
+      intro: null,
+      eventCount: null,
       items: all.slice(start, next),
       nextCursor: next < all.length ? String(next) : null,
     };

@@ -6,7 +6,7 @@
  *       `feedMaxItems`, per-source cap `feedMaxPerSource`, feed floor; slot reservation, MMR and Gumbel top-k unchanged.
  *    2. The crypto seed is saved to the `feed_snapshots` row RIGHT when the row is created, before selecting; if the process
  *       crashes midway, the next run reselects with exactly that seed. If already `ready`, reuse it, do not rebuild.
- *    3. The notification layer (the first ≤ 7 items through the notification floor, `pickNotify`) only MARKS items in the snapshot
+ *    3. The notification layer (the first ≤ 7 items by position, per-source cap 5, `pickNotify`; no floor of its own) only MARKS items in the snapshot
  *       (`notify_position`), it does not change the snapshot.
  */
 import {
@@ -23,6 +23,7 @@ import {
   feedItems,
   feedSnapshots,
   profile,
+  snapshotIntroMeta,
 } from "@radard/db";
 import { and, asc, eq } from "drizzle-orm";
 import { recordCandidatePoolSafely } from "./candidate-pool.ts";
@@ -34,6 +35,7 @@ import {
   notifyRuleOf,
   type SelectionLearning,
 } from "./selection-learning.ts";
+import { generateIntro } from "./snapshot-intro.ts";
 import { ensureSharedSummaries } from "./summaries.ts";
 
 const log = createLogger("feed");
@@ -135,10 +137,7 @@ export function feedItemsOf(rank: RankResult, profileId: number): FeedItemDraft[
       notifyPosition: null,
     }),
   );
-  const notified = pickNotify(
-    items.map((it) => ({ ...it, S: it.score })),
-    notifyRuleOf(rank),
-  );
+  const notified = pickNotify(items, notifyRuleOf(rank));
   for (const [i, n] of notified.entries()) {
     const it = items[n.position - 1];
     if (it) it.notifyPosition = i + 1;
@@ -199,7 +198,10 @@ async function loadItems(db: Database, s: FeedSnapshot): Promise<FeedItem[]> {
  * to each item: the summary is exactly as it was when the snapshot was built, stable even if the event later gains articles. Any error
  * only leaves items without a summary; it does not block the snapshot.
  */
-async function attachSharedSummaries(deps: FeedDeps, drafts: FeedItemDraft[]): Promise<void> {
+async function attachSharedSummaries(
+  deps: FeedDeps,
+  drafts: FeedItemDraft[],
+): Promise<Map<number, { title: string }>> {
   try {
     const [prof] = await deps.db
       .select({ lang: profile.displayLang })
@@ -217,11 +219,43 @@ async function attachSharedSummaries(deps: FeedDeps, drafts: FeedItemDraft[]): P
       requested: res.requested,
       failed: res.failed,
     });
+    return res.byEvent;
   } catch (err) {
     log.error("tóm tắt chung lỗi, bản chụp không có tóm tắt", {
       profileId: deps.profileId,
       error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
     });
+    return new Map();
+  }
+}
+
+/**
+ * The opening paragraph of the snapshot (once per snapshot, from the top items' titles in position order). Never throws:
+ * a failure returns null and the snapshot is built without an intro.
+ */
+async function snapshotIntro(
+  deps: FeedDeps,
+  drafts: readonly FeedItemDraft[],
+  summaries: ReadonlyMap<number, { title: string }>,
+): Promise<string | null> {
+  try {
+    const [prof] = await deps.db
+      .select({ lang: profile.displayLang, context: profile.promptContext })
+      .from(profile)
+      .where(eq(profile.id, deps.profileId));
+    return await generateIntro(deps.llm ?? null, {
+      context: prof?.context ?? "",
+      lang: prof?.lang ?? "vi",
+      titles: [...drafts]
+        .sort((a, b) => a.position - b.position)
+        .map((d) => summaries.get(d.eventId)?.title ?? d.title),
+    });
+  } catch (err) {
+    log.error("lời mở đầu lỗi, bản chụp không có lời mở đầu", {
+      profileId: deps.profileId,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
+    });
+    return null;
   }
 }
 
@@ -268,7 +302,9 @@ export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<Fe
     });
   }
   const drafts = feedItemsOf(rank, profileId);
-  await attachSharedSummaries(deps, drafts);
+  const summaries = await attachSharedSummaries(deps, drafts);
+  // Reuse an intro already in the row (never calls the model twice for one snapshot).
+  const intro = snapshotIntroMeta(row).intro ?? (await snapshotIntro(deps, drafts, summaries));
 
   const built = await db.transaction(async (tx) => {
     const [locked] = await tx.select().from(feedSnapshots).where(key).for("update");
@@ -287,12 +323,14 @@ export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<Fe
         status: "ready",
         itemCount: drafts.length,
         feedFloor: rank.feedFloor.value,
-        notifyFloor: rank.floor.value,
         config: configJson(rank.selectConfig),
         meta: {
           ...locked.meta,
-          floors: { feed: rank.feedFloor, notify: rank.floor },
+          floors: { feed: rank.feedFloor },
           ranking: rankingInfo(rank, rankMs, deps.decider),
+          // Events of the 24h window in the profile's topics (passed the topic gate): the "132" in the digest.
+          eventCount: rank.passedGate,
+          ...(intro ? { intro } : {}),
           ...(learning ? { learning } : {}),
         },
         builtAt: new Date(),

@@ -2,7 +2,7 @@
  * Web feed (docs/cau-truc-web.html section 4). Mounted AFTER `sessionMiddleware`; `profileId` is taken only from the session context
  * session. No SQL here: every query is a function in @radard/db that requires `profileId`.
  *
- *   GET /api/feed?date=&cursor=&limit=  → 200 { snapshotId, date, total, items[], nextCursor } · 404 no_snapshot · 400
+ *   GET /api/feed?date=&cursor=&limit=  → 200 { snapshotId, date, total, intro, eventCount, items[], nextCursor } · 404 no_snapshot · 400
  *   GET /api/feed/dates                 → 200 { dates: [{ date, snapshotId, itemCount }] } (max 60)
  */
 import {
@@ -11,6 +11,7 @@ import {
   feedItemsView,
   feedSnapshotOnDate,
   latestFeedSnapshot,
+  snapshotIntroMeta,
   vnDate,
 } from "@radard/db";
 import { Hono } from "hono";
@@ -68,6 +69,7 @@ export function feedRoute(deps: { db: Database }) {
         snapshotId: snap.id,
         date: vnDate(snap.periodEnd),
         total: snap.itemCount ?? 0,
+        ...snapshotIntroMeta(snap),
         items: page.items,
         nextCursor: page.nextAfter === null ? null : encodeCursor(snap.id, page.nextAfter),
       });

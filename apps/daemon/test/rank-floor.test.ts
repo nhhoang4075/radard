@@ -150,34 +150,34 @@ describe("sàn theo phân vị", () => {
     for (let d = 1; d <= 13; d++) await seedPool(d, same(40, 0.99));
     const pct = await rank();
     const fixed = await rank({ floorMode: "fixed" });
-    expect(pct.floor).toEqual({ value: 0.59, source: "fixed", days: 13 });
+    expect(pct.feedFloor).toEqual({ value: 0.55, source: "fixed", days: 13 });
     expect(pct.picked.map((p) => p.event.eventId)).toEqual([id]);
     expect(pct.picked.map((p) => [p.event.eventId, p.S])).toEqual(
       fixed.picked.map((p) => [p.event.eventId, p.S]),
     );
     expect(pct.rejected.map((r) => r.reason)).toEqual(fixed.rejected.map((r) => r.reason));
-    expect(fixed.floor.source).toBe("fixed");
-    expect(fixed.floor.value).toBe(0.59);
+    expect(fixed.feedFloor.source).toBe("fixed");
+    expect(fixed.feedFloor.value).toBe(0.55);
   });
 
-  test("(b)(g) đủ 14 ngày × 40 dòng: n = 40, q = 0,7, sàn = phân vị 70 tính tay", async () => {
+  test("(b)(g) đủ 14 ngày × 40 dòng: n = 40, q = 0,25 (mục tiêu 30/ngày), sàn = phân vị 25 tính tay", async () => {
     await addEvent();
     for (let d = 1; d <= 14; d++) await seedPool(d, spread40);
     const r = await rank();
-    // 560 scores, each value 0,30 + 0,01 i repeated 14 times. Position 559 × 0,7 = 391,3.
-    // Index 391 ↔ i = 27 (378..391) → 0,57; index 392 ↔ i = 28 → 0,58. Interpolation: 0,57 + 0,3 × 0,01.
-    expect(r.floor.source).toBe("percentile");
-    expect(r.floor.days).toBe(14);
-    expect(r.floor.n).toBeCloseTo(40, 9);
-    expect(r.floor.q).toBeCloseTo(0.7, 9);
-    expect(r.floor.value).toBeCloseTo(0.573, 9);
+    // 560 scores, each value 0,30 + 0,01 i repeated 14 times. The target is now 30 items/day: q = 1 − 30/40 = 0,25.
+    // Position 559 × 0,25 = 139,75. Index 139 ↔ i = 9 (126..139) → 0,39; index 140 ↔ i = 10 → 0,40. Interpolation: 0,39 + 0,75 × 0,01.
+    expect(r.feedFloor.source).toBe("percentile");
+    expect(r.feedFloor.days).toBe(14);
+    expect(r.feedFloor.n).toBeCloseTo(40, 9);
+    expect(r.feedFloor.q).toBeCloseTo(0.25, 9);
+    expect(r.feedFloor.value).toBeCloseTo(0.3975, 9);
   });
 
   test("(b) sàn phân vị thật sự dùng để chọn: sàn cao hơn S thì tin bị loại với lý do floor", async () => {
     const id = await addEvent();
     for (let d = 1; d <= 14; d++) await seedPool(d, same(40, 0.99));
     const r = await rank();
-    expect(r.floor.value).toBeCloseTo(0.99, 9);
+    expect(r.feedFloor.value).toBeCloseTo(0.99, 9);
     expect(r.picked).toEqual([]);
     expect(r.rejected.map((x) => [x.event.eventId, x.reason])).toEqual([[id, "floor"]]);
     const fixed = await rank({ floorMode: "fixed" });
@@ -191,11 +191,11 @@ describe("sàn theo phân vị", () => {
       await seedPool(d, same(40, 0.99), { notNew: true });
     }
     const r = await rank();
-    // If not_new were counted too: n = 80, q = 0,85, floor = 0,99. Correct: n = 40, q = 0,7, every score 0,5.
-    expect(r.floor.n).toBeCloseTo(40, 9);
-    expect(r.floor.q).toBeCloseTo(0.7, 9);
-    expect(r.floor.value).toBeCloseTo(0.5, 9);
-    expect(r.floor.days).toBe(14);
+    // If not_new were counted too: n = 80, q = 0,625, floor = 0,99. Correct: n = 40, q = 0,25, every score 0,5.
+    expect(r.feedFloor.n).toBeCloseTo(40, 9);
+    expect(r.feedFloor.q).toBeCloseTo(0.25, 9);
+    expect(r.feedFloor.value).toBeCloseTo(0.5, 9);
+    expect(r.feedFloor.days).toBe(14);
   });
 
   test("(d) cửa sổ không gồm ngày đang xếp hạng và dữ liệu cũ hơn 30 ngày; chạy lại ra cùng sàn", async () => {
@@ -206,10 +206,10 @@ describe("sàn theo phân vị", () => {
     await seedPool(45, same(40, 0.99));
     const a = await rank();
     const b = await rank();
-    expect(a.floor).toEqual(b.floor);
-    expect(a.floor.days).toBe(14);
-    expect(a.floor.n).toBeCloseTo(40, 9);
-    expect(a.floor.value).toBeCloseTo(0.5, 9);
+    expect(a.feedFloor).toEqual(b.feedFloor);
+    expect(a.feedFloor.days).toBe(14);
+    expect(a.feedFloor.n).toBeCloseTo(40, 9);
+    expect(a.feedFloor.value).toBeCloseTo(0.5, 9);
   });
 
   test("(d) ngày dữ liệu ngoài cửa sổ không giúp đủ 14 ngày", async () => {
@@ -217,7 +217,7 @@ describe("sàn theo phân vị", () => {
     for (let d = 1; d <= 10; d++) await seedPool(d, same(40, 0.5));
     for (let d = 31; d <= 35; d++) await seedPool(d, same(40, 0.5));
     const r = await rank();
-    expect(r.floor).toEqual({ value: 0.59, source: "fixed", days: 10 });
+    expect(r.feedFloor).toEqual({ value: 0.55, source: "fixed", days: 10 });
   });
 
   test("(e) dữ liệu của hồ sơ khác không lẫn vào", async () => {
@@ -225,18 +225,18 @@ describe("sàn theo phân vị", () => {
     await db.insert(profile).values({ id: 2, promptContext: "y" });
     for (let d = 1; d <= 14; d++) await seedPool(d, same(40, 0.99), { profileId: 2 });
     const r = await rank();
-    expect(r.floor).toEqual({ value: 0.59, source: "fixed", days: 0 });
+    expect(r.feedFloor).toEqual({ value: 0.55, source: "fixed", days: 0 });
     for (let d = 1; d <= 14; d++) await seedPool(d, same(40, 0.5));
     const r2 = await rank();
-    expect(r2.floor.value).toBeCloseTo(0.5, 9);
-    expect(r2.floor.n).toBeCloseTo(40, 9);
+    expect(r2.feedFloor.value).toBeCloseTo(0.5, 9);
+    expect(r2.feedFloor.n).toBeCloseTo(40, 9);
   });
 
-  test("(f) n ≤ 12 thì q kẹp về 0: sàn = điểm thấp nhất; bể rỗng thì sàn cố định", async () => {
+  test("(f) n ≤ 30 thì q kẹp về 0: không lọc (sàn 0); bể rỗng thì sàn cố định", async () => {
     await addEvent();
     const empty = await rank();
-    expect(empty.floor).toEqual({ value: 0.59, source: "fixed", days: 0 });
-    // 14 days × 10 rows 0,1 … 1,0: n = 10, 1 − 12/10 = −0,2 → q = 0.
+    expect(empty.feedFloor).toEqual({ value: 0.55, source: "fixed", days: 0 });
+    // 14 days × 10 rows 0,1 … 1,0: n = 10, 1 − 30/10 < 0 → q = 0.
     for (let d = 1; d <= 14; d++) {
       await seedPool(
         d,
@@ -244,17 +244,17 @@ describe("sàn theo phân vị", () => {
       );
     }
     const r = await rank();
-    expect(r.floor.source).toBe("percentile");
-    expect(r.floor.n).toBeCloseTo(10, 9);
-    expect(r.floor.q).toBe(0);
-    expect(r.floor.value).toBeCloseTo(0.1, 9);
+    expect(r.feedFloor.source).toBe("percentile");
+    expect(r.feedFloor.n).toBeCloseTo(10, 9);
+    expect(r.feedFloor.q).toBe(0);
+    expect(r.feedFloor.value).toBe(0);
   });
 
   test("floorMode fixed không đọc bể", async () => {
     await addEvent();
     for (let d = 1; d <= 14; d++) await seedPool(d, same(40, 0.99));
     const r = await rank({ floorMode: "fixed" });
-    expect(r.floor).toEqual({ value: 0.59, source: "fixed", days: 0 });
+    expect(r.feedFloor).toEqual({ value: 0.55, source: "fixed", days: 0 });
     expect(r.picked).toHaveLength(1);
   });
 });

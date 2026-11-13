@@ -80,11 +80,15 @@ async function addEvent(): Promise<{ eventId: number; docId: number }> {
   return { eventId, docId };
 }
 
-/** Fake LLM: each `Story n` gets one summary named after the first document's title; records every call. */
+/**
+ * Fake LLM: each `Story n` gets one summary; records every summary call in `calls`. The snapshot's opening-line
+ * call (system "opening line") is answered but not recorded here: these tests count summary calls only.
+ */
 function summaryLlm(opts: { failWhen?: (prompt: string) => boolean } = {}) {
   const calls: { prompt: string; system?: string }[] = [];
   const llm = fakeLlm({
     reply(prompt, system) {
+      if (system?.includes("opening line")) return JSON.stringify({ intro: "Mở đầu." });
       calls.push({ prompt, system });
       if (opts.failWhen?.(prompt)) throw new Error("model lỗi");
       const n = (prompt.match(/^Story \d+$/gm) ?? []).length;

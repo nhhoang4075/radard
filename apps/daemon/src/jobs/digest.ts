@@ -1,9 +1,10 @@
 /**
  * Daily digest job (the notification layer of the feed, decision 10/11/2026). Items come from the day's feed snapshot
  * (feed.ts: one snapshot per profile per slot, select runs once with cap K); the digest
- * takes only the first ≤ 7 items of the snapshot that pass the notification floor, using the SHARED summary captured in the snapshot
- * (`feed_items.summary_id`, summaries.ts; there is no separate summary model), and an LLM labels the topics and writes
- * the per-profile opening line (one small call that only receives titles), then sends it via the Notifier. Telegram does not affect
+ * takes only the first ≤ 7 items of the snapshot by position (no floor of its own), using the SHARED summary captured in the snapshot
+ * (`feed_items.summary_id`, summaries.ts; there is no separate summary model), the topic stored on the feed item, and the opening
+ * paragraph and event count stored in `feed_snapshots.meta` (snapshot-intro.ts; decision 13/11/2026), then sends it via the Notifier.
+ * The digest itself makes NO model call. Telegram does not affect
  * the feed selection.
  *
  * Safe to re-run (tuan-3-thuc-thi.html, step 6):
@@ -31,10 +32,10 @@ import {
   enabledRecipients,
   type FeedItem,
   profile,
+  snapshotIntroMeta,
 } from "@radard/db";
 import { and, eq } from "drizzle-orm";
 import { adapterFor } from "../sources/index.ts";
-import { TOPIC_TIE_BREAKS } from "../topics/library.ts";
 import { buildTrackingUrl } from "../web/token.ts";
 import {
   ensureFeedSnapshot,
@@ -49,13 +50,7 @@ import {
 import { host, type ItemDoc, loadItemDocs } from "./item-docs.ts";
 import { loadProfileTopics, type RankResult, rankPeriod } from "./rank.ts";
 import type { SelectionLearning } from "./selection-learning.ts";
-import {
-  ensureSharedSummaries,
-  LANG_NAMES,
-  LLM_MAX_OUTPUT_TOKENS,
-  loadSummariesById,
-  type SharedSummary,
-} from "./summaries.ts";
+import { ensureSharedSummaries, loadSummariesById, type SharedSummary } from "./summaries.ts";
 
 export type { ItemDoc } from "./item-docs.ts";
 
@@ -182,101 +177,6 @@ export function sourcesLine(docs: readonly ItemDoc[]): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Per-profile LLM: labels the topics and writes the opening line (one small call, receives titles only)
-//
-// Each item's summary is the SHARED summary (summaries.ts, decision 11/11/2026); only these two jobs stay
-// per profile, because they need the profile's topics and context.
-
-export interface Labels {
-  intro: string;
-  /** Topic label verbatim from the profile's list, by item number; absent if the model picks wrongly. */
-  topics: Map<number, string>;
-}
-
-/** An enabled topic, as the LLM sees it when labelling: its name and scope (self-added topics have only a name). */
-export interface TopicChoice {
-  label: string;
-  note?: string;
-}
-
-/**
- * `topics`: the topics you are following, with their scope. The model picks the label for each item because it reads
- * Vietnamese and English headlines and understands the topic scope, while an embedding of a 10-word headline often guesses wrong
- * (Janas, "streaming experts from SSD", was tagged RAG; 13/10/2026). The embedding label is not put in the prompt
- * so the model does not anchor on it. The scope (the "Not: …" line) and two arbitration rules come from
- * docs/bo-chu-de-moi.html: about 30% of items sit between two topics, so clear rules are needed for consistent labels.
- */
-export function labelSystem(context: string, lang: string, topics: readonly TopicChoice[]): string {
-  const language = LANG_NAMES[lang] ?? lang;
-  return [
-    "You label the stories of one reader's morning news brief and write its opening line.",
-    `About the reader: ${context}`,
-    `Write in ${language}. Keep product, company, model and library names as they are.`,
-    "Use only the facts in the input. Never invent numbers, names, dates or claims.",
-    "Never comment on the input itself (how much text you were given, missing details); just leave out what you do not know.",
-    "Return ONLY a JSON object, no markdown fences, with this shape:",
-    '{"intro": string, "items": [{"n": number, "topic": string}]}',
-    "- intro: 1-2 sentences on what stands out today as a whole.",
-    "- items: exactly one entry per input story, with the same n.",
-    "- topic: the reader's topic this story is mostly about. Copy only the quoted label, exactly as written, from this list (the text after a label says what the topic covers):",
-    ...topics.map((t) => `  - ${JSON.stringify(t.label)}${t.note ? `: ${t.note}` : ""}`),
-    "  When a story fits two topics:",
-    ...TOPIC_TIE_BREAKS.map((r) => `  - ${r}`),
-    '  - Follow the "Not:" notes. If the topic a note points to is not in the list, choose the best of the listed topics.',
-  ].join("\n");
-}
-
-export function labelPrompt(stories: readonly { n: number; title: string }[]): string {
-  return stories.map((s) => `Story ${s.n}: ${s.title}`).join("\n");
-}
-
-/** Reads the JSON the model returns; a missing opening line is an error (retry or drop). A wrong or missing label drops just that label. */
-export function parseLabels(reply: string, topics: readonly string[] = []): Labels {
-  const start = reply.indexOf("{");
-  const end = reply.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("không thấy JSON trong câu trả lời");
-  const data = JSON.parse(reply.slice(start, end + 1)) as { intro?: unknown; items?: unknown };
-  if (typeof data.intro !== "string" || data.intro.trim().length === 0) {
-    throw new Error("thiếu intro");
-  }
-  if (!Array.isArray(data.items)) throw new Error("thiếu items");
-  const known = new Set(topics);
-  const labelled = new Map<number, string>();
-  for (const it of data.items as { n?: unknown; topic?: unknown }[]) {
-    // A wrong or missing label does not break the whole digest: use the embedding label for that item.
-    if (typeof it.n === "number" && typeof it.topic === "string" && known.has(it.topic.trim())) {
-      labelled.set(it.n, it.topic.trim());
-    }
-  }
-  return { intro: data.intro.trim(), topics: labelled };
-}
-
-async function labelStories(
-  llm: LlmProvider,
-  system: string,
-  prompt: string,
-  topics: readonly string[],
-): Promise<{ ok: Labels } | { error: string }> {
-  let error = "";
-  // Retry exactly once: the model sometimes returns JSON that is missing fields or is truncated.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const reply = await llm.generateText({
-        task: "digest_labels",
-        system,
-        prompt,
-        maxOutputTokens: LLM_MAX_OUTPUT_TOKENS,
-      });
-      return { ok: parseLabels(reply, topics) };
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
-      log.warn("gán nhãn hỏng", { attempt, error: error.slice(0, 300) });
-    }
-  }
-  return { error: error.slice(0, 500) };
-}
-
-// ---------------------------------------------------------------------------------------------
 // Building the plan
 
 export interface DigestDeps {
@@ -345,6 +245,11 @@ export async function planFromItems(
   slot: Date,
   picked: readonly NotifySource[],
   ranking: RankingInfo,
+  /** Opening paragraph and event count stored in the snapshot meta; absent for previews (no intro line). */
+  snapshotMeta: { intro: string | null; eventCount: number | null } = {
+    intro: null,
+    eventCount: null,
+  },
 ): Promise<DigestPlan> {
   const period = { start: new Date(slot.getTime() - DAY_MS), end: slot };
   const [prof] = await deps.db.select().from(profile).where(eq(profile.id, deps.profileId));
@@ -396,35 +301,18 @@ export async function planFromItems(
   const summaryOf = (p: NotifySource): SharedSummary | undefined =>
     p.summaryId ? snapshotSummaries.get(p.summaryId) : previewSummaries.get(p.eventId);
 
-  // Per profile: topic label and opening line, one small call that only receives titles.
+  // Titles: the shared summary title when there is one, else the best-matching original title.
   const titleOf = (p: NotifySource, docs: readonly ItemDoc[]): string =>
     summaryOf(p)?.title ??
     [...docs].sort((a, b) => b.topicScore - a.topicScore)[0]?.title ??
     p.title;
-  let labels: Labels | null = null;
-  let llmInfo: DigestPlan["llm"] = null;
-  if (deps.llm) {
-    const topics = topicRows.map(
-      (t): TopicChoice => (t.note ? { label: t.label, note: t.note } : { label: t.label }),
-    );
-    const result = await labelStories(
-      deps.llm,
-      labelSystem(prof?.promptContext ?? "", lang, topics),
-      labelPrompt(picked.map((p, i) => ({ n: i + 1, title: titleOf(p, stories[i]?.docs ?? []) }))),
-      topics.map((t) => t.label),
-    );
-    if ("ok" in result) {
-      labels = result.ok;
-      llmInfo = { model: deps.llm.model };
-    } else llmInfo = { model: deps.llm.model, error: result.error };
-  }
 
   const items: PlanItem[] = picked.map((p, i) => {
     const story = stories[i] ?? { n: i + 1, topic: null, docs: [] };
     const written = summaryOf(p);
-    const labelled = labels?.topics.get(story.n);
     const { links, moreRelated } = buildLinks(story.docs);
-    const topic = labelled ?? story.topic;
+    // The topic is the one stored in the snapshot (the same label the web feed shows).
+    const topic = story.topic;
     // N < 1: an event sent earlier that now has new URLs, so it is a continuing story (xep-hang.html, tab N).
     const why = [
       p.n < 1 ? "Cập nhật" : null,
@@ -450,24 +338,26 @@ export async function planFromItems(
       score: scoreOfItem(p),
       topic,
       topicByEmbedding: story.topic,
-      topicSource: labelled ? "llm" : "embedding",
+      topicSource: "embedding",
     };
   });
 
-  const count = `Chọn ${items.length} trong ${ranking.passedGate.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`;
+  // Older snapshots have no meta.eventCount; ranking.passedGate is the same figure.
+  const eventCount = snapshotMeta.eventCount ?? ranking.passedGate;
+  const count = `Chọn ${items.length} trong ${eventCount.toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`;
   const summarized = picked.some((p) => summaryOf(p) !== undefined);
   const header: Message = {
     kind: "digest",
     title: `Điểm tin ${date}`,
     lines: [
-      ...(labels ? [labels.intro] : []),
+      ...(snapshotMeta.intro ? [snapshotMeta.intro] : []),
       count,
       ...(summarized
         ? []
         : ["Bản không tóm tắt: phần tóm tắt bị lỗi, các tin dưới đây chỉ có tiêu đề gốc và link."]),
     ],
   };
-  return { ...base, header, items, summarized, llm: llmInfo };
+  return { ...base, header, items, summarized, llm: deps.llm ? { model: deps.llm.model } : null };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -595,7 +485,13 @@ export async function runDigest(
       const { snapshot, items } = await ensureFeedSnapshot(deps, slot);
       const ranking = snapshotRanking(snapshot);
       if (!ranking) throw new Error(`bản chụp ${snapshot.id} thiếu thông tin xếp hạng`);
-      plan = await planFromItems(deps, slot, notifiedItems(items), ranking);
+      plan = await planFromItems(
+        deps,
+        slot,
+        notifiedItems(items),
+        ranking,
+        snapshotIntroMeta(snapshot),
+      );
       const learning = snapshotLearning(snapshot);
       const [prof] = await deps.db
         .select({ lang: profile.displayLang })

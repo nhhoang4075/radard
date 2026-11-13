@@ -17,11 +17,11 @@ import {
   eventDocuments,
   eventSummaries,
   events,
+  feedSnapshots,
   profile,
   profileTopics,
   runMigrations,
   sources,
-  topics,
 } from "@radard/db";
 import { asc, eq, sql } from "drizzle-orm";
 import {
@@ -30,12 +30,12 @@ import {
   type DigestPlan,
   digestSlot,
   type ItemDoc,
-  parseLabels,
   runDigest,
   vnDate,
 } from "../src/jobs/digest.ts";
 import { ensureFeedSnapshot } from "../src/jobs/feed.ts";
 import type { SelectionLearning } from "../src/jobs/selection-learning.ts";
+import { generateIntro, parseIntro } from "../src/jobs/snapshot-intro.ts";
 import { parseSummaryBatch } from "../src/jobs/summaries.ts";
 
 import { addTopic } from "./topic-fixture.ts";
@@ -86,22 +86,20 @@ async function addEvent(score = 0.79, sourceId = hn): Promise<{ eventId: number;
 }
 
 /**
- * Fake LLM. Two kinds of calls: shared summaries (system "news summaries": one summary per `Story n`) and assign
- * labels + an opening line per profile (system "label the stories": one label per `Story n: title`).
+ * Fake LLM. Two kinds of calls: shared summaries (system "news summaries": one summary per `Story n`) and the
+ * snapshot's opening paragraph (system "opening line of one reader's morning news brief": `Story n: title` lines).
  */
-function goodLlm(topicOf: (n: number) => string | undefined = () => undefined) {
+function goodLlm() {
   const calls: { prompt: string; system?: string }[] = [];
   const summaryCalls: { prompt: string; system?: string }[] = [];
-  const labelCalls: { prompt: string; system?: string }[] = [];
+  const introCalls: { prompt: string; system?: string }[] = [];
   const llm = fakeLlm({
     reply(prompt, system) {
       calls.push({ prompt, system });
       const wrap = (o: unknown) => `\`\`\`json\n${JSON.stringify(o)}\n\`\`\``;
-      if (system?.includes("label the stories")) {
-        labelCalls.push({ prompt, system });
-        const n = (prompt.match(/^Story \d+:/gm) ?? []).length;
-        const items = Array.from({ length: n }, (_, i) => ({ n: i + 1, topic: topicOf(i + 1) }));
-        return wrap({ intro: "Sáng nay nổi bật là agent.", items });
+      if (system?.includes("opening line")) {
+        introCalls.push({ prompt, system });
+        return wrap({ intro: "Sáng nay nổi bật là agent." });
       }
       summaryCalls.push({ prompt, system });
       const n = (prompt.match(/^Story \d+$/gm) ?? []).length;
@@ -113,7 +111,7 @@ function goodLlm(topicOf: (n: number) => string | undefined = () => undefined) {
       return wrap({ items });
     },
   });
-  return { llm, calls, summaryCalls, labelCalls };
+  return { llm, calls, summaryCalls, introCalls };
 }
 
 beforeAll(async () => {
@@ -161,23 +159,23 @@ const positions = async () =>
   (await db.select().from(deliveries).orderBy(asc(deliveries.position))).map((d) => d.position);
 
 describe("hồ sơ thứ hai", () => {
-  test("buildPlan và runDigest của hồ sơ 2 dùng ngôn ngữ và bối cảnh của hồ sơ 2, không lấy của hồ sơ 1", async () => {
+  test("bản chụp và runDigest của hồ sơ 2 dùng ngôn ngữ và bối cảnh của hồ sơ 2, không lấy của hồ sơ 1", async () => {
     await db
       .insert(profile)
       .values({ id: 2, promptContext: "I study robotics.", displayLang: "en" });
     await db.insert(profileTopics).values({ profileId: 2, topicId: topic });
     for (let i = 0; i < 3; i++) await addEvent();
     const one = goodLlm();
-    await buildPlan({ db, profileId: 1, llm: one.llm }, SLOT);
+    await ensureFeedSnapshot({ db, profileId: 1, llm: one.llm }, SLOT);
     const two = goodLlm();
-    const plan = await buildPlan({ db, profileId: 2, llm: two.llm }, SLOT);
-    expect(plan.items.length).toBeGreaterThan(0);
-    // Labels and opening line per profile: context and language of that exact profile.
-    expect(one.labelCalls[0]?.system).toContain("I build AI agents.");
-    expect(one.labelCalls[0]?.system).toContain("Write in Vietnamese");
-    expect(two.labelCalls[0]?.system).toContain("I study robotics.");
-    expect(two.labelCalls[0]?.system).not.toContain("I build AI agents.");
-    expect(two.labelCalls[0]?.system).toContain("Write in English");
+    const { items } = await ensureFeedSnapshot({ db, profileId: 2, llm: two.llm }, SLOT);
+    expect(items.length).toBeGreaterThan(0);
+    // Opening paragraph per profile: context and language of that exact profile.
+    expect(one.introCalls[0]?.system).toContain("I build AI agents.");
+    expect(one.introCalls[0]?.system).toContain("Write in Vietnamese");
+    expect(two.introCalls[0]?.system).toContain("I study robotics.");
+    expect(two.introCalls[0]?.system).not.toContain("I build AI agents.");
+    expect(two.introCalls[0]?.system).toContain("Write in English");
     // Shared summary is written in the language, carrying no reader's context.
     expect(one.summaryCalls[0]?.system).toContain("Write in Vietnamese");
     expect(two.summaryCalls[0]?.system).toContain("Write in English");
@@ -204,7 +202,7 @@ describe("runDigest", () => {
   test("gửi tin mở đầu rồi từng tin; chạy lại cùng khung thì không gửi gì thêm", async () => {
     for (let i = 0; i < 4; i++) await addEvent();
     const notifier = fakeNotifier();
-    const { llm, calls, labelCalls } = goodLlm();
+    const { llm, calls, introCalls } = goodLlm();
     const deps = { db, profileId: 1, llm, notifier, recipient: RECIPIENT };
 
     const first = await runDigest(deps, SLOT);
@@ -230,9 +228,9 @@ describe("runDigest", () => {
       `https://news.ycombinator.com/item?id=${1000 + Number(label.slice(4, 5))}`,
     );
     expect(item?.actions?.map((a) => a.id)).toEqual(["like", "dislike", "for_me"]);
-    // The labeling call reads context from the profile, not hard-coded.
-    expect(labelCalls[0]?.system).toContain("I build AI agents.");
-    expect(labelCalls[0]?.system).toContain("Vietnamese");
+    // The intro call (made when the snapshot was built) reads context from the profile, not hard-coded.
+    expect(introCalls[0]?.system).toContain("I build AI agents.");
+    expect(introCalls[0]?.system).toContain("Vietnamese");
 
     expect(await positions()).toEqual([0, 1, 2, 3, 4]);
     const [dg] = await db.select().from(digests);
@@ -244,7 +242,7 @@ describe("runDigest", () => {
     const again = await runDigest(deps, SLOT);
     expect(again).toMatchObject({ status: "already_sent", sentNow: 0 });
     expect(notifier.sent).toHaveLength(5);
-    // One shared-summary batch + one labeling call; rerunning makes no further calls.
+    // One shared-summary batch + one intro call, both at snapshot time; rerunning makes no further calls.
     expect(calls).toHaveLength(2);
   });
 
@@ -287,14 +285,16 @@ describe("runDigest", () => {
     const notifier = fakeNotifier();
     const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     expect(out).toMatchObject({ status: "sent", summarized: false, items: 1 });
-    // Each job (shared summary, labeling) is tried exactly twice.
+    // Each job (shared summary, snapshot intro) is tried exactly twice, both when the snapshot is built.
     expect(calls).toBe(4);
     const [header, item] = notifier.sent.map((s) => s.msg);
+    expect(header?.lines[0]).toMatch(/^Chọn 1 trong 1 /);
     expect(header?.lines.join(" ")).toContain("Bản không tóm tắt");
     expect(item?.title).toBe("1. Original title 1");
     expect(item?.lines).toEqual(["Chủ đề: Agent AI · HN"]);
-    const plan = planOf((await db.select().from(digests))[0]?.meta);
-    expect(plan.llm?.error).toBeTruthy();
+    const [snap] = await db.select().from(feedSnapshots);
+    expect(snap?.status).toBe("ready");
+    expect(snap?.meta.intro).toBeUndefined();
   });
 
   test("Telegram dùng đúng tóm tắt đã chụp trong bản chụp, không gọi model tóm tắt riêng", async () => {
@@ -302,12 +302,14 @@ describe("runDigest", () => {
     await addEvent();
     // Snapshot built without a model: item has no summary_id.
     await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
-    const { llm, summaryCalls, labelCalls } = goodLlm();
+    const { llm, calls, summaryCalls } = goodLlm();
     const notifier = fakeNotifier();
     const out = await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
     expect(out).toMatchObject({ status: "sent", summarized: false, items: 2 });
     expect(summaryCalls).toHaveLength(0);
-    expect(labelCalls).toHaveLength(1);
+    // The digest makes no model call of its own; the snapshot has no intro, so the header has no intro line.
+    expect(calls).toHaveLength(0);
+    expect(notifier.sent[0]?.msg.lines[0]).toMatch(/^Chọn 2 trong 2 /);
     expect(notifier.sent[1]?.msg.title).toMatch(/^1\. Original title \d$/);
     expect((await db.select().from(eventSummaries)).length).toBe(0);
   });
@@ -341,36 +343,34 @@ describe("runDigest", () => {
     );
   });
 
-  test("nhãn chủ đề: lấy chủ đề LLM chọn nếu nằm trong danh sách, không thì nhãn embedding", async () => {
-    const infra = await addTopic(db, "GPU & inference", { embedText: "inference" });
-    // Library topics have a scope; custom topics ("Agent AI" here) have only a name.
+  test("Telegram lấy lời mở đầu và số sự kiện từ meta của bản chụp, không gọi model", async () => {
+    await addEvent();
+    await addEvent();
+    await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
+    // Values set by hand: expected output derives from them, not from the code.
     await db
-      .update(topics)
-      .set({ labelGuide: "GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI)." })
-      .where(eq(topics.id, infra));
-    await addEvent();
-    await addEvent();
+      .update(feedSnapshots)
+      .set({ meta: sql`meta || '{"intro":"Hôm nay nổi bật là X.","eventCount":1132}'::jsonb` });
+    const { llm, calls } = goodLlm();
     const notifier = fakeNotifier();
-    const { llm, labelCalls } = goodLlm((n) =>
-      n === 1 ? "GPU & inference" : "Không có chủ đề này",
-    );
     await runDigest({ db, profileId: 1, llm, notifier, recipient: RECIPIENT }, SLOT);
-    const system = labelCalls[0]?.system ?? "";
-    expect(system).toContain(
-      '  - "Agent AI"\n  - "GPU & inference": GPUs and AI chips. Not: chip company finance (→ Kinh doanh AI).\n',
-    );
-    // Two arbitration rules when an item matches two topics.
-    expect(system).toContain("A more specific topic beats a general one");
-    expect(system).toContain("The application domain beats the data modality");
-    // Embedding labels must not be put into the prompt.
-    expect(labelCalls[0]?.prompt).not.toContain("Agent AI");
-    expect(notifier.sent[1]?.msg.lines.at(-1)).toBe("Chủ đề: GPU & inference · HN");
-    expect(notifier.sent[2]?.msg.lines.at(-1)).toBe("Chủ đề: Agent AI · HN");
-    const plan = planOf((await db.select().from(digests))[0]?.meta);
-    expect(plan.items.map((i) => [i.topicSource, i.topicByEmbedding])).toEqual([
-      ["llm", "Agent AI"],
-      ["embedding", "Agent AI"],
+    expect(calls).toHaveLength(0);
+    expect(notifier.sent[0]?.msg.lines.slice(0, 2)).toEqual([
+      "Hôm nay nổi bật là X.",
+      `Chọn 2 trong ${(1132).toLocaleString("vi-VN")} sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.`,
     ]);
+    // The topic label is the topic stored on the feed item.
+    expect(notifier.sent[1]?.msg.lines.at(-1)).toBe("Chủ đề: Agent AI · HN");
+  });
+
+  test("bản chụp cũ không có meta.intro/eventCount: bỏ dòng mở đầu, số sự kiện lấy từ ranking", async () => {
+    await addEvent();
+    await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
+    const notifier = fakeNotifier();
+    await runDigest({ db, profileId: 1, llm: null, notifier, recipient: RECIPIENT }, SLOT);
+    expect(notifier.sent[0]?.msg.lines[0]).toBe(
+      "Chọn 1 trong 1 sự kiện thuộc các chủ đề bạn quan tâm trong 24 giờ qua.",
+    );
   });
 
   test("plan ghi lại cổng vùng xám: từng sự kiện đã hỏi, xác suất, qua hay loại", async () => {
@@ -489,14 +489,24 @@ describe("hàm thuần", () => {
     ).toThrow("thiếu tóm tắt cho tin 2");
   });
 
-  test("đọc JSON nhãn: lời mở đầu bắt buộc; nhãn không có trong danh sách thì bỏ", () => {
-    const ok = parseLabels(
-      '{"intro":"Mở đầu","items":[{"n":1,"topic":"Agent AI"},{"n":2,"topic":"Lạ"},{"n":3}]}',
-      ["Agent AI"],
-    );
-    expect(ok.intro).toBe("Mở đầu");
-    expect([...ok.topics]).toEqual([[1, "Agent AI"]]);
-    expect(() => parseLabels('{"items":[]}', [])).toThrow("thiếu intro");
+  test("đọc JSON lời mở đầu: bỏ rào markdown; thiếu hoặc rỗng thì báo lỗi", () => {
+    expect(parseIntro('Đây:\n```json\n{"intro":" Mở đầu "}\n```')).toBe("Mở đầu");
+    expect(() => parseIntro('{"intro":"  "}')).toThrow("thiếu intro");
+    expect(() => parseIntro("không có json")).toThrow();
+  });
+
+  test("lời mở đầu chỉ nhận tối đa 10 tiêu đề đầu, theo thứ tự", async () => {
+    const seen: string[] = [];
+    const llm = fakeLlm({
+      reply(prompt) {
+        seen.push(prompt);
+        return '{"intro":"x"}';
+      },
+    });
+    const titles = Array.from({ length: 12 }, (_, i) => `T${i + 1}`);
+    expect(await generateIntro(llm, { context: "c", lang: "vi", titles })).toBe("x");
+    expect(seen[0]?.split("\n")).toEqual(titles.slice(0, 10).map((t, i) => `Story ${i + 1}: ${t}`));
+    expect(await generateIntro(null, { context: "c", lang: "vi", titles })).toBeNull();
   });
 });
 

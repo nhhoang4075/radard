@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fakeLlm } from "@radard/adapters/ai-fake";
 import { fakeNotifier } from "@radard/adapters/notify-fake";
 import { DEFAULT_RANK_CONFIG } from "@radard/core";
 import {
@@ -34,6 +35,7 @@ import {
   recordImpressions,
   runMigrations,
   scrollDepths,
+  snapshotIntroMeta,
   sources,
 } from "@radard/db";
 import { asc, eq, sql } from "drizzle-orm";
@@ -148,15 +150,15 @@ afterAll(async () => {
 });
 
 describe("cấu hình", () => {
-  test("mặc định đúng spec: K = 30, 10 tin/nguồn cho feed; 7 tin, 5/nguồn, ~12/ngày cho thông báo; sàn feed ~30/ngày", () => {
+  test("mặc định đúng spec: K = 30, 10 tin/nguồn cho feed; 7 tin, 5/nguồn cho thông báo, không sàn riêng; sàn feed ~30/ngày, sàn cố định 0,55", () => {
     expect(DEFAULT_RANK_CONFIG.feedMaxItems).toBe(30);
     expect(DEFAULT_RANK_CONFIG.feedMaxPerSource).toBe(10);
     expect(DEFAULT_RANK_CONFIG.feedFloorTargetPerDay).toBe(30);
     expect(DEFAULT_RANK_CONFIG.notify).toEqual({
       maxItems: 7,
       maxPerSource: 5,
-      floorTargetPerDay: 12,
     });
+    expect(DEFAULT_RANK_CONFIG.floorS).toBe(0.55);
     expect(DEFAULT_RANK_CONFIG.temperature).toBe(0.03);
   });
 });
@@ -185,14 +187,16 @@ describe("bản chụp feed", () => {
     const keys = items.map((i) => i.score - i.penalty);
     expect(keys).toEqual([...keys].sort((a, b) => b - a));
     expect(snapshot.config).toMatchObject({ maxItems: 30, maxPerSource: 10, temperature: 0.03 });
-    expect(snapshot.feedFloor).toBe(0.59);
-    expect(snapshot.notifyFloor).toBe(0.59);
+    expect(snapshot.feedFloor).toBe(0.55);
+    // One floor only: the notification floor is no longer recorded.
+    expect(snapshot.notifyFloor).toBeNull();
+    expect(snapshot.meta.floors).toEqual({ feed: { value: 0.55, source: "fixed", days: 0 } });
   });
 
   test("K là trần, không phải mục tiêu: hết tin đạt sàn thì dừng", async () => {
     const hn = await addSource("HN");
     for (let i = 0; i < 3; i++) await addEvent(hn);
-    await addEvent(hn, 0.66); // passes the gate, S below the floor 0,59
+    await addEvent(hn, 0.66); // passes the gate, S below the floor 0,55
     const { items } = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
     expect(items).toHaveLength(3);
   });
@@ -335,8 +339,122 @@ describe("một bản chụp mỗi ngày", () => {
   });
 });
 
-describe("sàn feed tách sàn thông báo", () => {
-  test("đủ 14 ngày bể: sàn feed nhắm 30 tin/ngày, sàn thông báo 12 tin/ngày; n ≤ 30 thì feed không lọc", async () => {
+describe("lời mở đầu của bản chụp", () => {
+  const seedDay = async () => {
+    const hn = await addSource("HN");
+    for (let i = 0; i < 3; i++) await addEvent(hn);
+  };
+  const introLlm = (introReply: string) => {
+    const intros: string[] = [];
+    const llm = fakeLlm({
+      reply(prompt, system) {
+        if (system?.includes("opening line")) {
+          intros.push(prompt);
+          return introReply;
+        }
+        const n = (prompt.match(/^Story \d+$/gm) ?? []).length;
+        const items = Array.from({ length: n }, (_, i) => ({
+          n: i + 1,
+          title: `Tiêu đề ${i + 1}`,
+          summary: `Tóm tắt tin số ${i + 1}, đủ dài để qua kiểm tra.`,
+        }));
+        return JSON.stringify({ items });
+      },
+    });
+    return { llm, intros };
+  };
+
+  test("viết một lần khi dựng, lưu ở meta.intro cùng meta.eventCount; chạy lại không gọi model", async () => {
+    await seedDay();
+    const { llm, intros } = introLlm('{"intro":"Hôm nay nổi bật là agent."}');
+    const first = await ensureFeedSnapshot({ db, profileId: 1, llm }, SLOT);
+    expect(first.snapshot.meta.intro).toBe("Hôm nay nổi bật là agent.");
+    // 3 events in the window all belong to the profile's topic.
+    expect(first.snapshot.meta.eventCount).toBe(3);
+    expect(intros).toHaveLength(1);
+    // The model sees the item titles in position order (shared summary titles when present).
+    expect(intros[0]).toBe("Story 1: Tiêu đề 1\nStory 2: Tiêu đề 2\nStory 3: Tiêu đề 3");
+
+    const again = await ensureFeedSnapshot({ db, profileId: 1, llm }, SLOT);
+    expect(again.built).toBe(false);
+    expect(again.snapshot.meta.intro).toBe("Hôm nay nổi bật là agent.");
+    expect(intros).toHaveLength(1);
+  });
+
+  test("model hỏng hai lần: bản chụp vẫn dựng xong, không có meta.intro, eventCount vẫn lưu", async () => {
+    await seedDay();
+    const { llm, intros } = introLlm("không phải JSON");
+    const res = await ensureFeedSnapshot({ db, profileId: 1, llm }, SLOT);
+    expect(res.snapshot.status).toBe("ready");
+    expect(res.items).toHaveLength(3);
+    expect(res.snapshot.meta.intro).toBeUndefined();
+    expect(res.snapshot.meta.eventCount).toBe(3);
+    expect(intros).toHaveLength(2); // one try plus exactly one retry
+    expect(snapshotIntroMeta(res.snapshot)).toEqual({ intro: null, eventCount: 3 });
+  });
+
+  test("không có model: không có intro", async () => {
+    await seedDay();
+    const res = await ensureFeedSnapshot({ db, profileId: 1, llm: null }, SLOT);
+    expect(res.snapshot.status).toBe("ready");
+    expect(snapshotIntroMeta(res.snapshot).intro).toBeNull();
+  });
+});
+
+describe("một sàn cho feed và Telegram", () => {
+  // Doc scores map to S roughly as: 0.80 -> 0.60, 0.76 -> 0.567, 0.74 -> 0.549, 0.70 -> 0.513.
+  test("khởi động (dưới 14 ngày): sàn cố định 0,55 - tin S = 0,567 vào feed, tin S = 0,549 thì không", async () => {
+    const hn = await addSource("HN");
+    await addEvent(hn, 0.79);
+    await addEvent(hn, 0.76);
+    await addEvent(hn, 0.74);
+    const { snapshot, items } = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
+    expect(snapshot.feedFloor).toBe(0.55);
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.score >= 0.55)).toBe(true);
+  });
+
+  test("dữ liệu giống thật: 12 tin S ≥ 0,59, 13 tin S trong [0,55, 0,59), 10 tin dưới 0,55 thì feed có 25 tin (trước đây 12)", async () => {
+    const srcs = [];
+    for (let s = 0; s < 5; s++) srcs.push(await addSource(`S${s}`));
+    let k = 0;
+    for (const [n, score] of [
+      [12, 0.8],
+      [13, 0.76],
+      [10, 0.7],
+    ] as const) {
+      for (let i = 0; i < n; i++) await addEvent(srcs[k++ % 5] ?? 0, score);
+    }
+    const { items } = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
+    expect(items).toHaveLength(25);
+  });
+
+  test("Telegram lấy 7 tin đầu theo vị trí, không sàn riêng: tin S = 0,567 vẫn được báo; 5 tin/nguồn vẫn áp dụng", async () => {
+    const a = await addSource("A");
+    const b = await addSource("B");
+    for (let i = 0; i < 8; i++) await addEvent(a, 0.76); // all below the old 0,59 notification floor
+    for (let i = 0; i < 2; i++) await addEvent(b, 0.76);
+    const { items } = await ensureFeedSnapshot({ db, profileId: 1 }, SLOT);
+    expect(items).toHaveLength(10);
+    const notified = items
+      .filter((i) => i.notifyPosition !== null)
+      .sort((x, y) => (x.notifyPosition ?? 0) - (y.notifyPosition ?? 0));
+    expect(notified).toHaveLength(7);
+    expect(items.every((i) => i.score < 0.59)).toBe(true);
+    // At most 5 per source, and the 7 are the first eligible items by position.
+    expect(notified.filter((i) => i.sourceId === a).length).toBeLessThanOrEqual(5);
+    let perA = 0;
+    const expected: number[] = [];
+    for (const it of items) {
+      if (expected.length === 7) break;
+      if (it.sourceId === a && perA >= 5) continue;
+      if (it.sourceId === a) perA++;
+      expected.push(it.position);
+    }
+    expect(notified.map((i) => i.position)).toEqual(expected);
+  });
+
+  test("đủ 14 ngày bể: sàn nhắm 30 tin/ngày; n ≤ 30 thì không lọc", async () => {
     const hn = await addSource("HN");
     await addEvent(hn);
     const pool = async (perDay: number) => {
@@ -369,13 +487,10 @@ describe("sàn feed tách sàn thông báo", () => {
     const r = await rankPeriod(db, periodEndingAt(SLOT), { profileId: 1 });
     expect(r.feedFloor.source).toBe("percentile");
     expect(r.feedFloor.q).toBeCloseTo(1 - 30 / 40, 9);
-    expect(r.floor.q).toBeCloseTo(1 - 12 / 40, 9);
-    expect(r.feedFloor.value).toBeLessThan(r.floor.value);
     expect(r.selectConfig.floorS).toBe(r.feedFloor.value);
     await pool(20);
     const r2 = await rankPeriod(db, periodEndingAt(SLOT), { profileId: 1 });
     expect(r2.feedFloor).toMatchObject({ source: "percentile", q: 0, value: 0 });
-    expect(r2.floor.q).toBeCloseTo(1 - 12 / 20, 9);
   });
 });
 
