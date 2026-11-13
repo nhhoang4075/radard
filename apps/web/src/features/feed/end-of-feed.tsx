@@ -10,7 +10,6 @@ export function EndOfFeed({ date, count }: { date: string; count: number }) {
   return (
     <div className="fd-end">
       <div>{strings.feed.end(label, count)}</div>
-      <div>{strings.feed.endHint}</div>
     </div>
   );
 }

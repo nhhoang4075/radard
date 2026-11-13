@@ -112,7 +112,6 @@ export const strings = {
       noTopic: "Chưa gán chủ đề",
     },
     end: (label: string, n: number) => `Hết tin ${label} · ${n} tin`,
-    endHint: "Muốn đọc rộng hơn, dùng Tìm kiếm.",
     waiting: {
       title: "Điểm tin hôm nay chưa dựng xong",
       body: "Dựng lúc 07:00. Trang tự kiểm tra lại mỗi 5 giây và dừng khi đã có.",
@@ -149,7 +148,7 @@ export const strings = {
       learnMore: "Tìm hiểu thêm",
       soon: "Sắp có ở giai đoạn 2",
       soonTag: "GĐ2",
-      note: "Suy luận của model từ mô tả của bạn, có thể chưa đúng. Đã lưu, mở lại hiện ngay.",
+      note: "Nội dung được tạo bởi AI",
       errors: {
         limit: "Hôm nay bạn đã dùng hết lượt hỏi.",
         unavailable: "Chưa suy luận được lúc này.",

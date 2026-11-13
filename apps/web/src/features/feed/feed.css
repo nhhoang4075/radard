@@ -309,12 +309,6 @@
   margin: 0;
   font-size: 14px;
 }
-.fd-forme-res small {
-  display: block;
-  margin-top: 8px;
-  font-size: 12.5px;
-  color: var(--rd-color-text-subtle);
-}
 @media (max-width: 899px) {
   .fd-page {
     padding: 16px;
@@ -352,5 +346,11 @@
   border: 1px solid var(--rd-color-border-strong);
   border-radius: 5px;
   padding: 0 5px;
+  color: var(--rd-color-text-subtle);
+}
+.fd-forme-res small {
+  display: block;
+  margin-top: 8px;
+  font-size: 12.5px;
   color: var(--rd-color-text-subtle);
 }
