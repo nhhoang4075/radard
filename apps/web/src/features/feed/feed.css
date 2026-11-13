@@ -168,30 +168,8 @@
   color: var(--rd-color-text-subtle);
 }
 
-/* list + detail card (>= 1100px); below that the detail is a slide-over sheet from the shell */
-.fd-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-.fd-detail-card {
-  display: none;
-}
+/* at >= 1100px the detail is a rounded full-height card in the shell column (no close button); below that a slide-over sheet */
 @media (min-width: 1100px) {
-  .fd-grid {
-    grid-template-columns: minmax(0, 1fr) var(--rd-shell-panel-width);
-  }
-  .fd-detail-card {
-    display: block;
-    position: sticky;
-    top: 0;
-    max-height: calc(100vh - 110px);
-    overflow: auto;
-    border: 1px solid var(--rd-color-border);
-    border-radius: 20px;
-    background: var(--rd-color-surface-panel);
-  }
   .fd-dh-close {
     display: none;
   }

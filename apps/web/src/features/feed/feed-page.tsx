@@ -158,32 +158,22 @@ export function FeedPage({
         <State>{strings.feed.noMatch}</State>
       ) : null}
 
-      <div className="fd-grid">
-        <div>
-          <div className="fd-list">
-            {visible.map((i) => (
-              <EventCard
-                key={i.feedItemId}
-                item={i}
-                selected={i === selected}
-                onSelect={() => select(i.feedItemId)}
-                innerRef={observe(i.position)}
-              />
-            ))}
-          </div>
-          <div ref={sentinel} aria-hidden="true" />
-          {fullyLoaded && all.length > 0 ? <EndOfFeed date={date} count={visible.length} /> : null}
-        </div>
-        {wide ? (
-          <aside className="fd-detail-card" aria-label={strings.feed.detail.label}>
-            <EventDetailPanel item={selected} onClose={() => select(undefined)} />
-          </aside>
-        ) : (
-          <ShellPanel>
-            <EventDetailPanel item={selected} onClose={() => select(undefined)} />
-          </ShellPanel>
-        )}
+      <div className="fd-list">
+        {visible.map((i) => (
+          <EventCard
+            key={i.feedItemId}
+            item={i}
+            selected={i === selected}
+            onSelect={() => select(i.feedItemId)}
+            innerRef={observe(i.position)}
+          />
+        ))}
       </div>
+      <div ref={sentinel} aria-hidden="true" />
+      {fullyLoaded && all.length > 0 ? <EndOfFeed date={date} count={visible.length} /> : null}
+      <ShellPanel>
+        <EventDetailPanel item={selected} onClose={() => select(undefined)} />
+      </ShellPanel>
     </div>
   );
 }

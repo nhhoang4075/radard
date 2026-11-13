@@ -243,8 +243,12 @@
   .rd-views:has(.rd-panel:not(:empty)) {
     grid-template-columns: minmax(0, 1fr) var(--rd-shell-panel-width);
   }
+  /* Full-height column drawn as its own rounded card (not split from the content by a vertical divider). */
   .rd-panel {
-    border-left: 1px solid var(--rd-color-border);
+    margin: var(--rd-shell-inset-gap) var(--rd-shell-inset-gap) var(--rd-shell-inset-gap) 0;
+    border: 1px solid var(--rd-color-border);
+    border-radius: 20px;
+    background: var(--rd-color-surface-panel);
     overflow: auto;
     min-height: 0;
   }
