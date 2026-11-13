@@ -10,8 +10,8 @@
  * Fail-closed: without `LINK_SECRET`, `/o/*` always returns 404. The target URL is taken only from `deliveries.meta`,
  * never from the request. Every error (wrong token, not found, odd URL) is a plain 404, with no reason given.
  */
-import { createLogger, type LlmProvider } from "@radard/core";
-import { type Database, deliveries } from "@radard/db";
+import { createLogger, type FeedbackState, type LlmProvider, type Notifier } from "@radard/core";
+import { type Database, deliveries, telegramMessagesOfFeedItem } from "@radard/db";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Auth } from "./auth.ts";
@@ -44,6 +44,31 @@ export interface WebOptions {
   forMeDailyLimit?: number;
   /** Clock, injected so tests can simulate time. */
   now?: () => Date;
+  /** Delivery channel (Telegram); if missing, web feedback does not refresh buttons of sent messages. */
+  notifier?: Notifier | null;
+}
+
+/**
+ * After a web feedback write, re-render the buttons of every Telegram message sent for that item to that profile.
+ * Best effort: failures are logged, never thrown.
+ */
+export async function refreshSentFeedback(
+  db: Database,
+  notifier: Notifier,
+  e: { profileId: number; feedItemId: number; state: FeedbackState },
+): Promise<void> {
+  try {
+    const msgs = await telegramMessagesOfFeedItem(db, e);
+    for (const m of msgs) {
+      try {
+        await notifier.refreshFeedbackMark(m.recipient, m.messageId, e.state, { forMe: m.forMe });
+      } catch (err) {
+        log.error("cập nhật nút phản hồi lỗi", { code: errCode(err), feedItemId: e.feedItemId });
+      }
+    }
+  } catch (err) {
+    log.error("tra tin đã gửi lỗi", { code: errCode(err), feedItemId: e.feedItemId });
+  }
 }
 
 /** Common preview-bot user agents (Telegram…) or prefetch headers. A flag only. */
@@ -116,6 +141,7 @@ export function buildApi(deps: {
   llm?: LlmProvider | null;
   forMeDailyLimit?: number;
   now?: () => Date;
+  onFeedbackRecorded?: (e: { profileId: number; feedItemId: number; state: FeedbackState }) => void;
 }) {
   return (
     new Hono<SessionEnv>()
@@ -125,7 +151,13 @@ export function buildApi(deps: {
       .use("*", sessionMiddleware(deps))
       .route("/me", meRoute)
       .route("/feed", feedRoute({ db: deps.db }))
-      .route("/feedback", feedbackRoute({ db: deps.db }))
+      .route(
+        "/feedback",
+        feedbackRoute({
+          db: deps.db,
+          ...(deps.onFeedbackRecorded ? { onRecorded: deps.onFeedbackRecorded } : {}),
+        }),
+      )
       .route("/impressions", impressionsRoute({ db: deps.db }))
       .route(
         "/events",
@@ -196,6 +228,7 @@ export function createWebApp(opts: WebOptions) {
 
   // --- API and sign-in. Registration order matters: public routes first, `requireProfile` after. ---
   const { auth } = opts;
+  const notifier = opts.notifier ?? null;
   if (auth) {
     const authHandler = auth.auth.handler;
     app.on(["GET", "POST"], "/api/auth/*", (c) => authHandler(c.req.raw));
@@ -206,6 +239,20 @@ export function createWebApp(opts: WebOptions) {
         auth: auth.auth,
         providers: auth.providers,
         llm: opts.llm ?? null,
+        ...(notifier
+          ? {
+              onFeedbackRecorded: (e: {
+                profileId: number;
+                feedItemId: number;
+                state: FeedbackState;
+              }) => {
+                const task = refreshSentFeedback(db, notifier, e).finally(() =>
+                  pending.delete(task),
+                );
+                pending.add(task);
+              },
+            }
+          : {}),
         ...(opts.forMeDailyLimit === undefined ? {} : { forMeDailyLimit: opts.forMeDailyLimit }),
         now,
       }),

@@ -262,6 +262,28 @@ describe("telegramNotifier", () => {
     });
   });
 
+  test("refreshFeedbackMark vẽ lại bàn phím theo trạng thái, giữ nút Với tôi?", async () => {
+    const { calls, t } = fakeApi();
+    const n = telegramNotifier({ token: "123:TEST", transformer: t });
+    await n.refreshFeedbackMark(ME, "58", "like", { forMe: true });
+    expect(calls[0]?.method).toBe("editMessageReplyMarkup");
+    expect(calls[0]?.payload).toMatchObject({ chat_id: ME, message_id: 58 });
+    const kb = JSON.stringify(calls[0]?.payload.reply_markup);
+    expect(kb).toContain("👍 ✓");
+    expect(kb).not.toContain("👎 ✓");
+    expect(kb).toContain("fm:ask");
+    await n.refreshFeedbackMark(ME, "58", "none", { forMe: false });
+    const kb2 = JSON.stringify(calls[1]?.payload.reply_markup);
+    expect(kb2).not.toContain("✓");
+    expect(kb2).not.toContain("fm:ask");
+  });
+
+  test("refreshFeedbackMark bỏ qua lỗi 'message is not modified'", async () => {
+    const { t } = fakeApi({ editMessageReplyMarkup: "Bad Request: message is not modified" });
+    const n = telegramNotifier({ token: "123:TEST", transformer: t });
+    await n.refreshFeedbackMark(ME, "58", "like", { forMe: true });
+  });
+
   test("lỗi được mô tả không kèm token hay URL", async () => {
     const { t } = fakeApi({ sendMessage: "Bad Request: can't parse entities" });
     const n = telegramNotifier({ token: "123:SECRET", transformer: t });

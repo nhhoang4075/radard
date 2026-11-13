@@ -39,6 +39,16 @@ export interface Notifier {
   readonly channel: string;
   /** Send one item; returns the channel-side message id, which the job writes to `deliveries.message_id`. */
   send(recipient: string, msg: Message): Promise<{ messageId: string }>;
+  /**
+   * Re-render the feedback buttons of an already sent message so they show `state` (used when feedback was
+   * written on another channel, e.g. the web). `forMe`: the message keeps its "Với tôi?" button.
+   */
+  refreshFeedbackMark(
+    recipient: string,
+    messageId: string,
+    state: FeedbackState,
+    opts: { forMe: boolean },
+  ): Promise<void>;
 }
 
 /** One button tap, normalized to a neutral form. */

@@ -17,6 +17,7 @@ import {
   type CustomTopicDraft,
   createLogger,
   type FeedbackKind,
+  type FeedbackState,
   FOR_ME_LABELS,
   type ForMeResult,
   type Link,
@@ -120,6 +121,18 @@ export function feedbackKeyboard(
   return kb;
 }
 
+/** The keyboard of a sent item for the item's current `state`; shared by the press path and `refreshFeedbackMark`. */
+export function feedbackStateKeyboard(state: FeedbackState, forMe: boolean): InlineKeyboard {
+  return feedbackKeyboard(
+    [
+      { id: "like", label: LABELS.like },
+      { id: "dislike", label: LABELS.dislike },
+      ...(forMe ? [{ id: "for_me" as const, label: FOR_ME_LABELS.button }] : []),
+    ],
+    state === "none" ? undefined : state,
+  );
+}
+
 /** Topic list as on/off buttons, two per row; the last ones are "Tự thêm chủ đề" and "Xong". */
 export function topicsKeyboard(items: TopicItem[]): InlineKeyboard {
   const kb = new InlineKeyboard();
@@ -211,6 +224,13 @@ export function telegramNotifier(opts: TelegramOptions): Notifier {
       } finally {
         nextAt = Date.now() + MIN_INTERVAL_MS;
       }
+    },
+    async refreshFeedbackMark(recipient, messageId, state, opts) {
+      await api
+        .editMessageReplyMarkup(recipient, Number(messageId), {
+          reply_markup: feedbackStateKeyboard(state, opts.forMe),
+        })
+        .catch(ignoreNotModified);
     },
   };
 }
@@ -613,14 +633,7 @@ export function createTelegramBot(opts: TelegramChatOptions, handlers: ChatHandl
           row.some((b) => "callback_data" in b && b.callback_data === FOR_ME_DATA),
         ),
       );
-    const kb = feedbackKeyboard(
-      [
-        { id: "like", label: LABELS.like },
-        { id: "dislike", label: LABELS.dislike },
-        ...(hasForMe ? [{ id: "for_me" as const, label: FOR_ME_LABELS.button }] : []),
-      ],
-      state === "none" ? undefined : state,
-    );
+    const kb = feedbackStateKeyboard(state, hasForMe);
     await ctx.editMessageReplyMarkup({ reply_markup: kb }).catch(ignoreNotModified);
   });
 
