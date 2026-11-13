@@ -6,7 +6,7 @@
  *       `feedMaxItems`, per-source cap `feedMaxPerSource`, feed floor; slot reservation, MMR and Gumbel top-k unchanged.
  *    2. The crypto seed is saved to the `feed_snapshots` row RIGHT when the row is created, before selecting; if the process
  *       crashes midway, the next run reselects with exactly that seed. If already `ready`, reuse it, do not rebuild.
- *    3. The notification layer (the first ≤ 7 items through the notification floor, `pickNotify`) only MARKS items in the snapshot
+ *    3. The notification layer (the first ≤ 7 items by position, per-source cap 5, `pickNotify`; no floor of its own) only MARKS items in the snapshot
  *       (`notify_position`), it does not change the snapshot.
  */
 import {
@@ -137,10 +137,7 @@ export function feedItemsOf(rank: RankResult, profileId: number): FeedItemDraft[
       notifyPosition: null,
     }),
   );
-  const notified = pickNotify(
-    items.map((it) => ({ ...it, S: it.score })),
-    notifyRuleOf(rank),
-  );
+  const notified = pickNotify(items, notifyRuleOf(rank));
   for (const [i, n] of notified.entries()) {
     const it = items[n.position - 1];
     if (it) it.notifyPosition = i + 1;
@@ -326,11 +323,10 @@ export async function ensureFeedSnapshot(deps: FeedDeps, slot: Date): Promise<Fe
         status: "ready",
         itemCount: drafts.length,
         feedFloor: rank.feedFloor.value,
-        notifyFloor: rank.floor.value,
         config: configJson(rank.selectConfig),
         meta: {
           ...locked.meta,
-          floors: { feed: rank.feedFloor, notify: rank.floor },
+          floors: { feed: rank.feedFloor },
           ranking: rankingInfo(rank, rankMs, deps.decider),
           // Events of the 24h window in the profile's topics (passed the topic gate): the "132" in the digest.
           eventCount: rank.passedGate,

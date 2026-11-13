@@ -18,7 +18,7 @@ export interface SimulateOptions {
   sim?: (a: RankEvent, b: RankEvent) => number;
   /**
    * From one `select` result, the events counted as "picked" (default: every `picked` item).
-   * The feed flow passes the notification layer (first ≤ 7 items through the notification floor) so that p_i, p_ij are the probability of being
+   * The feed flow passes the notification layer (first ≤ 7 items of the snapshot) so that p_i, p_ij are the probability of being
    * SENT, matching what was actually sent; the function must be pure (depend only on the selection result).
    */
   chosen?: (selection: Selection) => readonly number[];

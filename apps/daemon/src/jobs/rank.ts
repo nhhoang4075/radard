@@ -81,11 +81,9 @@ export interface RankResult extends Selection {
   /** Taste clusters (from 👍 items) used to score U, including `pending` clusters that did not take part. */
   interestClusters: InterestCluster[];
   /**
-   * NOTIFICATION floor (targets `notify.floorTargetPerDay` items/day): the Telegram layer filters the snapshot by this floor.
-   * Not used in `select`.
+   * The ONE floor, for the web feed and Telegram (decision 13/11/2026; targets `feedFloorTargetPerDay` items/day, fixed
+   * `FEED_FLOOR_WARMUP` while the pool has < 14 days). Passed into `select` (`selectConfig.floorS`).
    */
-  floor: FloorResult;
-  /** FEED floor (targets `feedFloorTargetPerDay` items/day) passed into `select` (`selectConfig.floorS`). */
   feedFloor: FloorResult;
   /** Baselines used, so the digest can store them and explain why items were chosen. */
   baselines: {
@@ -335,26 +333,16 @@ export async function rankPeriod(
       : { event: e, c, S: scoreOf(c, config), gate };
   });
 
-  const { feed: feedFloor, notify: floor } = await resolveFloors(
-    db,
-    opts.profileId,
-    period,
-    config,
-  );
-  for (const [kind, f] of [
-    ["feed", feedFloor],
-    ["notify", floor],
-  ] as const) {
-    log.info("sàn điểm", {
-      profileId: opts.profileId,
-      kind,
-      source: f.source,
-      value: f.value,
-      q: f.q ?? null,
-      n: f.n ?? null,
-      days: f.days,
-    });
-  }
+  const feedFloor = await resolveFloor(db, opts.profileId, period, config);
+  log.info("sàn điểm", {
+    profileId: opts.profileId,
+    kind: "feed",
+    source: feedFloor.source,
+    value: feedFloor.value,
+    q: feedFloor.q ?? null,
+    n: feedFloor.n ?? null,
+    days: feedFloor.days,
+  });
   // `select` runs ONCE for the feed snapshot: cap K = feedMaxItems, per-source cap feedMaxPerSource, feed
   // floor. The gate, grey zone, MMR, slot reservation and T stay unchanged.
   const selectConfig: RankConfig = {
@@ -374,7 +362,6 @@ export async function rankPeriod(
     scored,
     selectConfig,
     selectSeed: config.temperature > 0 && opts.selectSeed !== undefined ? opts.selectSeed : null,
-    floor,
     feedFloor,
     period,
     candidates: evRows.length,
@@ -428,22 +415,22 @@ async function loadDocVectors(
 }
 
 /**
- * The two floors of the ranking run (feed and notification) share one pool: the percentile of score S in the profile's pool over [end − 30 days, end) (excluding
+ * The floor of the ranking run (one floor for the web feed and Telegram): the percentile of score S in the profile's pool over [end − 30 days, end) (excluding
  * the day being ranked), dropping already-sent items (`not_new`, N = 0) from both the percentile and n. The "fixed" mode does not read the pool.
  *
  * SCORE SCALE NOTE (10/11/2026): old pool rows have S computed with the formula from before U existed (factor ×1.0, no U part),
  * new rows use the 0.9× + 0.10·U formula. The two scales are mixed within the 30-day window and are NOT
- * rescaled. During the first 14 days of the pool (`FLOOR_MIN_DAYS`), the fixed floor 0,59 is still used under the existing mechanism;
+ * rescaled. During the first 14 days of the pool (`FLOOR_MIN_DAYS`), the fixed floor `config.floorS` (FEED_FLOOR_WARMUP, 0.55) is still used under the existing mechanism;
  * the floor logic does not change because of U.
  */
-async function resolveFloors(
+async function resolveFloor(
   db: Database,
   profileId: number,
   period: RankPeriod,
   config: RankConfig,
-): Promise<{ feed: FloorResult; notify: FloorResult }> {
+): Promise<FloorResult> {
   const fixed: FloorResult = { value: config.floorS, source: "fixed", days: 0 };
-  if (config.floorMode === "fixed") return { feed: fixed, notify: fixed };
+  if (config.floorMode === "fixed") return fixed;
   let rows: Awaited<ReturnType<typeof readCandidateScores>>;
   try {
     rows = await readCandidateScores(db, {
@@ -457,27 +444,18 @@ async function resolveFloors(
       profileId,
       error: (err instanceof Error ? err.message : String(err)).slice(0, 300),
     });
-    return { feed: fixed, notify: fixed };
+    return fixed;
   }
   const days = new Set(rows.map((r) => r.periodEnd.getTime())).size;
   const scores = rows.filter((r) => r.rejectReason !== "not_new" && r.n !== 0).map((r) => r.score);
-  return {
-    // Feed floor: target ~30 items/day; if n ≤ the target (q clamped = 0), no floor filtering.
-    feed: percentileFloor({
-      scores,
-      days,
-      fixed: config.floorS,
-      targetPerDay: config.feedFloorTargetPerDay,
-      noFilterAtZeroQ: true,
-    }),
-    // Notification floor: same as the existing percentile floor (~12 items/day).
-    notify: percentileFloor({
-      scores,
-      days,
-      fixed: config.floorS,
-      targetPerDay: config.notify.floorTargetPerDay,
-    }),
-  };
+  // Target ~30 items/day; if n ≤ the target (q clamped = 0), no floor filtering.
+  return percentileFloor({
+    scores,
+    days,
+    fixed: config.floorS,
+    targetPerDay: config.feedFloorTargetPerDay,
+    noFilterAtZeroQ: true,
+  });
 }
 
 /**

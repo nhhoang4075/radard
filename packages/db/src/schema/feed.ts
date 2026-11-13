@@ -49,7 +49,7 @@ export const feedSnapshots = pgTable(
     selectSeed: bigint("select_seed", { mode: "number" }).notNull(),
     /** Number of items in the snapshot (≤ feedMaxItems); NULL until built. */
     itemCount: integer("item_count"),
-    /** Feed floor and notification floor used (values). Details (source, q, n, date) in `meta.floors`. */
+    /** Feed floor used (value); `notify_floor` is no longer written (decision 13/11/2026: one floor). Details in `meta.floors`. */
     feedFloor: doublePrecision("feed_floor"),
     notifyFloor: doublePrecision("notify_floor"),
     /** Config passed into `select` (K, source cap, T, MMR, floors…), so the selection can be reproduced. */

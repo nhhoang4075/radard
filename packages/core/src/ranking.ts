@@ -159,14 +159,14 @@ export interface RankConfig {
    */
   feedMaxItems: number;
   feedMaxPerSource: number;
-  /** Items/day the feed's percentile floor targets (separate from the notification floor). */
+  /** Items/day the feed's percentile floor targets (the one floor for both the web feed and Telegram). */
   feedFloorTargetPerDay: number;
   /**
-   * Notification layer (Telegram): takes at most `notify.maxItems` items FROM THE START of the snapshot with S ≥ the notification floor,
-   * at most `notify.maxPerSource` per source ("5 of the first 7 items"); the notification floor targets
-   * `notify.floorTargetPerDay` items/day. Does not affect feed selection.
+   * Notification layer (Telegram): takes at most `notify.maxItems` items FROM THE START of the snapshot (by position),
+   * at most `notify.maxPerSource` per source ("5 of the first 7 items"), with no floor of its own (decision 13/11/2026).
+   * Does not affect feed selection.
    */
-  notify: { maxItems: number; maxPerSource: number; floorTargetPerDay: number };
+  notify: { maxItems: number; maxPerSource: number };
   /** Duplicate penalty: starts at similarity `start`, reaching at most `max` at `start + span`. */
   mmr: { start: number; span: number; max: number };
   /**
@@ -177,6 +177,13 @@ export interface RankConfig {
   /** Source reputation (A), 0–1, from `sources.trust_score`. */
   priors: ReadonlyMap<number, number>;
 }
+
+/**
+ * Fixed FEED floor, used while the pool has fewer than FLOOR_MIN_DAYS (14) days of data (afterwards the percentile floor
+ * targeting `feedFloorTargetPerDay` applies). Measured on the 11-13/11/2026 pool data: 23-35 items/day have S >= 0.55
+ * (only 8-13 have S >= 0.59, which left web snapshots with 9-10 items instead of about 30). Owner decision 13/11/2026.
+ */
+export const FEED_FLOOR_WARMUP = 0.55;
 
 /** Cap K of the feed snapshot and per-source cap of the feed (decision 10/11/2026). */
 const FEED_MAX_ITEMS = 30;
@@ -201,7 +208,7 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   // Measured 13–16/10/2026 on real items with R in [0.5, 0.7): Jev at threshold 0.6 matches the reference labels
   // 84%, the old rule (R ≥ 0.6) only 53%; the project owner has confirmed the reference labels.
   decision: { low: 0.5, high: 0.7, minP: 0.6 },
-  floorS: 0.59,
+  floorS: FEED_FLOOR_WARMUP,
   floorMode: "percentile",
   neutralP: 0.3,
   followUpF: 0.6,
@@ -214,8 +221,8 @@ export const DEFAULT_RANK_CONFIG: Omit<RankConfig, "priors"> = {
   feedMaxPerSource: FEED_MAX_PER_SOURCE,
   feedFloorTargetPerDay: 30,
   // Notification layer: 7 items like the old digest; 5 items/source (3 made the 12/10 digest only 4 items even though 5 HN items
-  // passed the floor; raised to 5, fixed 13/10/2026); the floor targets ~12 items/day like the existing percentile floor.
-  notify: { maxItems: 7, maxPerSource: 5, floorTargetPerDay: 12 },
+  // passed the floor; raised to 5, fixed 13/10/2026). No floor of its own: the feed floor is the only one (13/11/2026).
+  notify: { maxItems: 7, maxPerSource: 5 },
   mmr: { start: 0.85, span: 0.1, max: 0.3 },
   // Temperature T of Gumbel top-k selection. 0.03 approved by the project owner 10/11/2026 (not yet measured on a real pool).
   // Retune after the first week with a pool, against the criteria: p̂ ≥ 0.05 for the top 12 and mean p̂ of the 7

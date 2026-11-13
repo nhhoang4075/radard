@@ -1,7 +1,7 @@
 /**
  * Daily digest job (the notification layer of the feed, decision 10/11/2026). Items come from the day's feed snapshot
  * (feed.ts: one snapshot per profile per slot, select runs once with cap K); the digest
- * takes only the first ≤ 7 items of the snapshot that pass the notification floor, using the SHARED summary captured in the snapshot
+ * takes only the first ≤ 7 items of the snapshot by position (no floor of its own), using the SHARED summary captured in the snapshot
  * (`feed_items.summary_id`, summaries.ts; there is no separate summary model), the topic stored on the feed item, and the opening
  * paragraph and event count stored in `feed_snapshots.meta` (snapshot-intro.ts; decision 13/11/2026), then sends it via the Notifier.
  * The digest itself makes NO model call. Telegram does not affect
