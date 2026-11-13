@@ -1,5 +1,5 @@
 /** `web` role: opens the HTTP port serving `/healthz`, `/o/:token`, `/api/*` (sign-in required) and the build files of `apps/web`. */
-import { createLogger, type LlmProvider } from "@radard/core";
+import { createLogger, type LlmProvider, type Notifier } from "@radard/core";
 import type { Database } from "@radard/db";
 import { createWebApp } from "../web/app.ts";
 import { createAuth } from "../web/auth.ts";
@@ -15,6 +15,8 @@ export function startWeb(opts: {
   /** Model that writes "Với tôi?"; if missing, `POST /api/events/:id/for-me` returns 503. */
   llm?: LlmProvider | null;
   forMeDailyLimit?: number;
+  /** Telegram notifier used to refresh the buttons of sent messages after web feedback; absent without a bot token. */
+  notifier?: Notifier | null;
 }): () => Promise<void> {
   if (!opts.secret) log.warn("chưa đặt LINK_SECRET: route /o/* trả 404 cho mọi token");
   const { config, problems } = loadAuthConfig(opts.auth);
@@ -31,6 +33,7 @@ export function startWeb(opts: {
     secret: opts.secret,
     auth,
     llm: opts.llm ?? null,
+    notifier: opts.notifier ?? null,
     ...(opts.forMeDailyLimit === undefined ? {} : { forMeDailyLimit: opts.forMeDailyLimit }),
   });
   const server = Bun.serve({ port: opts.port, fetch: app.fetch });

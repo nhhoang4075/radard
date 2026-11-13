@@ -237,6 +237,37 @@ export async function recordFeedFeedback(
   return { ok: true, feedbackId: row.id, state: kind === "clear" ? "none" : kind };
 }
 
+/**
+ * Telegram messages that were sent for this feed item to this profile (to refresh their buttons after a web
+ * feedback write). Filters by profile AND item AND channel: never returns another profile's messages.
+ * `forMe`: the message carries the "Với tôi?" button (every digest `event` message does).
+ */
+export async function telegramMessagesOfFeedItem(
+  db: Database,
+  q: { profileId: number; feedItemId: number },
+): Promise<{ recipient: string; messageId: string; forMe: boolean }[]> {
+  const rows = await db
+    .select({
+      recipient: deliveries.recipient,
+      messageId: deliveries.messageId,
+      kind: deliveries.kind,
+    })
+    .from(deliveries)
+    .where(
+      and(
+        eq(deliveries.profileId, q.profileId),
+        eq(deliveries.feedItemId, q.feedItemId),
+        eq(deliveries.channel, "telegram"),
+      ),
+    )
+    .orderBy(asc(deliveries.id));
+  return rows.map((r) => ({
+    recipient: r.recipient,
+    messageId: r.messageId,
+    forMe: r.kind === "event",
+  }));
+}
+
 // ---------------------------------------------------------------------------------------------
 // Reads for the /api/feed route (every function requires `profileId` and filters by it)
 // ---------------------------------------------------------------------------------------------

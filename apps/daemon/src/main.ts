@@ -23,6 +23,7 @@ import {
   createDigestDeps,
   createEmbedder,
   createLlm,
+  createNotifier,
   createPagesDeps,
   createProcessDeps,
 } from "./runtime.ts";
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
       auth: env.auth,
       llm: createLlm(deps.db),
       forMeDailyLimit: env.forMeDailyLimit,
+      notifier: createNotifier(),
     });
     stops.push(stopWeb);
   }
