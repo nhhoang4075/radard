@@ -58,12 +58,15 @@ export function EventDetailPanel({
         {d ? (
           <div className="fd-sec">
             <span className="rd-label">{t.merged(d.docs.length)}</span>
-            <ul className="fd-tl">
+            <ul className={d.docs.some((a) => a.publishedAt) ? "fd-tl" : "fd-tl fd-tl-notime"}>
               {d.docs.map((a) => {
                 const href = safeUrl(a.url);
                 return (
-                  <li key={a.url} className={a.publishedAt ? undefined : "fd-tl-notime"}>
-                    {a.publishedAt ? <span>{formatTime(a.publishedAt)}</span> : null}
+                  <li key={a.url}>
+                    {/* The whole list shares one layout: the time column exists only if some article has a time. */}
+                    {d.docs.some((x) => x.publishedAt) ? (
+                      <span>{a.publishedAt ? formatTime(a.publishedAt) : ""}</span>
+                    ) : null}
                     <div title={`${hostOf(a.url) ?? a.sourceName} · ${a.title}`}>
                       {hostOf(a.url) ?? a.sourceName} ·{" "}
                       {href ? (

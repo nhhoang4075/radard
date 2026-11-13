@@ -223,7 +223,7 @@
   padding: 8px 0;
   border-bottom: 1px solid var(--rd-color-border);
 }
-.fd-tl li.fd-tl-notime {
+.fd-tl-notime li {
   grid-template-columns: 1fr;
 }
 /* Clamp long titles to two lines with an ellipsis. */
