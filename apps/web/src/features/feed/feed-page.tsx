@@ -115,6 +115,8 @@ export function FeedPage({
       <TodayBanner
         date={date}
         total={first?.total ?? 0}
+        intro={first?.intro ?? null}
+        eventCount={first?.eventCount ?? null}
         digestCount={fullyLoaded ? all.filter((i) => i.inDigest).length : null}
         topicCount={fullyLoaded ? topics.length : null}
       />
