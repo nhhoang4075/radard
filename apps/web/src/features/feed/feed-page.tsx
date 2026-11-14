@@ -174,7 +174,12 @@ export function FeedPage({
       <div ref={sentinel} aria-hidden="true" />
       {fullyLoaded && all.length > 0 ? <EndOfFeed date={date} count={visible.length} /> : null}
       <ShellPanel>
-        <EventDetailPanel item={selected} onClose={() => select(undefined)} />
+        {/* Remount per event so no DOM of the previously opened event can survive. */}
+        <EventDetailPanel
+          key={selected?.eventId ?? 0}
+          item={selected}
+          onClose={() => select(undefined)}
+        />
       </ShellPanel>
     </div>
   );
