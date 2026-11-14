@@ -59,10 +59,11 @@ export function EventDetailPanel({
           <div className="fd-sec">
             <span className="rd-label">{t.merged(d.docs.length)}</span>
             <ul className={d.docs.some((a) => a.publishedAt) ? "fd-tl" : "fd-tl fd-tl-notime"}>
-              {d.docs.map((a) => {
+              {d.docs.map((a, i) => {
                 const href = safeUrl(a.url);
                 return (
-                  <li key={a.url}>
+                  // Two documents of one event can share a URL, so the URL alone is not a unique key.
+                  <li key={`${a.url}#${i}`}>
                     {/* The whole list shares one layout: the time column exists only if some article has a time. */}
                     {d.docs.some((x) => x.publishedAt) ? (
                       <span>{a.publishedAt ? formatTime(a.publishedAt) : ""}</span>
