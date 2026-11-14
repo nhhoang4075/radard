@@ -190,12 +190,13 @@ describe("explainForProfile", () => {
     expect(prompt).toContain("Original title 1");
     expect(prompt).toContain("- Tin đã thích");
     expect(prompt).not.toContain("Tin đã chê");
-    // System prompt requirements: 2-4 sentences, only use existing facts, say so plainly when not relevant, state inference clearly.
+    // System prompt requirements: 2-4 sentences, only use existing facts, say so plainly when not relevant, no inference disclaimer (the UI labels the text as AI-generated).
     const system = calls[0]?.system ?? "";
     expect(system).toContain("2-4 sentences");
     expect(system).toContain("Use only the facts in the input");
     expect(system).toContain("say so plainly in one sentence");
-    expect(system).toContain("your inference");
+    expect(system).toContain("Do not add disclaimers");
+    expect(system).not.toContain("your inference");
     expect(system).toBe(forMeSystem("vi"));
 
     const second = await explainForProfile(deps, { profileId: 1, eventId });
