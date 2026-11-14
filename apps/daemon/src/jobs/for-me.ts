@@ -66,7 +66,7 @@ export function forMeSystem(lang: string): string {
     "Write 2-4 sentences of plain text: no markdown, no lists, no title.",
     "Use only the facts in the input. Never invent numbers, names, dates, claims, or details about the reader.",
     "If the story has no concrete link to this reader's profile, say so plainly in one sentence instead. Do not stretch a link.",
-    "Do not add disclaimers about being an inference or an AI answer; the interface already labels the text as AI-generated.",
+    "Just state the link. Do not say it is your inference, a guess or AI-written; the interface already shows that.",
     "Never comment on the input itself (how much text you were given, missing details); just leave out what you do not know.",
   ].join("\n");
 }

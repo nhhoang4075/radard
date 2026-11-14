@@ -195,7 +195,7 @@ describe("explainForProfile", () => {
     expect(system).toContain("2-4 sentences");
     expect(system).toContain("Use only the facts in the input");
     expect(system).toContain("say so plainly in one sentence");
-    expect(system).toContain("Do not add disclaimers");
+    expect(system).toContain("Just state the link");
     expect(system).not.toContain("your inference");
     expect(system).toBe(forMeSystem("vi"));
 
