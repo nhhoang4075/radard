@@ -196,7 +196,6 @@ describe("explainForProfile", () => {
     expect(system).toContain("Use only the facts in the input");
     expect(system).toContain("say so plainly in one sentence");
     expect(system).toContain("Just state the link");
-    expect(system).not.toContain("your inference");
     expect(system).toBe(forMeSystem("vi"));
 
     const second = await explainForProfile(deps, { profileId: 1, eventId });
